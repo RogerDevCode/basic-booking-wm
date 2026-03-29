@@ -1,0 +1,625 @@
+{
+  "updatedAt": "2026-03-19T00:55:38.686Z",
+  "createdAt": "2026-03-14T14:01:47.986Z",
+  "id": "6RDslq06ZS78Zph1",
+  "name": "CB_01_Check_State",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "path": "circuit-breaker/check",
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "circuit-breaker-check",
+      "id": "cb_webhook_001"
+    },
+    {
+      "parameters": {},
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -200
+      ],
+      "id": "cb_manual_trigger"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nconst body = input.body || input;\n\nfunction ve(code, msg) {\n  return [{ json: {\n    success: false, error_code: code, error_message: msg, data: null,\n    _meta: { source: 'CB_01_Check_State', timestamp: new Date().toISOString() },\n    _exit_early: true\n  }}];\n}\n\nlet service_id = String(body.service_id || 'google_calendar');\n\nif (service_id.length > 100) {\n  return ve('INVALID_SERVICE_ID', 'service_id must be <= 100 chars');\n}\n\nconst SERVICE_ID_RE = /^[a-zA-Z0-9_-]{1,100}$/;\nif (!SERVICE_ID_RE.test(service_id)) {\n  return ve('INVALID_SERVICE_ID', 'service_id must be alphanumeric/underscore/hyphen, max 100 chars');\n}\n\nconst action = String(body.action || 'check');\nconst VALID_ACTIONS = ['check', 'record_success', 'record_failure'];\nif (!VALID_ACTIONS.includes(action)) {\n  return ve('INVALID_ACTION', 'Invalid action: ' + action);\n}\n\nreturn [{ json: {\n  service_id,\n  service_id_sanitized: service_id.replace(/'/g, \"''\"),\n  action,\n  _validated: true\n}}];",
+        "options": {}
+      },
+      "name": "Validate Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        250,
+        0
+      ],
+      "id": "cb_validate_002"
+    },
+    {
+      "parameters": {
+        "jsCode": "// LAYER 2: Validate service_id before query building\nconst input = $input.first().json;\n\nconst SERVICE_ID_RE = /^[a-zA-Z0-9_-]{1,100}$/;\nif (!SERVICE_ID_RE.test(input.service_id)) {\n  return [{\n    json: {\n      ...input,\n      _validation_error: true,\n      error_code: 'INVALID_SERVICE_ID',\n      error_message: 'service_id must be alphanumeric, underscore, or hyphen, max 100 chars'\n    }\n  }];\n}\n\nreturn [{ json: { ...input, _validated: true } }];"
+      },
+      "name": "Layer 2 - Validate for Query",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        0
+      ],
+      "id": "cb_validate_layer2"
+    },
+    {
+      "parameters": {
+        "jsCode": "// LAYER 3: Build query with validated input\nconst input = $input.first().json;\n\nif (input._validation_error) {\n  return [{ json: input }];\n}\n\n// Build query with explicit cast - no queryReplacement\nconst query = `SELECT * FROM circuit_breaker_state WHERE service_id = '${input.service_id.replace(/'/g, \"''\")}'::text;`;\n\nreturn [{ json: { ...input, query } }];"
+      },
+      "name": "Layer 3 - Build Query",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        550,
+        0
+      ],
+      "id": "cb_build_query"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{ $json.query }}"
+      },
+      "name": "Get Circuit State",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "alwaysOutputData": true,
+      "position": [
+        700,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "5LzvCP9BsQwCi9Z0",
+          "name": "Postgres account"
+        }
+      },
+      "id": "cb_get_003"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst service_id = $('Validate Input').first().json.service_id;\n\nif (!items.length || !items[0].json || !items[0].json.service_id) {\n  return [{ json: {\n    service_id: service_id,\n    state: 'closed',\n    failure_count: 0,\n    success_count: 0,\n    failure_threshold: 5,\n    success_threshold: 3,\n    timeout_seconds: 300,\n    opened_at: null,\n    _is_default: true\n  }}];\n}\n\nreturn [{ json: { ...items[0].json, _is_default: false } }];",
+        "options": {}
+      },
+      "name": "Handle Empty Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        750,
+        0
+      ],
+      "id": "cb_handle_empty"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Route By Circuit State - Gate+Skip pattern\nconst input = $input.first().json;\nconst isOpen = input.state === \"open\";\nreturn [{ json: { ...input, _route: isOpen ? \"check_timeout\" : \"allowed\" } }];",
+        "mode": "runOnceForAllItems"
+      },
+      "name": "Route By Circuit State",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1000,
+        0
+      ],
+      "id": "cb_if_open_004"
+    },
+    {
+      "parameters": {
+        "jsCode": "const state = $input.first().json;\nconst isHalfOpen = state.state === 'half-open';\n\nreturn [{ json: {\n  allowed: true,\n  circuit_state: isHalfOpen ? 'half-open' : 'closed',\n  message: isHalfOpen\n    ? 'Circuit in half-open state - test request allowed'\n    : 'Service is healthy - requests allowed',\n  failure_count: state.failure_count || 0,\n  service_id: state.service_id\n}}];",
+        "options": {}
+      },
+      "name": "Return Allowed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1250,
+        -100
+      ],
+      "id": "cb_allowed_005"
+    },
+    {
+      "parameters": {
+        "jsCode": "const state = $input.first().json;\nconst now = new Date();\nconst openedAt = state.opened_at ? new Date(state.opened_at) : null;\nconst timeoutSeconds = state.timeout_seconds || 300;\n\nlet shouldTryHalfOpen = false;\nlet timeUntilRetry = 0;\n\nif (openedAt) {\n  const elapsedSeconds = (now.getTime() - openedAt.getTime()) / 1000;\n  if (elapsedSeconds >= timeoutSeconds) {\n    shouldTryHalfOpen = true;\n  } else {\n    timeUntilRetry = Math.ceil(timeoutSeconds - elapsedSeconds);\n  }\n}\n\nreturn [{ json: {\n  ...state,\n  should_try_half_open: shouldTryHalfOpen,\n  time_until_retry_seconds: timeUntilRetry,\n  elapsed_since_open: openedAt ? Math.floor((now.getTime() - openedAt.getTime()) / 1000) : null\n}}];",
+        "options": {}
+      },
+      "name": "Check Timeout",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1250,
+        100
+      ],
+      "id": "cb_timeout_006"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Route By Timeout - Gate+Skip pattern\nconst input = $input.first().json;\nconst shouldTry = input.should_try_half_open === true;\nreturn [{ json: { ...input, _route: shouldTry ? \"set_halfopen\" : \"blocked\" } }];",
+        "mode": "runOnceForAllItems"
+      },
+      "name": "Route By Timeout",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1500,
+        100
+      ],
+      "id": "cb_if_timeout_007"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE circuit_breaker_state SET state = 'half-open', half_open_at = NOW(), success_count = 0 WHERE service_id = $json.service_id::text RETURNING *;"
+      },
+      "name": "Set Half-Open",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1750,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "5LzvCP9BsQwCi9Z0",
+          "name": "Postgres account"
+        }
+      },
+      "id": "cb_halfopen_008"
+    },
+    {
+      "parameters": {
+        "jsCode": "const state = $input.first().json;\n\nreturn [{ json: {\n  allowed: true,\n  circuit_state: 'half-open',\n  message: 'Circuit transitioned to half-open - test request allowed',\n  service_id: state.service_id,\n  failure_count: state.failure_count || 0,\n  opened_at: state.opened_at,\n  time_until_retry_seconds: 0\n}}];",
+        "options": {}
+      },
+      "name": "Return Half-Open",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2000,
+        0
+      ],
+      "id": "cb_return_halfopen_009"
+    },
+    {
+      "parameters": {
+        "jsCode": "const state = $input.first().json;\n\nreturn [{ json: {\n  allowed: false,\n  circuit_state: 'open',\n  message: 'Circuit breaker OPEN - service unavailable. Retry in ' + (state.time_until_retry_seconds || 'unknown') + ' seconds',\n  service_id: state.service_id,\n  retry_after_seconds: state.time_until_retry_seconds || 300,\n  failure_count: state.failure_count || 0\n}}];",
+        "options": {}
+      },
+      "name": "Return Blocked",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1750,
+        200
+      ],
+      "id": "cb_blocked_010"
+    },
+    {
+      "parameters": {
+        "jsCode": "let cbResult = null;\n\nif ($('Return Allowed').isExecuted) {\n  cbResult = $('Return Allowed').first().json;\n} else if ($('Return Half-Open').isExecuted) {\n  cbResult = $('Return Half-Open').first().json;\n} else if ($('Return Blocked').isExecuted) {\n  cbResult = $('Return Blocked').first().json;\n}\n\nif (!cbResult) {\n  cbResult = { allowed: false, circuit_state: 'unknown', message: 'No circuit state resolved' };\n}\n\nreturn [{ json: {\n  success: true,\n  error_code: null,\n  error_message: null,\n  data: cbResult,\n  _meta: {\n    source: 'CB_GCal_Circuit_Breaker',\n    timestamp: new Date().toISOString(),\n    workflow_id: $workflow.id || 'unknown'\n  }\n}}];",
+        "options": {}
+      },
+      "name": "Standard Contract Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2250,
+        0
+      ],
+      "id": "cb_sco_011"
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        -100
+      ],
+      "id": "cb_exec_trigger_01"
+    },
+    {
+      "parameters": {
+        "respondWith": "firstIncomingItem",
+        "options": {}
+      },
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        2500,
+        0
+      ],
+      "id": "cb_respond_webhook_012"
+    },
+    {
+      "parameters": {
+        "jsCode": "const i=$input.first().json; if(i._route!==\"check_timeout\") return []; return [{json:i}];",
+        "mode": "runOnceForAllItems"
+      },
+      "name": "Gate Check Timeout",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        50
+      ],
+      "id": "gate-check-timeout"
+    },
+    {
+      "parameters": {
+        "jsCode": "const i=$input.first().json; if(i._route!==\"allowed\") return []; return [{json:i}];",
+        "mode": "runOnceForAllItems"
+      },
+      "name": "Gate Return Allowed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        -150
+      ],
+      "id": "gate-return-allowed"
+    },
+    {
+      "parameters": {
+        "jsCode": "const i=$input.first().json; if(i._route!==\"set_halfopen\") return []; return [{json:i}];",
+        "mode": "runOnceForAllItems"
+      },
+      "name": "Gate Set Half-Open",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1700,
+        50
+      ],
+      "id": "gate-set-half-open"
+    },
+    {
+      "parameters": {
+        "jsCode": "const i=$input.first().json; if(i._route!==\"blocked\") return []; return [{json:i}];",
+        "mode": "runOnceForAllItems"
+      },
+      "name": "Gate Return Blocked",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1700,
+        250
+      ],
+      "id": "gate-return-blocked"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nif (input._exit_early) return [];\nreturn [{ json: input }];"
+      },
+      "name": "Gate Val Exec",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "id": "cb01_gate_val_exec"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nif (!input._exit_early) return [];\nreturn [{ json: input }];"
+      },
+      "name": "Gate Val Skip",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "id": "cb01_gate_val_skip"
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Input": {
+      "main": [
+        [
+          {
+            "node": "Gate Val Exec",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Gate Val Skip",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Circuit State": {
+      "main": [
+        [
+          {
+            "node": "Handle Empty Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle Empty Result": {
+      "main": [
+        [
+          {
+            "node": "Route By Circuit State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Timeout": {
+      "main": [
+        [
+          {
+            "node": "Route By Timeout",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Half-Open": {
+      "main": [
+        [
+          {
+            "node": "Return Half-Open",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Return Allowed": {
+      "main": [
+        [
+          {
+            "node": "Standard Contract Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Return Half-Open": {
+      "main": [
+        [
+          {
+            "node": "Standard Contract Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Return Blocked": {
+      "main": [
+        [
+          {
+            "node": "Standard Contract Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route By Circuit State": {
+      "main": [
+        [
+          {
+            "node": "Gate Check Timeout",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Gate Return Allowed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route By Timeout": {
+      "main": [
+        [
+          {
+            "node": "Gate Set Half-Open",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Gate Return Blocked",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gate Check Timeout": {
+      "main": [
+        [
+          {
+            "node": "Check Timeout",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gate Return Allowed": {
+      "main": [
+        [
+          {
+            "node": "Return Allowed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gate Set Half-Open": {
+      "main": [
+        [
+          {
+            "node": "Set Half-Open",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gate Return Blocked": {
+      "main": [
+        [
+          {
+            "node": "Return Blocked",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Standard Contract Output": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Layer 2 - Validate for Query": {
+      "main": [
+        [
+          {
+            "node": "Layer 3 - Build Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Layer 3 - Build Query": {
+      "main": [
+        [
+          {
+            "node": "Get Circuit State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gate Val Exec": {
+      "main": [
+        [
+          {
+            "node": "Layer 2 - Validate for Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gate Val Skip": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "B1VnkirO5dF20MHg",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": true
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": null,
+  "versionId": "49c0d260-a5f7-4bf8-8e43-3400a5b316dd",
+  "activeVersionId": "49c0d260-a5f7-4bf8-8e43-3400a5b316dd",
+  "versionCounter": 59,
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-03-14T14:01:47.986Z",
+      "createdAt": "2026-03-14T14:01:47.986Z",
+      "role": "workflow:owner",
+      "workflowId": "6RDslq06ZS78Zph1",
+      "projectId": "1q616I3NzJFEiwV5",
+      "project": {
+        "updatedAt": "2026-03-02T02:24:01.899Z",
+        "createdAt": "2026-03-02T00:39:33.634Z",
+        "id": "1q616I3NzJFEiwV5",
+        "name": "Roger Gallegos <baba.orere@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "29ad78ad-2907-4d12-a03c-326ce29a717c"
+      }
+    }
+  ],
+  "tags": []
+}

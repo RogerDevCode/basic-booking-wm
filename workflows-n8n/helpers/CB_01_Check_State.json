@@ -1,0 +1,418 @@
+{
+  "name": "CB_01_Check_State",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "circuit-breaker/check",
+        "httpMethod": "POST",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "circuit-breaker-check",
+      "id": "cb_webhook_001"
+    },
+    {
+      "parameters": {},
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -200
+      ],
+      "id": "cb_manual_trigger"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nconst body = input.body || input;\n\nconst service_id = String(body.service_id || 'google_calendar');\nconst action = String(body.action || 'check');\nconst error_message = body.error_message || null;\nconst metadata = body.metadata || {};\n\nconst SERVICE_ID_RE = /^[a-zA-Z0-9_-]{1,100}$/;\nif (!SERVICE_ID_RE.test(service_id)) {\n  throw new Error('Invalid service_id: must be alphanumeric/underscore/hyphen, max 100 chars');\n}\n\nconst VALID_ACTIONS = ['check', 'record_success', 'record_failure'];\nif (!VALID_ACTIONS.includes(action)) {\n  throw new Error('Invalid action: ' + action);\n}\n\nconst safe_error = error_message\n  ? String(error_message).substring(0, 500)\n  : null;\n\nreturn [{ json: { service_id, action, error_message: safe_error, metadata } }];",
+        "options": {}
+      },
+      "name": "Validate Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        250,
+        0
+      ],
+      "id": "cb_validate_002"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM circuit_breaker_state WHERE service_id = $1::text;",
+        "options": {
+          "queryReplacement": "={{ $json.service_id }}"
+        }
+      },
+      "name": "Get Circuit State",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "alwaysOutputData": true,
+      "position": [
+        500,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "SFNQsmuu4zirZAnP",
+          "name": "Postgres account"
+        }
+      },
+      "id": "cb_get_003"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst service_id = $('Validate Input').first().json.service_id;\n\nif (!items.length || !items[0].json || !items[0].json.service_id) {\n  return [{ json: {\n    service_id: service_id,\n    state: 'closed',\n    failure_count: 0,\n    success_count: 0,\n    failure_threshold: 5,\n    success_threshold: 3,\n    timeout_seconds: 300,\n    opened_at: null,\n    _is_default: true\n  }}];\n}\n\nreturn [{ json: { ...items[0].json, _is_default: false } }];",
+        "options": {}
+      },
+      "name": "Handle Empty Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        750,
+        0
+      ],
+      "id": "cb_handle_empty"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "cond_state_open",
+              "leftValue": "={{ $json.state }}",
+              "rightValue": "open",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "Is Circuit Open?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1000,
+        0
+      ],
+      "id": "cb_if_open_004"
+    },
+    {
+      "parameters": {
+        "jsCode": "const state = $input.first().json;\nconst isHalfOpen = state.state === 'half-open';\n\nreturn [{ json: {\n  allowed: true,\n  circuit_state: isHalfOpen ? 'half-open' : 'closed',\n  message: isHalfOpen\n    ? 'Circuit in half-open state - test request allowed'\n    : 'Service is healthy - requests allowed',\n  failure_count: state.failure_count || 0,\n  service_id: state.service_id\n}}];",
+        "options": {}
+      },
+      "name": "Return Allowed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1250,
+        -100
+      ],
+      "id": "cb_allowed_005"
+    },
+    {
+      "parameters": {
+        "jsCode": "const state = $input.first().json;\nconst now = new Date();\nconst openedAt = state.opened_at ? new Date(state.opened_at) : null;\nconst timeoutSeconds = state.timeout_seconds || 300;\n\nlet shouldTryHalfOpen = false;\nlet timeUntilRetry = 0;\n\nif (openedAt) {\n  const elapsedSeconds = (now.getTime() - openedAt.getTime()) / 1000;\n  if (elapsedSeconds >= timeoutSeconds) {\n    shouldTryHalfOpen = true;\n  } else {\n    timeUntilRetry = Math.ceil(timeoutSeconds - elapsedSeconds);\n  }\n}\n\nreturn [{ json: {\n  ...state,\n  should_try_half_open: shouldTryHalfOpen,\n  time_until_retry_seconds: timeUntilRetry,\n  elapsed_since_open: openedAt ? Math.floor((now.getTime() - openedAt.getTime()) / 1000) : null\n}}];",
+        "options": {}
+      },
+      "name": "Check Timeout",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1250,
+        100
+      ],
+      "id": "cb_timeout_006"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "cond_timeout_passed",
+              "leftValue": "={{ $json.should_try_half_open }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "Timeout Passed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1500,
+        100
+      ],
+      "id": "cb_if_timeout_007"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE circuit_breaker_state SET state = 'half-open', half_open_at = NOW(), success_count = 0 WHERE service_id = $1::text RETURNING *;",
+        "options": {
+          "queryReplacement": "={{ $json.service_id }}"
+        }
+      },
+      "name": "Set Half-Open",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1750,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "SFNQsmuu4zirZAnP",
+          "name": "Postgres account"
+        }
+      },
+      "id": "cb_halfopen_008"
+    },
+    {
+      "parameters": {
+        "jsCode": "const state = $input.first().json;\n\nreturn [{ json: {\n  allowed: true,\n  circuit_state: 'half-open',\n  message: 'Circuit transitioned to half-open - test request allowed',\n  service_id: state.service_id,\n  failure_count: state.failure_count || 0,\n  opened_at: state.opened_at,\n  time_until_retry_seconds: 0\n}}];",
+        "options": {}
+      },
+      "name": "Return Half-Open",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2000,
+        0
+      ],
+      "id": "cb_return_halfopen_009"
+    },
+    {
+      "parameters": {
+        "jsCode": "const state = $input.first().json;\n\nreturn [{ json: {\n  allowed: false,\n  circuit_state: 'open',\n  message: 'Circuit breaker OPEN - service unavailable. Retry in ' + (state.time_until_retry_seconds || 'unknown') + ' seconds',\n  service_id: state.service_id,\n  retry_after_seconds: state.time_until_retry_seconds || 300,\n  failure_count: state.failure_count || 0\n}}];",
+        "options": {}
+      },
+      "name": "Return Blocked",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1750,
+        200
+      ],
+      "id": "cb_blocked_010"
+    },
+    {
+      "parameters": {
+        "jsCode": "let cbResult = null;\n\nif ($('Return Allowed').isExecuted) {\n  cbResult = $('Return Allowed').first().json;\n} else if ($('Return Half-Open').isExecuted) {\n  cbResult = $('Return Half-Open').first().json;\n} else if ($('Return Blocked').isExecuted) {\n  cbResult = $('Return Blocked').first().json;\n}\n\nif (!cbResult) {\n  cbResult = { allowed: false, circuit_state: 'unknown', message: 'No circuit state resolved' };\n}\n\nreturn [{ json: {\n  success: true,\n  error_code: null,\n  error_message: null,\n  data: cbResult,\n  _meta: {\n    source: 'CB_GCal_Circuit_Breaker',\n    timestamp: new Date().toISOString(),\n    workflow_id: $workflow.id || 'unknown'\n  }\n}}];",
+        "options": {}
+      },
+      "name": "Standard Contract Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2250,
+        0
+      ],
+      "id": "cb_sco_011"
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        -100
+      ],
+      "id": "cb_exec_trigger_01"
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Input": {
+      "main": [
+        [
+          {
+            "node": "Get Circuit State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Circuit State": {
+      "main": [
+        [
+          {
+            "node": "Handle Empty Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle Empty Result": {
+      "main": [
+        [
+          {
+            "node": "Is Circuit Open?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Circuit Open?": {
+      "main": [
+        [
+          {
+            "node": "Check Timeout",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Allowed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Timeout": {
+      "main": [
+        [
+          {
+            "node": "Timeout Passed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Timeout Passed?": {
+      "main": [
+        [
+          {
+            "node": "Set Half-Open",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Return Blocked",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Half-Open": {
+      "main": [
+        [
+          {
+            "node": "Return Half-Open",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Return Allowed": {
+      "main": [
+        [
+          {
+            "node": "Standard Contract Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Return Half-Open": {
+      "main": [
+        [
+          {
+            "node": "Standard Contract Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Return Blocked": {
+      "main": [
+        [
+          {
+            "node": "Standard Contract Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false
+}

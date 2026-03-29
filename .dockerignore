@@ -1,0 +1,72 @@
+# Dependencies
+node_modules/
+vendor/
+
+# Build output
+bin/
+dist/
+build/
+*.exe
+*.dll
+*.so
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+go.work
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+temp/
+tmp/
+*.tmp
+*.bak
+*.swp
+*~
+
+# Test coverage
+coverage/
+coverage.out
+coverage.html
+
+# Docker
+*.pid
+*.seed
+*.pid.lock
+
+# SSL certificates (for nginx)
+nginx/ssl/*.pem
+nginx/ssl/*.key
+
+# Local docker-compose overrides
+docker-compose.override.yml
+docker-compose.local.yml
+
+# Kubernetes secrets
+*.secret
+*.key

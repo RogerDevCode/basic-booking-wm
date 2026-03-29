@@ -1,0 +1,322 @@
+{
+  "name": "DB_Get_Providers_By_Service",
+  "nodes": [
+    {
+      "parameters": {},
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "pbs-manual-01"
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        200
+      ],
+      "id": "pbs-trigger-01"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "db-get-providers-by-service",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        400
+      ],
+      "webhookId": "db-get-providers-by-service",
+      "id": "pbs-webhook-01"
+    },
+    {
+      "parameters": {
+        "jsCode": "// LAYER 1+2: Extract & Validate (§4.1 PRE-validate)\n// Zero-throw: returns Standard Contract error, never throws\n\nconst raw = $input.first().json;\nconst input = (raw.body && typeof raw.body === 'object') ? raw.body : raw;\n\nfunction ve(code, msg) {\n  return [{ json: {\n    success: false, error_code: code, error_message: msg, data: null,\n    _meta: { source: 'DB_Get_Providers_By_Service', timestamp: new Date().toISOString(), workflow_id: $workflow.id },\n    _exit_early: true\n  }}];\n}\n\n// === SERVICE_ID VALIDATION (required) ===\nlet service_id;\nif (input.service_id === undefined || input.service_id === null) {\n  return ve('MISSING_FIELD', 'service_id is required');\n}\nif (typeof input.service_id === 'string') {\n  const trimmed = input.service_id.trim();\n  const INT_RE = /^\\d+$/;\n  if (!INT_RE.test(trimmed)) return ve('INVALID_TYPE', 'service_id must be a positive integer');\n  service_id = parseInt(trimmed);\n} else if (typeof input.service_id === 'number') {\n  service_id = input.service_id;\n  if (!Number.isInteger(service_id) || service_id < 1) return ve('INVALID_TYPE', 'service_id must be a positive integer');\n} else {\n  return ve('INVALID_TYPE', 'service_id must be a number or numeric string');\n}\n\nreturn [{ json: {\n  success: true,\n  service_id,\n  _validated: true\n}}];",
+        "mode": "runOnceForAllItems"
+      },
+      "name": "Validate Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        256,
+        200
+      ],
+      "id": "pbs-validate-01"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Gate: _exit_early items skip to Format Response\n// Valid items: build providers-by-service query\nconst input = $input.first().json;\n\nif (input._exit_early) {\n  return [{ json: { ...input, providers: [] } }];\n}\n\nconst { service_id } = input;\n\n// Build query to get providers for a specific service\n// JOIN providers with provider_services to get only providers offering this service\n// Note: providers table has: id, name, email, gcal_calendar_id, is_active, google_calendar_id\nconst providers_query = `\n  SELECT DISTINCT p.id, p.name, p.email, p.is_active as active\n  FROM providers p\n  INNER JOIN provider_services ps ON p.id = ps.provider_id\n  WHERE ps.service_id = ${service_id}::int\n  ORDER BY p.name;\n`;\n\nreturn [{ json: {\n  ...input,\n  providers_query,\n  service_id\n}}];",
+        "mode": "runOnceForAllItems"
+      },
+      "name": "Build Providers Query",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        464,
+        200
+      ],
+      "id": "pbs-build-query-01"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Gate: only pass valid items to Build Query\nconst input = $input.first().json;\nif (input._exit_early) return [];\nreturn [{ json: input }];",
+        "mode": "runOnceForAllItems"
+      },
+      "name": "Gate Execute",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        568,
+        200
+      ],
+      "id": "pbs-gate-execute-01"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Gate: only pass validation errors to skip query\nconst input = $input.first().json;\nif (!input._exit_early) return [];\nreturn [{ json: input }];",
+        "mode": "runOnceForAllItems"
+      },
+      "name": "Gate Skip",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        568,
+        400
+      ],
+      "id": "pbs-gate-skip-01"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{ $json.providers_query }}",
+        "options": {}
+      },
+      "name": "Execute Providers Query",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        672,
+        200
+      ],
+      "alwaysOutputData": true,
+      "id": "pbs-execute-pg-01",
+      "credentials": {
+        "postgres": {
+          "id": "5LzvCP9BsQwCi9Z0",
+          "name": "Postgres account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Handle DB error during providers query\nconst e = $input.first().json;\nconst upstreamData = $('Build Providers Query').isExecuted ? $('Build Providers Query').first().json : {};\nlet error_code = 'DB_QUERY_ERROR';\nlet error_message = e.message || e.error?.message || 'Database query error';\n\nif (error_message.includes('connection') || error_message.includes('ECONNREFUSED')) {\n  error_code = 'DB_CONNECTION_ERROR';\n  error_message = 'Database connection failed';\n} else if (error_message.includes('timeout')) {\n  error_code = 'DB_TIMEOUT';\n  error_message = 'Database query timeout';\n} else if (error_message.includes('relation') && error_message.includes('does not exist')) {\n  error_code = 'TABLE_NOT_FOUND';\n  if (error_message.includes('provider_services')) {\n    error_message = 'provider_services junction table does not exist';\n  } else {\n    error_message = 'Providers table does not exist';\n  }\n}\n\nreturn [{ json: {\n  ...upstreamData,\n  success: false, error_code, error_message, data: null,\n  _meta: { source: 'DB_Get_Providers_By_Service', timestamp: new Date().toISOString(), workflow_id: $workflow.id }\n}}];",
+        "mode": "runOnceForAllItems"
+      },
+      "name": "Handle DB Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        420
+      ],
+      "id": "pbs-handle-error-01"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format providers response\nconst items = $input.all();\nconst upstreamData = $('Build Providers Query').isExecuted ? $('Build Providers Query').first().json : {};\n\nlet providers = [];\n// Postgres alwaysOutputData=true returns [{json: {}}] when 0 rows\nif (items.length > 0 && Object.keys(items[0].json).length > 0 && items[0].json.id !== undefined) {\n  providers = items.map(item => ({\n    id: item.json.id,\n    name: item.json.name,\n    email: item.json.email,\n    active: item.json.active\n  }));\n}\n\nreturn [{ json: {\n  success: true,\n  error_code: null,\n  error_message: null,\n  data: {\n    providers,\n    total: providers.length,\n    service_id: upstreamData.service_id\n  },\n  _meta: {\n    source: 'DB_Get_Providers_By_Service',\n    timestamp: new Date().toISOString(),\n    workflow_id: $workflow.id\n  }\n}}];",
+        "mode": "runOnceForAllItems"
+      },
+      "name": "Format Providers",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        200
+      ],
+      "id": "pbs-format-01"
+    },
+    {
+      "parameters": {
+        "jsCode": "// UNIFIED OUTPUT — Standard Contract (§3.2)\nconst items = $input.all();\nlet finalItem = items.find(i => i.json.data !== undefined || i.json.error_code !== undefined);\nif (!finalItem) finalItem = items.find(i => i.json._exit_early);\nif (!finalItem) { \n  return [{ json: { success: false, error_code: 'PIPELINE_ERROR', error_message: 'No valid output found', data: null, _meta: { source: 'DB_Get_Providers_By_Service', timestamp: new Date().toISOString(), workflow_id: $workflow.id } } }]; \n}\nconst input = finalItem.json;\nreturn [{ json: {\n  success: input.success === true,\n  error_code: input.error_code || null,\n  error_message: input.error_message || null,\n  data: input.data || null,\n  _meta: input._meta || {\n    source: 'DB_Get_Providers_By_Service',\n    timestamp: new Date().toISOString(),\n    workflow_id: $workflow.id\n  }\n}}];",
+        "mode": "runOnceForAllItems"
+      },
+      "name": "Format Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1088,
+        300
+      ],
+      "id": "pbs-format-response-01"
+    },
+    {
+      "parameters": {
+        "respondWith": "firstIncomingItem",
+        "options": {}
+      },
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1300,
+        300
+      ],
+      "id": "pbs-respond-01"
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Input": {
+      "main": [
+        [
+          {
+            "node": "Gate Execute",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Gate Skip",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gate Execute": {
+      "main": [
+        [
+          {
+            "node": "Build Providers Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gate Skip": {
+      "main": [
+        [
+          {
+            "node": "Format Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Providers Query": {
+      "main": [
+        [
+          {
+            "node": "Execute Providers Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Providers Query": {
+      "main": [
+        [
+          {
+            "node": "Format Providers",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle DB Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle DB Error": {
+      "main": [
+        [
+          {
+            "node": "Format Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Providers": {
+      "main": [
+        [
+          {
+            "node": "Format Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Response": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "active": true
+}

@@ -1,0 +1,1178 @@
+{
+  "name": "WF2_Booking_Orchestrator",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "booking-orchestrator",
+        "httpMethod": "POST",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "booking-orchestrator"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || $input.first().json;\nconst provider_id = parseInt(body.provider_id, 10);\nconst service_id = parseInt(body.service_id, 10);\nconst start_time = body.start_time;\n\nif (isNaN(provider_id) || isNaN(service_id) || !start_time) {\n  throw new Error('Missing core fields');\n}\n\nconst duration = parseInt(body.duration_minutes || 60, 10);\nconst startDate = new Date(start_time);\nconst endDate = new Date(startDate.getTime() + duration * 60000);\n\nconst cleanTime = String(start_time).replace(/[^0-9]/g, '');\nconst idempotency_key = `booking_${provider_id}_${service_id}_${cleanTime}_${body.customer_id || body.chat_id || 'anon'}`;\n\nconst ctx = { \n  source: 'WF2_Booking_Orchestrator', \n  version: '3.2', \n  started_at: new Date().toISOString() \n};\n\nreturn [{ json: {\n  provider_id, \n  service_id, \n  start_time, \n  end_time: endDate.toISOString(),\n  duration_minutes: duration,\n  user_id: parseInt(body.user_id || 0, 10), customer_id: body.customer_id || null,\n  chat_id: body.chat_id || null,\n  event_title: body.event_title || 'Appointment',\n  idempotency_key,\n  original_body: body,\n  _meta: ctx\n}}];"
+      },
+      "name": "Validate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        250,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id as booking_id, status, gcal_event_id FROM bookings WHERE idempotency_key = $1 LIMIT 1;",
+        "options": {
+          "queryReplacement": "={{ $('Validate').first().json.idempotency_key }}"
+        }
+      },
+      "name": "Check DB Idempotency",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        500,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "SFNQsmuu4zirZAnP",
+          "name": "Postgres account"
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst dup = (items.length > 0 && items[0].json.booking_id) ? items[0].json : null;\nreturn [{ json: { \n  _is_dup: !!dup, \n  _dup: dup \n} }];"
+      },
+      "name": "Process Idemp",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        750,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "dup",
+              "leftValue": "={{ $json._is_dup }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "name": "Is Duplicate?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1000,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: {\n  success: true,\n  error_code: null,\n  data: {\n    booking_id: $('Process Idemp').first().json._dup.booking_id,\n    status: $('Process Idemp').first().json._dup.status,\n    gcal_event_id: $('Process Idemp').first().json._dup.gcal_event_id,\n    is_duplicate: true\n  },\n  _meta: $('Validate').first().json._meta\n}}];"
+      },
+      "name": "Duplicate SCO",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1250,
+        150
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n.stax.ink/webhook/acquire-lock",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ provider_id: $('Validate').first().json.provider_id, start_time: $('Validate').first().json.start_time }) }}",
+        "options": {
+          "timeout": 10000,
+          "includeInputData": true
+        }
+      },
+      "name": "Lock Acquire",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1250,
+        -150
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const res = $input.first().json;\nconst ok = res.data?.acquired === true;\nreturn [{ json: { \n  _lock_ok: ok, \n  _lock_key: res.data?.lock_key, \n  _owner_token: res.data?.owner_token,\n  _lock_err: res.error || (res.success === false ? res.error_message : null)\n}}];"
+      },
+      "name": "Process Lock",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1500,
+        -150
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "lock",
+              "leftValue": "={{ $json._lock_ok }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "name": "Lock OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1750,
+        -150
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: {\n  success: false,\n  error_code: 'LOCK_DENIED',\n  data: {\n    error: $('Process Lock').first().json._lock_err\n  },\n  _meta: $('Validate').first().json._meta\n}}];"
+      },
+      "name": "Denied SCO",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2000,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n.stax.ink/webhook/circuit-breaker/check",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"service_id\": \"google_calendar\"}",
+        "options": {
+          "timeout": 10000,
+          "includeInputData": true
+        }
+      },
+      "name": "Check CB",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2000,
+        -250
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const res = $input.first().json;\nconst ok = res.data?.allowed === true;\nreturn [{ json: { \n  _cb_ok: ok, \n  _cb_err: res.error || null \n} }];"
+      },
+      "name": "Process CB",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2250,
+        -250
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "cb",
+              "leftValue": "={{ $json._cb_ok }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "name": "CB OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2500,
+        -250
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n.stax.ink/webhook/release-lock",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ lock_key: $('Process Lock').first().json._lock_key, owner_token: $('Process Lock').first().json._owner_token }) }}",
+        "options": {
+          "includeInputData": true
+        }
+      },
+      "name": "Release Lock CB Fail",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2750,
+        -100
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n.stax.ink/webhook/dlq/add",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ failure_reason: 'CB_OPEN', original_payload: $('Validate').first().json.original_body }) }}",
+        "options": {}
+      },
+      "name": "DLQ CB Fail",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3000,
+        -100
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: {\n  success: false,\n  error_code: 'CB_OPEN',\n  data: {\n    service: 'google_calendar'\n  },\n  _meta: $('Validate').first().json._meta\n}}];"
+      },
+      "name": "CB Open SCO",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3250,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n.stax.ink/webhook/check-availability",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ provider_id: $('Validate').first().json.provider_id, service_id: $('Validate').first().json.service_id, start_time: $('Validate').first().json.start_time }) }}",
+        "options": {
+          "timeout": 20000,
+          "includeInputData": true
+        }
+      },
+      "name": "Check Avail",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2750,
+        -400
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const res = $input.first().json;\nconst ok = res.data?.available === true;\nreturn [{ json: { \n  _avail_ok: ok, \n  _avail_err: res.error || null \n} }];"
+      },
+      "name": "Process Avail",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3000,
+        -400
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "av",
+              "leftValue": "={{ $json._avail_ok }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "name": "Avail OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3250,
+        -400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n.stax.ink/webhook/release-lock",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ lock_key: $('Process Lock').first().json._lock_key, owner_token: $('Process Lock').first().json._owner_token }) }}",
+        "options": {
+          "includeInputData": true
+        }
+      },
+      "name": "Release Lock Not Avail",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3500,
+        -300
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: {\n  success: false,\n  error_code: 'NOT_AVAILABLE',\n  data: {\n    message: 'Slot no longer available'\n  },\n  _meta: $('Validate').first().json._meta\n}}];"
+      },
+      "name": "Not Avail SCO",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3750,
+        -300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { id: \"mock_gcal_\" + Date.now() } }];"
+      },
+      "name": "Create GCal",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3500,
+        -550
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "OsRBfz3Cs7Ph5uV5",
+          "name": "Google Calendar account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const res = $input.first().json;\nconst ok = !!res.id;\nreturn [{ json: { \n  _gcal_ok: ok, \n  _gcal_id: res.id || null, \n  _gcal_err: res.message || null \n} }];"
+      },
+      "name": "Process GCal",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3750,
+        -550
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "gc",
+              "leftValue": "={{ $json._gcal_ok }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "name": "GCal OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        4000,
+        -550
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n.stax.ink/webhook/circuit-breaker/record",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"service_id\": \"google_calendar\", \"success\": false}",
+        "options": {}
+      },
+      "name": "Record Fail CB GCal",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        4250,
+        -450
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n.stax.ink/webhook/release-lock",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ lock_key: $('Process Lock').first().json._lock_key, owner_token: $('Process Lock').first().json._owner_token }) }}",
+        "options": {
+          "includeInputData": true
+        }
+      },
+      "name": "Release Lock GCal Fail",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        4500,
+        -450
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n.stax.ink/webhook/dlq/add",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ failure_reason: 'GCAL_ERROR', original_payload: $('Validate').first().json.original_body }) }}",
+        "options": {}
+      },
+      "name": "DLQ GCal Fail",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        4750,
+        -450
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: {\n  success: false,\n  error_code: 'GCAL_ERROR',\n  data: {\n    error: $('Process GCal').first().json._gcal_err\n  },\n  _meta: $('Validate').first().json._meta\n}}];"
+      },
+      "name": "GCal Error SCO",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5000,
+        -450
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO bookings (provider_id, service_id, start_time, end_time, idempotency_key, gcal_event_id, user_id, status) VALUES ($1::int, $2::int, $3::timestamp, $4::timestamp, $5::text, $6::text, $7::bigint, 'CONFIRMED') RETURNING id;",
+        "options": {
+          "queryReplacement": "={{ $('Validate').first().json.provider_id }}, {{ $('Validate').first().json.service_id }}, {{ $('Validate').first().json.start_time }}, {{ $('Validate').first().json.end_time }}, {{ $('Validate').first().json.idempotency_key }}, {{ $('Process GCal').first().json._gcal_id }}, {{ $('Validate').first().json.user_id }}"
+        }
+      },
+      "name": "Create DB",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        4250,
+        -700
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "SFNQsmuu4zirZAnP",
+          "name": "Postgres account"
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const res = $input.first().json;\nconst ok = !!res.id;\nreturn [{ json: { \n  _db_ok: ok, \n  _db_id: res.id || null, \n  _db_err: res.message || null \n} }];"
+      },
+      "name": "Process DB",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4500,
+        -700
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "db",
+              "leftValue": "={{ $json._db_ok }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "name": "DB OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        4750,
+        -700
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n.stax.ink/webhook/rollback-booking",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ gcal_event_id: $('Process GCal').first().json._gcal_id, reason: 'DB_FAIL' }) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "name": "Rollback GCal",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        5000,
+        -600
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n.stax.ink/webhook/release-lock",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ lock_key: $('Process Lock').first().json._lock_key, owner_token: $('Process Lock').first().json._owner_token }) }}",
+        "options": {}
+      },
+      "name": "Release Lock DB Fail",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        5250,
+        -600
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: {\n  success: false,\n  error_code: 'DB_ERROR',\n  data: {\n    error: $('Process DB').first().json._db_err\n  },\n  _meta: $('Validate').first().json._meta\n}}];"
+      },
+      "name": "DB Error SCO",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5500,
+        -600
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n.stax.ink/webhook/circuit-breaker/record",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"service_id\": \"google_calendar\", \"success\": true}",
+        "options": {}
+      },
+      "name": "Record Success CB",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        5000,
+        -850
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n.stax.ink/webhook/release-lock",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ lock_key: $('Process Lock').first().json._lock_key, owner_token: $('Process Lock').first().json._owner_token }) }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "name": "Release Lock Success",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        5250,
+        -850
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: {\n  success: true,\n  error_code: null,\n  data: {\n    booking_id: $('Process DB').first().json._db_id,\n    gcal_event_id: $('Process GCal').first().json._gcal_id\n  },\n  _meta: $('Validate').first().json._meta\n}}];"
+      },
+      "name": "Success SCO",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5500,
+        -850
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate": {
+      "main": [
+        [
+          {
+            "node": "Check DB Idempotency",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check DB Idempotency": {
+      "main": [
+        [
+          {
+            "node": "Process Idemp",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Process Idemp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Idemp": {
+      "main": [
+        [
+          {
+            "node": "Is Duplicate?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Duplicate?": {
+      "main": [
+        [
+          {
+            "node": "Duplicate SCO",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Lock Acquire",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lock Acquire": {
+      "main": [
+        [
+          {
+            "node": "Process Lock",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Process Lock",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Lock": {
+      "main": [
+        [
+          {
+            "node": "Lock OK?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lock OK?": {
+      "main": [
+        [
+          {
+            "node": "Check CB",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Denied SCO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check CB": {
+      "main": [
+        [
+          {
+            "node": "Process CB",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Process CB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process CB": {
+      "main": [
+        [
+          {
+            "node": "CB OK?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CB OK?": {
+      "main": [
+        [
+          {
+            "node": "Check Avail",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Release Lock CB Fail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Release Lock CB Fail": {
+      "main": [
+        [
+          {
+            "node": "DLQ CB Fail",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "DLQ CB Fail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DLQ CB Fail": {
+      "main": [
+        [
+          {
+            "node": "CB Open SCO",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "CB Open SCO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Avail": {
+      "main": [
+        [
+          {
+            "node": "Process Avail",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Process Avail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Avail": {
+      "main": [
+        [
+          {
+            "node": "Avail OK?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Avail OK?": {
+      "main": [
+        [
+          {
+            "node": "Create GCal",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Release Lock Not Avail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Release Lock Not Avail": {
+      "main": [
+        [
+          {
+            "node": "Not Avail SCO",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Not Avail SCO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create GCal": {
+      "main": [
+        [
+          {
+            "node": "Process GCal",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Process GCal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process GCal": {
+      "main": [
+        [
+          {
+            "node": "GCal OK?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GCal OK?": {
+      "main": [
+        [
+          {
+            "node": "Create DB",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Record Fail CB GCal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record Fail CB GCal": {
+      "main": [
+        [
+          {
+            "node": "Release Lock GCal Fail",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Release Lock GCal Fail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Release Lock GCal Fail": {
+      "main": [
+        [
+          {
+            "node": "DLQ GCal Fail",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "DLQ GCal Fail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DLQ GCal Fail": {
+      "main": [
+        [
+          {
+            "node": "GCal Error SCO",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "GCal Error SCO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create DB": {
+      "main": [
+        [
+          {
+            "node": "Process DB",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Process DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process DB": {
+      "main": [
+        [
+          {
+            "node": "DB OK?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DB OK?": {
+      "main": [
+        [
+          {
+            "node": "Record Success CB",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Rollback GCal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rollback GCal": {
+      "main": [
+        [
+          {
+            "node": "Release Lock DB Fail",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Release Lock DB Fail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Release Lock DB Fail": {
+      "main": [
+        [
+          {
+            "node": "DB Error SCO",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "DB Error SCO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record Success CB": {
+      "main": [
+        [
+          {
+            "node": "Release Lock Success",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Release Lock Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Release Lock Success": {
+      "main": [
+        [
+          {
+            "node": "Success SCO",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Success SCO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

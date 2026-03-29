@@ -1,0 +1,377 @@
+{
+  "name": "DB_Cancel_Booking",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        208
+      ],
+      "id": "cancel-trigger-01"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "db-cancel-booking",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        400
+      ],
+      "webhookId": "db-cancel-booking",
+      "id": "cancel-webhook-01"
+    },
+    {
+      "parameters": {},
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "cancel-manual-01"
+    },
+    {
+      "parameters": {
+        "jsCode": "// LAYER 1+2: Extract & Validate (§3.3 GEMINI.md)\n// Zero-throw: returns Standard Contract error, never throws\nconst raw = $input.first().json;\nconst input = (raw.body && typeof raw.body === 'object') ? raw.body : raw;\n\nconst UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;\n\nfunction ve(code, msg) {\n  return [{ json: {\n    success: false, error_code: code, error_message: msg, data: null,\n    _meta: { source: 'DB_Cancel_Booking', timestamp: new Date().toISOString() },\n    _exit_early: true\n  }}];\n}\n\nconst booking_id = String(input.booking_id || '').trim();\nif (!booking_id) return ve('MISSING_FIELD', 'booking_id is required');\nif (!UUID_RE.test(booking_id)) return ve('INVALID_TYPE', 'booking_id must be a UUID');\n\nlet cancellation_reason = String(input.cancellation_reason || '').trim() || null;\nif (cancellation_reason && cancellation_reason.length > 500) return ve('INVALID_INPUT', 'Reason too long (max 500 chars)');\n\n// Sanitize for SQL (escape single quotes)\nconst booking_id_sanitized = booking_id.replace(/'/g, \"''\");\nconst cancellation_reason_sanitized = cancellation_reason ? cancellation_reason.replace(/'/g, \"''\") : null;\n\nreturn [{ json: {\n  success: true,\n  booking_id,\n  booking_id_sanitized,\n  cancellation_reason,\n  cancellation_reason_sanitized,\n  _validated: true\n}}];",
+        "mode": "runOnceForAllItems"
+      },
+      "name": "Validate Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        260,
+        300
+      ],
+      "id": "node-1"
+    },
+    {
+      "parameters": {
+        "jsCode": "// LAYER 3: Build Check Query (§3.3 GEMINI.md)\nconst input = $input.first().json;\nif (input._exit_early) return [{ json: input }];\n\n// Union trick ensures at least one row is returned (avoids n8n stopping on empty result)\nconst query = `\nSELECT id, status FROM bookings WHERE id = '${input.booking_id_sanitized}'::uuid\nUNION ALL\nSELECT NULL as id, 'NOT_FOUND' as status\nLIMIT 1;\n`;\n\nreturn [{ json: { ...input, check_query: query }}];",
+        "mode": "runOnceForAllItems"
+      },
+      "name": "Build Check Query",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        380,
+        300
+      ],
+      "id": "build-check-query-wf2"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Gate Execute - solo pasa items válidos\nconst input = $input.first().json;\nif (input._exit_early) return [];\nreturn [{ json: input }];",
+        "mode": "runOnceForAllItems"
+      },
+      "name": "Gate Execute",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        450,
+        250
+      ],
+      "id": "gate-execute-cancel-wf2"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Gate Skip - solo pasa errores de validación\nconst input = $input.first().json;\nif (!input._exit_early) return [];\nreturn [{ json: input }];",
+        "mode": "runOnceForAllItems"
+      },
+      "name": "Gate Skip",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        450,
+        450
+      ],
+      "id": "gate-skip-cancel-wf2"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{ $json.check_query }}",
+        "alwaysOutputData": true,
+        "onError": "continueErrorOutput"
+      },
+      "name": "Check Exists",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        580,
+        250
+      ],
+      "id": "node-2",
+      "credentials": {
+        "postgres": {
+          "id": "5LzvCP9BsQwCi9Z0",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Route By Check Result - Gate+Skip pattern\nconst pg = $input.first().json;\nconst upstream = $('Validate Input').first().json;\n\nif (upstream._exit_early) return [{ json: upstream }];\n\n// Handle DB Error\nif (pg.error && pg.error.message) {\n  return [{ json: {\n    success: false, error_code: 'DB_CHECK_ERROR', error_message: pg.error.message,\n    _meta: { source: 'DB_Cancel_Booking', timestamp: new Date().toISOString() },\n    _exit_early: true,\n    _route: 'error'\n  }}];\n}\n\n// Check found (pg.status === 'NOT_FOUND' means the union dummy row was returned)\nif (!pg.id || pg.status === 'NOT_FOUND') {\n  return [{ json: {\n    success: false, error_code: 'NOT_FOUND', error_message: 'Booking not found',\n    _meta: { source: 'DB_Cancel_Booking', timestamp: new Date().toISOString() },\n    _exit_early: true,\n    _route: 'error'\n  }}];\n}\n\n// Check status\nif (pg.status === 'CANCELLED') {\n  return [{ json: {\n    success: false, error_code: 'ALREADY_CANCELLED', error_message: 'Already cancelled',\n    data: { booking_id: pg.id, status: pg.status },\n    _meta: { source: 'DB_Cancel_Booking', timestamp: new Date().toISOString() },\n    _exit_early: true,\n    _route: 'error'\n  }}];\n}\n\n// OK to cancel - build cancel query\nconst bid = pg.id.replace(/'/g, \"''\");\nconst reason = upstream.cancellation_reason_sanitized;\nconst cancel_query = `UPDATE bookings SET status = 'CANCELLED', cancelled_at = NOW(), cancellation_reason = ${reason ? `'${reason}'` : 'NULL'} WHERE id = '${bid}'::uuid RETURNING id, status;`;\n\nreturn [{ json: {\n  ...upstream,\n  ...pg,\n  _route: 'execute',\n  cancel_query\n}}];",
+        "mode": "runOnceForAllItems"
+      },
+      "name": "Route By Check Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        700,
+        250
+      ],
+      "id": "node-3"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Gate Execute Cancel - solo pasa items con _route: execute\nconst input = $input.first().json;\nif (input._route !== 'execute') return [];\nreturn [{ json: input }];",
+        "mode": "runOnceForAllItems"
+      },
+      "name": "Gate Execute Cancel",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        850,
+        200
+      ],
+      "id": "gate-execute-cancel-node-wf2"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Gate Skip Cancel - solo pasa errores\nconst input = $input.first().json;\nif (input._route === 'execute') return [];\nreturn [{ json: input }];",
+        "mode": "runOnceForAllItems"
+      },
+      "name": "Gate Skip Cancel",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        850,
+        400
+      ],
+      "id": "gate-skip-cancel-node-wf2"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{ $json.cancel_query }}",
+        "options": {}
+      },
+      "name": "Execute Cancel",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        920,
+        300
+      ],
+      "alwaysOutputData": true,
+      "id": "node-4",
+      "credentials": {
+        "postgres": {
+          "id": "5LzvCP9BsQwCi9Z0",
+          "name": "Postgres account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// STEP 5: Final Response - Standard Contract (§3.2)\nconst current = $input.first().json;\n\n// Detect state\nconst hasError = !!(current.error || current.error_code || current.success === false);\nconst isSuccess = !hasError && !!(current.success === true || current.id || current.booking_id);\n\nconst response = {\n  success: isSuccess,\n  error_code: current.error_code || (current.error ? 'DB_ERROR' : null),\n  error_message: current.error_message || current.error?.message || null,\n  data: isSuccess ? { \n    booking_id: current.id || current.booking_id, \n    status: current.status || 'CANCELLED', \n    cancelled: true \n  } : (current.data || null),\n  _meta: current._meta || { \n    source: 'DB_Cancel_Booking', \n    timestamp: new Date().toISOString(), \n    workflow_id: $workflow.id \n  }\n};\n\nreturn [{ json: response }];"
+      },
+      "name": "Format Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1140,
+        300
+      ],
+      "id": "node-5"
+    },
+    {
+      "parameters": {
+        "respondWith": "firstIncomingItem",
+        "options": {}
+      },
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1340,
+        300
+      ],
+      "id": "respond-to-webhook-cancel-wf2"
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Input": {
+      "main": [
+        [
+          {
+            "node": "Build Check Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Check Query": {
+      "main": [
+        [
+          {
+            "node": "Gate Execute",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Gate Skip",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gate Execute": {
+      "main": [
+        [
+          {
+            "node": "Check Exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gate Skip": {
+      "main": [
+        [
+          {
+            "node": "Format Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Exists": {
+      "main": [
+        [
+          {
+            "node": "Route By Check Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route By Check Result": {
+      "main": [
+        [
+          {
+            "node": "Gate Execute Cancel",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Gate Skip Cancel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gate Execute Cancel": {
+      "main": [
+        [
+          {
+            "node": "Execute Cancel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gate Skip Cancel": {
+      "main": [
+        [
+          {
+            "node": "Format Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Cancel": {
+      "main": [
+        [
+          {
+            "node": "Format Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Response": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "active": true
+}

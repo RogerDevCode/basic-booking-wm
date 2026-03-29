@@ -1,0 +1,890 @@
+{
+  "updatedAt": "2026-03-19T00:55:30.855Z",
+  "createdAt": "2026-03-13T23:22:48.675Z",
+  "id": "fhjJXp5DWLjbsem1",
+  "name": "WF7_Distributed_Lock_System",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "acquire-lock",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Acquire Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "acquire-lock",
+      "id": "16291799-56c9-4960-980c-3ffcf0d59d25"
+    },
+    {
+      "parameters": {},
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -200
+      ],
+      "id": "42d1f74d-b6b8-47d7-906c-06a832ebb737"
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        200
+      ],
+      "id": "2c31d9a8-6921-4e3e-9b44-ed85591a6277"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nconst body = input.body || input;\n\n// provider_id: required, positive integer\nconst provider_id = parseInt(body.provider_id, 10);\nif (isNaN(provider_id) || provider_id < 1) {\n  return [{ json: { success: false, error_code: 'VALIDATION_ERROR', error_message: 'Invalid provider_id: must be a positive integer', _exit_early: true } }];\n}\n\n// start_time: required, ISO 8601\nconst start_time = String(body.start_time || '');\nif (!start_time) return [{ json: { success: false, error_code: 'VALIDATION_ERROR', error_message: 'Missing required field: start_time', _exit_early: true } }];\nconst ISO_RE = /^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}/;\nif (!ISO_RE.test(start_time)) {\n  return [{ json: { success: false, error_code: 'VALIDATION_ERROR', error_message: 'Invalid start_time: must be ISO 8601 format', _exit_early: true } }];\n}\n\n// lock_duration_minutes: optional, 1-30, default 5\n// FIX DE-NEW-41: Validación explícita para lock_duration_minutes = 0\nlet lock_duration = parseInt(body.lock_duration_minutes || 5, 10);\n// Rechazar explícitamente 0 o negativo\nif (isNaN(lock_duration) || lock_duration < 1 || lock_duration > 30) {\n  return [{ json: { success: false, error_code: 'VALIDATION_ERROR', error_message: 'Invalid lock_duration_minutes: must be between 1 and 30', _exit_early: true } }];\n}\n\n// owner_token: optional, auto-generated if not provided\nconst owner_token = body.owner_token\n  ? String(body.owner_token).substring(0, 100)\n  : (Date.now().toString(36) + Math.random().toString(36).substring(2, 10));\n\n// Build lock_key with safe characters only (Bypass n8n comma bug naturally)\nconst safe_time = start_time.replace(/[^a-zA-Z0-9T:.+\\-]/g, '_');\nconst lock_key = ('lock_' + provider_id + '_' + safe_time).substring(0, 200);\n\nreturn [{ json: {\n  provider_id,\n  start_time,\n  lock_key,\n  owner_token,\n  lock_duration_minutes: lock_duration\n}}];"
+      },
+      "name": "Validate & Build Key",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        250,
+        0
+      ],
+      "id": "8b08f373-3b8a-4f98-be17-df9d78cbf616"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nif (input._exit_early) return [{ json: input }];\n\nconst lk = String(input.lock_key).replace(/'/g, \"''\");\nconst ot = String(input.owner_token).replace(/'/g, \"''\");\n\nconst query = `\nWITH upsert AS (\n  INSERT INTO booking_locks (lock_key, owner_token, created_at)\n  VALUES ('${lk}'::text, '${ot}'::text, NOW())\n  ON CONFLICT (lock_key) DO UPDATE\n    SET owner_token = EXCLUDED.owner_token,\n        created_at = NOW()\n    WHERE booking_locks.created_at < NOW() - INTERVAL '5 minutes'\n  RETURNING id, owner_token, created_at\n)\nSELECT id, owner_token, created_at, 'acquired' as status FROM upsert\nUNION ALL\nSELECT id, owner_token, created_at, 'denied' as status FROM booking_locks WHERE lock_key = '${lk}'::text\nLIMIT 1;\n`;\n\nreturn [{ json: { ...input, query } }];",
+        "mode": "runOnceForAllItems"
+      },
+      "name": "Acquire_Build_Query",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        300,
+        0
+      ],
+      "id": "acquire-sql-build"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{ $json.query }}"
+      },
+      "name": "Acquire SQL",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        500,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "5LzvCP9BsQwCi9Z0",
+          "name": "Postgres account"
+        }
+      },
+      "onError": "continueErrorOutput",
+      "id": "de5c31b6-233f-4096-8134-15e47a9367fe"
+    },
+    {
+      "parameters": {
+        "jsCode": "const pg = $input.first().json;\nconst upstream = $('Validate & Build Key').first()?.json || {};\n\nconst isAcquired = pg.status === 'acquired' || (pg.owner_token === upstream.owner_token);\n\nreturn [{ json: {\n  ...upstream,\n  ...pg,\n  _route: isAcquired ? 'success' : 'denied'\n}}];",
+        "mode": "runOnceForAllItems"
+      },
+      "name": "Route By Lock",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        750,
+        0
+      ],
+      "id": "86d31b5a-052d-49f6-95df-e09673b67f26"
+    },
+    {
+      "parameters": {
+        "jsCode": "const result = $input.first().json;\n\nreturn [{ json: {\n  success: true,\n  error_code: null,\n  error_message: null,\n  data: {\n    acquired: true,\n    lock_id: result.lock_id,\n    lock_key: result.lock_key,\n    owner_token: result.owner_token,\n    expires_at: result.expires_at,\n    message: 'Lock acquired'\n  },\n  _meta: {\n    source: 'WF7_Distributed_Lock_System',\n    timestamp: new Date().toISOString(),\n    workflow_id: $workflow.id\n  }\n}}];"
+      },
+      "name": "Acquire Success SCO",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1000,
+        -100
+      ],
+      "id": "e303484c-b10f-4ed9-b950-f5e6df436567"
+    },
+    {
+      "parameters": {
+        "jsCode": "const result = $input.first().json;\n\n// Check if it was a real DB error or just a lock held\nif (result.message && !result.lock_key) {\n  const b64Err = Buffer.from(result.message).toString('base64');\n  return [{ json: {\n    success: false,\n    error_code: 'LOCK_DB_ERROR',\n    error_message: 'Database error',\n    data: { b64_debug: b64Err },\n    _meta: { source: 'WF7_Distributed_Lock_System', timestamp: new Date().toISOString(), workflow_id: $workflow.id }\n  }}];\n}\n\nreturn [{ json: {\n  success: true,\n  error_code: 'LOCK_HELD',\n  error_message: 'Lock is already held by another process',\n  data: {\n    acquired: false,\n    lock_key: result.lock_key,\n    retry_after: result.retry_after\n  },\n  _meta: {\n    source: 'WF7_Distributed_Lock_System',\n    timestamp: new Date().toISOString(),\n    workflow_id: $workflow.id\n  }\n}}];"
+      },
+      "name": "Acquire Denied/Error SCO",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1000,
+        100
+      ],
+      "id": "afa51d46-2c5f-4f74-9dba-94ca199f25ea"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "release-lock",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Release Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        400
+      ],
+      "webhookId": "release-lock",
+      "id": "e9c0fa78-7178-4a63-bc09-6fc808d770e9"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nconst body = input.body || input;\n\nif (!body.lock_key || !body.owner_token) {\n  return [{ json: { success: false, error_code: 'VALIDATION_ERROR', error_message: 'Missing required fields: lock_key, owner_token', _exit_early: true } }];\n}\n\nreturn [{ json: {\n  lock_key: String(body.lock_key).substring(0, 255),\n  owner_token: String(body.owner_token).substring(0, 255)\n}}];"
+      },
+      "name": "Validate Release",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        250,
+        400
+      ],
+      "id": "7ac230c1-734f-4081-b776-74f09fa54993"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nif (input._exit_early) return [{ json: input }];\n\nconst lk = String(input.lock_key).replace(/'/g, \"''\");\nconst ot = String(input.owner_token).replace(/'/g, \"''\");\n\nconst query = `\nWITH deleted AS (\n  DELETE FROM booking_locks \n  WHERE lock_key = '${lk}'::text AND owner_token = '${ot}'::text \n  RETURNING id\n)\nSELECT id, 'released' as status FROM deleted\nUNION ALL\nSELECT NULL as id, 'not_found' as status\nLIMIT 1;\n`;\n\nreturn [{ json: { ...input, query } }];",
+        "mode": "runOnceForAllItems"
+      },
+      "name": "Release_Build_Query",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        300,
+        400
+      ],
+      "id": "release-sql-build"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{ $json.query }}"
+      },
+      "name": "Release SQL",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        500,
+        400
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "5LzvCP9BsQwCi9Z0",
+          "name": "Postgres account"
+        }
+      },
+      "onError": "continueErrorOutput",
+      "id": "0bcd5fa3-186a-4407-abeb-a501b2e8cf5c"
+    },
+    {
+      "parameters": {
+        "jsCode": "const pg = $input.first().json;\nconst upstream = $('Validate Release').first()?.json || {};\n\nconst isReleased = pg.status === 'released';\n\nreturn [{ json: {\n  success: true,\n  error_code: null,\n  error_message: null,\n  data: {\n    released: isReleased,\n    lock_key: upstream.lock_key,\n    status: pg.status\n  },\n  _meta: {\n    source: 'WF7_Distributed_Lock_System',\n    timestamp: new Date().toISOString(),\n    workflow_id: $workflow.id\n  }\n}}];"
+      },
+      "name": "Release SCO",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        750,
+        400
+      ],
+      "id": "32d3778b-fbee-4173-ac78-d94127785234"
+    },
+    {
+      "parameters": {
+        "respondWith": "firstIncomingItem",
+        "options": {}
+      },
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1500,
+        200
+      ],
+      "id": "wf7_respond_webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nif (input._route !== 'success') return [];\nreturn [{ json: input }];",
+        "mode": "runOnceForAllItems"
+      },
+      "name": "Gate Success: Lock",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        -100
+      ],
+      "id": "gate-success-lock"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nif (input._route === 'success') return [];\nreturn [{ json: input }];",
+        "mode": "runOnceForAllItems"
+      },
+      "name": "Gate Error: Lock",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        100
+      ],
+      "id": "gate-error-lock"
+    }
+  ],
+  "connections": {
+    "Acquire Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate & Build Key",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Validate & Build Key",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Validate & Build Key",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate & Build Key": {
+      "main": [
+        [
+          {
+            "node": "Acquire SQL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Acquire SQL": {
+      "main": [
+        [
+          {
+            "node": "Route By Lock",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Release Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Release",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Release": {
+      "main": [
+        [
+          {
+            "node": "Release SQL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Release SQL": {
+      "main": [
+        [
+          {
+            "node": "Release SCO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Acquire Success SCO": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Acquire Denied/Error SCO": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Release SCO": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route By Lock": {
+      "main": [
+        [
+          {
+            "node": "Gate Success: Lock",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Gate Error: Lock",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gate Success: Lock": {
+      "main": [
+        [
+          {
+            "node": "Acquire Success SCO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gate Error: Lock": {
+      "main": [
+        [
+          {
+            "node": "Acquire Denied/Error SCO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": true
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": null,
+  "versionId": "05f7ac28-f28e-4136-9b18-f4f531473c70",
+  "activeVersionId": "05f7ac28-f28e-4136-9b18-f4f531473c70",
+  "versionCounter": 58,
+  "triggerCount": 2,
+  "shared": [
+    {
+      "updatedAt": "2026-03-13T23:22:48.675Z",
+      "createdAt": "2026-03-13T23:22:48.675Z",
+      "role": "workflow:owner",
+      "workflowId": "fhjJXp5DWLjbsem1",
+      "projectId": "1q616I3NzJFEiwV5",
+      "project": {
+        "updatedAt": "2026-03-02T02:24:01.899Z",
+        "createdAt": "2026-03-02T00:39:33.634Z",
+        "id": "1q616I3NzJFEiwV5",
+        "name": "Roger Gallegos <baba.orere@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "29ad78ad-2907-4d12-a03c-326ce29a717c"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-03-14T16:54:50.929Z",
+    "createdAt": "2026-03-14T16:54:50.929Z",
+    "versionId": "05f7ac28-f28e-4136-9b18-f4f531473c70",
+    "workflowId": "fhjJXp5DWLjbsem1",
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "acquire-lock",
+          "responseMode": "lastNode",
+          "options": {}
+        },
+        "name": "Acquire Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2.1,
+        "position": [
+          0,
+          0
+        ],
+        "webhookId": "acquire-lock",
+        "id": "16291799-56c9-4960-980c-3ffcf0d59d25"
+      },
+      {
+        "parameters": {},
+        "name": "Manual Trigger",
+        "type": "n8n-nodes-base.manualTrigger",
+        "typeVersion": 1,
+        "position": [
+          0,
+          -200
+        ],
+        "id": "42d1f74d-b6b8-47d7-906c-06a832ebb737"
+      },
+      {
+        "parameters": {
+          "inputSource": "passthrough"
+        },
+        "name": "Execute Workflow Trigger",
+        "type": "n8n-nodes-base.executeWorkflowTrigger",
+        "typeVersion": 1.1,
+        "position": [
+          0,
+          200
+        ],
+        "id": "2c31d9a8-6921-4e3e-9b44-ed85591a6277"
+      },
+      {
+        "parameters": {
+          "jsCode": "const input = $input.first().json;\nconst body = input.body || input;\n\n// provider_id: required, positive integer\nconst provider_id = parseInt(body.provider_id, 10);\nif (isNaN(provider_id) || provider_id < 1) {\n  return [{ json: { success: false, error_code: 'VALIDATION_ERROR', error_message: 'Invalid provider_id: must be a positive integer', _exit_early: true } }];\n}\n\n// start_time: required, ISO 8601\nconst start_time = String(body.start_time || '');\nif (!start_time) return [{ json: { success: false, error_code: 'VALIDATION_ERROR', error_message: 'Missing required field: start_time', _exit_early: true } }];\nconst ISO_RE = /^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}/;\nif (!ISO_RE.test(start_time)) {\n  return [{ json: { success: false, error_code: 'VALIDATION_ERROR', error_message: 'Invalid start_time: must be ISO 8601 format', _exit_early: true } }];\n}\n\n// lock_duration_minutes: optional, 1-30, default 5\n// FIX DE-NEW-41: Validación explícita para lock_duration_minutes = 0\nlet lock_duration = parseInt(body.lock_duration_minutes || 5, 10);\n// Rechazar explícitamente 0 o negativo\nif (isNaN(lock_duration) || lock_duration < 1 || lock_duration > 30) {\n  return [{ json: { success: false, error_code: 'VALIDATION_ERROR', error_message: 'Invalid lock_duration_minutes: must be between 1 and 30', _exit_early: true } }];\n}\n\n// owner_token: optional, auto-generated if not provided\nconst owner_token = body.owner_token\n  ? String(body.owner_token).substring(0, 100)\n  : (Date.now().toString(36) + Math.random().toString(36).substring(2, 10));\n\n// Build lock_key with safe characters only (Bypass n8n comma bug naturally)\nconst safe_time = start_time.replace(/[^a-zA-Z0-9T:.+\\-]/g, '_');\nconst lock_key = ('lock_' + provider_id + '_' + safe_time).substring(0, 200);\n\nreturn [{ json: {\n  provider_id,\n  start_time,\n  lock_key,\n  owner_token,\n  lock_duration_minutes: lock_duration\n}}];"
+        },
+        "name": "Validate & Build Key",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          250,
+          0
+        ],
+        "id": "8b08f373-3b8a-4f98-be17-df9d78cbf616"
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "WITH upsert AS (\n    INSERT INTO booking_locks (provider_id, start_time, lock_key, owner_token, acquired_at, expires_at)\n    VALUES ($1::int, $2::timestamp, $3::text, $4::text, NOW(), NOW() + ($5::int * INTERVAL '1 minute'))\n    ON CONFLICT (lock_key) \n    DO UPDATE SET \n        provider_id = EXCLUDED.provider_id,\n        start_time = EXCLUDED.start_time,\n        owner_token = EXCLUDED.owner_token,\n        acquired_at = EXCLUDED.acquired_at,\n        expires_at = EXCLUDED.expires_at\n    WHERE booking_locks.expires_at <= NOW()\n    RETURNING lock_id, lock_key, owner_token, acquired_at, expires_at, true as acquired, NULL::timestamptz as retry_after\n)\nSELECT * FROM upsert\nUNION ALL\nSELECT lock_id, lock_key, owner_token, acquired_at, expires_at, false as acquired, expires_at as retry_after\nFROM booking_locks\nWHERE lock_key = $3::text AND NOT EXISTS (SELECT 1 FROM upsert)\nLIMIT 1;",
+          "options": {
+            "queryReplacement": "={{ $json.provider_id }}, {{ $json.start_time }}, {{ $json.lock_key }}, {{ $json.owner_token }}, {{ $json.lock_duration_minutes }}"
+          }
+        },
+        "name": "Acquire SQL",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.6,
+        "position": [
+          500,
+          0
+        ],
+        "credentials": {
+          "postgres": {
+            "id": "5LzvCP9BsQwCi9Z0",
+            "name": "Postgres account"
+          }
+        },
+        "onError": "continueErrorOutput",
+        "id": "de5c31b6-233f-4096-8134-15e47a9367fe"
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict"
+            },
+            "conditions": [
+              {
+                "id": "lock_acquired_check",
+                "leftValue": "={{ $json.acquired }}",
+                "rightValue": true,
+                "operator": {
+                  "type": "boolean",
+                  "operation": "equals"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "name": "Is Acquired?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.3,
+        "position": [
+          750,
+          0
+        ],
+        "id": "86d31b5a-052d-49f6-95df-e09673b67f26"
+      },
+      {
+        "parameters": {
+          "jsCode": "const result = $input.first().json;\n\nreturn [{ json: {\n  success: true,\n  error_code: null,\n  error_message: null,\n  data: {\n    acquired: true,\n    lock_id: result.lock_id,\n    lock_key: result.lock_key,\n    owner_token: result.owner_token,\n    expires_at: result.expires_at,\n    message: 'Lock acquired'\n  },\n  _meta: {\n    source: 'WF7_Distributed_Lock_System',\n    timestamp: new Date().toISOString(),\n    workflow_id: $workflow.id\n  }\n}}];"
+        },
+        "name": "Acquire Success SCO",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1000,
+          -100
+        ],
+        "id": "e303484c-b10f-4ed9-b950-f5e6df436567"
+      },
+      {
+        "parameters": {
+          "jsCode": "const result = $input.first().json;\n\n// Check if it was a real DB error or just a lock held\nif (result.message && !result.lock_key) {\n  const b64Err = Buffer.from(result.message).toString('base64');\n  return [{ json: {\n    success: false,\n    error_code: 'LOCK_DB_ERROR',\n    error_message: 'Database error',\n    data: { b64_debug: b64Err },\n    _meta: { source: 'WF7_Distributed_Lock_System', timestamp: new Date().toISOString(), workflow_id: $workflow.id }\n  }}];\n}\n\nreturn [{ json: {\n  success: true,\n  error_code: 'LOCK_HELD',\n  error_message: 'Lock is already held by another process',\n  data: {\n    acquired: false,\n    lock_key: result.lock_key,\n    retry_after: result.retry_after\n  },\n  _meta: {\n    source: 'WF7_Distributed_Lock_System',\n    timestamp: new Date().toISOString(),\n    workflow_id: $workflow.id\n  }\n}}];"
+        },
+        "name": "Acquire Denied/Error SCO",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1000,
+          100
+        ],
+        "id": "afa51d46-2c5f-4f74-9dba-94ca199f25ea"
+      },
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "release-lock",
+          "responseMode": "lastNode",
+          "options": {}
+        },
+        "name": "Release Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2.1,
+        "position": [
+          0,
+          400
+        ],
+        "webhookId": "release-lock",
+        "id": "e9c0fa78-7178-4a63-bc09-6fc808d770e9"
+      },
+      {
+        "parameters": {
+          "jsCode": "const input = $input.first().json;\nconst body = input.body || input;\n\nif (!body.lock_key || !body.owner_token) {\n  throw new Error('Missing required fields: lock_key, owner_token');\n}\n\nreturn [{ json: {\n  lock_key: String(body.lock_key).substring(0, 255),\n  owner_token: String(body.owner_token).substring(0, 255)\n}}];"
+        },
+        "name": "Validate Release",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          250,
+          400
+        ],
+        "id": "7ac230c1-734f-4081-b776-74f09fa54993"
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "DELETE FROM booking_locks\nWHERE lock_key = $1::text\n  AND owner_token = $2::text\nRETURNING lock_id, lock_key;",
+          "options": {
+            "queryReplacement": "={{ $json.lock_key }}, {{ $json.owner_token }}"
+          }
+        },
+        "name": "Release SQL",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.6,
+        "position": [
+          500,
+          400
+        ],
+        "credentials": {
+          "postgres": {
+            "id": "5LzvCP9BsQwCi9Z0",
+            "name": "Postgres account"
+          }
+        },
+        "onError": "continueErrorOutput",
+        "id": "0bcd5fa3-186a-4407-abeb-a501b2e8cf5c"
+      },
+      {
+        "parameters": {
+          "jsCode": "const items = $input.all();\nconst result = items[0]?.json;\nconst wasReleased = !!(result && result.lock_id);\n\nif (result && result.message && !result.lock_key) {\n   return [{ json: {\n    success: false,\n    error_code: 'RELEASE_DB_ERROR',\n    error_message: result.message,\n    data: null,\n    _meta: { source: 'WF7_Distributed_Lock_System', timestamp: new Date().toISOString(), workflow_id: $workflow.id }\n  }}];\n}\n\nreturn [{ json: {\n  success: true,\n  error_code: wasReleased ? null : 'LOCK_NOT_FOUND',\n  error_message: wasReleased ? null : 'Lock not found or owner_token mismatch',\n  data: {\n    released: wasReleased,\n    lock_key: wasReleased ? result.lock_key : $('Validate Release').first().json.lock_key\n  },\n  _meta: {\n    source: 'WF7_Distributed_Lock_System',\n    timestamp: new Date().toISOString(),\n    workflow_id: $workflow.id\n  }\n}}];"
+        },
+        "name": "Release SCO",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          750,
+          400
+        ],
+        "id": "32d3778b-fbee-4173-ac78-d94127785234"
+      }
+    ],
+    "connections": {
+      "Acquire Webhook": {
+        "main": [
+          [
+            {
+              "node": "Validate & Build Key",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Manual Trigger": {
+        "main": [
+          [
+            {
+              "node": "Validate & Build Key",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Execute Workflow Trigger": {
+        "main": [
+          [
+            {
+              "node": "Validate & Build Key",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Validate & Build Key": {
+        "main": [
+          [
+            {
+              "node": "Acquire SQL",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Acquire SQL": {
+        "main": [
+          [
+            {
+              "node": "Is Acquired?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Is Acquired?": {
+        "main": [
+          [
+            {
+              "node": "Acquire Success SCO",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Acquire Denied/Error SCO",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Release Webhook": {
+        "main": [
+          [
+            {
+              "node": "Validate Release",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Validate Release": {
+        "main": [
+          [
+            {
+              "node": "Release SQL",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Release SQL": {
+        "main": [
+          [
+            {
+              "node": "Release SCO",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Roger Gallegos",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-03-19T00:55:30.885Z",
+        "id": 1509,
+        "workflowId": "fhjJXp5DWLjbsem1",
+        "versionId": "05f7ac28-f28e-4136-9b18-f4f531473c70",
+        "event": "deactivated",
+        "userId": "29ad78ad-2907-4d12-a03c-326ce29a717c"
+      },
+      {
+        "createdAt": "2026-03-19T00:55:30.906Z",
+        "id": 1510,
+        "workflowId": "fhjJXp5DWLjbsem1",
+        "versionId": "05f7ac28-f28e-4136-9b18-f4f531473c70",
+        "event": "activated",
+        "userId": "29ad78ad-2907-4d12-a03c-326ce29a717c"
+      },
+      {
+        "createdAt": "2026-03-18T14:18:50.590Z",
+        "id": 1250,
+        "workflowId": "fhjJXp5DWLjbsem1",
+        "versionId": "05f7ac28-f28e-4136-9b18-f4f531473c70",
+        "event": "deactivated",
+        "userId": "29ad78ad-2907-4d12-a03c-326ce29a717c"
+      },
+      {
+        "createdAt": "2026-03-18T14:18:50.615Z",
+        "id": 1251,
+        "workflowId": "fhjJXp5DWLjbsem1",
+        "versionId": "05f7ac28-f28e-4136-9b18-f4f531473c70",
+        "event": "activated",
+        "userId": "29ad78ad-2907-4d12-a03c-326ce29a717c"
+      },
+      {
+        "createdAt": "2026-03-18T22:20:03.034Z",
+        "id": 1388,
+        "workflowId": "fhjJXp5DWLjbsem1",
+        "versionId": "05f7ac28-f28e-4136-9b18-f4f531473c70",
+        "event": "deactivated",
+        "userId": "29ad78ad-2907-4d12-a03c-326ce29a717c"
+      },
+      {
+        "createdAt": "2026-03-18T22:20:03.056Z",
+        "id": 1389,
+        "workflowId": "fhjJXp5DWLjbsem1",
+        "versionId": "05f7ac28-f28e-4136-9b18-f4f531473c70",
+        "event": "activated",
+        "userId": "29ad78ad-2907-4d12-a03c-326ce29a717c"
+      },
+      {
+        "createdAt": "2026-03-19T00:55:37.342Z",
+        "id": 1511,
+        "workflowId": "fhjJXp5DWLjbsem1",
+        "versionId": "05f7ac28-f28e-4136-9b18-f4f531473c70",
+        "event": "deactivated",
+        "userId": "29ad78ad-2907-4d12-a03c-326ce29a717c"
+      },
+      {
+        "createdAt": "2026-03-19T00:55:37.363Z",
+        "id": 1512,
+        "workflowId": "fhjJXp5DWLjbsem1",
+        "versionId": "05f7ac28-f28e-4136-9b18-f4f531473c70",
+        "event": "activated",
+        "userId": "29ad78ad-2907-4d12-a03c-326ce29a717c"
+      },
+      {
+        "createdAt": "2026-03-14T16:54:51.034Z",
+        "id": 683,
+        "workflowId": "fhjJXp5DWLjbsem1",
+        "versionId": "05f7ac28-f28e-4136-9b18-f4f531473c70",
+        "event": "deactivated",
+        "userId": "29ad78ad-2907-4d12-a03c-326ce29a717c"
+      },
+      {
+        "createdAt": "2026-03-14T16:54:51.071Z",
+        "id": 684,
+        "workflowId": "fhjJXp5DWLjbsem1",
+        "versionId": "05f7ac28-f28e-4136-9b18-f4f531473c70",
+        "event": "activated",
+        "userId": "29ad78ad-2907-4d12-a03c-326ce29a717c"
+      },
+      {
+        "createdAt": "2026-03-14T16:54:50.963Z",
+        "id": 681,
+        "workflowId": "fhjJXp5DWLjbsem1",
+        "versionId": "05f7ac28-f28e-4136-9b18-f4f531473c70",
+        "event": "deactivated",
+        "userId": "29ad78ad-2907-4d12-a03c-326ce29a717c"
+      },
+      {
+        "createdAt": "2026-03-14T16:54:50.992Z",
+        "id": 682,
+        "workflowId": "fhjJXp5DWLjbsem1",
+        "versionId": "05f7ac28-f28e-4136-9b18-f4f531473c70",
+        "event": "activated",
+        "userId": "29ad78ad-2907-4d12-a03c-326ce29a717c"
+      },
+      {
+        "createdAt": "2026-03-18T22:19:56.782Z",
+        "id": 1386,
+        "workflowId": "fhjJXp5DWLjbsem1",
+        "versionId": "05f7ac28-f28e-4136-9b18-f4f531473c70",
+        "event": "deactivated",
+        "userId": "29ad78ad-2907-4d12-a03c-326ce29a717c"
+      },
+      {
+        "createdAt": "2026-03-18T22:19:56.802Z",
+        "id": 1387,
+        "workflowId": "fhjJXp5DWLjbsem1",
+        "versionId": "05f7ac28-f28e-4136-9b18-f4f531473c70",
+        "event": "activated",
+        "userId": "29ad78ad-2907-4d12-a03c-326ce29a717c"
+      }
+    ]
+  }
+}

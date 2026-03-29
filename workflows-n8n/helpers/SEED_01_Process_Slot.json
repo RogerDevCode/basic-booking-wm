@@ -1,0 +1,161 @@
+{
+  "name": "SEED_01_Process_Slot",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "696c555d-a6f7-4b88-951b-3c3410c7433f",
+      "name": "When Called",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Normalize slot from parent and preserve as _slot for downstream access\nconst s = $input.first().json;\nreturn [{\n  json: {\n    provider_id:      Number(s.provider_id),\n    service_id:       Number(s.service_id),\n    start_time:       String(s.start_time),\n    duration_minutes: Number(s.duration_minutes || 60),\n    _slot: {\n      provider_id:     Number(s.provider_id),\n      service_id:      Number(s.service_id),\n      start_time:      String(s.start_time),\n      end_time:        String(s.end_time || ''),\n      chat_id:         Number(s.chat_id),\n      idempotency_key: String(s.idempotency_key),\n      duration_minutes:Number(s.duration_minutes || 60),\n      source:          String(s.source || 'SEED_01')\n    }\n  }\n}];"
+      },
+      "id": "e65892ad-4723-4c84-bcf9-cec1e89fbf9e",
+      "name": "Prepare WF3 Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [420, 300]
+    },
+    {
+      "parameters": {
+        "workflowId": { "__rl": true, "value": "6zftqMdtBAT0QaCt", "mode": "id" },
+        "mode": "wait",
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "provider_id": "={{ $json.provider_id }}",
+            "service_id": "={{ $json.service_id }}",
+            "start_time": "={{ $json.start_time }}",
+            "duration_minutes": "={{ $json.duration_minutes }}"
+          }
+        },
+        "alwaysOutputData": true,
+        "onError": "continueErrorOutput"
+      },
+      "id": "d3221fe1-e05e-4e83-9f34-935ba1e9b55e",
+      "name": "Check Availability WF3",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [640, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [{
+            "leftValue": "={{ $json.data?.available }}",
+            "rightValue": true,
+            "operator": { "type": "boolean", "operation": "equals" }
+          }]
+        }
+      },
+      "id": "575165ef-41a3-4d5f-a7c9-bd4343c1824f",
+      "name": "Is Available?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [860, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const err  = $input.first().json;\nconst slot = $('Prepare WF3 Input').first().json._slot;\nreturn [{\n  json: {\n    success:         false,\n    slot:            slot?.start_time || 'unknown',\n    error_code:      'WF3_ERROR',\n    error_message:   err.message || err.error?.message || 'WF3 availability check failed',\n    idempotency_key: slot?.idempotency_key || null,\n    source:          'SEED_01',\n    _meta: { source: 'SEED_01_Process_Slot', timestamp: new Date().toISOString() }\n  }\n}];"
+      },
+      "id": "6c277857-9a16-45b1-a888-e70c9ab85711",
+      "name": "Handle WF3 Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [860, 520]
+    },
+    {
+      "parameters": {
+        "jsCode": "const slot = $('Prepare WF3 Input').first().json._slot;\nreturn [{\n  json: {\n    provider_id: slot.provider_id,\n    service_id:  slot.service_id,\n    start_time:  slot.start_time,\n    chat_id:     String(slot.chat_id),\n    user_name:   'SEED Booking',\n    _slot:       slot\n  }\n}];"
+      },
+      "id": "3110ae0a-c74f-4652-8c35-536898dd8e80",
+      "name": "Prepare WF2 Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1080, 180]
+    },
+    {
+      "parameters": {
+        "jsCode": "const availResponse = $input.first().json;\nconst slot = $('Prepare WF3 Input').first().json._slot;\nreturn [{\n  json: {\n    success:         false,\n    slot:            slot.start_time,\n    error_code:      'SLOT_UNAVAILABLE',\n    error_message:   availResponse.data?.gcal_error || availResponse.error_message || 'Slot not available',\n    idempotency_key: slot.idempotency_key,\n    source:          slot.source,\n    _meta: { source: 'SEED_01_Process_Slot', timestamp: new Date().toISOString() }\n  }\n}];"
+      },
+      "id": "24c352dd-7251-4947-b3ad-d2c4ed0f3729",
+      "name": "Format Unavailable",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1080, 440]
+    },
+    {
+      "parameters": {
+        "workflowId": { "__rl": true, "value": "Z7g7DgxXQ61V368P", "mode": "id" },
+        "mode": "wait",
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "provider_id": "={{ $json.provider_id }}",
+            "service_id": "={{ $json.service_id }}",
+            "start_time": "={{ $json.start_time }}",
+            "chat_id": "={{ $json.chat_id }}",
+            "user_name": "={{ $json.user_name }}"
+          }
+        },
+        "alwaysOutputData": true,
+        "onError": "continueErrorOutput"
+      },
+      "id": "bda95b15-4fe8-4e9e-a0f5-e85f1974ff7c",
+      "name": "Call WF2 Orchestrator",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [1300, 180]
+    },
+    {
+      "parameters": {
+        "jsCode": "const err  = $input.first().json;\nconst slot = $('Prepare WF2 Input').first().json._slot;\nreturn [{\n  json: {\n    success:         false,\n    slot:            slot?.start_time || 'unknown',\n    error_code:      'WF2_ERROR',\n    error_message:   err.message || err.error?.message || 'WF2 booking orchestrator failed',\n    idempotency_key: slot?.idempotency_key || null,\n    source:          'SEED_01',\n    _meta: { source: 'SEED_01_Process_Slot', timestamp: new Date().toISOString() }\n  }\n}];"
+      },
+      "id": "09d61d88-d00f-4bd4-a154-7966824638b2",
+      "name": "Handle WF2 Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1520, 340]
+    },
+    {
+      "parameters": {
+        "jsCode": "const booking = $input.first().json;\nconst slot    = $('Prepare WF2 Input').first().json._slot;\nreturn [{\n  json: {\n    success:         true,\n    slot:            slot.start_time,\n    booking_id:      booking.data?.booking_id || null,\n    idempotency_key: slot.idempotency_key,\n    chat_id:         slot.chat_id,\n    status:          booking.data?.status || 'CONFIRMED',\n    source:          slot.source,\n    _meta: { source: 'SEED_01_Process_Slot', timestamp: new Date().toISOString() }\n  }\n}];"
+      },
+      "id": "e0101b7c-7ed9-45da-b083-0a504b4e3945",
+      "name": "Format Success",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1520, 80]
+    }
+  ],
+  "connections": {
+    "When Called": { "main": [[{ "node": "Prepare WF3 Input", "type": "main", "index": 0 }]] },
+    "Prepare WF3 Input": { "main": [[{ "node": "Check Availability WF3", "type": "main", "index": 0 }]] },
+    "Check Availability WF3": {
+      "main": [
+        [{ "node": "Is Available?", "type": "main", "index": 0 }],
+        [{ "node": "Handle WF3 Error", "type": "main", "index": 0 }]
+      ]
+    },
+    "Is Available?": {
+      "main": [
+        [{ "node": "Prepare WF2 Input", "type": "main", "index": 0 }],
+        [{ "node": "Format Unavailable", "type": "main", "index": 0 }]
+      ]
+    },
+    "Prepare WF2 Input": { "main": [[{ "node": "Call WF2 Orchestrator", "type": "main", "index": 0 }]] },
+    "Call WF2 Orchestrator": {
+      "main": [
+        [{ "node": "Format Success", "type": "main", "index": 0 }],
+        [{ "node": "Handle WF2 Error", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": { "executionOrder": "v1", "callerPolicy": "workflowsFromSameOwner" },
+  "id": "MeFXVc6XEVr6EMrh"
+}

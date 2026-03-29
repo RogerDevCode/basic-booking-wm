@@ -1,0 +1,16 @@
+{
+  "name": "booking-titanium",
+  "description": "Booking Titanium - Windmill Migration Project",
+  "version": "1.0.0",
+  "workspace": "booking-titanium",
+  "scripts": {
+    "dev": "wmctl dev",
+    "deploy": "wmctl deploy",
+    "test": "wmctl test"
+  },
+  "settings": {
+    "defaultLanguage": "typescript",
+    "autoSave": true,
+    "formatOnSave": true
+  }
+}

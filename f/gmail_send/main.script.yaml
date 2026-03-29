@@ -1,0 +1,56 @@
+summary: ''
+description: ''
+lock: '!inline f/gmail_send/main.script.lock'
+kind: script
+schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  properties:
+    bccEmails:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    body:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    ccEmails:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    isHTML:
+      type: boolean
+      description: ''
+      default: null
+    replyToEmail:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    subject:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    toEmail:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    toName:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+  required:
+    - toEmail
+    - subject
+    - body
+    - isHTML
+    - toName
+    - ccEmails
+    - bccEmails
+    - replyToEmail

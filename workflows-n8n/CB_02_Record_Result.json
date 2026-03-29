@@ -1,0 +1,298 @@
+{
+  "updatedAt": "2026-03-19T00:55:51.365Z",
+  "createdAt": "2026-03-14T14:02:10.231Z",
+  "id": "bT0r2EmUqGjc6Ioz",
+  "name": "CB_02_Record_Result",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "path": "circuit-breaker/record",
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Record Result Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "circuit-breaker-record",
+      "id": "cb_record_webhook_012"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nconst body = input.body || input;\n\nconst service_id = String(body.service_id || 'google_calendar');\nconst success = body.success;\nconst result = success ? 'success' : 'failure';\nconst error_message = body.error_message || null;\n\nconst SERVICE_ID_RE = /^[a-zA-Z0-9_-]{1,100}$/;\nif (!SERVICE_ID_RE.test(service_id)) {\n  return [{\n    json: {\n      success: false,\n      error_code: 'INVALID_SERVICE_ID',\n      error_message: 'Invalid service_id',\n      data: null,\n      _meta: { source: 'CB_02_Record_Result', timestamp: new Date().toISOString(), workflow_id: $workflow.id },\n      _exit_early: true\n    }\n  }];\n}\n\nconst safe_error = error_message\n  ? String(error_message).substring(0, 500).replace(/'/g, \"''\")\n  : 'none';\n\nreturn [{ json: { service_id, service_id_sanitized: service_id.replace(/'/g, \"''\"), result, error_message: safe_error, metadata: body.metadata || {} } }];",
+        "options": {}
+      },
+      "name": "Validate Record Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        250,
+        0
+      ],
+      "id": "cb_validate_record_013"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{ $json.query }}",
+        "alwaysOutputData": true
+      },
+      "name": "Record Result",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        500,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "5LzvCP9BsQwCi9Z0",
+          "name": "Postgres account"
+        }
+      },
+      "onError": "continueErrorOutput",
+      "id": "cb_record_014"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst upstream = $('Build Query').first()?.json || {};\n\nif (!items.length || !items[0].json || !items[0].json.service_id) {\n  // Check if there was an error in Postgres\n  const error = items[0]?.json?.error || items[0]?.json?.message;\n  if (error) {\n    return [{ json: {\n      success: false,\n      error_code: 'DB_ERROR',\n      error_message: error,\n      data: null,\n      _meta: { source: 'CB_02_Record_Result', timestamp: new Date().toISOString(), workflow_id: $workflow.id },\n      _route: 'done'\n    }}];\n  }\n\n  return [{ json: {\n    success: false,\n    error_code: 'SERVICE_NOT_FOUND',\n    error_message: 'Service not initialized in circuit_breaker_state table',\n    data: null,\n    _meta: { source: 'CB_02_Record_Result', timestamp: new Date().toISOString(), workflow_id: $workflow.id },\n    _route: 'done'\n  }}];\n}\n\nconst state = items[0].json;\nreturn [{ json: {\n  success: true,\n  error_code: null,\n  error_message: null,\n  data: {\n    recorded: true,\n    service_id: state.service_id,\n    new_state: state.state,\n    failure_count: state.failure_count,\n    success_count: state.success_count\n  },\n  _meta: { source: 'CB_02_Record_Result', timestamp: new Date().toISOString(), workflow_id: $workflow.id },\n  _route: 'done'\n}}];",
+        "options": {}
+      },
+      "name": "Record SCO",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        750,
+        0
+      ],
+      "id": "cb_record_sco_015"
+    },
+    {
+      "parameters": {
+        "respondWith": "firstIncomingItem",
+        "options": {}
+      },
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "id": "cb-respond-01"
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "name": "Execute Workflow Trigger 2",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        100
+      ],
+      "id": "cb_exec_trigger_02"
+    },
+    {
+      "parameters": {},
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        200
+      ],
+      "id": "cb_manual_trigger_2"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nif (input._exit_early) return [{ json: input }];\nreturn [{ json: {\n  ...input,\n  query: `INSERT INTO circuit_breaker_state (\n    service_id, state, failure_count, success_count, \n    last_failure_at, last_success_at, opened_at, last_error_message\n)\nVALUES (\n    '${input.service_id_sanitized}'::text, \n    CASE WHEN '${input.result}'::text = 'failure' THEN 'open' ELSE 'closed' END,\n    CASE WHEN '${input.result}'::text = 'failure' THEN 1 ELSE 0 END, \n    CASE WHEN '${input.result}'::text = 'success' THEN 1 ELSE 0 END, \n    CASE WHEN '${input.result}'::text = 'failure' THEN NOW() ELSE NULL END,\n    CASE WHEN '${input.result}'::text = 'success' THEN NOW() ELSE NULL END,\n    CASE WHEN '${input.result}'::text = 'failure' THEN NOW() ELSE NULL END,\n    CASE WHEN '${input.result}'::text = 'failure' THEN '${input.error_message}'::text ELSE NULL END\n)\nON CONFLICT (service_id) DO UPDATE SET \n    failure_count = CASE \n      WHEN '${input.result}'::text = 'success' THEN 0\n      ELSE circuit_breaker_state.failure_count + 1\n    END,\n    success_count = CASE \n      WHEN '${input.result}'::text = 'success' THEN \n        CASE WHEN circuit_breaker_state.state = 'half-open' THEN circuit_breaker_state.success_count + 1 ELSE 1 END\n      ELSE 0\n    END,\n    state = CASE \n      WHEN '${input.result}'::text = 'failure' AND circuit_breaker_state.failure_count + 1 >= circuit_breaker_state.failure_threshold THEN 'open'\n      WHEN '${input.result}'::text = 'success' AND circuit_breaker_state.state = 'half-open' AND circuit_breaker_state.success_count + 1 >= circuit_breaker_state.success_threshold THEN 'closed'\n      ELSE circuit_breaker_state.state\n    END,\n    opened_at = CASE \n      WHEN '${input.result}'::text = 'failure' AND circuit_breaker_state.state != 'open' AND circuit_breaker_state.failure_count + 1 >= circuit_breaker_state.failure_threshold THEN NOW()\n      ELSE circuit_breaker_state.opened_at\n    END,\n    last_failure_at = CASE WHEN '${input.result}'::text = 'failure' THEN NOW() ELSE circuit_breaker_state.last_failure_at END,\n    last_success_at = CASE WHEN '${input.result}'::text = 'success' THEN NOW() ELSE circuit_breaker_state.last_success_at END,\n    last_error_message = CASE WHEN '${input.result}'::text = 'failure' THEN '${input.error_message}'::text ELSE circuit_breaker_state.last_error_message END\nRETURNING *;`\n} }];"
+      },
+      "name": "Build Query",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "id": "cb_build_query"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nif (input._exit_early) return [];\nreturn [{ json: input }];"
+      },
+      "name": "Gate Execute",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "id": "cb_gate_execute"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nif (!input._exit_early) return [];\nreturn [{ json: input }];"
+      },
+      "name": "Gate Skip",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "id": "cb_gate_skip"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nlet finalItem = items.find(i => i.json.data !== undefined || i.json.error_code !== undefined);\n\nif (!finalItem) {\n  return [{ json: {\n    success: false,\n    error_code: 'PIPELINE_ERROR',\n    error_message: 'No valid output found',\n    data: null,\n    _meta: { source: 'CB_02_Record_Result', timestamp: new Date().toISOString(), workflow_id: $workflow.id }\n  }}];\n}\n\nreturn [{ json: finalItem.json }];"
+      },
+      "name": "Format Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "id": "cb_format_response"
+    }
+  ],
+  "connections": {
+    "Record Result Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Record Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Record Request": {
+      "main": [
+        [
+          {
+            "node": "Build Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record Result": {
+      "main": [
+        [
+          {
+            "node": "Record SCO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record SCO": {
+      "main": [
+        [
+          {
+            "node": "Format Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Workflow Trigger 2": {
+      "main": [
+        [
+          {
+            "node": "Validate Record Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Validate Record Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Query": {
+      "main": [
+        [
+          {
+            "node": "Gate Execute",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Gate Skip",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gate Execute": {
+      "main": [
+        [
+          {
+            "node": "Record Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gate Skip": {
+      "main": [
+        [
+          {
+            "node": "Format Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Response": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "B1VnkirO5dF20MHg",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": true
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": null,
+  "versionId": "a9f0f2d6-0eba-4133-8c40-d56e6614973e",
+  "activeVersionId": "a9f0f2d6-0eba-4133-8c40-d56e6614973e",
+  "versionCounter": 57,
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-03-14T14:02:10.231Z",
+      "createdAt": "2026-03-14T14:02:10.231Z",
+      "role": "workflow:owner",
+      "workflowId": "bT0r2EmUqGjc6Ioz",
+      "projectId": "1q616I3NzJFEiwV5",
+      "project": {
+        "updatedAt": "2026-03-02T02:24:01.899Z",
+        "createdAt": "2026-03-02T00:39:33.634Z",
+        "id": "1q616I3NzJFEiwV5",
+        "name": "Roger Gallegos <baba.orere@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "29ad78ad-2907-4d12-a03c-326ce29a717c"
+      }
+    }
+  ],
+  "tags": []
+}

@@ -1,0 +1,87 @@
+version: '3.8'
+
+# ==============================================================================
+# DEVELOPMENT DOCKER COMPOSE
+# ==============================================================================
+# Development environment - DB + Redis only
+# Tests run locally, connect to Docker services
+# All files isolated in docker-compose.dev/ folder
+# ==============================================================================
+
+services:
+  # ============================================================================
+  # PostgreSQL Database
+  # ============================================================================
+  postgres:
+    image: postgres:17-alpine
+    container_name: booking-dev-db
+    restart: unless-stopped
+    ports:
+      - "${POSTGRES_PORT}:5432"
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - PGDATA=${PGDATA}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - booking-dev-network
+
+  # ============================================================================
+  # Redis (Cache)
+  # ============================================================================
+  redis:
+    image: redis:latest
+    container_name: booking-dev-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT}:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - booking-dev-network
+
+  # ============================================================================
+  # Cloudflared Tunnel (Expose services to internet)
+  # ============================================================================
+  cloudflared:
+    container_name: cloudflared-tunnel-dev
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    env_file:
+      - .env.cloudflared
+    command: tunnel run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      - postgres
+    networks:
+      - booking-dev-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:2000/ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+networks:
+  booking-dev-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local

@@ -1,0 +1,292 @@
+{
+  "name": "DB_Reschedule_Booking",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        208
+      ],
+      "id": "res-trigger-01"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "db-reschedule-booking",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        400
+      ],
+      "webhookId": "db-reschedule-booking",
+      "id": "res-webhook-01"
+    },
+    {
+      "parameters": {},
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "res-manual-01"
+    },
+    {
+      "parameters": {
+        "jsCode": "// STEP 1: Extract & Validate\nconst raw = $input.first().json;\nconst input = (raw.body && typeof raw.body === 'object') ? raw.body : raw;\n\nconst UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;\n\nfunction ve(code, msg) {\n  return [{ json: {\n    success: false, error_code: code, error_message: msg, data: null,\n    _meta: { source: 'DB_Reschedule_Booking', timestamp: new Date().toISOString() },\n    _exit_early: true\n  }}];\n}\n\nconst booking_id = String(input.booking_id || '').trim();\nif (!booking_id) return ve('MISSING_FIELD', 'booking_id is required');\nif (!UUID_RE.test(booking_id)) return ve('INVALID_TYPE', 'booking_id must be a UUID');\n\nconst new_start_time = String(input.new_start_time || '').trim();\nif (!new_start_time) return ve('MISSING_FIELD', 'new_start_time is required');\nif (!new_start_time.includes('T')) return ve('INVALID_TYPE', 'new_start_time must be ISO 8601');\n\nconst newDate = new Date(new_start_time);\nif (isNaN(newDate.getTime())) return ve('INVALID_TYPE', 'Invalid date format');\nif (newDate.getTime() < Date.now()) return ve('PAST_DATE', 'Cannot reschedule to the past');\n\nreturn [{ json: {\n  success: true, booking_id, new_start_time,\n  provider_id: input.provider_id || null,\n  service_id: input.service_id || null,\n  check_query: `SELECT id, status, provider_id, service_id FROM bookings WHERE id = '${booking_id}'::uuid LIMIT 1;`,\n  _validated: true\n}}];",
+        "mode": "runOnceForAllItems"
+      },
+      "name": "Validate Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        260,
+        300
+      ],
+      "id": "node-1"
+    },
+    {
+      "parameters": {
+        "jsCode": "// LAYER 2: Validate booking_id UUID before query (§3.3 GEMINI.md)\nconst input = $input.first().json;\n\nif (input._exit_early) {\n  return [{ json: input }];\n}\n\n// Validate booking_id UUID format\nconst UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;\nif (!input.booking_id || !UUID_RE.test(input.booking_id)) {\n  return [{ json: { ...input, _skip_db: true, error_code: 'INVALID_UUID', error_message: 'booking_id must be a valid UUID' } }];\n}\n\n// Validate new_start_time is ISO 8601 with timezone\nconst ISO_RE = /^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}/;\nif (!input.new_start_time || !ISO_RE.test(input.new_start_time)) {\n  return [{ json: { ...input, _skip_db: true, error_code: 'INVALID_DATETIME', error_message: 'new_start_time must be ISO 8601' } }];\n}\n\n// Build check query with explicit cast - SQL injection safe\nconst safeBookingId = input.booking_id;\nconst checkQuery = \"SELECT id, status, provider_id, service_id FROM bookings WHERE id = '\" + safeBookingId + \"'::uuid LIMIT 1;\";\n\nreturn [{ json: { ...input, check_query: checkQuery } }];"
+      },
+      "name": "Layer 2 - Validate for Query",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        350,
+        300
+      ],
+      "id": "db11-layer2-001"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{ $json.check_query }}",
+        "options": {}
+      },
+      "name": "Check Exists",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        480,
+        300
+      ],
+      "alwaysOutputData": true,
+      "id": "node-2",
+      "credentials": {
+        "postgres": {
+          "id": "5LzvCP9BsQwCi9Z0",
+          "name": "Postgres account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// STEP 3: Business Logic\nconst pg = $input.first().json;\nconst upstream = $('Validate Input').first().json;\n\nif (upstream._exit_early) return [{ json: upstream }];\n\nif (pg.error) return [{ json: { ...upstream, success: false, error_code: 'DB_CHECK_ERROR', error_message: pg.error.message, _exit_early: true } }];\n\nif (!pg.id) return [{ json: { success: false, error_code: 'NOT_FOUND', error_message: 'Booking not found', _exit_early: true } }];\n\nif (pg.status === 'CANCELLED') {\n  return [{ json: {\n    success: false, error_code: 'ALREADY_CANCELLED', error_message: 'Cannot reschedule cancelled booking',\n    data: { booking_id: pg.id, status: pg.status },\n    _exit_early: true\n  }}];\n}\n\nconst pid = upstream.provider_id || pg.provider_id;\nconst sid = upstream.service_id || pg.service_id;\nconst nst = upstream.new_start_time;\n\nreturn [{ json: {\n  ...upstream,\n  _route: 'execute',\n  reschedule_query: `UPDATE bookings SET start_time = '${nst}'::timestamptz, provider_id = ${pid}::int, service_id = ${sid}::int, updated_at = NOW() WHERE id = '${pg.id}'::uuid RETURNING id, status, start_time;`\n}}];",
+        "mode": "runOnceForAllItems"
+      },
+      "name": "Logic Decision",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        700,
+        300
+      ],
+      "id": "node-3"
+    },
+    {
+      "parameters": {
+        "jsCode": "// LAYER 2: Build reschedule query with validated input (§3.3 GEMINI.md)\nconst input = $input.first().json;\n\nif (input._exit_early || input._route !== 'execute') {\n  return [{ json: input }];\n}\n\n// Validate UUID again for safety\nconst UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;\nif (!UUID_RE.test(input.booking_id)) {\n  return [{ json: { ...input, _skip_reschedule: true, error_code: 'INVALID_UUID', error_message: 'booking_id must be a valid UUID' } }];\n}\n\n// Validate new_start_time\nconst ISO_RE = /^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}/;\nif (!ISO_RE.test(input.new_start_time)) {\n  return [{ json: { ...input, _skip_reschedule: true, error_code: 'INVALID_DATETIME', error_message: 'new_start_time must be ISO 8601' } }];\n}\n\n// Validate provider_id and service_id are positive integers\nconst INT_RE = /^\\d+$/;\nif (!INT_RE.test(String(input.provider_id)) || input.provider_id < 1) {\n  return [{ json: { ...input, _skip_reschedule: true, error_code: 'INVALID_PROVIDER', error_message: 'provider_id must be positive integer' } }];\n}\nif (!INT_RE.test(String(input.service_id)) || input.service_id < 1) {\n  return [{ json: { ...input, _skip_reschedule: true, error_code: 'INVALID_SERVICE', error_message: 'service_id must be positive integer' } }];\n}\n\n// Build reschedule query with explicit casts - SQL injection safe\nconst safeBookingId = input.booking_id;\nconst safeNewTime = input.new_start_time;\nconst query = \"UPDATE bookings SET start_time = '\" + safeNewTime + \"'::timestamptz, provider_id = \" + input.provider_id + \"::int, service_id = \" + input.service_id + \"::int, updated_at = NOW() WHERE id = '\" + safeBookingId + \"'::uuid RETURNING id, status, start_time;\";\n\nreturn [{ json: { ...input, reschedule_query: query } }];"
+      },
+      "name": "Layer 2 - Build Reschedule Query",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        800,
+        300
+      ],
+      "id": "db11-layer2-resched-001"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{ $json.reschedule_query }}",
+        "options": {}
+      },
+      "name": "Execute Reschedule",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        920,
+        300
+      ],
+      "alwaysOutputData": true,
+      "id": "node-4",
+      "credentials": {
+        "postgres": {
+          "id": "5LzvCP9BsQwCi9Z0",
+          "name": "Postgres account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// STEP 5: Final Response\nconst pg = $input.first().json;\nconst upstream = $('Logic Decision').first().json;\n\nif (upstream._exit_early || upstream._route !== 'execute') {\n  return [{ json: {\n    success: upstream.success === true,\n    error_code: upstream.error_code || null,\n    error_message: upstream.error_message || null,\n    data: upstream.data || null,\n    _meta: upstream._meta || { source: 'DB_Reschedule_Booking', timestamp: new Date().toISOString() }\n  }}];\n}\n\nif (pg.error) return [{ json: { success: false, error_code: 'DB_RESCHEDULE_ERROR', error_message: pg.error.message } }];\n\nreturn [{ json: {\n  success: true, \n  data: { \n    booking_id: pg.id || upstream.booking_id, \n    status: pg.status || 'CONFIRMED', \n    rescheduled: true,\n    new_start_time: pg.start_time || upstream.new_start_time\n  },\n  _meta: { source: 'DB_Reschedule_Booking', timestamp: new Date().toISOString() }\n}}];",
+        "mode": "runOnceForAllItems"
+      },
+      "name": "Format Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1140,
+        300
+      ],
+      "id": "node-5"
+    },
+    {
+      "parameters": {
+        "respondWith": "firstIncomingItem",
+        "options": {}
+      },
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1340,
+        300
+      ],
+      "id": "res-respond-01"
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Input": {
+      "main": [
+        [
+          {
+            "node": "Layer 2 - Validate for Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Exists": {
+      "main": [
+        [
+          {
+            "node": "Logic Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Logic Decision": {
+      "main": [
+        [
+          {
+            "node": "Layer 2 - Build Reschedule Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Reschedule": {
+      "main": [
+        [
+          {
+            "node": "Format Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Response": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Layer 2 - Validate for Query": {
+      "main": [
+        [
+          {
+            "node": "Check Exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Layer 2 - Build Reschedule Query": {
+      "main": [
+        [
+          {
+            "node": "Execute Reschedule",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "active": true
+}

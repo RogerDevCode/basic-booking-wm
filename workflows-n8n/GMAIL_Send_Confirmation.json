@@ -1,0 +1,297 @@
+{
+  "name": "GMAIL_Send_Confirmation",
+  "nodes": [
+    {
+      "parameters": {},
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        200
+      ],
+      "id": "gmail-manual-01"
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        400
+      ],
+      "id": "gmail-trigger-01"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "gmail-send-confirmation",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        600
+      ],
+      "webhookId": "gmail-send-confirmation",
+      "id": "gmail-webhook-01"
+    },
+    {
+      "parameters": {
+        "jsCode": "// GMAIL_Send_Confirmation v1.0.0\n// Validate input and prepare email data\nconst raw = $input.first()?.json || {};\n\n// Webhook body comes through raw.body or directly at root\nconst input = (raw.body && typeof raw.body === 'object') ? raw.body : raw;\n\nfunction ve(code, msg) {\n  return [{ json: {\n    success: false, error_code: code, error_message: msg, data: null,\n    _meta: { source: 'GMAIL_Send_Confirmation', timestamp: new Date().toISOString(), workflow_id: $workflow.id }\n  }}];\n}\n\n// Extract email from multiple possible paths\nconst userEmail = input.user_email || input.final_email || input.email;\n\n// Validate required fields\nif (!userEmail) {\n  return ve('MISSING_FIELD', 'user_email, final_email, or email is required');\n}\n\n// Basic email format validation\nconst EMAIL_RE = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;\nif (!EMAIL_RE.test(String(userEmail))) {\n  return ve('INVALID_TYPE', 'Invalid email format');\n}\n\nconst userName = input.user_name || input.customer_name || 'Cliente';\nconst startTime = input.start_time || input.appointment_time || 'Por confirmar';\nconst serviceName = input.service_name || input.appointment_type || 'Consulta';\n\nreturn [{ json: {\n  success: true,\n  user_email: userEmail,\n  user_name: userName,\n  start_time: startTime,\n  service_name: serviceName,\n  _validated: true\n}}];",
+        "mode": "runOnceForAllItems"
+      },
+      "name": "Validate Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        250,
+        400
+      ],
+      "id": "gmail-validate-01"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Gate: only pass valid items to Gmail\nconst input = $input.first().json;\nif (!input._validated) return [];\nreturn [{ json: input }];",
+        "mode": "runOnceForAllItems"
+      },
+      "name": "Gate Execute",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        450,
+        350
+      ],
+      "id": "gmail-gate-execute-01"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Gate: pass validation errors to Format Output\nconst input = $input.first().json;\nif (input._validated) return [];\nreturn [{ json: input }];",
+        "mode": "runOnceForAllItems"
+      },
+      "name": "Gate Skip",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        450,
+        550
+      ],
+      "id": "gmail-gate-skip-01"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.user_email }}",
+        "subject": "📅 Reserva Confirmada - {{ $json.service_name }}",
+        "message": "=Hola {{ $json.user_name }},\n\nTu cita ha sido agendada exitosamente.\n\n📋 Detalles:\nServicio: {{ $json.service_name }}\nFecha: {{ $json.start_time }}\n\nGracias por confiar en nosotros.",
+        "appendAttributions": false
+      },
+      "name": "Gmail",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        650,
+        350
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "2oXMGEYDP70ILkBs",
+          "name": "Gmail account"
+        }
+      },
+      "onError": "continueErrorOutput",
+      "id": "gmail-send-01"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Handle Gmail error\nconst e = $input.first().json;\nlet error_code = 'GMAIL_ERROR';\nlet error_message = e.message || e.error?.message || 'Gmail send failed';\n\nif (error_message.includes('insufficient_permission') || error_message.includes('401')) {\n  error_code = 'GMAIL_AUTH_ERROR';\n  error_message = 'Gmail authentication failed - please re-authenticate';\n} else if (error_message.includes('quota') || error_message.includes('429')) {\n  error_code = 'GMAIL_RATE_LIMIT';\n  error_message = 'Gmail rate limit exceeded';\n}\n\nreturn [{ json: {\n  success: false,\n  error_code,\n  error_message,\n  data: null,\n  _meta: { source: 'GMAIL_Send_Confirmation', timestamp: new Date().toISOString(), workflow_id: $workflow.id }\n}}];",
+        "mode": "runOnceForAllItems"
+      },
+      "name": "Handle Gmail Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        850,
+        500
+      ],
+      "id": "gmail-handle-error-01"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format Gmail success response\nconst gmailResponse = $input.first()?.json || {};\n\nreturn [{ json: {\n  success: true,\n  error_code: null,\n  error_message: null,\n  data: {\n    message_id: gmailResponse.id || null,\n    thread_id: gmailResponse.threadId || null,\n    sent_to: $('Validate Input').first().json.user_email\n  },\n  _meta: {\n    source: 'GMAIL_Send_Confirmation',\n    timestamp: new Date().toISOString(),\n    workflow_id: $workflow.id\n  }\n}}];",
+        "mode": "runOnceForAllItems"
+      },
+      "name": "Format Success",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        850,
+        350
+      ],
+      "id": "gmail-format-success-01"
+    },
+    {
+      "parameters": {
+        "jsCode": "// UNIFIED OUTPUT — Standard Contract (§3.2)\nconst items = $input.all();\nlet finalItem = items.find(i => i.json.data !== undefined || i.json.error_code !== undefined);\nif (!finalItem) finalItem = items.find(i => i.json._validated === false);\nif (!finalItem) { \n  return [{ json: { success: false, error_code: 'PIPELINE_ERROR', error_message: 'No valid output found', data: null, _meta: { source: 'GMAIL_Send_Confirmation', timestamp: new Date().toISOString(), workflow_id: $workflow.id } } }]; \n}\nconst input = finalItem.json;\nreturn [{ json: {\n  success: input.success === true,\n  error_code: input.error_code || null,\n  error_message: input.error_message || null,\n  data: input.data || null,\n  _meta: input._meta || {\n    source: 'GMAIL_Send_Confirmation',\n    timestamp: new Date().toISOString(),\n    workflow_id: $workflow.id\n  }\n}}];",
+        "mode": "runOnceForAllItems"
+      },
+      "name": "Format Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1050,
+        450
+      ],
+      "id": "gmail-format-response-01"
+    },
+    {
+      "parameters": {
+        "respondWith": "firstIncomingItem",
+        "options": {}
+      },
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1250,
+        450
+      ],
+      "id": "gmail-respond-01"
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Input": {
+      "main": [
+        [
+          {
+            "node": "Gate Execute",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Gate Skip",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gate Execute": {
+      "main": [
+        [
+          {
+            "node": "Gmail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gate Skip": {
+      "main": [
+        [
+          {
+            "node": "Format Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail": {
+      "main": [
+        [
+          {
+            "node": "Format Success",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle Gmail Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle Gmail Error": {
+      "main": [
+        [
+          {
+            "node": "Format Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Success": {
+      "main": [
+        [
+          {
+            "node": "Format Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Response": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "active": true
+}

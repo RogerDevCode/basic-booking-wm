@@ -1,0 +1,190 @@
+summary: Booking Orchestrator Flow - Orquestación visual de creación de reservas
+description: |
+  Flow equivalente al script booking-orchestrator.go
+  Implementa el flujo completo de creación de reservas con:
+  - Circuit Breaker para resiliencia
+  - Distributed Lock para prevenir double-booking
+  - Availability check
+  - GCal event creation
+  - DB booking creation
+  - Rollback automático en caso de error
+value:
+  modules:
+    - id: circuit_breaker_check
+      retry:
+        constant:
+          seconds: 1
+          attempts: 2
+        exponential:
+          seconds: 0
+          attempts: 0
+          multiplier: 1
+          random_factor: null
+      value:
+        path: f/circuit_breaker_check
+        type: script
+        input_transforms:
+          service_id:
+            type: static
+            value: gcal
+      summary: Verificar estado del Circuit Breaker
+    - id: gate_cb_open
+      value:
+        lock: "!inline check_si_cb_está_open.lock"
+        type: rawscript
+        content: "!inline check_si_cb_está_open.ts"
+        language: bun
+        input_transforms: {}
+      skip_if:
+        expr: |
+          results.circuit_breaker_check.data?.state === 'open'
+      summary: Check si CB está open
+    - id: distributed_lock_acquire
+      value:
+        path: f/distributed_lock_acquire
+        type: script
+        input_transforms:
+          start_time:
+            expr: flow_input.start_time
+            type: javascript
+          provider_id:
+            expr: flow_input.provider_id
+            type: javascript
+          duration_minutes:
+            type: static
+            value: 5
+      summary: Adquirir lock del time slot
+    - id: availability_check
+      value:
+        path: f/availability_check
+        type: script
+        input_transforms:
+          service_id:
+            expr: flow_input.service_id
+            type: javascript
+          start_time:
+            expr: flow_input.start_time
+            type: javascript
+          provider_id:
+            expr: flow_input.provider_id
+            type: javascript
+      summary: Verificar disponibilidad real
+    - id: gcal_create_event
+      value:
+        path: f/gcal_create_event
+        type: script
+        input_transforms:
+          end_time:
+            expr: flow_input.end_time
+            type: javascript
+          user_name:
+            expr: flow_input.user_name
+            type: javascript
+          service_id:
+            expr: flow_input.service_id
+            type: javascript
+          start_time:
+            expr: flow_input.start_time
+            type: javascript
+          user_email:
+            expr: flow_input.user_email
+            type: javascript
+          provider_id:
+            expr: flow_input.provider_id
+            type: javascript
+      summary: Crear evento en Google Calendar
+    - id: circuit_breaker_record
+      value:
+        path: f/circuit_breaker_record
+        type: script
+        input_transforms:
+          success:
+            type: static
+            value: true
+          service_id:
+            type: static
+            value: gcal
+      summary: Registrar éxito en Circuit Breaker
+    - id: db_create_booking
+      value:
+        path: f/booking_create
+        type: script
+        input_transforms:
+          chat_id:
+            expr: flow_input.chat_id
+            type: javascript
+          end_time:
+            expr: flow_input.end_time
+            type: javascript
+          service_id:
+            expr: flow_input.service_id
+            type: javascript
+          start_time:
+            expr: flow_input.start_time
+            type: javascript
+          provider_id:
+            expr: flow_input.provider_id
+            type: javascript
+          gcal_event_id:
+            expr: results.gcal_create_event.data?.event_id
+            type: javascript
+      summary: Crear reserva en base de datos
+    - id: distributed_lock_release
+      value:
+        path: f/distributed_lock_release
+        type: script
+        input_transforms:
+          start_time:
+            expr: flow_input.start_time
+            type: javascript
+          owner_token:
+            expr: results.distributed_lock_acquire.data?.owner_token
+            type: javascript
+          provider_id:
+            expr: flow_input.provider_id
+            type: javascript
+      summary: Liberar lock del time slot
+    - id: failure_handler
+      value:
+        lock: "!inline failure_handler_rollback.lock"
+        type: rawscript
+        content: "!inline failure_handler_rollback.ts"
+        language: bun
+        input_transforms:
+          error:
+            expr: flow_input.error
+            type: javascript
+          results:
+            expr: flow_input.results
+            type: javascript
+          flowInput:
+            expr: flow_input
+            type: javascript
+      summary: Manejador de fallos - Rollback
+schema:
+  type: object
+  properties:
+    provider_id:
+      type: number
+      description: ID del proveedor
+    service_id:
+      type: number
+      description: ID del servicio
+    start_time:
+      type: string
+      format: date-time
+      description: Fecha y hora de inicio (ISO 8601)
+    end_time:
+      type: string
+      format: date-time
+      description: Fecha y hora de fin (ISO 8601)
+    chat_id:
+      type: string
+      description: Chat ID de Telegram
+    user_name:
+      type: string
+      description: Nombre del usuario
+    user_email:
+      type: string
+      format: email
+      description: Email del usuario

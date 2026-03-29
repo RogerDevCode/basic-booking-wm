@@ -1,0 +1,366 @@
+{
+  "updatedAt": "2026-03-20T14:56:22.837Z",
+  "createdAt": "2026-03-14T15:38:07.226Z",
+  "id": "XRMU2cqA3fxU9e2I",
+  "name": "DLQ_01_Add_Entry",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "path": "dlq/add",
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "webhookId": "dlq-add",
+      "id": "61ff1fe6-fc34-48fe-b3b7-0c57a02d3c0f"
+    },
+    {
+      "parameters": {},
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "id": "b5df008a-68b6-4eb9-800d-0f78a60ae987"
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "id": "0653a9ec-2ead-46f4-844d-155a0886bcd2"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nconst body = input.body || input;\n\nconst payload = {\n  booking_id: parseInt(body.booking_id) || null,\n  provider_id: parseInt(body.provider_id) || null,\n  service_id: parseInt(body.service_id) || 1,\n  failure_reason: String(body.failure_reason || 'UNKNOWN').substring(0, 100),\n  error_message: String(body.error_message || 'No message provided').substring(0, 500),\n  error_stack: body.error_stack ? String(body.error_stack).substring(0, 2000) : null,\n  original_payload: body.original_payload || {},\n  idempotency_key: body.idempotency_key || 'gen_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9)\n};\n\nconst b64Payload = Buffer.from(JSON.stringify(payload)).toString('base64');\nreturn [{ json: { b64_payload: b64Payload, ...payload } }];\n"
+      },
+      "name": "Validate & Encode",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "id": "b2c9c185-d8a6-4103-9275-449168f93907"
+    },
+    {
+      "parameters": {
+        "jsCode": "// LAYER 3: Build DLQ Insert Query\nconst input = $input.first().json;\nconst query = \"SELECT * FROM booking_dlq_add(convert_from(decode('\" + input.b64_payload + \"', 'base64'), 'utf-8')::jsonb);\";\nreturn [{ json: { ...input, query } }];",
+        "mode": "runOnceForAllItems"
+      },
+      "name": "Build DLQ Query",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        200
+      ],
+      "id": "dlq_build_query"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{ $json.query }}"
+      },
+      "name": "Insert to DLQ",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "credentials": {
+        "postgres": {
+          "id": "5LzvCP9BsQwCi9Z0",
+          "name": "Postgres account"
+        }
+      },
+      "id": "52e68a58-a8eb-4791-a71f-10c5d07abbf2"
+    },
+    {
+      "parameters": {
+        "jsCode": "const result = $input.first().json;\nconst validated = $('Validate & Encode').first().json;\n\nreturn [{\n  json: {\n    success: true,\n    error_code: null,\n    error_message: null,\n    data: {\n      dlq_id: result.out_dlq_id,\n      idempotency_key: validated.idempotency_key\n    },\n    _meta: {\n      source: 'DLQ_01_Add_Entry',\n      timestamp: new Date().toISOString(),\n      workflow_id: $workflow.id\n    }\n  }\n}];"
+      },
+      "name": "Standard Contract Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "id": "0ddd8100-5bf2-4765-b22b-6e5c808d105e"
+    },
+    {
+      "parameters": {
+        "respondWith": "firstIncomingItem",
+        "options": {}
+      },
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        700,
+        200
+      ],
+      "id": "dlq_respond_webhook"
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate & Encode",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Validate & Encode",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Validate & Encode",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate & Encode": {
+      "main": [
+        [
+          {
+            "node": "Build DLQ Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert to DLQ": {
+      "main": [
+        [
+          {
+            "node": "Standard Contract Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build DLQ Query": {
+      "main": [
+        [
+          {
+            "node": "Insert to DLQ",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Standard Contract Output": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": true
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": null,
+  "versionId": "ad307f61-4c7e-4403-866d-6fb9fe3b9502",
+  "activeVersionId": "ad307f61-4c7e-4403-866d-6fb9fe3b9502",
+  "versionCounter": 32,
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-03-14T15:38:07.226Z",
+      "createdAt": "2026-03-14T15:38:07.226Z",
+      "role": "workflow:owner",
+      "workflowId": "XRMU2cqA3fxU9e2I",
+      "projectId": "1q616I3NzJFEiwV5",
+      "project": {
+        "updatedAt": "2026-03-02T02:24:01.899Z",
+        "createdAt": "2026-03-02T00:39:33.634Z",
+        "id": "1q616I3NzJFEiwV5",
+        "name": "Roger Gallegos <baba.orere@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "29ad78ad-2907-4d12-a03c-326ce29a717c"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-03-20T14:56:22.838Z",
+    "createdAt": "2026-03-20T14:56:22.838Z",
+    "versionId": "ad307f61-4c7e-4403-866d-6fb9fe3b9502",
+    "workflowId": "XRMU2cqA3fxU9e2I",
+    "nodes": [
+      {
+        "parameters": {
+          "path": "dlq/add",
+          "httpMethod": "POST",
+          "responseMode": "lastNode",
+          "options": {}
+        },
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2.1,
+        "webhookId": "dlq-add",
+        "id": "61ff1fe6-fc34-48fe-b3b7-0c57a02d3c0f"
+      },
+      {
+        "parameters": {},
+        "name": "Manual Trigger",
+        "type": "n8n-nodes-base.manualTrigger",
+        "typeVersion": 1,
+        "id": "b5df008a-68b6-4eb9-800d-0f78a60ae987"
+      },
+      {
+        "parameters": {
+          "inputSource": "passthrough"
+        },
+        "name": "Execute Workflow Trigger",
+        "type": "n8n-nodes-base.executeWorkflowTrigger",
+        "typeVersion": 1.1,
+        "id": "0653a9ec-2ead-46f4-844d-155a0886bcd2"
+      },
+      {
+        "parameters": {
+          "jsCode": "const input = $input.first().json;\nconst body = input.body || input;\n\nconst payload = {\n  booking_id: parseInt(body.booking_id) || null,\n  provider_id: parseInt(body.provider_id) || null,\n  service_id: parseInt(body.service_id) || 1,\n  failure_reason: String(body.failure_reason || 'UNKNOWN').substring(0, 100),\n  error_message: String(body.error_message || 'No message provided').substring(0, 500),\n  error_stack: body.error_stack ? String(body.error_stack).substring(0, 2000) : null,\n  original_payload: body.original_payload || {},\n  idempotency_key: body.idempotency_key || 'gen_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9)\n};\n\nconst b64Payload = Buffer.from(JSON.stringify(payload)).toString('base64');\nreturn [{ json: { b64_payload: b64Payload, ...payload } }];\n"
+        },
+        "name": "Validate & Encode",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "id": "b2c9c185-d8a6-4103-9275-449168f93907"
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "SELECT * FROM booking_dlq_add(convert_from(decode($1, 'base64'), 'utf-8')::jsonb);",
+          "options": {
+            "queryReplacement": "={{ $json.b64_payload }}"
+          }
+        },
+        "name": "Insert to DLQ",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.6,
+        "credentials": {
+          "postgres": {
+            "id": "5LzvCP9BsQwCi9Z0",
+            "name": "Postgres account"
+          }
+        },
+        "id": "52e68a58-a8eb-4791-a71f-10c5d07abbf2"
+      },
+      {
+        "parameters": {
+          "jsCode": "const result = $input.first().json;\nconst validated = $('Validate & Encode').first().json;\n\nreturn [{\n  json: {\n    success: true,\n    error_code: null,\n    error_message: null,\n    data: {\n      dlq_id: result.out_dlq_id,\n      idempotency_key: validated.idempotency_key\n    },\n    _meta: {\n      source: 'DLQ_01_Add_Entry',\n      timestamp: new Date().toISOString(),\n      workflow_id: $workflow.id\n    }\n  }\n}];"
+        },
+        "name": "Standard Contract Output",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "id": "0ddd8100-5bf2-4765-b22b-6e5c808d105e"
+      }
+    ],
+    "connections": {
+      "Webhook": {
+        "main": [
+          [
+            {
+              "node": "Validate & Encode",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Manual Trigger": {
+        "main": [
+          [
+            {
+              "node": "Validate & Encode",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Execute Workflow Trigger": {
+        "main": [
+          [
+            {
+              "node": "Validate & Encode",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Validate & Encode": {
+        "main": [
+          [
+            {
+              "node": "Insert to DLQ",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Insert to DLQ": {
+        "main": [
+          [
+            {
+              "node": "Standard Contract Output",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Roger Gallegos",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-03-20T14:56:22.871Z",
+        "id": 1570,
+        "workflowId": "XRMU2cqA3fxU9e2I",
+        "versionId": "ad307f61-4c7e-4403-866d-6fb9fe3b9502",
+        "event": "deactivated",
+        "userId": "29ad78ad-2907-4d12-a03c-326ce29a717c"
+      },
+      {
+        "createdAt": "2026-03-20T14:56:22.890Z",
+        "id": 1571,
+        "workflowId": "XRMU2cqA3fxU9e2I",
+        "versionId": "ad307f61-4c7e-4403-866d-6fb9fe3b9502",
+        "event": "activated",
+        "userId": "29ad78ad-2907-4d12-a03c-326ce29a717c"
+      }
+    ]
+  }
+}

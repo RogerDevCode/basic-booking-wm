@@ -1,0 +1,566 @@
+{
+  "updatedAt": "2026-03-23T14:00:00.000Z",
+  "createdAt": "2026-03-02T02:19:34.753Z",
+  "id": "oi5AiSoJRbzDf2A8",
+  "name": "DB_Find_Next_Available",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "jsonExample",
+        "jsonExample": "{\"provider_id\": 1, \"service_id\": 1, \"date\": \"2026-03-04\"}"
+      },
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        400
+      ],
+      "id": "64f1b8c5-220e-4075-aa13-894162cc9d4c"
+    },
+    {
+      "parameters": {},
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        200
+      ],
+      "id": "804c9941-1c88-448d-ba88-d87ce620d077"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "db-find-next-available",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        600
+      ],
+      "webhookId": "db-find-next-available",
+      "id": "118afff3-0235-4506-b34d-1a010884ff53"
+    },
+    {
+      "parameters": {
+        "jsCode": "// LAYER 1+2: Extract & Validate (§4.1 PRE-validate)\n// Zero-throw: returns Standard Contract error, never throws\n\nconst raw = $input.first().json;\nconst input = (raw.body && typeof raw.body === 'object') ? raw.body : raw;\n\nfunction ve(code, msg) {\n  return [{ json: {\n    success: false, error_code: code, error_message: msg, data: null,\n    _meta: { source: 'DB_Find_Next_Available', timestamp: new Date().toISOString(), workflow_id: $workflow.id },\n    _exit_early: true\n  }}];\n}\n\n// === PROVIDER_ID VALIDATION ===\nlet provider_id;\nif (input.provider_id === undefined || input.provider_id === null) {\n  return ve('MISSING_FIELD', 'provider_id is required');\n}\nif (typeof input.provider_id === 'string') {\n  const trimmed = input.provider_id.trim();\n  const INT_RE = /^\\d+$/;\n  if (!INT_RE.test(trimmed)) return ve('INVALID_TYPE', 'provider_id must be a positive integer');\n  provider_id = parseInt(trimmed);\n} else if (typeof input.provider_id === 'number') {\n  provider_id = input.provider_id;\n  if (!Number.isInteger(provider_id) || provider_id < 1) return ve('INVALID_TYPE', 'provider_id must be a positive integer');\n} else {\n  return ve('INVALID_TYPE', 'provider_id must be a number or numeric string');\n}\n\n// === SERVICE_ID VALIDATION ===\nlet service_id;\nif (input.service_id === undefined || input.service_id === null) {\n  return ve('MISSING_FIELD', 'service_id is required');\n}\nif (typeof input.service_id === 'string') {\n  const trimmed = input.service_id.trim();\n  const INT_RE = /^\\d+$/;\n  if (!INT_RE.test(trimmed)) return ve('INVALID_TYPE', 'service_id must be a positive integer');\n  service_id = parseInt(trimmed);\n} else if (typeof input.service_id === 'number') {\n  service_id = input.service_id;\n  if (!Number.isInteger(service_id) || service_id < 1) return ve('INVALID_TYPE', 'service_id must be a positive integer');\n} else {\n  return ve('INVALID_TYPE', 'service_id must be a number or numeric string');\n}\n\n// === DATE VALIDATION ===\nlet date;\nif (input.date === undefined || input.date === null) {\n  return ve('MISSING_FIELD', 'date is required (YYYY-MM-DD format)');\n}\ndate = String(input.date).trim();\n\n// Validate YYYY-MM-DD format\nconst DATE_RE = /^\\d{4}-\\d{2}-\\d{2}$/;\nif (!DATE_RE.test(date)) return ve('INVALID_TYPE', 'date must be in YYYY-MM-DD format');\n\n// Validate date exists (not Feb 30, etc.)\nconst dateObj = new Date(date + 'T00:00:00Z');\nif (isNaN(dateObj.getTime())) return ve('INVALID_DATE', 'date is not a valid calendar date');\n\n// Check date components match (catches Feb 30 → Mar 02 normalization)\nconst [year, month, day] = date.split('-').map(Number);\nif (dateObj.getUTCFullYear() !== year || (dateObj.getUTCMonth() + 1) !== month || dateObj.getUTCDate() !== day) {\n  return ve('INVALID_DATE', 'date does not exist in the calendar');\n}\n\nreturn [{ json: {\n  success: true,\n  provider_id,\n  service_id,\n  date,\n  _validated: true\n}}];",
+        "mode": "runOnceForAllItems"
+      },
+      "name": "Validate Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        256,
+        200
+      ],
+      "id": "validate-input-01"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Gate: only pass valid items to DAL\nconst input = $input.first().json;\nif (input._exit_early) return [];\nreturn [{ json: input }];",
+        "mode": "runOnceForAllItems"
+      },
+      "name": "Gate Execute",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        464,
+        150
+      ],
+      "id": "gate-execute-01"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Gate: only pass validation errors to skip DAL\nconst input = $input.first().json;\nif (!input._exit_early) return [];\nreturn [{ json: input }];",
+        "mode": "runOnceForAllItems"
+      },
+      "name": "Gate Skip",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        464,
+        450
+      ],
+      "id": "gate-skip-01"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://dal-service:3000/find-next-available",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"provider_id\": {{ $json.provider_id }},\n  \"service_id\": {{ $json.service_id }},\n  \"date\": \"{{ $json.date }}\"\n}",
+        "options": {
+          "timeout": 15000
+        },
+        "onError": "continueErrorOutput"
+      },
+      "name": "Call DAL Smart Lookup",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        672,
+        150
+      ],
+      "id": "08873e84-4864-452a-905c-ff1222e008b9",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 1000
+    },
+    {
+      "parameters": {
+        "jsCode": "// Handle DAL HTTP error\nconst e = $input.first().json;\nconst upstreamData = $('Validate Input').isExecuted ? $('Validate Input').first().json : {};\nlet error_code = 'DAL_ERROR';\nlet error_message = e.message || 'DAL service unavailable';\n\nif (e.statusCode === 429) {\n  error_code = 'RATE_LIMITED';\n  error_message = 'Too many requests';\n} else if (e.statusCode >= 500) {\n  error_code = 'DAL_SERVER_ERROR';\n  error_message = 'DAL service internal error';\n} else if (e.statusCode === 408 || e.message.includes('timeout')) {\n  error_code = 'DAL_TIMEOUT';\n  error_message = 'DAL service timeout';\n}\n\nreturn [{ json: {\n  ...upstreamData,\n  success: false, error_code, error_message, data: null,\n  _meta: { source: 'DB_Find_Next_Available', timestamp: new Date().toISOString(), workflow_id: $workflow.id }\n}}];",
+        "mode": "runOnceForAllItems"
+      },
+      "name": "Handle DAL Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1088,
+        300
+      ],
+      "id": "handle-dal-error-01"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first()?.json || {};\nconst isCacheHit = input.cache_hit === true;\nconst dalResponse = isCacheHit ? input.cache_data : input;\nconst isSuccess = dalResponse.success === true || dalResponse.success === undefined;\n\nreturn [{\n  json: {\n    success: dalResponse.success !== undefined ? dalResponse.success : true,\n    error_code: isSuccess ? null : (dalResponse.error_code || 'DAL_ERROR'),\n    error_message: isSuccess ? null : (dalResponse.error_message || 'Operation failed'),\n    data: dalResponse.data || dalResponse,\n    _meta: {\n      source: 'DB_Find_Next_Available',\n      timestamp: new Date().toISOString(),\n      workflow_id: 'DB_Find_Next_Available',\n      version: '2.0.0'\n    }\n  }\n}];"
+      },
+      "name": "Format Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        150
+      ],
+      "id": "c0ef3f79-c5d6-44b3-80bb-363b8ddcd172"
+    },
+    {
+      "parameters": {
+        "jsCode": "// UNIFIED OUTPUT — Standard Contract (§3.2)\nconst items = $input.all();\nlet finalItem = items.find(i => i.json.data !== undefined || i.json.error_code !== undefined);\nif (!finalItem) finalItem = items.find(i => i.json._exit_early);\nif (!finalItem) { \n  return [{ json: { success: false, error_code: 'PIPELINE_ERROR', error_message: 'No valid output found', data: null, _meta: { source: 'DB_Find_Next_Available', timestamp: new Date().toISOString(), workflow_id: $workflow.id } } }]; \n}\nconst input = finalItem.json;\nreturn [{ json: {\n  success: input.success === true,\n  error_code: input.error_code || null,\n  error_message: input.error_message || null,\n  data: input.data || null,\n  _meta: input._meta || {\n    source: 'DB_Find_Next_Available',\n    timestamp: new Date().toISOString(),\n    workflow_id: $workflow.id\n  }\n}}];",
+        "mode": "runOnceForAllItems"
+      },
+      "name": "Format Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1300,
+        300
+      ],
+      "id": "format-response-01"
+    },
+    {
+      "parameters": {
+        "respondWith": "firstIncomingItem",
+        "options": {}
+      },
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1500,
+        300
+      ],
+      "id": "respond-to-webhook-01"
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Input": {
+      "main": [
+        [
+          {
+            "node": "Gate Execute",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Gate Skip",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gate Execute": {
+      "main": [
+        [
+          {
+            "node": "Call DAL Smart Lookup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gate Skip": {
+      "main": [
+        [
+          {
+            "node": "Format Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call DAL Smart Lookup": {
+      "main": [
+        [
+          {
+            "node": "Format Output",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle DAL Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle DAL Error": {
+      "main": [
+        [
+          {
+            "node": "Format Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Output": {
+      "main": [
+        [
+          {
+            "node": "Format Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Response": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": {
+    "global": {
+      "1_1_2026-03-04": {
+        "timestamp": 1772646460497,
+        "data": {
+          "success": true,
+          "date": "2026-03-04",
+          "slots": [
+            {
+              "start_time": "2026-03-04T00:00:00.000Z",
+              "display_time": "00:00"
+            },
+            {
+              "start_time": "2026-03-04T00:40:00.000Z",
+              "display_time": "00:40"
+            },
+            {
+              "start_time": "2026-03-04T01:20:00.000Z",
+              "display_time": "01:20"
+            },
+            {
+              "start_time": "2026-03-04T02:00:00.000Z",
+              "display_time": "02:00"
+            },
+            {
+              "start_time": "2026-03-04T02:40:00.000Z",
+              "display_time": "02:40"
+            }
+          ]
+        }
+      },
+      "1_1": {
+        "timestamp": 1772714665438,
+        "data": {
+          "success": true,
+          "date": "2026-03-04",
+          "slots": [
+            {
+              "start_time": "2026-03-04T00:00:00.000Z",
+              "display_time": "00:00"
+            },
+            {
+              "start_time": "2026-03-04T00:40:00.000Z",
+              "display_time": "00:40"
+            },
+            {
+              "start_time": "2026-03-04T01:20:00.000Z",
+              "display_time": "01:20"
+            },
+            {
+              "start_time": "2026-03-04T02:00:00.000Z",
+              "display_time": "02:00"
+            },
+            {
+              "start_time": "2026-03-04T02:40:00.000Z",
+              "display_time": "02:40"
+            }
+          ]
+        }
+      },
+      "1_1_2026-03-05": {
+        "timestamp": 1772746796148,
+        "data": {
+          "success": true,
+          "date": "2026-03-05",
+          "slots": [
+            {
+              "start_time": "2026-03-05T20:40:00.000-03:00",
+              "display_time": "20:40"
+            },
+            {
+              "start_time": "2026-03-05T21:20:00.000-03:00",
+              "display_time": "21:20"
+            },
+            {
+              "start_time": "2026-03-05T22:00:00.000-03:00",
+              "display_time": "22:00"
+            },
+            {
+              "start_time": "2026-03-05T22:40:00.000-03:00",
+              "display_time": "22:40"
+            },
+            {
+              "start_time": "2026-03-05T23:20:00.000-03:00",
+              "display_time": "23:20"
+            }
+          ]
+        }
+      },
+      "4_2_2026-03-05": {
+        "timestamp": 1772742289563,
+        "data": {
+          "success": true,
+          "date": "2026-03-06",
+          "slots": [
+            {
+              "start_time": "2026-03-06T09:00:00.000-03:00",
+              "display_time": "09:00"
+            },
+            {
+              "start_time": "2026-03-06T11:00:00.000-03:00",
+              "display_time": "11:00"
+            },
+            {
+              "start_time": "2026-03-06T11:40:00.000-03:00",
+              "display_time": "11:40"
+            },
+            {
+              "start_time": "2026-03-06T12:20:00.000-03:00",
+              "display_time": "12:20"
+            },
+            {
+              "start_time": "2026-03-06T13:00:00.000-03:00",
+              "display_time": "13:00"
+            }
+          ]
+        }
+      },
+      "1_1_2024-03-18": {
+        "timestamp": 1772746205964,
+        "data": {
+          "success": true,
+          "date": null,
+          "slots": [],
+          "message": "No availability in the next 7 days"
+        }
+      },
+      "2_1_2024-03-05": {
+        "timestamp": 1772750710550,
+        "data": {
+          "success": true,
+          "date": null,
+          "slots": [],
+          "message": "No availability in the next 7 days"
+        }
+      },
+      "4_1_2024-03-05": {
+        "timestamp": 1772750710123,
+        "data": {
+          "success": true,
+          "date": null,
+          "slots": [],
+          "message": "No availability in the next 7 days"
+        }
+      },
+      "3_1_2024-03-05": {
+        "timestamp": 1772750710342,
+        "data": {
+          "success": true,
+          "date": null,
+          "slots": [],
+          "message": "No availability in the next 7 days"
+        }
+      },
+      "1_1_2024-03-05": {
+        "timestamp": 1772750710842,
+        "data": {
+          "success": true,
+          "date": null,
+          "slots": [],
+          "message": "No availability in the next 7 days"
+        }
+      },
+      "5_1_2024-03-15": {
+        "timestamp": 1772751069541,
+        "data": {
+          "success": true,
+          "date": null,
+          "slots": [],
+          "message": "No availability in the next 7 days"
+        }
+      },
+      "4_1_2024-03-15": {
+        "timestamp": 1772751069764,
+        "data": {
+          "success": true,
+          "date": null,
+          "slots": [],
+          "message": "No availability in the next 7 days"
+        }
+      },
+      "3_1_2024-03-15": {
+        "timestamp": 1772751069990,
+        "data": {
+          "success": true,
+          "date": null,
+          "slots": [],
+          "message": "No availability in the next 7 days"
+        }
+      },
+      "2_1_2024-03-15": {
+        "timestamp": 1772751070202,
+        "data": {
+          "success": true,
+          "date": null,
+          "slots": [],
+          "message": "No availability in the next 7 days"
+        }
+      },
+      "1_1_2024-03-15": {
+        "timestamp": 1772751070812,
+        "data": {
+          "success": true,
+          "date": null,
+          "slots": [],
+          "message": "No availability in the next 7 days"
+        }
+      },
+      "1_1_2026-03-06": {
+        "timestamp": 1772756152885,
+        "data": {
+          "success": true,
+          "date": "2026-03-06",
+          "slots": [
+            {
+              "start_time": "2026-03-06T00:00:00.000-03:00",
+              "display_time": "00:00"
+            },
+            {
+              "start_time": "2026-03-06T00:40:00.000-03:00",
+              "display_time": "00:40"
+            },
+            {
+              "start_time": "2026-03-06T01:20:00.000-03:00",
+              "display_time": "01:20"
+            },
+            {
+              "start_time": "2026-03-06T02:00:00.000-03:00",
+              "display_time": "02:00"
+            },
+            {
+              "start_time": "2026-03-06T02:40:00.000-03:00",
+              "display_time": "02:40"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "meta": null,
+  "pinData": null,
+  "versionId": "4205ff27-3d52-476c-a465-52768a08ed72",
+  "activeVersionId": "4205ff27-3d52-476c-a465-52768a08ed72",
+  "versionCounter": 141,
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-03-02T02:19:34.753Z",
+      "createdAt": "2026-03-02T02:19:34.753Z",
+      "role": "workflow:owner",
+      "workflowId": "oi5AiSoJRbzDf2A8",
+      "projectId": "1q616I3NzJFEiwV5",
+      "project": {
+        "updatedAt": "2026-03-02T02:24:01.899Z",
+        "createdAt": "2026-03-02T00:39:33.634Z",
+        "id": "1q616I3NzJFEiwV5",
+        "name": "Roger Gallegos <baba.orere@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "29ad78ad-2907-4d12-a03c-326ce29a717c"
+      }
+    }
+  ],
+  "tags": []
+}

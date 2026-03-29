@@ -1,0 +1,638 @@
+{
+  "updatedAt": "2026-03-18T14:18:47.268Z",
+  "createdAt": "2026-03-13T23:22:40.811Z",
+  "id": "hJtyeGLsMtOxLbAd",
+  "name": "WF6_Rollback_Workflow",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "path": "rollback-booking",
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "rollback-booking",
+      "id": "1a17a026-279c-4c69-a8f5-97adb8962805"
+    },
+    {
+      "parameters": {},
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -200
+      ],
+      "id": "dd027c6f-bd54-4a7b-82e5-0707a79072fb"
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        200
+      ],
+      "id": "87386e3b-1c4a-40b9-b3c8-dbdf6bef05c9"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst input = $input.first().json;\nconst body = input.body || input;\n\nconst UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;\n\nlet booking_id = body.booking_id || null;\nif (booking_id && !UUID_RE.test(booking_id)) {\n  booking_id = null;\n}\n\nconst payload = {\n  gcal_event_id: body.gcal_event_id || null,\n  booking_id: booking_id,\n  lock_key: body.lock_key || null,\n  owner_token: body.owner_token || null,\n  reason: String(body.reason || 'manual_rollback').substring(0, 500)\n};\n\nif (!payload.gcal_event_id && !payload.booking_id && !payload.lock_key) {\n  return [{ json: {\n    _valid: false,\n    success: false,\n    error_code: 'INVALID_INPUT',\n    error_message: 'Rollback requires at least one valid ID (gcal_event_id, booking_id, or lock_key)',\n    data: null,\n    _meta: { source: 'WF6_Rollback_Workflow', timestamp: new Date().toISOString() }\n  }}];\n}\n\nconst b64Reason = Buffer.from(payload.reason).toString('base64');\n\nreturn [{ json: {\n  _valid: true,\n  ...payload,\n  b64_reason: b64Reason,\n  _rollback: {\n    initiated_at: new Date().toISOString(),\n    steps: { gcal: { success: true, skipped: true }, db: { success: true, skipped: true }, lock: { success: true, skipped: true } }\n  }\n}}];\n"
+      },
+      "name": "Validate & Prepare",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        250,
+        0
+      ],
+      "id": "7ef9be29-215f-451e-a1f9-626bf4fde60c"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Gate GCal: only pass items with gcal_event_id\nconst input = $input.first().json;\nif (!input.gcal_event_id) return [];\nreturn [{ json: input }];",
+        "mode": "runOnceForAllItems"
+      },
+      "name": "Gate GCal",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        500,
+        -100
+      ],
+      "id": "gate-gcal-wf6-01"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Gate GCal Skip: pass items without gcal_event_id\nconst input = $input.first().json;\nif (input.gcal_event_id) return [];\nreturn [{ json: { ...input, _gcal_skipped: true } }];",
+        "mode": "runOnceForAllItems"
+      },
+      "name": "Gate GCal Skip",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        500,
+        100
+      ],
+      "id": "gate-gcal-skip-wf6-01"
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "calendar": {
+          "__rl": true,
+          "value": "primary",
+          "mode": "list"
+        },
+        "eventId": "={{ $json.gcal_event_id }}"
+      },
+      "name": "Delete GCal",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        750,
+        -100
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "OsRBfz3Cs7Ph5uV5",
+          "name": "Google Calendar account"
+        }
+      },
+      "onError": "continueErrorOutput",
+      "id": "cda63d2d-b78f-4c67-8031-f7e98b0e289a"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nconst prev = $('Validate & Prepare').first().json;\nconst isError = !!input.message;\n// 404 is acceptable (idempotency)\nconst is404 = isError && (input.message.includes('404') || input.message.toLowerCase().includes('not found'));\n\nreturn [{ json: {\n  ...prev,\n  _rollback: {\n    ...prev._rollback,\n    steps: { ...prev._rollback.steps, gcal: { success: !isError || is404, skipped: false, error: isError && !is404 ? input.message : null } }\n  }\n}}];"
+      },
+      "name": "Post GCal",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1000,
+        0
+      ],
+      "id": "c1e6082f-9e75-4975-bd75-eed7a7c87e3d"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Gate DB: only pass items with booking_id\nconst input = $input.first().json;\nif (!input.booking_id) return [];\nreturn [{ json: input }];",
+        "mode": "runOnceForAllItems"
+      },
+      "name": "Gate DB",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        -100
+      ],
+      "id": "gate-db-wf6-01"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\n\nif (!input.booking_id) {\n  return [{ json: { ...input, _skip_db_cancel: true } }];\n}\n\nconst UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;\nif (!UUID_RE.test(input.booking_id)) {\n  return [{ json: { ...input, _skip_db_cancel: true, _error: 'Invalid booking_id UUID' } }];\n}\n\nconst reason = (input.reason || 'manual_rollback').replace(/'/g, \"''\").substring(0, 500);\nconst query = \"UPDATE bookings SET status = 'CANCELLED', cancelled_at = NOW(), cancellation_reason = '\" + reason + \"' WHERE id = '\" + input.booking_id + \"'::uuid AND status != 'CANCELLED' RETURNING id;\";\n\nreturn [{ json: { ...input, cancel_query: query } }];"
+      },
+      "name": "Layer 2 - Build Cancel Query",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1600,
+        -100
+      ],
+      "id": "wf6-layer2-cancel-001"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Gate DB Skip: pass items without booking_id\nconst input = $input.first().json;\nif (input.booking_id) return [];\nreturn [{ json: { ...input, _db_skipped: true } }];",
+        "mode": "runOnceForAllItems"
+      },
+      "name": "Gate DB Skip",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        100
+      ],
+      "id": "gate-db-skip-wf6-01"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{ $json.cancel_query }}"
+      },
+      "name": "Cancel DB",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1500,
+        -100
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "5LzvCP9BsQwCi9Z0",
+          "name": "Postgres account"
+        }
+      },
+      "onError": "continueErrorOutput",
+      "id": "fb364762-253a-4c35-8331-04df6955e4c6"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nconst prev = $('Post GCal').first().json;\nconst isError = !!input.message;\nreturn [{ json: {\n  ...prev,\n  _rollback: {\n    ...prev._rollback,\n    steps: { ...prev._rollback.steps, db: { success: !isError, skipped: false, was_updated: !!input.id, error: isError ? input.message : null } }\n  }\n}}];"
+      },
+      "name": "Post DB",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1750,
+        0
+      ],
+      "id": "6a2665f9-664a-45af-80f6-6a5011c382b4"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Gate Lock: only pass items with lock_key\nconst input = $input.first().json;\nif (!input.lock_key) return [];\nreturn [{ json: input }];",
+        "mode": "runOnceForAllItems"
+      },
+      "name": "Gate Lock",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1800,
+        -100
+      ],
+      "id": "gate-lock-wf6-01"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\n\nif (!input.lock_key || !input.owner_token) {\n  return [{ json: { ...input, _skip_lock_release: true } }];\n}\n\nconst SAFE_STR_RE = /^[a-zA-Z0-9_-]{1,255}$/;\nif (!SAFE_STR_RE.test(input.lock_key) || !SAFE_STR_RE.test(input.owner_token)) {\n  return [{ json: { ...input, _skip_lock_release: true, _error: 'Invalid lock_key or owner_token format' } }];\n}\n\nconst lockKey = input.lock_key.replace(/'/g, \"''\");\nconst ownerToken = input.owner_token.replace(/'/g, \"''\");\nconst query = \"DELETE FROM booking_locks WHERE lock_key = '\" + lockKey + \"'::text AND owner_token = '\" + ownerToken + \"'::text RETURNING lock_id;\";\n\nreturn [{ json: { ...input, release_query: query } }];"
+      },
+      "name": "Layer 2 - Build Release Query",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2350,
+        -100
+      ],
+      "id": "wf6-layer2-release-001"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Gate Lock Skip: pass items without lock_key\nconst input = $input.first().json;\nif (input.lock_key) return [];\nreturn [{ json: { ...input, _lock_skipped: true } }];",
+        "mode": "runOnceForAllItems"
+      },
+      "name": "Gate Lock Skip",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1800,
+        100
+      ],
+      "id": "gate-lock-skip-wf6-01"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{ $json.release_query }}"
+      },
+      "name": "Release Lock",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2250,
+        -100
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "5LzvCP9BsQwCi9Z0",
+          "name": "Postgres account"
+        }
+      },
+      "onError": "continueErrorOutput",
+      "id": "89143e4a-d7af-4eb1-806f-ca85f4e6f44d"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\nconst prev = $('Post DB').first().json;\nconst isError = !!input.message;\nreturn [{ json: {\n  ...prev,\n  _rollback: {\n    ...prev._rollback,\n    steps: { ...prev._rollback.steps, lock: { success: !isError, skipped: false, was_released: !!input.lock_id, error: isError ? input.message : null } }\n  }\n}}];"
+      },
+      "name": "Post Lock",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2500,
+        0
+      ],
+      "id": "5368ee53-8cb2-4f97-8f03-7bfd18d3f513"
+    },
+    {
+      "parameters": {
+        "jsCode": "const rb = $input.first().json._rollback;\nconst steps = rb.steps;\nconst hasFailure = !steps.gcal.success || !steps.db.success || !steps.lock.success;\n\nreturn [{ json: {\n  success: !hasFailure,\n  error_code: hasFailure ? 'PARTIAL_ROLLBACK_FAILED' : null,\n  error_message: hasFailure ? 'Some rollback steps failed' : null,\n  data: {\n    rollback_completed: !hasFailure,\n    steps: steps,\n    initiated_at: rb.initiated_at,\n    completed_at: new Date().toISOString()\n  },\n  _meta: { source: 'WF6_Rollback_Workflow', timestamp: new Date().toISOString(), workflow_id: $workflow.id }\n}}];"
+      },
+      "name": "Standard Contract Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2750,
+        0
+      ],
+      "id": "d55d8213-f5b8-4b25-b9a5-ef263fd9baa4"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Gate Valid: only pass valid items to rollback flow\nconst input = $input.first().json;\nif (input._valid !== true) return [];\nreturn [{ json: input }];",
+        "mode": "runOnceForAllItems"
+      },
+      "name": "Gate Valid",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        -100
+      ],
+      "id": "gate-valid-wf6-01"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Gate Valid Skip: pass validation errors to output\nconst input = $input.first().json;\nif (input._valid === true) return [];\nreturn [{ json: {\n  success: false,\n  error_code: input.error_code || 'INVALID_INPUT',\n  error_message: input.error_message || 'Invalid rollback input',\n  data: null,\n  _meta: { source: 'WF6_Rollback_Workflow', timestamp: new Date().toISOString(), workflow_id: $workflow.id }\n}}];",
+        "mode": "runOnceForAllItems"
+      },
+      "name": "Gate Valid Skip",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        150
+      ],
+      "id": "gate-valid-skip-wf6-01"
+    },
+    {
+      "parameters": {
+        "respondWith": "firstIncomingItem",
+        "options": {}
+      },
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        2950,
+        0
+      ],
+      "id": "respond-webhook-wf6-01"
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Validate & Prepare",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate & Prepare",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Validate & Prepare",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate & Prepare": {
+      "main": [
+        [
+          {
+            "node": "Gate Valid",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Gate Valid Skip",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gate Valid": {
+      "main": [
+        [
+          {
+            "node": "Gate GCal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gate Valid Skip": {
+      "main": [
+        [
+          {
+            "node": "Standard Contract Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gate GCal": {
+      "main": [
+        [
+          {
+            "node": "Delete GCal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gate GCal Skip": {
+      "main": [
+        [
+          {
+            "node": "Post GCal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete GCal": {
+      "main": [
+        [
+          {
+            "node": "Post GCal",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Post GCal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post GCal": {
+      "main": [
+        [
+          {
+            "node": "Gate DB",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Gate DB Skip",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gate DB": {
+      "main": [
+        [
+          {
+            "node": "Layer 2 - Build Cancel Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gate DB Skip": {
+      "main": [
+        [
+          {
+            "node": "Post DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cancel DB": {
+      "main": [
+        [
+          {
+            "node": "Post DB",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Post DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post DB": {
+      "main": [
+        [
+          {
+            "node": "Gate Lock",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Gate Lock Skip",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gate Lock": {
+      "main": [
+        [
+          {
+            "node": "Layer 2 - Build Release Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gate Lock Skip": {
+      "main": [
+        [
+          {
+            "node": "Post Lock",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Release Lock": {
+      "main": [
+        [
+          {
+            "node": "Post Lock",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Post Lock",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post Lock": {
+      "main": [
+        [
+          {
+            "node": "Standard Contract Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Standard Contract Output": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Layer 2 - Build Cancel Query": {
+      "main": [
+        [
+          {
+            "node": "Cancel DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Layer 2 - Build Release Query": {
+      "main": [
+        [
+          {
+            "node": "Release Lock",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": true
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": null,
+  "versionId": "dc2d4964-ac10-452e-b2de-f6b72b3bfbc2",
+  "activeVersionId": "dc2d4964-ac10-452e-b2de-f6b72b3bfbc2",
+  "versionCounter": 87,
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-03-13T23:22:40.811Z",
+      "createdAt": "2026-03-13T23:22:40.811Z",
+      "role": "workflow:owner",
+      "workflowId": "hJtyeGLsMtOxLbAd",
+      "projectId": "1q616I3NzJFEiwV5",
+      "project": {
+        "updatedAt": "2026-03-02T02:24:01.899Z",
+        "createdAt": "2026-03-02T00:39:33.634Z",
+        "id": "1q616I3NzJFEiwV5",
+        "name": "Roger Gallegos <baba.orere@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "29ad78ad-2907-4d12-a03c-326ce29a717c"
+      }
+    }
+  ],
+  "tags": []
+}

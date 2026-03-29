@@ -1,0 +1,33 @@
+summary: ''
+description: ''
+lock: '!inline f/gcal_create_event/main.script.lock'
+kind: script
+schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  properties:
+    description:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    calendarID:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    startTime:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    title:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+  required:
+    - startTime
+    - title
+    - description
+    - calendarID

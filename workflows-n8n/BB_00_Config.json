@@ -1,0 +1,256 @@
+{
+  "updatedAt": "2026-03-18T22:44:19.767Z",
+  "createdAt": "2026-03-03T19:25:00.498Z",
+  "id": "9aK8rsjujaBEDmDp",
+  "name": "BB_00_Config",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {},
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        200
+      ],
+      "id": "41bea39f-1a54-417f-b9af-250fce75fec7"
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        400
+      ],
+      "id": "ad399099-32eb-4a8c-8a8a-35af9d6776f9"
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "bb-00-config",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        600
+      ],
+      "webhookId": "bb-00-config",
+      "id": "6a2ec381-e29f-4186-9946-9c7c464f5549"
+    },
+    {
+      "parameters": {
+        "jsCode": "// BB_00_Config — Global Constants (Community Edition replacement for $vars)\n// Centralizado: un solo lugar para mantener todas las constantes\nreturn [{\n  json: {\n    success: true,\n    error_code: null,\n    error_message: null,\n    data: {\n      N8N_EDITOR_BASE_URL: 'https://n8n.stax.ink',\n      TELEGRAM_ADMIN_ID: '5391760292',\n      BUSINESS_EMAIL: 'baba.orere@gmail.com',\n      DEFAULT_PROVIDER_ID: 1,\n      DEFAULT_SERVICE_ID: 1,\n      DAL_SERVICE_URL: 'http://127.0.0.1:3000'\n    },\n    _meta: {\n      source: 'BB_00_Config',\n      timestamp: new Date().toISOString(),\n      workflow_id: $workflow.id,\n      version: '1.0.0'\n    }\n  }\n}];"
+      },
+      "name": "Global Constants",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        250,
+        400
+      ],
+      "id": "750278b6-9ce1-4806-861e-46f218eab2c8"
+    },
+    {
+      "parameters": {
+        "respondWith": "firstIncomingItem",
+        "options": {}
+      },
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "id": "bb-respond-01"
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [[{ "node": "Global Constants", "type": "main", "index": 0 }]]
+    },
+    "Execute Workflow Trigger": {
+      "main": [[{ "node": "Global Constants", "type": "main", "index": 0 }]]
+    },
+    "Webhook": {
+      "main": [[{ "node": "Global Constants", "type": "main", "index": 0 }]]
+    },
+    "Global Constants": {
+      "main": [[{ "node": "Respond to Webhook", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": true
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": null,
+  "versionId": "9f56f61a-ac6b-4257-a4d2-1aaee538c921",
+  "activeVersionId": "9f56f61a-ac6b-4257-a4d2-1aaee538c921",
+  "versionCounter": 49,
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-03-03T19:25:00.498Z",
+      "createdAt": "2026-03-03T19:25:00.498Z",
+      "role": "workflow:owner",
+      "workflowId": "9aK8rsjujaBEDmDp",
+      "projectId": "1q616I3NzJFEiwV5",
+      "project": {
+        "updatedAt": "2026-03-02T02:24:01.899Z",
+        "createdAt": "2026-03-02T00:39:33.634Z",
+        "id": "1q616I3NzJFEiwV5",
+        "name": "Roger Gallegos <baba.orere@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "29ad78ad-2907-4d12-a03c-326ce29a717c"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-03-18T22:44:19.768Z",
+    "createdAt": "2026-03-18T22:44:19.768Z",
+    "versionId": "9f56f61a-ac6b-4257-a4d2-1aaee538c921",
+    "workflowId": "9aK8rsjujaBEDmDp",
+    "nodes": [
+      {
+        "parameters": {},
+        "name": "Manual Trigger",
+        "type": "n8n-nodes-base.manualTrigger",
+        "typeVersion": 1,
+        "position": [
+          0,
+          200
+        ],
+        "id": "41bea39f-1a54-417f-b9af-250fce75fec7"
+      },
+      {
+        "parameters": {
+          "inputSource": "passthrough"
+        },
+        "name": "Execute Workflow Trigger",
+        "type": "n8n-nodes-base.executeWorkflowTrigger",
+        "typeVersion": 1.1,
+        "position": [
+          0,
+          400
+        ],
+        "id": "ad399099-32eb-4a8c-8a8a-35af9d6776f9"
+      },
+      {
+        "parameters": {
+          "httpMethod": "GET",
+          "path": "bb-00-config",
+          "responseMode": "lastNode",
+          "options": {}
+        },
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2.1,
+        "position": [
+          0,
+          600
+        ],
+        "webhookId": "bb-00-config",
+        "id": "6a2ec381-e29f-4186-9946-9c7c464f5549"
+      },
+      {
+        "parameters": {
+          "jsCode": "// BB_00_Config — Global Constants (Community Edition replacement for $vars)\n// Centralizado: un solo lugar para mantener todas las constantes\nreturn [{\n  json: {\n    N8N_EDITOR_BASE_URL: 'https://n8n.stax.ink',\n    TELEGRAM_ADMIN_ID: '5391760292',\n    BUSINESS_EMAIL: 'baba.orere@gmail.com',\n    DEFAULT_PROVIDER_ID: 1,\n    DEFAULT_SERVICE_ID: 1,\n    DAL_SERVICE_URL: 'http://127.0.0.1:3000',\n    _meta: {\n      source: 'BB_00_Config',\n      timestamp: new Date().toISOString(),\n      version: '1.0.0'\n    }\n  }\n}];"
+        },
+        "name": "Global Constants",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          250,
+          400
+        ],
+        "id": "750278b6-9ce1-4806-861e-46f218eab2c8"
+      }
+    ],
+    "connections": {
+      "Manual Trigger": {
+        "main": [
+          [
+            {
+              "node": "Global Constants",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Execute Workflow Trigger": {
+        "main": [
+          [
+            {
+              "node": "Global Constants",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Webhook": {
+        "main": [
+          [
+            {
+              "node": "Global Constants",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Roger Gallegos",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-03-18T22:44:26.654Z",
+        "id": 1451,
+        "workflowId": "9aK8rsjujaBEDmDp",
+        "versionId": "9f56f61a-ac6b-4257-a4d2-1aaee538c921",
+        "event": "deactivated",
+        "userId": "29ad78ad-2907-4d12-a03c-326ce29a717c"
+      },
+      {
+        "createdAt": "2026-03-18T22:44:26.671Z",
+        "id": 1452,
+        "workflowId": "9aK8rsjujaBEDmDp",
+        "versionId": "9f56f61a-ac6b-4257-a4d2-1aaee538c921",
+        "event": "activated",
+        "userId": "29ad78ad-2907-4d12-a03c-326ce29a717c"
+      },
+      {
+        "createdAt": "2026-03-18T22:44:19.798Z",
+        "id": 1449,
+        "workflowId": "9aK8rsjujaBEDmDp",
+        "versionId": "9f56f61a-ac6b-4257-a4d2-1aaee538c921",
+        "event": "deactivated",
+        "userId": "29ad78ad-2907-4d12-a03c-326ce29a717c"
+      },
+      {
+        "createdAt": "2026-03-18T22:44:19.815Z",
+        "id": 1450,
+        "workflowId": "9aK8rsjujaBEDmDp",
+        "versionId": "9f56f61a-ac6b-4257-a4d2-1aaee538c921",
+        "event": "activated",
+        "userId": "29ad78ad-2907-4d12-a03c-326ce29a717c"
+      }
+    ]
+  }
+}

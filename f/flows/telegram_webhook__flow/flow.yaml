@@ -1,0 +1,132 @@
+summary: Telegram Webhook - Single Provider (v5.0)
+description: |
+  Flow simplificado para sistema single-provider.
+  Recibe webhooks de Telegram, parsea el mensaje, detecta intención con AI,
+  y ejecuta acciones de booking.
+  
+  CAMBIOS v5.0:
+  - NO extrae provider_id ni service_id (hay uno solo)
+  - Los IDs se auto-inyectan desde system_config
+  - Mensajes de confirmación simplificados (sin nombre de proveedor)
+
+  Flujo:
+  1. Webhook HTTP recibe mensaje de Telegram
+  2. Parsea el mensaje (extrae chat_id, texto)
+  3. AI Agent detecta la intención
+  4. Ejecuta acción (crear/cancelar/reservar) - auto-inyecta provider/service
+  5. Envía respuesta por Telegram
+value:
+  modules:
+    - id: webhook_trigger
+      value:
+        lock: "!inline telegram_webhook_trigger.lock"
+        type: rawscript
+        content: "!inline telegram_webhook_trigger.ts"
+        language: bun
+        input_transforms:
+          event:
+            expr: |
+              // Windmill pasa el body del webhook como 'event'
+              flow_input
+            type: javascript
+      summary: Telegram Webhook Trigger
+    - id: parse_message
+      value:
+        path: f/internal/message_parser
+        type: script
+        input_transforms:
+          text:
+            expr: results.webhook_trigger.text
+            type: javascript
+          chat_id:
+            expr: results.webhook_trigger.chat_id
+            type: javascript
+      summary: Parsear mensaje de Telegram
+    - id: gate_parser_error
+      value:
+        lock: "!inline check_parser_error.lock"
+        type: rawscript
+        content: "!inline check_parser_error.ts"
+        language: bun
+        input_transforms: {}
+      skip_if:
+        expr: |
+          !results.parse_message.success
+      summary: Check parser error
+    - id: ai_agent
+      value:
+        path: f/internal/ai_agent
+        type: script
+        input_transforms:
+          text:
+            expr: results.parse_message.data.text
+            type: javascript
+          chat_id:
+            expr: results.parse_message.data.chat_id
+            type: javascript
+      summary: AI Agent - Detectar intención (v5.0 - NO extrae provider/service)
+    - id: execute_action
+      value:
+        path: f/flows/booking_orchestrator__flow
+        type: script
+        input_transforms:
+          chat_id:
+            expr: results.ai_agent.data?.chat_id || results.parse_message.data.chat_id
+            type: javascript
+          user_name:
+            expr: results.webhook_trigger.username
+            type: javascript
+          service_id:
+            type: static
+            value: 1
+            # NOTA: El valor real se obtiene de system_config en el backend
+          start_time:
+            expr: |
+              const entities = results.ai_agent.data?.entities || {};
+              return entities.start_time || '';
+            type: javascript
+          user_email:
+            expr: |
+              const entities = results.ai_agent.data?.entities || {};
+              return entities.email || ''
+            type: javascript
+          provider_id:
+            type: static
+            value: 1
+            # NOTA: El valor real se obtiene de system_config en el backend
+      summary: Ejecutar acción de booking (auto-inyecta provider/service)
+    - id: send_telegram_response
+      value:
+        path: f/telegram_send
+        type: script
+        input_transforms:
+          text:
+            expr: >
+              const booking = results.execute_action.data;
+
+              if (booking?.id) {
+                return `✅ *Reserva Confirmada*\n\nID: \`${booking.id}\`\nFecha: ${booking.start_time}`;
+              }
+
+              return results.ai_agent.data?.ai_response || 'Procesado';
+            type: javascript
+          chat_id:
+            expr: results.execute_action.data?.chat_id || results.ai_agent.data?.chat_id
+            type: javascript
+      summary: Enviar respuesta por Telegram (sin nombre de proveedor)
+schema:
+  type: object
+  properties:
+    webhook_payload:
+      type: object
+      description: Payload del webhook de Telegram
+      properties:
+        message:
+          type: object
+          properties:
+            chat:
+              type: object
+            text:
+              type: string
+            from:
+              type: object

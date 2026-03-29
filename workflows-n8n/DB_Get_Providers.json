@@ -1,0 +1,192 @@
+{
+  "name": "DB_Get_Providers",
+  "nodes": [
+    {
+      "parameters": {},
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 0],
+      "id": "prov-manual-01"
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [0, 200],
+      "id": "prov-trigger-01"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "db-get-providers",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [0, 400],
+      "webhookId": "db-get-providers",
+      "id": "prov-webhook-01"
+    },
+    {
+      "parameters": {
+        "jsCode": "// LAYER 1+2: Extract & Validate (§4.1 PRE-validate)\n// Zero-throw: returns Standard Contract error, never throws\n\nconst raw = $input.first().json;\nconst input = (raw.body && typeof raw.body === 'object') ? raw.body : raw;\n\nfunction ve(code, msg) {\n  return [{ json: {\n    success: false, error_code: code, error_message: msg, data: null,\n    _meta: { source: 'DB_Get_Providers', timestamp: new Date().toISOString(), workflow_id: $workflow.id },\n    _exit_early: true\n  }}];\n}\n\n// === ACTIVE FILTER VALIDATION (optional) ===\nlet active = null;\nif (input.active !== undefined && input.active !== null) {\n  if (typeof input.active === 'boolean') {\n    active = input.active;\n  } else if (typeof input.active === 'string') {\n    const activeStr = input.active.toLowerCase().trim();\n    if (activeStr === 'true' || activeStr === '1') {\n      active = true;\n    } else if (activeStr === 'false' || activeStr === '0') {\n      active = false;\n    } else {\n      return ve('INVALID_TYPE', 'active must be a boolean (true/false)');\n    }\n  } else {\n    return ve('INVALID_TYPE', 'active must be a boolean (true/false)');\n  }\n}\n\nreturn [{ json: {\n  success: true,\n  active,\n  _validated: true\n}}];",
+        "mode": "runOnceForAllItems"
+      },
+      "name": "Validate Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [256, 200],
+      "id": "prov-validate-01"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Gate: only pass valid items to Build Query\nconst input = $input.first().json;\nif (input._exit_early) return [];\nreturn [{ json: input }];",
+        "mode": "runOnceForAllItems"
+      },
+      "name": "Gate Execute",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [464, 150],
+      "id": "prov-gate-execute-01"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Gate: only pass validation errors to skip query\nconst input = $input.first().json;\nif (!input._exit_early) return [];\nreturn [{ json: input }];",
+        "mode": "runOnceForAllItems"
+      },
+      "name": "Gate Skip",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [464, 450],
+      "id": "prov-gate-skip-01"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build query to get all providers\n// Note: Using only columns that exist in providers table\nconst { active } = $input.first().json;\nlet providers_query;\nif (active === null || active === undefined) {\n  providers_query = `SELECT id, name, email, active, created_at FROM providers ORDER BY name;`;\n} else if (active === true) {\n  providers_query = `SELECT id, name, email, active, created_at FROM providers WHERE active = true ORDER BY name;`;\n} else {\n  providers_query = `SELECT id, name, email, active, created_at FROM providers WHERE active = false ORDER BY name;`;\n}\n\nreturn [{ json: {\n  ...$input.first().json,\n  providers_query,\n  active\n}}];",
+        "mode": "runOnceForAllItems"
+      },
+      "name": "Build Providers Query",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [672, 150],
+      "id": "prov-build-query-01"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "={{ $json.providers_query }}",
+        "options": {}
+      },
+      "name": "Execute Providers Query",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [880, 150],
+      "alwaysOutputData": true,
+      "id": "prov-execute-pg-01",
+      "credentials": {
+        "postgres": {
+          "id": "5LzvCP9BsQwCi9Z0",
+          "name": "Postgres account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Handle DB error during providers query\nconst e = $input.first().json;\nconst upstreamData = $('Build Providers Query').isExecuted ? $('Build Providers Query').first().json : {};\nlet error_code = 'DB_QUERY_ERROR';\nlet error_message = e.message || e.error?.message || 'Database query error';\n\nif (error_message.includes('connection') || error_message.includes('ECONNREFUSED')) {\n  error_code = 'DB_CONNECTION_ERROR';\n  error_message = 'Database connection failed';\n} else if (error_message.includes('timeout')) {\n  error_code = 'DB_TIMEOUT';\n  error_message = 'Database query timeout';\n} else if (error_message.includes('relation') && error_message.includes('does not exist')) {\n  error_code = 'TABLE_NOT_FOUND';\n  error_message = 'Providers table does not exist';\n}\n\nreturn [{ json: {\n  ...upstreamData,\n  success: false, error_code, error_message, data: null,\n  _meta: { source: 'DB_Get_Providers', timestamp: new Date().toISOString(), workflow_id: $workflow.id }\n}}];",
+        "mode": "runOnceForAllItems"
+      },
+      "name": "Handle DB Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1088, 300],
+      "id": "prov-handle-error-01"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format providers response\nconst items = $input.all();\nconst upstreamData = $('Build Providers Query').isExecuted ? $('Build Providers Query').first().json : {};\n\nlet providers = [];\n// Postgres alwaysOutputData=true returns [{json: {}}] when 0 rows\nif (items.length > 0 && Object.keys(items[0].json).length > 0) {\n  providers = items.map(item => ({\n    id: item.json.id,\n    name: item.json.name,\n    email: item.json.email,\n    active: item.json.active,\n    created_at: item.json.created_at\n  }));\n}\n\nreturn [{ json: {\n  success: true,\n  error_code: null,\n  error_message: null,\n  data: {\n    providers,\n    total: providers.length,\n    active_filter: upstreamData.active !== undefined ? upstreamData.active : null\n  },\n  _meta: {\n    source: 'DB_Get_Providers',\n    timestamp: new Date().toISOString(),\n    workflow_id: $workflow.id\n  }\n}}];",
+        "mode": "runOnceForAllItems"
+      },
+      "name": "Format Providers",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1088, 150],
+      "id": "prov-format-01"
+    },
+    {
+      "parameters": {
+        "jsCode": "// UNIFIED OUTPUT — Standard Contract (§3.2)\nconst items = $input.all();\nlet finalItem = items.find(i => i.json.data !== undefined || i.json.error_code !== undefined);\nif (!finalItem) finalItem = items.find(i => i.json._exit_early);\nif (!finalItem) { \n  return [{ json: { success: false, error_code: 'PIPELINE_ERROR', error_message: 'No valid output found', data: null, _meta: { source: 'DB_Get_Providers', timestamp: new Date().toISOString(), workflow_id: $workflow.id } } }]; \n}\nconst input = finalItem.json;\nreturn [{ json: {\n  success: input.success === true,\n  error_code: input.error_code || null,\n  error_message: input.error_message || null,\n  data: input.data || null,\n  _meta: input._meta || {\n    source: 'DB_Get_Providers',\n    timestamp: new Date().toISOString(),\n    workflow_id: $workflow.id\n  }\n}}];",
+        "mode": "runOnceForAllItems"
+      },
+      "name": "Format Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1300, 300],
+      "id": "prov-format-response-01"
+    },
+    {
+      "parameters": {
+        "respondWith": "firstIncomingItem",
+        "options": {}
+      },
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1500, 300],
+      "id": "prov-respond-01"
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [[{ "node": "Validate Input", "type": "main", "index": 0 }]]
+    },
+    "Execute Workflow Trigger": {
+      "main": [[{ "node": "Validate Input", "type": "main", "index": 0 }]]
+    },
+    "Webhook": {
+      "main": [[{ "node": "Validate Input", "type": "main", "index": 0 }]]
+    },
+    "Validate Input": {
+      "main": [[
+        { "node": "Gate Execute", "type": "main", "index": 0 },
+        { "node": "Gate Skip", "type": "main", "index": 0 }
+      ]]
+    },
+    "Gate Execute": {
+      "main": [[{ "node": "Build Providers Query", "type": "main", "index": 0 }]]
+    },
+    "Gate Skip": {
+      "main": [[{ "node": "Format Response", "type": "main", "index": 0 }]]
+    },
+    "Build Providers Query": {
+      "main": [[{ "node": "Execute Providers Query", "type": "main", "index": 0 }]]
+    },
+    "Execute Providers Query": {
+      "main": [
+        [{ "node": "Format Providers", "type": "main", "index": 0 }],
+        [{ "node": "Handle DB Error", "type": "main", "index": 0 }]
+      ]
+    },
+    "Handle DB Error": {
+      "main": [[{ "node": "Format Response", "type": "main", "index": 0 }]]
+    },
+    "Format Providers": {
+      "main": [[{ "node": "Format Response", "type": "main", "index": 0 }]]
+    },
+    "Format Response": {
+      "main": [[{ "node": "Respond to Webhook", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "active": true
+}

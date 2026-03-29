@@ -1,0 +1,200 @@
+{
+  "updatedAt": "2026-03-20T14:58:53.390Z",
+  "createdAt": "2026-03-14T15:38:07.283Z",
+  "id": "85HqM7BIAApvfKbm",
+  "name": "DLQ_02_Get_Status",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "path": "dlq/status",
+        "httpMethod": "GET",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "webhookId": "dlq-status",
+      "id": "c5e44a17-f1d0-48e2-a7c6-47eb963af792"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT COALESCE(status, 'empty') as status, COUNT(*) as count\nFROM booking_dlq\nGROUP BY status\nUNION ALL\nSELECT 'total' as status, COUNT(*) as count FROM booking_dlq\nHAVING COUNT(*) = 0;",
+        "options": {}
+      },
+      "name": "Get DB Stats",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "credentials": {
+        "postgres": {
+          "id": "5LzvCP9BsQwCi9Z0",
+          "name": "Postgres account"
+        }
+      },
+      "onError": "continueErrorOutput",
+      "id": "5ade372f-a469-4287-81ef-d932861429f6"
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all();\nconst stats = {\n  pending: 0,\n  resolved: 0,\n  discarded: 0,\n  total: 0\n};\n\nrows.forEach(row => {\n  const s = row.json.status;\n  const c = parseInt(row.json.count);\n  if (stats.hasOwnProperty(s)) stats[s] = c;\n  stats.total += c;\n});\n\nreturn [{\n  json: {\n    success: true,\n    error_code: null,\n    error_message: null,\n    data: {\n      pending_count: stats.pending,\n      resolved_count: stats.resolved,\n      discarded_count: stats.discarded,\n      total_items: stats.total\n    },\n    _meta: {\n      source: 'DLQ_02_Get_Status',\n      timestamp: new Date().toISOString(),\n      workflow_id: $workflow.id\n    }\n  }\n}];"
+      },
+      "name": "Format Status Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "id": "d4b6fd20-b1e9-4091-90c9-752517db4ad3"
+    },
+    {
+      "parameters": {
+        "respondWith": "firstIncomingItem",
+        "options": {}
+      },
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "id": "dlq-respond-01"
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{ "node": "Get DB Stats", "type": "main", "index": 0 }]]
+    },
+    "Get DB Stats": {
+      "main": [
+        [{ "node": "Format Status Response", "type": "main", "index": 0 }],
+        [{ "node": "Format Status Response", "type": "main", "index": 0 }]
+      ]
+    },
+    "Format Status Response": {
+      "main": [[{ "node": "Respond to Webhook", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": true
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": null,
+  "versionId": "3a6ec81d-2560-4ec8-98e4-65106c78dd38",
+  "activeVersionId": "3a6ec81d-2560-4ec8-98e4-65106c78dd38",
+  "versionCounter": 29,
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-03-14T15:38:07.283Z",
+      "createdAt": "2026-03-14T15:38:07.283Z",
+      "role": "workflow:owner",
+      "workflowId": "85HqM7BIAApvfKbm",
+      "projectId": "1q616I3NzJFEiwV5",
+      "project": {
+        "updatedAt": "2026-03-02T02:24:01.899Z",
+        "createdAt": "2026-03-02T00:39:33.634Z",
+        "id": "1q616I3NzJFEiwV5",
+        "name": "Roger Gallegos <baba.orere@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "29ad78ad-2907-4d12-a03c-326ce29a717c"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-03-20T14:58:53.391Z",
+    "createdAt": "2026-03-20T14:58:53.391Z",
+    "versionId": "3a6ec81d-2560-4ec8-98e4-65106c78dd38",
+    "workflowId": "85HqM7BIAApvfKbm",
+    "nodes": [
+      {
+        "parameters": {
+          "path": "dlq/status",
+          "httpMethod": "GET",
+          "responseMode": "lastNode",
+          "options": {}
+        },
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2.1,
+        "webhookId": "dlq-status",
+        "id": "c5e44a17-f1d0-48e2-a7c6-47eb963af792"
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "SELECT COALESCE(status, 'empty') as status, COUNT(*) as count\nFROM booking_dlq\nGROUP BY status\nUNION ALL\nSELECT 'total' as status, COUNT(*) as count FROM booking_dlq\nHAVING COUNT(*) = 0;",
+          "options": {}
+        },
+        "name": "Get DB Stats",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.6,
+        "credentials": {
+          "postgres": {
+            "id": "5LzvCP9BsQwCi9Z0",
+            "name": "Postgres account"
+          }
+        },
+        "id": "5ade372f-a469-4287-81ef-d932861429f6"
+      },
+      {
+        "parameters": {
+          "jsCode": "const rows = $input.all();\nconst stats = {\n  pending: 0,\n  resolved: 0,\n  discarded: 0,\n  total: 0\n};\n\nrows.forEach(row => {\n  const s = row.json.status;\n  const c = parseInt(row.json.count);\n  if (stats.hasOwnProperty(s)) stats[s] = c;\n  stats.total += c;\n});\n\nreturn [{\n  json: {\n    success: true,\n    error_code: null,\n    error_message: null,\n    data: {\n      pending_count: stats.pending,\n      resolved_count: stats.resolved,\n      discarded_count: stats.discarded,\n      total_items: stats.total\n    },\n    _meta: {\n      source: 'DLQ_02_Get_Status',\n      timestamp: new Date().toISOString(),\n      workflow_id: $workflow.id\n    }\n  }\n}];"
+        },
+        "name": "Format Status Response",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "id": "d4b6fd20-b1e9-4091-90c9-752517db4ad3"
+      }
+    ],
+    "connections": {
+      "Webhook": {
+        "main": [
+          [
+            {
+              "node": "Get DB Stats",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Get DB Stats": {
+        "main": [
+          [
+            {
+              "node": "Format Status Response",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Roger Gallegos",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-03-20T14:58:53.419Z",
+        "id": 1572,
+        "workflowId": "85HqM7BIAApvfKbm",
+        "versionId": "3a6ec81d-2560-4ec8-98e4-65106c78dd38",
+        "event": "deactivated",
+        "userId": "29ad78ad-2907-4d12-a03c-326ce29a717c"
+      },
+      {
+        "createdAt": "2026-03-20T14:58:53.437Z",
+        "id": 1573,
+        "workflowId": "85HqM7BIAApvfKbm",
+        "versionId": "3a6ec81d-2560-4ec8-98e4-65106c78dd38",
+        "event": "activated",
+        "userId": "29ad78ad-2907-4d12-a03c-326ce29a717c"
+      }
+    ]
+  }
+}

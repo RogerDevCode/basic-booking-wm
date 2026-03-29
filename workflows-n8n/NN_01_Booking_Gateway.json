@@ -1,0 +1,391 @@
+{
+  "name": "NN_01_Booking_Gateway",
+  "nodes": [
+    {
+      "parameters": {},
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        1824,
+        320
+      ],
+      "id": "gw-manual-01"
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        1824,
+        688
+      ],
+      "id": "gw-trigger-01"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "nn-01-booking-gateway",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        1824,
+        512
+      ],
+      "webhookId": "nn-01-booking-gateway",
+      "id": "gw-webhook-01"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "SN9Vp2VKGnQZoskT",
+          "mode": "id"
+        },
+        "mode": "wait",
+        "options": {}
+      },
+      "name": "Parse Incoming Payload (NN_02)",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        2048,
+        512
+      ],
+      "id": "gw-nn02-01"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Gate: only pass valid parser results to AI\nconst nn02 = $input.first().json;\nif (!nn02.success) return [];\nreturn [{ json: nn02 }];",
+        "mode": "runOnceForAllItems"
+      },
+      "name": "Gate Parser OK",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2224,
+        450
+      ],
+      "id": "gw-gate-parser-01"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Gate Skip: pass parser errors to final response\nconst nn02 = $input.first().json;\nif (nn02.success) return [];\nreturn [{ json: nn02 }];",
+        "mode": "runOnceForAllItems"
+      },
+      "name": "Gate Parser Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2224,
+        650
+      ],
+      "id": "gw-gate-parser-error-01"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "text",
+              "name": "text",
+              "value": "={{ $('Parse Incoming Payload (NN_02)').first().json.data?.text }}",
+              "type": "string"
+            },
+            {
+              "id": "chat_id",
+              "name": "chat_id",
+              "value": "={{ $('Parse Incoming Payload (NN_02)').first().json.data?.chat_id }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Prepare AI Input",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2400,
+        450
+      ],
+      "id": "gw-prepare-ai-01"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "hiEJxddaGJ1InA9s",
+          "mode": "id"
+        },
+        "mode": "wait",
+        "options": {}
+      },
+      "name": "Execute Pipeline Agent (NN_03-B)",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        2576,
+        450
+      ],
+      "id": "gw-nn03b-01"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Gate: only pass successful AI results to Telegram\nconst ai = $input.first().json;\nif (!ai.success) return [];\nreturn [{ json: ai }];",
+        "mode": "runOnceForAllItems"
+      },
+      "name": "Gate AI OK",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2752,
+        400
+      ],
+      "id": "gw-gate-ai-01"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Gate Skip: pass AI errors to error formatter\nconst ai = $input.first().json;\nif (ai.success) return [];\nreturn [{ json: ai }];",
+        "mode": "runOnceForAllItems"
+      },
+      "name": "Gate AI Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2752,
+        600
+      ],
+      "id": "gw-gate-ai-error-01"
+    },
+    {
+      "parameters": {
+        "jsCode": "const nn02 = $('Parse Incoming Payload (NN_02)').first()?.json || {};\nconst ai = $('Execute Pipeline Agent (NN_03-B)').first()?.json || {};\n\nconst chat_id = nn02.data?.chat_id || ai.data?.chat_id;\nconst error_msg = ai.error_message || 'El servicio está congestionado o experimentó un error temporal. Por favor, intenta de nuevo en un momento.';\n\nreturn [{ json: {\n  chat_id: chat_id,\n  text: \"⚠️ Error del asistente:\\n\" + error_msg\n} }];",
+        "mode": "runOnceForAllItems"
+      },
+      "name": "Format Telegram Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2928,
+        600
+      ],
+      "id": "gw-format-tg-error-01"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "pBqrvNAXXhCHrtWx",
+          "mode": "id"
+        },
+        "mode": "wait",
+        "options": {}
+      },
+      "name": "Send Telegram Response (NN_04)",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        2928,
+        400
+      ],
+      "id": "gw-nn04-01"
+    },
+    {
+      "parameters": {
+        "jsCode": "// NN_01_Booking_Gateway v1.0.0 - Final Response\nlet nn02 = {};\nif ($('Parse Incoming Payload (NN_02)').isExecuted) {\n  nn02 = $('Parse Incoming Payload (NN_02)').first()?.json || {};\n}\n\nlet ai = {};\nif ($('Execute Pipeline Agent (NN_03-B)').isExecuted) {\n  ai = $('Execute Pipeline Agent (NN_03-B)').first()?.json || {};\n}\n\nlet tg = {};\nif ($('Send Telegram Response (NN_04)').isExecuted) {\n  tg = $('Send Telegram Response (NN_04)').first()?.json || {};\n}\n\n// Telegram is ok if we got message_id or delivery status SENT\nconst tgOk = !!(tg.success || tg.data?.message_id);\nconst isSuccess = !!(nn02.success && ai.success && (tgOk || !$('Send Telegram Response (NN_04)').isExecuted));\n\nlet errCode = null;\nlet errMsg = null;\nif (!nn02.success) { errCode = nn02.error_code || 'VALIDATION_ERROR'; errMsg = nn02.error_message; }\nelse if (!ai.success) { errCode = ai.error_code || 'AI_ERROR'; errMsg = ai.error_message; }\nelse if ($('Send Telegram Response (NN_04)').isExecuted && !tgOk) { errCode = tg.error_code || 'TELEGRAM_API_ERROR'; errMsg = tg.error_message || 'Telegram failed to send message'; }\n\nreturn [{ json: {\n  success: isSuccess,\n  error_code: isSuccess ? null : errCode,\n  error_message: isSuccess ? null : errMsg,\n  data: isSuccess ? {\n    message_sent: true,\n    chat_id: ai.data?.chat_id || nn02.data?.chat_id,\n    ai_response: ai.data?.ai_response,\n    intent: ai.data?.intent\n  } : null,\n  _meta: { source: 'NN_01_Booking_Gateway', workflow_id: $workflow.id, timestamp: new Date().toISOString(), version: '1.0.0' }\n} }];",
+        "mode": "runOnceForAllItems"
+      },
+      "name": "Final Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3280,
+        500
+      ],
+      "id": "gw-final-response-01"
+    },
+    {
+      "parameters": {
+        "respondWith": "firstIncomingItem",
+        "options": {}
+      },
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        3500,
+        500
+      ],
+      "id": "gw-respond-01"
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Parse Incoming Payload (NN_02)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Parse Incoming Payload (NN_02)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Parse Incoming Payload (NN_02)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Incoming Payload (NN_02)": {
+      "main": [
+        [
+          {
+            "node": "Gate Parser OK",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Gate Parser Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gate Parser OK": {
+      "main": [
+        [
+          {
+            "node": "Prepare AI Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gate Parser Error": {
+      "main": [
+        [
+          {
+            "node": "Final Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare AI Input": {
+      "main": [
+        [
+          {
+            "node": "Execute Pipeline Agent (NN_03-B)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Pipeline Agent (NN_03-B)": {
+      "main": [
+        [
+          {
+            "node": "Gate AI OK",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Gate AI Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gate AI OK": {
+      "main": [
+        [
+          {
+            "node": "Send Telegram Response (NN_04)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gate AI Error": {
+      "main": [
+        [
+          {
+            "node": "Format Telegram Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Telegram Error": {
+      "main": [
+        [
+          {
+            "node": "Send Telegram Response (NN_04)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Telegram Response (NN_04)": {
+      "main": [
+        [
+          {
+            "node": "Final Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Final Response": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "active": true
+}

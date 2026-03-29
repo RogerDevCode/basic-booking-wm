@@ -1,0 +1,21 @@
+summary: ''
+description: ''
+lock: '!inline f/distributed_lock_release/main.script.lock'
+kind: script
+schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  properties:
+    lockKey:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    ownerToken:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+  required:
+    - lockKey
+    - ownerToken

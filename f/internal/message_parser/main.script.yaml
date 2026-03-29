@@ -1,0 +1,24 @@
+summary: ''
+description: ''
+lock: '!inline f/internal/message_parser/main.script.lock'
+kind: script
+schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  properties:
+    input:
+      type: object
+      description: ''
+      default: null
+      format: resource-message_parser_input
+      properties:
+        chat_id:
+          type: string
+          description: ''
+          originalType: string
+        text:
+          type: string
+          description: ''
+          originalType: string
+  required:
+    - input
