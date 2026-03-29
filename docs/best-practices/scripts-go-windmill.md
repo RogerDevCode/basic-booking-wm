@@ -190,7 +190,7 @@ func main() (map[string]any, error) {
 ```bash
 # Configurar variables en UI: Variables → New Variable
 # Path: f/variables/groq-key
-# Value: gsk_xxx
+# Value: gsk_***REDACTED***
 # Secret: ✅ (enmascarado en logs)
 
 # Referenciar en scripts:

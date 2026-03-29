@@ -337,7 +337,7 @@ DATABASE_URL=postgresql://user:password@localhost:5432/bookings
 SERVER_PORT=8080
 LOG_LEVEL=info
 REDIS_URL=redis://localhost:6379
-GROQ_API_KEY=gsk_xxx
+GROQ_API_KEY=gsk_***REDACTED***
 OPENAI_API_KEY=sk-xxx
 TELEGRAM_BOT_TOKEN=xxx
 

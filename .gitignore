@@ -46,3 +46,4 @@ coverage/
 # Windmill credentials (never commit)
 resources/credentials.json
 secrets/
+resources/*.json

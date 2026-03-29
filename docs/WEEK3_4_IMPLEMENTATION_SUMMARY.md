@@ -36,7 +36,7 @@
 **Configuración Requerida:**
 ```bash
 # Groq (primary)
-GROQ_API_KEY=gsk_xxx
+GROQ_API_KEY=gsk_***REDACTED***
 
 # OpenAI (fallback)
 OPENAI_API_KEY=sk-xxx

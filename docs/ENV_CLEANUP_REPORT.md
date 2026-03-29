@@ -105,8 +105,8 @@ export DEV_LOCAL_TELEGRAM_TOKEN="8581822135:AAE..."
 export TELEGRAM_ID="5391760292"
 
 # LLMs
-export GROQ_API_KEY="gsk_02dDKD8wCT..."
-export OPENAI_API_KEY="sk-proj-VuR5IEQ..."
+export GROQ_API_KEY="gsk_***REDACTED***..."
+export OPENAI_API_KEY="sk-proj-***REDACTED***..."
 ```
 
 ### Docker Compose (Solo configuración local)
@@ -163,8 +163,8 @@ DEV_LOCAL_TELEGRAM_TOKEN=8581822135:AAE...
 TELEGRAM_ID=5391760292
 
 # LLMs
-GROQ_API_KEY=gsk_02dDKD8wCT...
-OPENAI_API_KEY=sk-proj-VuR5IEQ...
+GROQ_API_KEY=gsk_***REDACTED***...
+OPENAI_API_KEY=sk-proj-***REDACTED***...
 ```
 
 ### Docker Local (en `docker-compose/.env`)

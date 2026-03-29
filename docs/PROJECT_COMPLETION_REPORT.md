@@ -356,7 +356,7 @@ GMAIL_PASSWORD=app-password
 GOOGLE_CREDENTIALS_JSON={"type":"service_account",...}
 
 # LLM
-GROQ_API_KEY=gsk_xxx
+GROQ_API_KEY=gsk_***REDACTED***
 # OR
 OPENAI_API_KEY=sk-xxx
 

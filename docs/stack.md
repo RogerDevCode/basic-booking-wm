@@ -572,7 +572,7 @@ GOOGLE_CREDENTIALS_JSON={"type":"service_account",...}
 ### LLM APIs
 
 ```bash
-GROQ_API_KEY=gsk_xxx
+GROQ_API_KEY=gsk_***REDACTED***
 OPENAI_API_KEY=sk-xxx
 ```
 
