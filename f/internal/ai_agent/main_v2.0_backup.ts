@@ -1,8 +1,6 @@
-// AI Agent v2.1 - FIXED Intent Priority & Scoring
-// Corrige bugs detectados por Red Team:
-// 1. Cancel/Reschedule tienen prioridad sobre Create
-// 2. Generic verbs no determinan intent por sí solos
-// 3. Flexibilidad mejor detectada
+// AI Agent v2.0 - Enhanced with Availability Context
+// Detecta intención del usuario, urgencia, contexto y sugiere tipo de respuesta
+// Equivalente mejorado de NN_03_AI_Agent
 
 export interface AIAgentInput {
   chat_id: string;
@@ -20,9 +18,10 @@ export interface AIAgentEntities {
   start_time?: string;
   date?: string;
   time?: string;
-  date_range?: string;
+  date_range?: string; // "hoy", "mañana", "próxima semana", "este mes"
 }
 
+// NUEVO: Contexto para respuestas de disponibilidad
 export interface AvailabilityContext {
   is_today: boolean;
   is_tomorrow: boolean;
@@ -30,33 +29,34 @@ export interface AvailabilityContext {
   is_flexible: boolean;
   is_specific_date: boolean;
   time_preference: 'morning' | 'afternoon' | 'evening' | 'any';
-  day_preference?: string;
+  day_preference?: string; // "monday", "tuesday", etc.
 }
 
+// NUEVO: Tipo de respuesta sugerida
 export type SuggestedResponseType =
-  | 'availability_list'
-  | 'no_availability_today'
-  | 'no_availability_extended'
-  | 'urgent_options'
-  | 'general_search'
-  | 'filtered_search'
-  | 'booking_confirmation'
-  | 'cancellation_flow'
-  | 'reschedule_flow'
-  | 'clarifying_question'
-  | 'greeting_response'
-  | 'fallback';
+  | 'availability_list'           // Hay disponibilidad, mostrar lista
+  | 'no_availability_today'       // No hay hoy, sugerir mañana
+  | 'no_availability_extended'    // No hay en 7+ días, lista de espera
+  | 'urgent_options'              // Urgencia, mostrar opciones prioritarias
+  | 'general_search'              // Búsqueda general sin fecha específica
+  | 'filtered_search'             // Búsqueda con filtros (día/horario)
+  | 'booking_confirmation'        // Confirmar detalles de reserva
+  | 'cancellation_flow'           // Flujo de cancelación
+  | 'reschedule_flow'             // Flujo de reagendamiento
+  | 'clarifying_question'         // Necesita más información
+  | 'greeting_response'           // Saludo
+  | 'fallback';                   // Respuesta genérica
 
 export interface AIAgentData {
   intent: string;
   chat_id: string;
   entities: AIAgentEntities;
   confidence: number;
-  context: AvailabilityContext;
-  suggested_response_type: SuggestedResponseType;
+  context: AvailabilityContext;  // NUEVO
+  suggested_response_type: SuggestedResponseType;  // NUEVO
   ai_response?: string;
-  needs_more_info?: boolean;
-  follow_up_question?: string;
+  needs_more_info?: boolean;  // NUEVO
+  follow_up_question?: string;  // NUEVO
 }
 
 export interface AIAgentResponse {
@@ -83,81 +83,29 @@ const INTENTS = {
   GREETING: 'greeting',
   FAREWELL: 'farewell',
   THANK_YOU: 'thank_you',
-  URGENT_CARE: 'urgent_care',
+  URGENT_CARE: 'urgent_care',  // NUEVO
   UNKNOWN: 'unknown'
 };
 
-// ============================================================================
-// FIX #1: Keywords con pesos de prioridad
-// ============================================================================
-
-// Specific intents have higher weight (detected first)
-const INTENT_KEYWORDS: Record<string, { keywords: string[]; weight: number }> = {
-  // Priority 5: Maximum (urgency)
-  [INTENTS.URGENT_CARE]: { 
-    keywords: ['urgente', 'emergencia', 'urgencia', 'ya mismo', 'ahora mismo', 'inmediato', 'dolor'], 
-    weight: 5 
-  },
-  
-  // Priority 3: High (cancel, reschedule - specific actions)
-  [INTENTS.CANCEL_APPOINTMENT]: { 
-    keywords: ['cancelar', 'anular', 'eliminar', 'borrar'], 
-    weight: 3 
-  },
-  [INTENTS.RESCHEDULE_APPOINTMENT]: { 
-    keywords: ['reprogramar', 'cambiar', 'mover', 'trasladar', 'pasar'], 
-    weight: 3 
-  },
-  
-  // Priority 2: Medium (availability check)
-  [INTENTS.CHECK_AVAILABILITY]: { 
-    keywords: ['disponibilidad', 'disponible', 'hueco', 'espacio', 'libre', 'tiene', 'tienen'], 
-    weight: 2 
-  },
-  
-  // Priority 1: Low (generic booking)
-  [INTENTS.CREATE_APPOINTMENT]: { 
-    keywords: ['reservar', 'agendar', 'citar', 'crear', 'nueva', 'nuevo', 'turno'], 
-    weight: 1 
-  },
-  
-  // Priority 1: Low (greetings, farewells)
-  [INTENTS.GREETING]: { 
-    keywords: ['hola', 'buenos', 'buenas', 'saludos', 'qué tal', 'que tal'], 
-    weight: 1 
-  },
-  [INTENTS.FAREWELL]: { 
-    keywords: ['adiós', 'chao', 'chau', 'hasta', 'nos vemos'], 
-    weight: 1 
-  },
-  [INTENTS.THANK_YOU]: { 
-    keywords: ['gracias', 'agradezco', 'thank'], 
-    weight: 1 
-  },
+// Keywords for intent detection (enhanced)
+const INTENT_KEYWORDS: Record<string, string[]> = {
+  [INTENTS.CREATE_APPOINTMENT]: ['reservar', 'agendar', 'citar', 'crear', 'nueva', 'nuevo', 'quiero', 'deseo', 'para', 'turno'],
+  [INTENTS.CANCEL_APPOINTMENT]: ['cancelar', 'anular', 'eliminar', 'borrar'],
+  [INTENTS.RESCHEDULE_APPOINTMENT]: ['reprogramar', 'cambiar', 'mover', 'trasladar', 'pasar'],
+  [INTENTS.CHECK_AVAILABILITY]: ['disponibilidad', 'disponible', 'hueco', 'espacio', 'libre', 'tiene', 'tienen'],
+  [INTENTS.LIST_PROVIDERS]: ['proveedores', 'profesionales', 'doctores', 'médicos', 'doctor', 'doctora'],
+  [INTENTS.LIST_SERVICES]: ['servicios', 'tratamientos', 'procedimientos', 'consulta'],
+  [INTENTS.GREETING]: ['hola', 'buenos', 'buenas', 'saludos', 'qué tal', 'que tal'],
+  [INTENTS.FAREWELL]: ['adiós', 'chao', 'chau', 'hasta', 'nos vemos'],
+  [INTENTS.THANK_YOU]: ['gracias', 'agradezco', 'thank'],
+  [INTENTS.URGENT_CARE]: ['urgente', 'emergencia', 'urgencia', 'ya mismo', 'ahora mismo', 'inmediato', 'dolor', 'urgencia']  // NUEVO
 };
-
-// ============================================================================
-// FIX #2: Generic verbs that should NOT determine intent by themselves
-// ============================================================================
-
-const GENERIC_VERBS = ['quiero', 'deseo', 'necesito', 'para', 'me sirve'];
 
 // Palabras clave para detectar urgencia
 const URGENCY_KEYWORDS = ['urgente', 'emergencia', 'urgencia', 'ya', 'inmediato', 'dolor', 'molesto', 'rápido', 'pronto', 'antes'];
 
-// Palabras clave para detectar flexibilidad (FIX #3: Enhanced)
-const FLEXIBILITY_KEYWORDS = [
-  'cualquier', 
-  'lo que tengas', 
-  'lo que conviene', 
-  'indistinto', 
-  'flexible',
-  'cualquiera',
-  'lo que esté',
-  'lo que haya',
-  'primero que',
-  'mejor que'
-];
+// Palabras clave para detectar flexibilidad
+const FLEXIBILITY_KEYWORDS = ['cualquier', 'lo que', 'lo que tengas', 'indistinto', 'cualquiera', 'primero', 'mejor', 'conviene'];
 
 // Preferencias horarias
 const TIME_PREFERENCES: Record<string, string[]> = {
@@ -194,9 +142,9 @@ const RELATIVE_DATES: Record<string, string> = {
 };
 
 export async function main(input: AIAgentInput): Promise<AIAgentResponse> {
-  const source = "NN_03_AI_Agent_v2.1";
-  const workflowID = "ai-agent-v2.1";
-  const version = "2.1.0";
+  const source = "NN_03_AI_Agent_v2";
+  const workflowID = "ai-agent-v2";
+  const version = "2.0.0";
 
   const { chat_id, text, user_profile } = input;
 
@@ -213,16 +161,16 @@ export async function main(input: AIAgentInput): Promise<AIAgentResponse> {
 
   const textLower = text.toLowerCase().trim();
 
-  // === 1. INTENT DETECTION (FIXED with priority scoring) ===
-  const { detectedIntent, confidence } = detectIntentWithPriority(textLower);
+  // === 1. INTENT DETECTION (Enhanced with scoring) ===
+  const { detectedIntent, confidence } = detectIntent(textLower);
 
   // === 2. ENTITY EXTRACTION (Enhanced) ===
   const entities = extractEntities(textLower);
 
-  // === 3. CONTEXT DETECTION (Enhanced) ===
+  // === 3. CONTEXT DETECTION (NEW) ===
   const context = detectContext(textLower, entities);
 
-  // === 4. SUGGESTED RESPONSE TYPE ===
+  // === 4. SUGGESTED RESPONSE TYPE (NEW) ===
   const suggestedResponseType = suggestResponseType(detectedIntent, context, entities);
 
   // === 5. GENERATE AI RESPONSE (Enhanced) ===
@@ -243,78 +191,43 @@ export async function main(input: AIAgentInput): Promise<AIAgentResponse> {
       chat_id,
       entities,
       confidence,
-      context,
-      suggested_response_type: suggestedResponseType,
+      context,  // NEW
+      suggested_response_type: suggestedResponseType,  // NEW
       ai_response: aiResponse,
-      needs_more_info: needsMoreInfo,
-      follow_up_question: followUpQuestion
+      needs_more_info: needsMoreInfo,  // NEW
+      follow_up_question: followUpQuestion  // NEW
     },
     _meta: { source, timestamp: new Date().toISOString(), workflow_id: workflowID, version }
   };
 }
 
 // ============================================================================
-// FIX #1: Priority-based intent detection
+// HELPER FUNCTIONS
 // ============================================================================
 
-function detectIntentWithPriority(text: string): { detectedIntent: string; confidence: number } {
-  // Step 1: Check urgency FIRST (highest priority)
-  const urgencyScore = scoreKeywords(text, URGENCY_KEYWORDS);
-  if (urgencyScore >= 1) {
-    return {
-      detectedIntent: INTENTS.URGENT_CARE,
-      confidence: Math.min(1.0, urgencyScore / 2.0)
-    };
-  }
+function detectIntent(text: string): { detectedIntent: string; confidence: number } {
+  let detectedIntent = INTENTS.UNKNOWN;
+  let maxScore = 0;
 
-  // Step 2: Score all intents with weighted keywords
-  let bestIntent = INTENTS.UNKNOWN;
-  let maxWeightedScore = 0;
-
-  // Process intents in priority order (high to low weight)
-  const priorityOrder = [
-    INTENTS.CANCEL_APPOINTMENT,    // weight 3
-    INTENTS.RESCHEDULE_APPOINTMENT, // weight 3
-    INTENTS.CHECK_AVAILABILITY,     // weight 2
-    INTENTS.CREATE_APPOINTMENT,     // weight 1
-    INTENTS.GREETING,               // weight 1
-    INTENTS.FAREWELL,               // weight 1
-    INTENTS.THANK_YOU,              // weight 1
-  ];
-
-  for (const intent of priorityOrder) {
-    const config = INTENT_KEYWORDS[intent];
-    const score = scoreKeywords(text, config.keywords);
-    const weightedScore = score * config.weight;
-
-    // Only override if significantly better score
-    if (weightedScore > maxWeightedScore) {
-      maxWeightedScore = weightedScore;
-      bestIntent = intent;
+  for (const [intent, keywords] of Object.entries(INTENT_KEYWORDS)) {
+    const score = keywords.filter(kw => text.includes(kw)).length;
+    if (score > maxScore) {
+      maxScore = score;
+      detectedIntent = intent;
     }
   }
 
-  // Step 3: Calculate confidence
-  const confidence = maxWeightedScore > 0 
-    ? Math.min(1.0, maxWeightedScore / 6.0)  // Normalize (max possible = 3 keywords * weight 3 = 9)
-    : 0.3;
-
-  return { detectedIntent: bestIntent, confidence };
-}
-
-function scoreKeywords(text: string, keywords: string[]): number {
-  let score = 0;
-  for (const kw of keywords) {
-    if (text.includes(kw)) {
-      score++;
-    }
+  // Detectar urgencia como intent prioritario
+  const urgencyScore = URGENCY_KEYWORDS.filter(kw => text.includes(kw)).length;
+  if (urgencyScore >= 2 || (urgencyScore >= 1 && (detectedIntent === INTENTS.CREATE_APPOINTMENT || detectedIntent === INTENTS.CHECK_AVAILABILITY))) {
+    detectedIntent = INTENTS.URGENT_CARE;
+    maxScore = Math.max(maxScore, urgencyScore);
   }
-  return score;
-}
 
-// ============================================================================
-// HELPER FUNCTIONS (unchanged from v2.0)
-// ============================================================================
+  const confidence = maxScore > 0 ? Math.min(maxScore / 3, 1.0) : 0.3;
+
+  return { detectedIntent, confidence };
+}
 
 function extractEntities(text: string): AIAgentEntities {
   const entities: AIAgentEntities = {};
@@ -331,10 +244,10 @@ function extractEntities(text: string): AIAgentEntities {
     entities.service_id = serviceMatch[1];
   }
 
-  // Extract date
+  // Extract date (enhanced with relative dates)
   const datePatterns = [
-    /(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/,
-    /(\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2})/,
+    /(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/,  // DD/MM/YYYY or DD-MM-YYYY
+    /(\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2})/,     // YYYY-MM-DD
   ];
 
   for (const pattern of datePatterns) {
@@ -345,7 +258,7 @@ function extractEntities(text: string): AIAgentEntities {
     }
   }
 
-  // Extract relative dates
+  // Extract relative dates (hoy, mañana, etc.)
   for (const [relative, value] of Object.entries(RELATIVE_DATES)) {
     if (text.includes(relative)) {
       entities.date_range = relative;
@@ -356,7 +269,7 @@ function extractEntities(text: string): AIAgentEntities {
     }
   }
 
-  // Extract time
+  // Extract time (enhanced)
   const timePatterns = [
     /(\d{1,2}:\d{2}\s*(am|pm|hrs|horas)?)/i,
     /(\d{1,2}\s*(am|pm|hrs|horas))/i,
@@ -398,20 +311,16 @@ function detectContext(text: string, entities: AIAgentEntities): AvailabilityCon
   }
 
   // Detect is_urgent
-  const urgencyScore = scoreKeywords(text, URGENCY_KEYWORDS);
+  const urgencyScore = URGENCY_KEYWORDS.filter(kw => text.includes(kw)).length;
   context.is_urgent = urgencyScore >= 1;
 
-  // Detect is_flexible (FIX #3: Enhanced)
-  for (const kw of FLEXIBILITY_KEYWORDS) {
-    if (text.includes(kw)) {
-      context.is_flexible = true;
-      break;
-    }
-  }
+  // Detect is_flexible
+  const flexibilityScore = FLEXIBILITY_KEYWORDS.filter(kw => text.includes(kw)).length;
+  context.is_flexible = flexibilityScore >= 1;
 
   // Detect time_preference
   for (const [pref, keywords] of Object.entries(TIME_PREFERENCES)) {
-    const score = scoreKeywords(text, keywords);
+    const score = keywords.filter(kw => text.includes(kw)).length;
     if (score >= 1) {
       context.time_preference = pref as 'morning' | 'afternoon' | 'evening' | 'any';
       break;
@@ -464,10 +373,7 @@ function suggestResponseType(
   // Availability checks
   if (intent === INTENTS.CHECK_AVAILABILITY) {
     if (context.is_today) {
-      return 'no_availability_today';
-    }
-    if (context.is_tomorrow) {
-      return 'no_availability_today';
+      return 'no_availability_today'; // Asumir el peor caso, el sistema ajustará
     }
     if (context.is_specific_date) {
       return 'availability_list';
@@ -496,6 +402,7 @@ function generateAIResponse(
   let followUpQuestion: string | undefined;
 
   const isFirstTime = user_profile?.is_first_time ?? true;
+  const bookingCount = user_profile?.booking_count ?? 0;
 
   switch (responseType) {
     case 'urgent_options':
@@ -544,7 +451,7 @@ function generateAIResponse(
     case 'general_search':
       aiResponse = `📅 Te ayudo a buscar disponibilidad. 
 
-${context.is_flexible ? '✨ Veo que eres flexible, eso es bueno! ' : ''}¿Tienes alguna preferencia de:
+${context.is_flexible ? 'Veo que eres flexible, eso es bueno! ' : ''}¿Tienes alguna preferencia de:
 - 📅 Día de la semana?
 - 🕐 Horario (mañana, tarde)?
 - 📆 Esta semana o la próxima?`;
@@ -553,7 +460,7 @@ ${context.is_flexible ? '✨ Veo que eres flexible, eso es bueno! ' : ''}¿Tiene
       break;
 
     case 'filtered_search':
-      aiResponse = `📅 Entendido! Busco disponibilidad${context.day_preference ? ` los ${context.day_preference}` : ''}${context.time_preference !== 'any' ? ` por la ${context.time_preference}` : ''}.
+      aiResponse = `📅 Entendido! Buscas disponibilidad${context.day_preference ? ` los ${context.day_preference}` : ''}${context.time_preference !== 'any' ? ` por la ${context.time_preference}` : ''}.
       
 Déjame consultar la agenda con esos filtros...`;
       break;
@@ -566,7 +473,7 @@ ${entities.date ? `- 📅 Fecha: ${entities.date}` : '- 📅 Fecha: Por definir'
 ${entities.time ? `- 🕐 Hora: ${entities.time}` : '- 🕐 Hora: Por definir'}
 ${entities.service_id ? `- 🏥 Servicio: ${entities.service_id}` : '- 🏥 Servicio: Por definir'}
 
-${isFirstTime ? '👋 Veo que es tu primera vez! ' : ''}¿Confirmas estos detalles para reservar?`;
+${isFirstTime ? '👋 Veo que es tu primera vez! ' : ''}${bookingCount > 5 ? '🌟 Gracias por tu confianza! ' : ''}¿Confirmas estos detalles para reservar?`;
       break;
 
     case 'cancellation_flow':
