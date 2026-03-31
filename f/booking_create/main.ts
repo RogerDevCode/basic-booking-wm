@@ -31,7 +31,9 @@ export async function main(rawInput: unknown): Promise<Result<CreateBookingRespo
     const idempotencyKey = `${input.service_id}-${input.start_time}-${input.chat_id}`;
 
     // 3. TRANSACTIONAL SAFETY (Serializable)
-    return await sql.begin("serializable", async (tx) => {
+    return await sql.begin(async (tx) => {
+      // Set transaction isolation level
+      await tx`SET TRANSACTION ISOLATION LEVEL SERIALIZABLE`;
       
       // A. Check Idempotency
       const existing = await tx`
@@ -146,15 +148,15 @@ export async function main(rawInput: unknown): Promise<Result<CreateBookingRespo
       });
     });
 
-  } catch (err: unknown) {
+  } catch (e: unknown) {
     // We catch exceptions from the DB driver or our manual throws inside the transaction,
     // translating them into the Result monad pattern.
-    if (err instanceof postgres.PostgresError) {
-      if (err.code === '23P01') { // Exclusion constraint violation
-        return err(new Error("Slot unavailable - exclusion constraint violation"));
+    if (e instanceof postgres.PostgresError) {
+      if (e.code === '23P01' || e.code === '40001') { // Exclusion constraint or Serialization failure
+        return err(new Error("Slot unavailable - concurrency conflict"));
       }
-      return err(new Error(`Database error: ${err.message}`));
+      return err(new Error(`Database error: ${e.message}`));
     }
-    return err(err instanceof Error ? err : new Error(String(err)));
+    return err(e instanceof Error ? e : new Error(String(e)));
   }
 }
