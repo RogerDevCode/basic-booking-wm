@@ -35,12 +35,14 @@
     "ioredis": "^5.3.2",
     "neverthrow": "^8.2.0",
     "nodemailer": "^8.0.4",
+    "postgres": "^3.4.8",
     "zod": "^4.3.6"
   },
   "devDependencies": {
     "@tsconfig/strictest": "^2.0.2",
     "@types/node": "^20.19.37",
     "@types/nodemailer": "^7.0.11",
+    "@types/pg": "^8.20.0",
     "@typescript-eslint/eslint-plugin": "^6.19.0",
     "@typescript-eslint/parser": "^6.19.0",
     "@vitest/coverage-v8": "^1.2.0",
