@@ -1,3 +1,4 @@
+import { describe, test, expect } from "vitest";
 // AI Agent v2.0 - Tests para las nuevas funcionalidades
 // Test de detección de urgencia, contexto y sugerencia de respuestas
 

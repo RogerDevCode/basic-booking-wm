@@ -18,10 +18,10 @@
   - Implementar Base Result Pattern.
 
 ## 🏗️ Fase 2: Migración de Core y Dominio
-*Estado: 🔴 Pendiente*
+*Estado: ✅ Completado*
 
-- [ ] **2.1 Zod Schemas como Frontera**
-- [ ] **2.2 Reescritura de Utilidades sin Excepciones**
+- [x] **2.1 Zod Schemas como Frontera**
+- [x] **2.2 Reescritura de Utilidades sin Excepciones**
 
 ## 🔄 Fase 3: Migración de Scripts Windmill
 *Estado: 🔴 Pendiente*
