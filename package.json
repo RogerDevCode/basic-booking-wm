@@ -1,6 +1,6 @@
 {
   "name": "booking-titanium-wm",
-  "version": "2.3.0",
+  "version": "2.3.1",
   "description": "Medical Booking System with AI Agent - Windmill + TypeScript",
   "type": "module",
   "scripts": {
@@ -12,8 +12,10 @@
     "typecheck:watch": "tsc --noEmit -p tsconfig.strict.json --watch",
     "lint": "eslint f/ internal/ cmd/ pkg/ --ext .ts",
     "lint:fix": "eslint f/ internal/ cmd/ pkg/ --ext .ts --fix",
+    "lint:strict": "eslint f/ internal/ cmd/ pkg/ --ext .ts --max-warnings 0",
     "build": "tsc -p tsconfig.strict.json",
-    "dev": "tsx watch f/internal/ai_agent/main.ts"
+    "dev": "tsx watch f/internal/ai_agent/main.ts",
+    "check:all": "npm run typecheck && npm run lint:strict && npm run test"
   },
   "keywords": [
     "booking",
@@ -39,6 +41,10 @@
     "@vitest/coverage-v8": "^1.2.0",
     "@vitest/ui": "^1.2.0",
     "eslint": "^8.56.0",
+    "eslint-plugin-no-null": "^1.0.2",
+    "eslint-plugin-sonarjs": "^0.23.0",
+    "eslint-plugin-typescript-enum": "^2.1.0",
+    "eslint-plugin-unicorn": "^50.0.0",
     "tsx": "^4.7.0",
     "typescript": "^5.3.3",
     "vitest": "^1.2.0"
