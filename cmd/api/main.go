@@ -137,6 +137,7 @@ func main() {
 	mux.HandleFunc("/book-appointment/rag-search", ragSearchHandler)
 	mux.HandleFunc("/api/v1/bookings/", bookingsHandler)
 	mux.HandleFunc("/api/telegram/webhook", telegramWebhookHandler)
+	mux.HandleFunc("/api/gcal/webhook", gcalWebhookHandler) // Google Calendar Push Notifications
 
 	// Create HTTP server
 	server := &http.Server{
@@ -727,6 +728,155 @@ func telegramWebhookHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(response)
+}
+
+// ============================================================================
+// GOOGLE CALENDAR WEBHOOK HANDLER
+// ============================================================================
+
+// gcalWebhookHandler handles POST /api/gcal/webhook
+// Receives Google Calendar Push Notifications (webhooks)
+// Documentation: docs/GCAL_WEBHOOK_SETUP.md
+func gcalWebhookHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// 1. Verificar X-Goog-Channel-Token (seguridad)
+	token := r.Header.Get("X-Goog-Channel-Token")
+	expectedToken := os.Getenv("GCAL_WEBHOOK_TOKEN")
+	if expectedToken != "" && token != expectedToken {
+		log.Warn("GCal webhook: invalid token")
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// 2. Extraer headers de Google Calendar
+	channelID := r.Header.Get("X-Goog-Channel-ID")
+	resourceID := r.Header.Get("X-Goog-Resource-ID")
+	// resourceURI := r.Header.Get("X-Goog-Resource-URI") // No usado actualmente
+	resourceState := r.Header.Get("X-Goog-Resource-State")
+	messageNumber := r.Header.Get("X-Goog-Message-Number")
+
+	// 3. Logging (sin PII)
+	log.Info("GCal webhook received: channel=%s, resource=%s, state=%s, msg_num=%s",
+		channelID, resourceID, resourceState, messageNumber)
+
+	// 4. Procesar según el estado del recurso
+	switch resourceState {
+	case "sync":
+		// Webhook recién creado/verificado por Google
+		log.Info("GCal webhook sync confirmed")
+		// No action needed, solo responder OK
+
+	case "exists":
+		// No hay cambios, el recurso existe
+		// Ignorar silenciosamente
+		log.Debug("GCal webhook: resource exists (no changes)")
+
+	case "update":
+		// Hubo un cambio en el calendario
+		// Extraer event_id del channel_id (formato: "booking-<event_id>")
+		eventID := extractEventIDFromChannel(channelID)
+
+		if eventID != "" {
+			// Llamar a Windmill Flow para procesar el cambio
+			// Esto actualizará la DB si el evento fue cancelado/editado
+			go processGCalWebhookEvent(eventID, resourceState)
+		} else {
+			log.Warn("GCal webhook: could not extract event_id from channel_id=%s", channelID)
+		}
+
+	default:
+		log.Warn("GCal webhook: unknown resource state=%s", resourceState)
+	}
+
+	// 5. Responder 200 OK (Google espera < 3 segundos)
+	// La respuesta debe ser rápida, el procesamiento se hace asíncronamente
+	w.Header().Set("Content-Type", "text/plain")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("OK"))
+}
+
+// extractEventIDFromChannel extrae el event_id del channel_id
+// Formato esperado: "booking-<event_id>" o "<event_id>"
+func extractEventIDFromChannel(channelID string) string {
+	if channelID == "" {
+		return ""
+	}
+
+	// Si el channel_id tiene formato "booking-<event_id>", extraer event_id
+	if len(channelID) > 9 && channelID[:9] == "booking-" {
+		return channelID[9:]
+	}
+
+	// Si no, asumir que el channel_id es el event_id
+	return channelID
+}
+
+// processGCalWebhookEvent procesa el evento asíncronamente
+// Llama al script de Windmill: gcal-sync-engine
+func processGCalWebhookEvent(eventID, resourceState string) {
+	// ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	// defer cancel()
+
+	log.Info("Processing GCal webhook event: event_id=%s, state=%s", eventID, resourceState)
+
+	// Determinar acción basada en el estado
+	action := "sync_updated"
+	if resourceState == "update" {
+		// Podría ser cancelación, edición, etc.
+		// El sync engine se encarga de determinar la acción específica
+		action = "sync_from_gcal"
+	}
+
+	// Preparar payload para Windmill
+	payload := map[string]any{
+		"event_id":    eventID,
+		"status":      resourceState,
+		"calendar_id": "primary", // Default, podría venir del header
+		"source":      "webhook",
+		"action":      action,
+	}
+
+	// TODO: Implementar llamada a Windmill API
+	// Por ahora, solo logging
+	log.Info("GCal webhook event queued for processing: %v", payload)
+
+	// Ejemplo de llamada a Windmill (descomentar cuando esté configurado):
+	/*
+		windmillURL := os.Getenv("WINDMILL_API_URL")
+		if windmillURL == "" {
+			windmillURL = "https://windmill.stax.ink"
+		}
+
+		windmillToken := os.Getenv("WINDMILL_API_TOKEN")
+
+		req, err := http.NewRequestWithContext(ctx, "POST",
+			fmt.Sprintf("%s/api/workspaces/main/flows/run/f/gcal-sync-engine", windmillURL),
+			bytes.NewBufferJSON(payload))
+
+		if err != nil {
+			log.Error("Failed to create Windmill request: %v", err)
+			return
+		}
+
+		req.Header.Set("Authorization", "Bearer "+windmillToken)
+		req.Header.Set("Content-Type", "application/json")
+
+		client := &http.Client{Timeout: 30 * time.Second}
+		resp, err := client.Do(req)
+		if err != nil {
+			log.Error("Failed to call Windmill: %v", err)
+			return
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			log.Error("Windmill returned non-200 status: %d", resp.StatusCode)
+		}
+	*/
 }
 
 func ptr[T any](v T) *T {
