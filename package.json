@@ -1,0 +1,49 @@
+{
+  "name": "booking-titanium-wm",
+  "version": "2.3.0",
+  "description": "Medical Booking System with AI Agent - Windmill + TypeScript",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:ui": "vitest --ui",
+    "typecheck": "tsc --noEmit -p tsconfig.strict.json",
+    "typecheck:watch": "tsc --noEmit -p tsconfig.strict.json --watch",
+    "lint": "eslint f/ internal/ cmd/ pkg/ --ext .ts",
+    "lint:fix": "eslint f/ internal/ cmd/ pkg/ --ext .ts --fix",
+    "build": "tsc -p tsconfig.strict.json",
+    "dev": "tsx watch f/internal/ai_agent/main.ts"
+  },
+  "keywords": [
+    "booking",
+    "medical",
+    "ai",
+    "windmill",
+    "typescript"
+  ],
+  "author": "Booking Titanium Team",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.0.0",
+    "bun": ">=1.0.0"
+  },
+  "dependencies": {
+    "ioredis": "^5.3.2"
+  },
+  "devDependencies": {
+    "@tsconfig/strictest": "^2.0.2",
+    "@types/node": "^20.11.0",
+    "@typescript-eslint/eslint-plugin": "^6.19.0",
+    "@typescript-eslint/parser": "^6.19.0",
+    "@vitest/coverage-v8": "^1.2.0",
+    "@vitest/ui": "^1.2.0",
+    "eslint": "^8.56.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3",
+    "vitest": "^1.2.0"
+  },
+  "optionalDependencies": {
+    "@rollup/rollup-linux-x64-gnu": "^4.9.6"
+  }
+}
