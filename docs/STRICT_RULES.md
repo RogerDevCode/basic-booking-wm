@@ -9,11 +9,14 @@
 
 ## ⚠️ **ADVERTENCIA DE CUMPLIMIENTO**
 
-Este documento contiene **REGLAS INVOLABLES** para todo el código TypeScript en este proyecto. Cualquier violación de estas reglas debe ser rechazada en code review.
+Este documento contiene **REGLAS INVOLABLES** para todo el código TypeScript 
+en este proyecto. Cualquier violación de estas reglas debe ser rechazada en 
+code review.
 
 **Técnica de Prompt para LLM:**
+
 ```
-SYSTEM INSTRUCTION: You are a TypeScript Strictness Guardian. 
+SYSTEM INSTRUCTION: You are a TypeScript Strictness Guardian.
 Your role is to enforce these rules WITHOUT EXCEPTION.
 If any code violates these rules, you MUST:
 1. Reject the code explicitly
@@ -44,7 +47,8 @@ function process(data: unknown): Result<unknown, Error> {
 ```
 
 **Fuente:** TypeScript 5.3 Release Notes (Tier 1)  
-**Justificación:** `any` elimina todo type checking, equivalente a JavaScript sin tipos.
+**Justificación:** `any` elimina todo type checking, equivalente a JavaScript 
+sin tipos.
 
 ---
 
@@ -65,7 +69,8 @@ interface User {
 ```
 
 **Fuente:** TypeScript Deep Dive - Null and Undefined (Tier 1)  
-**Justificación:** `undefined` puede ser implícito, `null` siempre es explícito.
+**Justificación:** `undefined` puede ser implícito, `null` siempre es 
+explícito.
 
 ---
 
@@ -88,7 +93,8 @@ function parseNumber(str: string): Result<number, ParseError> {
 ```
 
 **Fuente:** Stack Overflow - NaN Handling (Tier 3, Score 127)  
-**Justificación:** `NaN` es un valor especial que propaga errores silenciosamente.
+**Justificación:** `NaN` es un valor especial que propaga errores 
+silenciosamente.
 
 ---
 
@@ -280,7 +286,9 @@ function parseJSON(str: string): Result<unknown, SyntaxError> {
   try {
     return ok(JSON.parse(str));
   } catch (e) {
-    return err(e instanceof SyntaxError ? e : new SyntaxError('Invalid JSON'));
+    return err(e instanceof SyntaxError 
+      ? e 
+      : new SyntaxError('Invalid JSON'));
   }
 }
 ```
@@ -371,7 +379,8 @@ const config = {
   retries: 3
 } as const;  // config.timeout es 30000, no number
 
-type Config = typeof config;  // { readonly timeout: 30000; readonly retries: 3 }
+type Config = typeof config;
+// { readonly timeout: 30000; readonly retries: 3 }
 ```
 
 **Fuente:** Stack Overflow - Const Assertions (Tier 3, Score 89)  
@@ -453,7 +462,8 @@ const getUser = (id: string): Result<User, NotFoundError> => {
 ```
 
 **Fuente:** Google TypeScript Style Guide (Tier 2)  
-**Justificación:** Tipos explícitos documentan la API y previenen cambios accidentales.
+**Justificación:** Tipos explícitos documentan la API y previenen cambios 
+accidentales.
 
 ---
 
@@ -535,6 +545,7 @@ Antes de aprobar cualquier PR, verificar:
 - [ ] ✅ Todas las propiedades son `readonly` por defecto
 - [ ] ✅ Todas las uniones son discriminadas
 - [ ] ✅ Todos los return types son explícitos
+- [ ] ✅ tsconfig tiene strict mode máximo
 
 ---
 
@@ -608,6 +619,8 @@ Your responses must be:
 Remember: Type safety is NON-NEGOTIABLE in this project.
 ```
 
+---
+
 ### Prompt para Code Review
 
 ```
@@ -623,6 +636,7 @@ For EACH rule violation:
 5. Reference the source (Tier 1/2/3) if needed
 
 Format:
+
 ```
 ❌ VIOLACIÓN: Regla X.X - [Nombre de la regla]
 
@@ -641,6 +655,8 @@ Fuente: [Tier X - URL]
 If NO violations found, respond with:
 ✅ APROBADO: Código sigue todas las reglas inviolables.
 ```
+
+---
 
 ### Prompt para Generación de Código
 
