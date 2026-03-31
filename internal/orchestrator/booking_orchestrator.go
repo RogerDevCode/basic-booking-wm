@@ -174,7 +174,7 @@ func BookingOrchestrator(req BookingOrchestratorRequest) types.StandardContractR
 		req.StartTime,
 		fmt.Sprintf("Reserva: %s", req.UserName),
 		fmt.Sprintf("Service ID: %s", serviceID),
-		"primary",
+		cfg.GCalCalendarID,
 	)
 
 	var gcalEventID string

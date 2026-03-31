@@ -296,12 +296,12 @@ func (q *BookingQueries) GetByID(bookingID string) (*types.Booking, error) {
 func (q *BookingQueries) Cancel(bookingID string, cancellationReason *string) (*types.Booking, error) {
 	query := `
 		UPDATE bookings 
-		SET status = 'CANCELLED', 
+		SET status = 'cancelled', 
 		    cancelled_at = NOW(), 
 		    cancellation_reason = $2,
 		    updated_at = NOW()
 		WHERE id = $1 
-		  AND status != 'CANCELLED' 
+		  AND status != 'cancelled' 
 		RETURNING id, status, cancelled_at`
 
 	row := GetDB().QueryRow(query, bookingID, cancellationReason)

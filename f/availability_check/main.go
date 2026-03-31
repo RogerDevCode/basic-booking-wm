@@ -5,8 +5,8 @@ import (
 )
 
 func main(
-	providerID int,
-	serviceID int,
+	providerID string,
+	serviceID string,
 	date string,
 ) (map[string]any, error) {
 	response := availability.CheckAvailability(providerID, serviceID, date)

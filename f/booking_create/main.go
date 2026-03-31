@@ -5,8 +5,8 @@ import (
 )
 
 func main(
-	providerID int,
-	serviceID int,
+	providerID string,
+	serviceID string,
 	startTime string,
 	chatID string,
 	userName string,

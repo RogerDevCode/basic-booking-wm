@@ -22,6 +22,7 @@ var configLog = logging.GetDefaultLogger()
 type SystemConfig struct {
 	ProviderID             string `json:"provider_id"`              // UUID del único proveedor
 	ServiceID              string `json:"service_id"`               // UUID del único servicio
+	GCalCalendarID         string `json:"gcal_calendar_id"`         // Google Calendar ID del proveedor
 	ServiceDurationMin     int    `json:"service_duration_min"`     // Duración en minutos
 	ServiceBufferMin       int    `json:"service_buffer_min"`       // Buffer entre citas
 	BookingMaxAdvanceDays  int    `json:"booking_max_advance_days"` // Días máximos de anticipación
@@ -127,6 +128,8 @@ func loadConfigFromDB() *SystemConfig {
 			cfg.ServiceDurationMin, _ = strconv.Atoi(value)
 		case "service_buffer_min":
 			cfg.ServiceBufferMin, _ = strconv.Atoi(value)
+		case "gcal_calendar_id":
+			cfg.GCalCalendarID = strings.TrimSpace(value)
 		case "booking_max_advance_days":
 			cfg.BookingMaxAdvanceDays, _ = strconv.Atoi(value)
 		case "booking_min_advance_hours":
@@ -150,16 +153,33 @@ func loadConfigFromDB() *SystemConfig {
 		return loadConfigFromEnv()
 	}
 
-	configLog.Info("System configuration loaded from DB: provider_id=%s, service_id=%s",
-		maskUUID(cfg.ProviderID), maskUUID(cfg.ServiceID))
+	// If GCalCalendarID not in system_config table, load from providers table
+	if cfg.GCalCalendarID == "" {
+		var gcalCalID string
+		err := database.QueryRow("SELECT gcal_calendar_id FROM providers WHERE id = $1", cfg.ProviderID).Scan(&gcalCalID)
+		if err == nil && gcalCalID != "" {
+			cfg.GCalCalendarID = gcalCalID
+		} else {
+			cfg.GCalCalendarID = "primary"
+		}
+	}
+
+	configLog.Info("System configuration loaded from DB: provider_id=%s, service_id=%s, gcal_calendar=%s",
+		maskUUID(cfg.ProviderID), maskUUID(cfg.ServiceID), cfg.GCalCalendarID[:min(30, len(cfg.GCalCalendarID))]+"...")
 
 	return cfg
 }
 
 func loadConfigFromEnv() *SystemConfig {
+	gcalCalID := strings.TrimSpace(os.Getenv("GCAL_CALENDAR_ID"))
+	if gcalCalID == "" {
+		gcalCalID = "primary"
+	}
+
 	cfg := &SystemConfig{
 		ProviderID:             strings.TrimSpace(os.Getenv("SINGLE_PROVIDER_ID")),
 		ServiceID:              strings.TrimSpace(os.Getenv("SINGLE_SERVICE_ID")),
+		GCalCalendarID:         gcalCalID,
 		ServiceDurationMin:     getEnvAsIntSystem("SERVICE_DURATION_MIN", 60),
 		ServiceBufferMin:       getEnvAsIntSystem("SERVICE_BUFFER_MIN", 10),
 		BookingMaxAdvanceDays:  getEnvAsIntSystem("BOOKING_MAX_ADVANCE_DAYS", 90),
@@ -297,6 +317,11 @@ func GetBookingMaxAdvanceDays() int {
 // GetBookingMinAdvanceHours returns the minimum advance booking hours
 func GetBookingMinAdvanceHours() int {
 	return GetSystemConfig().BookingMinAdvanceHours
+}
+
+// GetGCalCalendarID returns the Google Calendar ID for the provider
+func GetGCalCalendarID() string {
+	return GetSystemConfig().GCalCalendarID
 }
 
 // GetServiceEndTime calculates the end time for a booking given start time

@@ -1,49 +1,34 @@
-# Dependencies
-node_modules/
-.pnp
-.pnp.js
+# Go
+bin/
+main
+*.test
+*.out
 
-# Build output
-dist/
-build/
-
-# IDE
-.idea/
-.vscode/
-*.iml
-*.ipr
-*.iws
-
-# Windmill local
-.windmill/cache/
-.windmill/local/
-
-# Environment
+# Environment & Secrets
 .env
 .env.local
 .env.*.local
+.secrets/
+.secrets_wm/
+*.secrets
+resources/*.json
 
-# Logs
-logs/
-*.log
-npm-debug.log*
+# Windmill
+.windmill/
+wmill-lock.yaml
+main.script.lock
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
 
 # OS
 .DS_Store
 Thumbs.db
 
-# Temporary files
+# Logs
+logs/
+*.log
 temp/
-tmp/
-*.tmp
-*.bak
-*.swp
-*~
-
-# Test coverage
-coverage/
-
-# Windmill credentials (never commit)
-resources/credentials.json
-secrets/
-resources/*.json
