@@ -140,7 +140,7 @@ export const URGENCY_WORDS = ['urgente', 'emergencia', 'urgencia', 'ya mismo', '
 // FLEXIBILITY KEYWORDS
 // ============================================================================
 
-export const FLEXIBILITY_KEYWORDS = ['cualquier', 'lo que tengas', 'lo que conviene', 'indistinto', 'flexible', 'lo que tengas disponible'];
+export const FLEXIBILITY_KEYWORDS = ['cualquier', 'lo que tengas', 'lo que conviene', 'lo que más conviene', 'indistinto', 'flexible', 'lo que tengas disponible'];
 
 // ============================================================================
 // DAY NAMES (Spanish → English mapping)
