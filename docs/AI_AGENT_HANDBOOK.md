@@ -1,6 +1,8 @@
 # 🤖 AI Agent & LLM Handbook - Booking Titanium
 
-Este documento es la fuente única de verdad para la inteligencia del sistema, cubriendo desde la selección de modelos hasta la arquitectura de prompts y lógica de disponibilidad.
+**Versión:** v3.0 (Híbrido LLM + Reglas)
+**Fecha:** 2026-04-01
+**Estado:** Producción
 
 ---
 
@@ -12,75 +14,156 @@ Este documento es la fuente única de verdad para la inteligencia del sistema, c
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Primario** | **Llama 3.3 70B** | Groq | 400ms | $0.79 | 89% |
 | **Fallback** | **GPT-4o mini** | OpenAI | 350ms | $0.15 | 91% |
-| **Local/Edge** | **Phi-4 (3.8B)** | Microsoft | 50ms | $0.02 | 85% |
 
 **Configuración de Router:**
 Se prioriza **Groq** por su velocidad de inferencia (280 tokens/seg) y soporte nativo del español médico. Se usa **OpenAI** como fallback automático ante errores 429 o caídas de servicio.
 
 ---
 
-## 2. Sistema de Detección de Intents (v2.2)
+## 2. Arquitectura Híbrida (v3.0)
 
-El sistema utiliza un enfoque híbrido: **LLM para extracción semántica** + **Rule-Based Validator** para prioridades.
+### Flujo de Clasificación
 
-### Clasificación de Intents y Pesos
-| Intent | Peso | Descripción |
+```
+┌──────────────────────────────────────────────────────────────┐
+│                    AI AGENT v3.0 FLOW                        │
+│                                                              │
+│  1. VALIDATE input (Zod schema)                              │
+│  2. INPUT GUARDRAILS (injection, unicode, length)            │
+│  3. FAST-PATH: greeting/farewell/thankyou/off-topic          │
+│     → ~30% de mensajes, sin llamada LLM (~1ms)               │
+│  4. LLM PRIMARY: Groq Llama 3.3 70B                          │
+│     → System prompt con 7 secciones                          │
+│     → Temperature 0.0, max_tokens 512                        │
+│     → json_object response format                            │
+│  5. OUTPUT GUARDRAILS: schema validation, leakage check      │
+│  6. FALLBACK: Si LLM falla → detectIntentRules (keyword)     │
+│  7. MERGE: LLM intent + rule-based entities + context        │
+│  8. RESPONSE: generateAIResponse + suggestResponseType        │
+│  9. TRACE: Log estructurado con métricas                     │
+│  10. RETURN: Resultado completo                              │
+└──────────────────────────────────────────────────────────────┘
+```
+
+### Intents (Single Source of Truth)
+
+| Intent | Valor | Descripción |
 | :--- | :--- | :--- |
-| `urgent_care` | 5 | Prioridad máxima (dolor, emergencia). |
-| `cancel_appointment` | 3 | Cancelaciones específicas. |
-| `reschedule` | 3 | Reagendamiento. |
-| `check_availability` | 2 | Consultas de huecos libres. |
-| `create_appointment` | 1 | Reservas nuevas. |
+| `create_appointment` | `create_appointment` | Agendar cita nueva |
+| `cancel_appointment` | `cancel_appointment` | Anular cita existente |
+| `reschedule` | `reschedule` | Cambiar cita a otro día/hora |
+| `check_availability` | `check_availability` | Consultar disponibilidad |
+| `urgent_care` | `urgent_care` | Urgencia médica real |
+| `general_question` | `general_question` | Pregunta general |
+| `greeting` | `greeting` | Saludo puro |
+| `farewell` | `farewell` | Despedida pura |
+| `thank_you` | `thank_you` | Agradecimiento puro |
+| `unknown` | `unknown` | No se puede determinar |
 
-### Mejora Semántica (v2.2)
-- **Few-Shot Examples:** 10 ejemplos reales por intent para mejorar el F1 Score (+24%).
-- **Chain-of-Thought Dual:** El prompt obliga al modelo a analizar palabras clave antes de concluir el intent.
-- **Confidence Thresholds:**
-  - Urgente: >0.5
-  - Cancelar/Reagendar: >0.3
-  - Crear: >0.3
+### Confidence Thresholds
 
----
-
-## 3. Inteligencia de Disponibilidad (v2.0)
-
-Capacidad del agente para detectar contexto temporal y flexibilidad del usuario.
-
-### Capacidades de Detección
-- **Urgencia:** Detecta "ya mismo", "emergencia", "dolor". Sugiere `urgent_options`.
-- **Contexto Temporal:** Diferencia entre "hoy", "mañana" y fechas específicas.
-- **Flexibilidad:** Detecta "cualquier día", "lo que tengas". Activa `general_search`.
-- **Preferencias:** Clasifica en `morning` (8-11hs), `afternoon` (14-18hs) y `evening` (19-22hs).
-
-### Tipos de Respuesta Sugeridos (Smart Search)
-1. `urgent_options`: Lista de espera prioritaria + consulta express.
-2. `no_availability_today`: Sugiere automáticamente disponibilidad para mañana.
-3. `no_availability_extended`: Ofrece alternativas si no hay cupo en 7+ días.
-4. `availability_list`: Formato enriquecido con iconos y horas específicas.
+| Intent | Umbral |
+| :--- | :--- |
+| `urgent_care` | 0.5 |
+| `cancel_appointment` | 0.5 |
+| `reschedule` | 0.5 |
+| `create_appointment` | 0.3 |
+| `check_availability` | 0.3 |
+| `greeting/farewell/thank_you` | 0.5 |
+| `unknown` | 0.0 |
 
 ---
 
-## 4. RAG (Retrieval Augmented Generation)
+## 3. System Prompt (7 Secciones)
 
-Búsqueda híbrida para preguntas generales (servicios, ubicación, políticas).
-
-- **Schema:** Tabla `knowledge_base` con `pgvector` (1536 dimensiones).
-- **Search:** Fusión de **Semantic Search** (pgvector cosine distance) + **Full-Text Search** (tsvector español).
-- **Categorías:** Agenda, Pagos, Servicios, Preparación, Horarios, Ubicación, Telemedicina, Resultados.
-
----
-
-## 5. Mejores Prácticas de Ingeniería de Prompts
-
-1. **Identity + Constraint + Format:** Definir rol, leyes inviolables y schema JSON estricto.
-2. **Post-LLM Validation:** El resultado del LLM pasa por validación de lógica de negocio (ej. is_today y is_tomorrow no pueden ser ambos true).
-3. **Structured Outputs:** Uso de JSON Schema strict mode para garantizar 0 errores de parseo.
-4. **Semantic Caching:** Redis almacena embeddings de consultas comunes para reducir costos (-40%) y latencia (5ms).
+1. **Identity & Role** — Clasificador de intenciones médico en español
+2. **Security Boundary** — USER_DATA marking (previene prompt injection)
+3. **Intent Definitions** — Criterios ✅ SÍ / ❌ NO por intent
+4. **Disambiguation Rules** — 8 reglas de desempate (resuelve bugs del Red Team)
+5. **Entity Spec** — Qué extraer: date, time, booking_id, patient_name, service_type
+6. **Few-Shot Examples** — 15 ejemplos estáticos cubriendo todos los intents + edge cases
+7. **Output Schema** — JSON estricto: intent, confidence, entities, needs_more, follow_up
 
 ---
 
-## 📚 Referencias de Investigación
-- *arXiv:2505.11176v1 (Few-Shot Intent Discovery)*
-- *arXiv:2512.22130 (Expert-Grounded Optimization)*
-- *Groq Documentation (Structured Outputs)*
-- *OpenAI API Best Practices*
+## 4. Guardrails
+
+### Input Validation
+- Longitud: 2-500 caracteres
+- Prompt injection: 7 patrones detectados (`ignore previous`, `developer mode`, etc.)
+- Unicode peligroso: 8 caracteres bloqueados (zero-width, RTL override, etc.)
+
+### Output Validation
+- JSON parsing con sanitización (markdown code blocks, preámbulos)
+- Schema validation: intent válido, confidence en [0,1], entities es objeto
+- Leakage detection: 5 patrones de sistema prompt
+- Cross-check: si `urgent_care` sin urgency words → bajar confidence
+
+---
+
+## 5. Observabilidad (Tracing)
+
+Cada request genera un trace estructurado:
+
+```json
+{
+  "chat_id": "123456",
+  "intent": "create_appointment",
+  "confidence": 0.95,
+  "provider": "groq",
+  "latency_ms": 412,
+  "tokens_in": 520,
+  "tokens_out": 85,
+  "cached": false,
+  "fallback_used": false,
+  "timestamp": "2026-04-01T04:35:01.288Z"
+}
+```
+
+### Métricas Clave
+| Métrica | Alerta si |
+| :--- | :--- |
+| LLM success rate | < 95% |
+| Fallback rate | > 20% |
+| Avg confidence | < 0.7 |
+| P95 latency | > 2s |
+
+---
+
+## 6. Archivos del Sistema
+
+| Archivo | Descripción |
+| :--- | :--- |
+| `constants.ts` | Intents unificados, thresholds, keywords, maps |
+| `prompt-builder.ts` | Constructor del system prompt con 7 secciones |
+| `llm-client.ts` | Groq + OpenAI con fallback y retry |
+| `guardrails.ts` | Input/Output validation + injection detection |
+| `tracing.ts` | Request tracing estructurado |
+| `main.ts` | Flujo híbrido LLM + reglas |
+| `main.test.ts` | 41 tests de funcionalidad |
+| `main.comprehensive.test.ts` | 100 queries de validación |
+| `redteam.test.ts` | 27 tests de colisión y edge cases |
+
+---
+
+## 7. Testing
+
+| Suite | Tests | Estado |
+| :--- | :--- | :--- |
+| `main.test.ts` | 41 | ✅ PASS |
+| `main.comprehensive.test.ts` | 100 | ✅ PASS |
+| `redteam.test.ts` | 27 | ✅ PASS |
+| **Total** | **168** | **✅ PASS** |
+
+---
+
+## 8. Decisiones Arquitectónicas
+
+| Decisión | Racional |
+| :--- | :--- |
+| Few-shot estático (no dinámico) | 15 ejemplos caben en prompt, dinámico es over-engineering |
+| Sin model cascading | Duplica latencia/costo, fallback a rules es suficiente |
+| Sin CoT en output JSON | Aumenta costo 20% sin mejorar accuracy de clasificación |
+| Temperature 0.0 | Clasificación debe ser determinística |
+| Groq primario, OpenAI fallback | Groq es más rápido y soporta español médico |
+| Fast-path para greetings | ~30% de mensajes, ahorra llamadas LLM innecesarias |
