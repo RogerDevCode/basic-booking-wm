@@ -572,7 +572,7 @@ describe('AI Agent v2.0 - Enhanced Availability Context', () => {
       
       const result = await main(input);
       
-      expect(result.data?.intent).toBe('reschedule_appointment');
+      expect(result.data?.intent).toBe('reschedule');
       expect(result.data?.suggested_response_type).toBe('reschedule_flow');
       expect(result.data?.needs_more_info).toBe(true);
       expect(result.data?.follow_up_question).toContain('reserva actual');

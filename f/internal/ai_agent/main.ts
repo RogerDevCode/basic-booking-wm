@@ -1,107 +1,23 @@
 import { z } from "zod";
 import "@total-typescript/ts-reset";
-
-// ============================================================================
-// CONFIGURACIÓN Y CONSTANTES
-// ============================================================================
-
-const CONFIDENCE_THRESHOLDS: Record<string, number> = {
-  urgent_care: 0.5,
-  cancel_appointment: 0.5,
-  reschedule: 0.5,
-  create_appointment: 0.3,
-  check_availability: 0.3,
-  greeting: 0.5,
-  farewell: 0.5,
-  thank_you: 0.5,
-  general_question: 0.5,
-  unknown: 0.0,
-};
-
-const INTENTS = {
-  CREATE_APPOINTMENT: 'create_appointment',
-  CANCEL_APPOINTMENT: 'cancel_appointment',
-  RESCHEDULE: 'reschedule_appointment',  // Compatible con tests existentes
-  CHECK_AVAILABILITY: 'check_availability',
-  URGENT_CARE: 'urgent_care',
-  GREETING: 'greeting',
-  FAREWELL: 'farewell',
-  THANK_YOU: 'thank_you',
-  GENERAL_QUESTION: 'general_question',
-  UNKNOWN: 'unknown',
-} as const;
-
-const INTENT_KEYWORDS: Record<string, { readonly keywords: readonly string[]; readonly weight: number }> = {
-  [INTENTS.URGENT_CARE]: {
-    keywords: ['urgente', 'emergencia', 'urgencia', 'ya mismo', 'ahora mismo', 'inmediato', 'dolor', 'sangrando', 'no puedo esperar'],
-    weight: 10,
-  },
-  [INTENTS.CANCEL_APPOINTMENT]: {
-    keywords: ['cancelar', 'anular', 'eliminar', 'borrar', 'dar de baja', 'no necesito'],
-    weight: 4,
-  },
-  [INTENTS.RESCHEDULE]: {
-    keywords: ['reprogramar', 'reagendar', 'cambiar', 'mover', 'trasladar', 'pasar', 'modificar'],
-    weight: 4,
-  },
-  [INTENTS.CHECK_AVAILABILITY]: {
-    keywords: ['disponibilidad', 'disponible', 'hueco', 'espacio', 'libre', 'tienen', 'lugar', 'horario', 'busco'],
-    weight: 3,
-  },
-  [INTENTS.CREATE_APPOINTMENT]: {
-    keywords: ['reservar', 'agendar', 'cita', 'turno', 'sacar', 'pedir hora', 'necesito hora', 'consulta', 'visita', 'ver al doctor'],
-    weight: 3,
-  },
-};
-
-const NORMALIZATION_MAP: Record<string, string> = {
-  'ajendar': 'agendar', 'sita': 'cita', 'kita': 'cita',
-  'reserbar': 'reservar', 'reserba': 'reserva',
-  'kanselar': 'cancelar', 'kansela': 'cancela', 'cancelsr': 'cancelar', 'canelar': 'cancelar',
-  'kambiar': 'cambiar', 'kambia': 'cambia',
-  'disponiblidad': 'disponibilidad', 'disponsible': 'disponible', 'disponibilidaz': 'disponibilidad',
-  'konsulta': 'consulta', 'konsulto': 'consulto', 'cosulta': 'consulta',
-  'ora': 'hora', 'oras': 'horas',
-  'lugr': 'lugar', 'lugare': 'lugar',
-  'truno': 'turno', 'trunos': 'turnos',
-  'urjente': 'urgente', 'urjencia': 'urgencia', 'urgnete': 'urgente',
-  'reporgramar': 'reprogramar',
-  'anualr': 'anular',
-  'resera': 'reserva',
-  'agnedar': 'agendar', 'resevar': 'reservar',
-  'nececito': 'necesito', 'hor': 'hora',
-  'grasias': 'gracias', 'ola': 'hola', 'holaa': 'hola',
-  'chao': 'chau', 'adios': 'adiós',
-  'qiero': 'quiero',
-};
-
-const PROFANITY_TO_IGNORE = ['carajo', 'puta', 'puto', 'mierda', 'coño', 'joder', 'boludo', 'pelotudo'];
-
-function removeProfanity(text: string): string {
-  let clean = text.toLowerCase();
-  for (const word of PROFANITY_TO_IGNORE) {
-    clean = clean.replace(new RegExp(`\\b${word}\\b`, 'gi'), '');
-  }
-  return clean.trim().replace(/\s+/g, ' ');
-}
-
-const OFF_TOPIC_PATTERNS = [
-  '¿qué tiempo hace', 'que tiempo hace', 'cómo está el clima', 'como esta el clima',
-  '¿cuál es la capital', 'cual es la capital', '¿dónde queda', 'donde queda',
-  '¿me puedes contar', '¿me puedes decir', '¿sabes', '¿puedes decirme',
-  '¿qué hora es', 'que hora es', '¿tienes hora', 'tienes hora',
-  '¿quién es el', 'quien es el', '¿quién ganó', 'quien gano',
-  '¿cómo se hace', 'como se hace', '¿cómo hacer', 'como hacer',
-  '¿qué películas', 'que peliculas', '¿qué series', 'que series',
-  '¿cuánto es', 'cuanto es', '¿cuánto cuesta', 'cuanto cuesta',
-  '¿dónde está', 'donde esta', '¿dónde queda', 'donde queda',
-  '¿qué equipo', 'que equipo', '¿quién gana', 'quien gana',
-  'chiste', 'broma', 'acertijo', 'adivinanza',
-  'receta', 'cocinar', 'preparar', 'cómo hacer', 'como hacer',
-  'noticias', 'periódico', 'diario', 'prensa',
-  'fútbol', 'película', 'cine', 'tele', 'televisión',
-  'presidente', 'gobierno', 'política', 'economia',
-];
+import {
+  INTENT,
+  CONFIDENCE_THRESHOLDS,
+  INTENT_KEYWORDS,
+  NORMALIZATION_MAP,
+  PROFANITY_TO_IGNORE,
+  OFF_TOPIC_PATTERNS,
+  GREETINGS,
+  GREETING_PHRASES,
+  FAREWELLS,
+  FAREWELL_PHRASES,
+  THANK_YOU_WORDS,
+  URGENCY_WORDS,
+  FLEXIBILITY_KEYWORDS,
+  DAY_NAMES,
+  RELATIVE_DATES,
+  SERVICE_TYPES,
+} from './constants';
 
 // ============================================================================
 // ENTITY EXTRACTION
@@ -129,8 +45,7 @@ function extractEntities(text: string): AIAgentEntities {
   let booking_id: string | null = null;
 
   // Date extraction - relative dates
-  const relativeDates = ['hoy', 'mañana', 'manana', 'pasado mañana', 'pasado manana', 'esta semana', 'próxima semana', 'la semana que viene'];
-  for (const relDate of relativeDates) {
+  for (const relDate of RELATIVE_DATES) {
     if (lowerText.includes(relDate)) {
       date = relDate;
       break;
@@ -155,8 +70,7 @@ function extractEntities(text: string): AIAgentEntities {
 
   // Date extraction - day names
   if (!date) {
-    const dayNames = ['lunes', 'martes', 'miércoles', 'miercoles', 'jueves', 'viernes', 'sábado', 'sabado', 'domingo'];
-    for (const day of dayNames) {
+    for (const day of Object.keys(DAY_NAMES)) {
       if (lowerText.includes(day)) {
         date = day;
         break;
@@ -192,8 +106,7 @@ function extractEntities(text: string): AIAgentEntities {
   }
 
   // Service type extraction
-  const serviceKeywords = ['consulta general', 'cardiología', 'cardiologia', 'pediatría', 'pediatria', 'dermatología', 'dermatologia', 'ginecología', 'ginecologia', 'psicología', 'psicologia', 'odontología', 'odontologia', 'limpieza', 'rayos x', 'laboratorio', 'análisis', 'analisis'];
-  for (const service of serviceKeywords) {
+  for (const service of SERVICE_TYPES) {
     if (lowerText.includes(service)) {
       service_type = service;
       break;
@@ -245,23 +158,12 @@ interface AvailabilityContext {
 function detectContext(text: string, entities: AIAgentEntities): AvailabilityContext {
   const lowerText = text.toLowerCase();
   
-  // is_today detection
   const is_today = lowerText.includes('hoy') || entities.date === 'hoy';
-  
-  // is_tomorrow detection
   const is_tomorrow = lowerText.includes('mañana') || lowerText.includes('manana') || entities.date === 'mañana' || entities.date === 'tomorrow';
-  
-  // is_urgent detection
-  const urgencyWords = ['urgente', 'emergencia', 'urgencia', 'ya mismo', 'ahora mismo', 'inmediato', 'dolor', 'sangrando'];
-  const is_urgent = urgencyWords.some(w => lowerText.includes(w));
-  
-  // is_flexible detection
-  const is_flexible = lowerText.includes('cualquier') || lowerText.includes('lo que') || lowerText.includes('indistinto') || lowerText.includes('flexible');
-  
-  // is_specific_date detection
+  const is_urgent = URGENCY_WORDS.some(w => lowerText.includes(w));
+  const is_flexible = FLEXIBILITY_KEYWORDS.some(k => lowerText.includes(k));
   const is_specific_date = entities.date !== null;
   
-  // time_preference detection
   let time_preference: 'morning' | 'afternoon' | 'evening' | 'any' = 'any';
   const morningKeywords = ['mañana', 'antes de las 12', 'am', 'temprano'];
   const afternoonKeywords = ['tarde', 'después de las', 'pm', 'despues'];
@@ -275,13 +177,8 @@ function detectContext(text: string, entities: AIAgentEntities): AvailabilityCon
     time_preference = 'evening';
   }
   
-  // day_preference detection
   let day_preference: string | null = null;
-  const dayNames: Record<string, string> = {
-    'lunes': 'monday', 'martes': 'tuesday', 'miércoles': 'wednesday', 'miercoles': 'wednesday',
-    'jueves': 'thursday', 'viernes': 'friday', 'sábado': 'saturday', 'sabado': 'saturday', 'domingo': 'sunday'
-  };
-  for (const [spanish, english] of Object.entries(dayNames)) {
+  for (const [spanish, english] of Object.entries(DAY_NAMES)) {
     if (lowerText.includes(spanish)) {
       day_preference = english;
       break;
@@ -322,25 +219,21 @@ function suggestResponseType(
   context: AvailabilityContext,
   entities: AIAgentEntities
 ): SuggestedResponseType {
-  // Urgency first
-  if (context.is_urgent || intent === INTENTS.URGENT_CARE) {
+  if (context.is_urgent || intent === INTENT.URGENT_CARE) {
     return 'urgent_options';
   }
 
-  // Greeting/farewell/thank you
-  if (intent === INTENTS.GREETING) return 'greeting_response';
-  if (intent === INTENTS.FAREWELL) return 'fallback';
-  if (intent === INTENTS.THANK_YOU) return 'fallback';
+  if (intent === INTENT.GREETING) return 'greeting_response';
+  if (intent === INTENT.FAREWELL) return 'fallback';
+  if (intent === INTENT.THANK_YOU) return 'fallback';
 
-  // Booking flows
-  if (intent === INTENTS.CANCEL_APPOINTMENT) return 'cancellation_flow';
-  if (intent === INTENTS.RESCHEDULE) return 'reschedule_flow';
+  if (intent === INTENT.CANCEL_APPOINTMENT) return 'cancellation_flow';
+  if (intent === INTENT.RESCHEDULE) return 'reschedule_flow';
 
-  if (intent === INTENTS.CREATE_APPOINTMENT) {
+  if (intent === INTENT.CREATE_APPOINTMENT) {
     if (context.is_flexible) {
       return 'general_search';
     }
-    // If they provided a day_preference or time_preference but no exact time, they need options
     if ((context.day_preference !== null || context.time_preference !== 'any') && !entities.time) {
       return 'filtered_search';
     }
@@ -350,8 +243,7 @@ function suggestResponseType(
     return 'booking_confirmation';
   }
 
-  // Availability checks
-  if (intent === INTENTS.CHECK_AVAILABILITY) {
+  if (intent === INTENT.CHECK_AVAILABILITY) {
     if (context.is_today || context.is_tomorrow) {
       return 'no_availability_today';
     }
@@ -367,12 +259,10 @@ function suggestResponseType(
     return 'general_search';
   }
 
-  // Handle unknown with preferences
-  if (intent === INTENTS.UNKNOWN && (context.day_preference !== null || context.time_preference !== 'any')) {
+  if (intent === INTENT.UNKNOWN && (context.day_preference !== null || context.time_preference !== 'any')) {
     return 'filtered_search';
   }
 
-  // Default
   return 'fallback';
 }
 
@@ -457,35 +347,39 @@ function generateAIResponse(
 }
 
 // ============================================================================
-// INTENT DETECTION (HELPER FUNCTIONS)
+// HELPER FUNCTIONS
 // ============================================================================
 
-function detectGreetingOrFarewell(text: string): { intent: string; confidence: number } | null {
+function removeProfanity(text: string): string {
+  let clean = text.toLowerCase();
+  for (const word of PROFANITY_TO_IGNORE) {
+    clean = clean.replace(new RegExp(`\\b${word}\\b`, 'gi'), '');
+  }
+  return clean.trim().replace(/\s+/g, ' ');
+}
+
+type IntentType = typeof INTENT[keyof typeof INTENT];
+
+function detectGreetingOrFarewell(text: string): { intent: IntentType; confidence: number } | null {
   const lower = text.toLowerCase().trim();
   const stripped = lower.replace(/[¿?¡!,.]/g, '').trim();
   const words = stripped.split(/\s+/);
 
-  const GREETINGS = ['hola', 'holaa', 'ola'];
-  const GREETING_PHRASES = ['buenos días', 'buenas tardes', 'buenas noches', 'buen día', 'qué tal'];
-  const FAREWELLS = ['chau', 'chao', 'adiós', 'adios'];
-  const FAREWELL_PHRASES = ['hasta luego', 'nos vemos', 'hasta pronto'];
-
   if (FAREWELLS.includes(stripped) || FAREWELL_PHRASES.some(p => lower.includes(p))) {
-    return { intent: INTENTS.FAREWELL, confidence: 0.9 };
+    return { intent: INTENT.FAREWELL, confidence: 0.9 };
   }
 
-  // Fast-track greetings, but only if they are the sole intent (e.g. short message)
   if (GREETINGS.includes(words[0]) || GREETING_PHRASES.some(p => lower.startsWith(p))) {
     if (words.length <= 4 || GREETINGS.includes(stripped)) {
-      return { intent: INTENTS.GREETING, confidence: 0.9 };
+      return { intent: INTENT.GREETING, confidence: 0.9 };
     }
   }
   if (stripped === 'saludos') {
-    return { intent: INTENTS.GREETING, confidence: 0.9 };
+    return { intent: INTENT.GREETING, confidence: 0.9 };
   }
 
-  if ((lower.includes('gracias') || lower.includes('agradezco')) && words.length <= 4) {
-    return { intent: INTENTS.THANK_YOU, confidence: 0.9 };
+  if (THANK_YOU_WORDS.some(w => lower.includes(w)) && words.length <= 4) {
+    return { intent: INTENT.THANK_YOU, confidence: 0.9 };
   }
 
   return null;
@@ -540,20 +434,20 @@ function normalizeText(text: string): string {
   return normalized.trim();
 }
 
-function detectIntent(text: string): { intent: string; confidence: number } {
-  if (isOffTopic(text)) return { intent: INTENTS.GENERAL_QUESTION, confidence: 0.8 };
+function detectIntent(text: string): { intent: typeof INTENT[keyof typeof INTENT]; confidence: number } {
+  if (isOffTopic(text)) return { intent: INTENT.GENERAL_QUESTION, confidence: 0.8 };
 
   const normalizedText = normalizeText(text);
 
   const greeting = detectGreetingOrFarewell(normalizedText);
-  if (greeting) return greeting;
+  if (greeting) return greeting as { intent: typeof INTENT[keyof typeof INTENT]; confidence: number };
 
-  let bestIntent = INTENTS.UNKNOWN;
+  let bestIntent: typeof INTENT[keyof typeof INTENT] = INTENT.UNKNOWN;
   let maxScore = 0;
 
   const lowerNorm = normalizedText.toLowerCase();
   if (/\breagendar\b/.test(lowerNorm)) {
-    return { intent: INTENTS.RESCHEDULE, confidence: 1.0 };
+    return { intent: INTENT.RESCHEDULE, confidence: 1.0 };
   }
 
   for (const [intent, config] of Object.entries(INTENT_KEYWORDS)) {
@@ -563,33 +457,42 @@ function detectIntent(text: string): { intent: string; confidence: number } {
         score += config.weight;
       }
     }
-    if (score > maxScore) { maxScore = score; bestIntent = intent; }
+    if (score > maxScore) { maxScore = score; bestIntent = intent as typeof INTENT[keyof typeof INTENT]; }
   }
 
-  if (bestIntent === INTENTS.URGENT_CARE) {
-    const urgencyWords = ['urgente', 'emergencia', 'urgencia', 'ya mismo', 'ahora mismo', 'inmediato', 'dolor', 'sangrando', 'no puedo esperar'];
-    const hasRealUrgency = urgencyWords.some(w => lowerNorm.includes(w));
+  if (bestIntent === INTENT.URGENT_CARE) {
+    const hasRealUrgency = URGENCY_WORDS.some(w => lowerNorm.includes(w));
     if (!hasRealUrgency) {
       maxScore = 0;
-      bestIntent = INTENTS.UNKNOWN;
+      bestIntent = INTENT.UNKNOWN;
       for (const [intent, config] of Object.entries(INTENT_KEYWORDS)) {
-        if (intent === INTENTS.URGENT_CARE) continue;
+        if (intent === INTENT.URGENT_CARE) continue;
         let score = 0;
         for (const keyword of config.keywords) {
           if (fuzzyMatch(normalizedText, keyword)) score += config.weight;
         }
-        if (score > maxScore) { maxScore = score; bestIntent = intent; }
+        if (score > maxScore) { maxScore = score; bestIntent = intent as typeof INTENT[keyof typeof INTENT]; }
       }
     }
   }
 
-  const confidence = maxScore > 0 ? Math.min(1.0, maxScore / (CONFIDENCE_THRESHOLDS[bestIntent] ?? 0.3) / 3) : 0.1;
+  const threshold = CONFIDENCE_THRESHOLDS[bestIntent] ?? 0.3;
+  const confidence = maxScore > 0 ? Math.min(1.0, maxScore / threshold / 3) : 0.1;
   return { intent: bestIntent, confidence };
 }
 
 // ============================================================================
 // MAIN FUNCTION
 // ============================================================================
+
+export interface AIAgentInput {
+  chat_id: string;
+  text: string;
+  user_profile?: {
+    is_first_time: boolean;
+    booking_count: number;
+  };
+}
 
 export async function main(rawInput: unknown): Promise<{ readonly success: boolean; readonly data: unknown | null; readonly error_message: string | null; readonly error_code?: string }> {
   try {
@@ -610,16 +513,9 @@ export async function main(rawInput: unknown): Promise<{ readonly success: boole
     const intent = intentResult.intent;
     const confidence = intentResult.confidence;
 
-    // Extract entities
     const entities = extractEntities(input.data.text);
-
-    // Detect context
     const context = detectContext(input.data.text, entities);
-
-    // Suggest response type
     const suggested_response_type = suggestResponseType(intent, context, entities);
-
-    // Generate AI response
     const { aiResponse, needsMoreInfo, followUpQuestion } = generateAIResponse(intent, entities, context, suggested_response_type, input.data.user_profile);
 
     return {
@@ -647,4 +543,4 @@ export async function main(rawInput: unknown): Promise<{ readonly success: boole
 }
 
 export type { AIAgentEntities, AvailabilityContext, SuggestedResponseType };
-export { INTENTS, CONFIDENCE_THRESHOLDS, NORMALIZATION_MAP, normalizeText, detectIntent, levenshtein, fuzzyMatch, extractEntities, detectContext, suggestResponseType, generateAIResponse };
+export { INTENT, CONFIDENCE_THRESHOLDS, NORMALIZATION_MAP, normalizeText, detectIntent, levenshtein, fuzzyMatch, extractEntities, detectContext, suggestResponseType, generateAIResponse };
