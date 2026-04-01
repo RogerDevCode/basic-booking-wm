@@ -27,22 +27,23 @@ import {
   crossCheckUrgency,
 } from './guardrails';
 import { trace, buildTrace } from './tracing';
+import {
+  TypedTypedAIAgentInputSchema,
+  EntityMapSchema,
+  AvailabilityContextSchema,
+  IntentResultSchema,
+  type TypedTypedAIAgentInput,
+  type EntityMap,
+  type AvailabilityContext,
+  type IntentResult,
+  type IntentType,
+} from './types';
 
 // ============================================================================
-// ENTITY EXTRACTION
+// ENTITY EXTRACTION — uses EntityMap type from types.ts (z.infer)
 // ============================================================================
 
-export interface AIAgentEntities {
-  readonly date: string | null;
-  readonly time: string | null;
-  readonly provider_name: string | null;
-  readonly provider_id: string | null;
-  readonly service_type: string | null;
-  readonly service_id: string | null;
-  readonly booking_id: string | null;
-}
-
-function extractEntities(text: string): AIAgentEntities {
+function extractEntities(text: string): EntityMap {
   const lowerText = text.toLowerCase();
 
   let date: string | null = null;
@@ -117,20 +118,10 @@ function extractEntities(text: string): AIAgentEntities {
 }
 
 // ============================================================================
-// CONTEXT DETECTION
+// CONTEXT DETECTION — uses AvailabilityContext type from types.ts (z.infer)
 // ============================================================================
 
-export interface AvailabilityContext {
-  readonly is_today: boolean;
-  readonly is_tomorrow: boolean;
-  readonly is_urgent: boolean;
-  readonly is_flexible: boolean;
-  readonly is_specific_date: boolean;
-  readonly time_preference: 'morning' | 'afternoon' | 'evening' | 'any';
-  readonly day_preference: string | null;
-}
-
-function detectContext(text: string, entities: AIAgentEntities): AvailabilityContext {
+function detectContext(text: string, entities: EntityMap): AvailabilityContext {
   const lowerText = text.toLowerCase();
 
   const is_today = lowerText.includes('hoy') || entities.date === 'hoy';
@@ -177,7 +168,7 @@ type SuggestedResponseType =
 function suggestResponseType(
   intent: string,
   context: AvailabilityContext,
-  entities: AIAgentEntities
+  entities: EntityMap
 ): SuggestedResponseType {
   if (context.is_urgent || intent === INTENT.URGENT_CARE) return 'urgent_options';
   if (intent === INTENT.GREETING) return 'greeting_response';
@@ -213,7 +204,7 @@ function suggestResponseType(
 
 function generateAIResponse(
   intent: string,
-  entities: AIAgentEntities,
+  entities: EntityMap,
   context: AvailabilityContext,
   responseType: SuggestedResponseType,
   userProfile?: { is_first_time: boolean; booking_count: number }
@@ -289,7 +280,6 @@ function removeProfanity(text: string): string {
   return clean.trim().replace(/\s+/g, ' ');
 }
 
-type IntentType = typeof INTENT[keyof typeof INTENT];
 
 function detectGreetingOrFarewell(text: string): { intent: IntentType; confidence: number } | null {
   const lower = text.toLowerCase().trim();
@@ -425,7 +415,7 @@ function tryFastPath(text: string): { intent: IntentType; confidence: number } |
 // MAIN FUNCTION — Hybrid LLM + Rules
 // ============================================================================
 
-export interface AIAgentInput {
+export interface TypedTypedAIAgentInput {
   chat_id: string;
   text: string;
   user_profile?: {
@@ -549,7 +539,7 @@ export async function main(rawInput: unknown): Promise<{ readonly success: boole
     const entities = extractEntities(text);
 
     // Merge LLM entities with rule entities (rules take precedence for regex-extracted fields)
-    const mergedEntities: AIAgentEntities = {
+    const mergedEntities: EntityMap = {
       date: entities.date ?? (llmEntities['date'] as string | null) ?? null,
       time: entities.time ?? (llmEntities['time'] as string | null) ?? null,
       provider_name: entities.provider_name ?? (llmEntities['patient_name'] as string | null) ?? null,
@@ -595,5 +585,4 @@ export async function main(rawInput: unknown): Promise<{ readonly success: boole
   }
 }
 
-export type { SuggestedResponseType };
 export { INTENT, CONFIDENCE_THRESHOLDS, NORMALIZATION_MAP, normalizeText, detectIntentRules as detectIntent, levenshtein, fuzzyMatch, extractEntities, detectContext, suggestResponseType, generateAIResponse };
