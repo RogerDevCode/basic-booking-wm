@@ -5,7 +5,6 @@
 # ============================================================================
 # Este script ejecuta todos los tests para los scripts de Windmill
 # 
-# Uso: bash scripts/test_windmill_scripts.sh [options]
 #
 # Options:
 #   -v, --verbose     Verbose output

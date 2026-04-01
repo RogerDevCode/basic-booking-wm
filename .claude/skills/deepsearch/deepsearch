@@ -1,0 +1,192 @@
+#!/usr/bin/env python3
+"""
+deepsearch — Búsqueda técnica profunda en 3 Tiers para AI Agents
+Fuentes: GitHub (Tier 1), Semantic Scholar (Tier 2), Stack Overflow (Tier 3)
+
+Uso:
+  deepsearch --topic "<query>" [--citations <int>] [--score <int>]
+
+Salida: JSON estricto por stdout. Errores por stderr.
+"""
+import urllib.request
+import urllib.parse
+import json
+import time
+import sys
+import argparse
+from typing import Dict, List, Any
+
+# ==========================================
+# CONFIGURACIÓN Y UTILIDADES
+# ==========================================
+HEADERS = {
+    'User-Agent': 'DeepSearchAgent/1.0 (Booking-Titanium-WM CLI Tool)',
+    'Accept': 'application/vnd.github.v3+json',
+}
+
+
+def fetch_json(url: str, headers: Dict[str, str] = None) -> Dict[str, Any]:
+    """Fetch JSON from URL with error handling. Errors go to stderr."""
+    req_headers = HEADERS.copy()
+    if headers:
+        req_headers.update(headers)
+    req = urllib.request.Request(url, headers=req_headers)
+    try:
+        with urllib.request.urlopen(req, timeout=15) as response:
+            return json.loads(response.read().decode())
+    except urllib.error.HTTPError as e:
+        err = {"error": f"HTTP {e.code}: {e.reason}", "url": url}
+        sys.stderr.write(json.dumps(err) + "\n")
+        return err
+    except urllib.error.URLError as e:
+        err = {"error": f"Network error: {e.reason}", "url": url}
+        sys.stderr.write(json.dumps(err) + "\n")
+        return err
+    except Exception as e:
+        err = {"error": str(e), "url": url}
+        sys.stderr.write(json.dumps(err) + "\n")
+        return err
+
+
+# ==========================================
+# MOTORES DE BÚSQUEDA
+# ==========================================
+def search_tier1_github(topic: str, limit: int = 3) -> List[Dict[str, Any]]:
+    """Tier 1: Repositorios oficiales en GitHub (por estrellas)."""
+    query = urllib.parse.quote(topic)
+    url = f"https://api.github.com/search/repositories?q={query}&sort=stars&order=desc&per_page={limit}"
+    data = fetch_json(url)
+    results = []
+    if "items" in data:
+        for item in data["items"]:
+            results.append({
+                "source": "GitHub",
+                "tier": "Tier 1",
+                "title": item.get("full_name"),
+                "url": item.get("html_url"),
+                "description": item.get("description"),
+                "language": item.get("language"),
+                "authority": f"{item.get('stargazers_count', 0)} stars",
+                "stars": item.get("stargazers_count", 0),
+                "updated_at": item.get("pushed_at"),
+            })
+    return results
+
+
+def search_tier2_academic(topic: str, min_citations: int = 50, limit: int = 3) -> List[Dict[str, Any]]:
+    """Tier 2: Papers académicos en Semantic Scholar (por citas)."""
+    query = urllib.parse.quote(topic)
+    fields = "title,url,citationCount,year,authors"
+    url = f"https://api.semanticscholar.org/graph/v1/paper/search?query={query}&fields={fields}&limit={limit * 2}"
+    data = fetch_json(url)
+    results = []
+    if "data" in data:
+        for item in data["data"]:
+            citations = item.get("citationCount", 0) or 0
+            if citations >= min_citations:
+                authors = item.get("authors", [])
+                author_names = [a.get("name", "") for a in (authors or [])][:3]
+                results.append({
+                    "source": "Semantic Scholar",
+                    "tier": "Tier 2",
+                    "title": item.get("title"),
+                    "url": item.get("url"),
+                    "year": item.get("year"),
+                    "authors": author_names,
+                    "authority": f"{citations} citations",
+                    "citations": citations,
+                })
+                if len(results) >= limit:
+                    break
+    return results
+
+
+def search_tier3_community(topic: str, min_score: int = 50, limit: int = 3) -> List[Dict[str, Any]]:
+    """Tier 3: Comunidad en Stack Overflow (por votos)."""
+    query = urllib.parse.quote(topic)
+    url = (
+        f"https://api.stackexchange.com/2.3/search/advanced?"
+        f"order=desc&sort=votes&q={query}&site=stackoverflow&pagesize={limit}"
+    )
+    data = fetch_json(url)
+    results = []
+    if "items" in data:
+        for item in data["items"]:
+            score = item.get("score", 0) or 0
+            if score >= min_score and item.get("is_answered"):
+                results.append({
+                    "source": "Stack Overflow",
+                    "tier": "Tier 3",
+                    "title": item.get("title"),
+                    "url": item.get("link"),
+                    "score": score,
+                    "answer_count": item.get("answer_count", 0),
+                    "view_count": item.get("view_count", 0),
+                    "authority": f"Score {score}, {item.get('answer_count', 0)} answers",
+                })
+    return results
+
+
+# ==========================================
+# CONTROLADOR CLI
+# ==========================================
+def main():
+    parser = argparse.ArgumentParser(
+        description="Ejecuta una búsqueda técnica profunda estructurada en 3 Tiers.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Ejemplos:
+  deepsearch --topic "TypeScript AI agent best practices"
+  deepsearch --topic "LLM intent classification" --citations 20
+  deepsearch --topic "Windmill workflow patterns" --score 10
+        """,
+    )
+    parser.add_argument(
+        "--topic",
+        type=str,
+        required=True,
+        help="El tema técnico a investigar.",
+    )
+    parser.add_argument(
+        "--citations",
+        type=int,
+        default=50,
+        help="Mínimo de citas para Tier 2 (Papers). Default: 50",
+    )
+    parser.add_argument(
+        "--score",
+        type=int,
+        default=50,
+        help="Mínimo de votos para Tier 3 (StackOverflow). Default: 50",
+    )
+
+    args = parser.parse_args()
+
+    report = {
+        "metadata": {
+            "topic": args.topic,
+            "timestamp": time.time(),
+            "iso_timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "tool": "deepsearch",
+            "version": "1.0",
+        },
+        "findings": {
+            "tier_1_github": search_tier1_github(args.topic),
+            "tier_2_academic": search_tier2_academic(args.topic, args.citations),
+            "tier_3_community": search_tier3_community(args.topic, args.score),
+        },
+    }
+
+    # Salida estricta por STDOUT para el consumo de la IA
+    sys.stdout.write(json.dumps(report, indent=2, ensure_ascii=False))
+    sys.stdout.write("\n")
+    sys.stdout.flush()
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception as e:
+        # Los errores críticos van a STDERR para no corromper el JSON
+        sys.stderr.write(json.dumps({"critical_error": str(e)}) + "\n")
+        sys.exit(1)
