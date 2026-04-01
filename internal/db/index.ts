@@ -1,14 +1,17 @@
 import postgres from "postgres";
 
-export const getDbPool = () => {
-  // En Windmill, la BD puede venir por recurso o por env local.
+interface CustomGlobal {
+  __dbPool?: postgres.Sql<Record<string, never>>;
+}
+
+export const getDatabasePool = (): postgres.Sql<Record<string, never>> => {
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) {
     throw new Error("DATABASE_URL is not configured.");
   }
   
-  // Singleton para no agotar pool en hot starts de bun
-  const globalAny = global as any;
+  const globalAny = global as unknown as CustomGlobal;
+  
   if (!globalAny.__dbPool) {
     globalAny.__dbPool = postgres(connectionString, {
         max: 5,
@@ -17,5 +20,5 @@ export const getDbPool = () => {
     });
   }
   
-  return globalAny.__dbPool as postgres.Sql<{}>;
+  return globalAny.__dbPool;
 };

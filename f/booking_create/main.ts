@@ -1,11 +1,10 @@
-import { z } from "zod";
 import "@total-typescript/ts-reset";
 import { CreateBookingRequestSchema } from "../../internal/schemas";
 import { Result, ok, err, BookingID, ProviderID, ServiceID, PatientID } from "../../internal/types/domain";
-import { getDbPool } from "../../internal/db";
+import { getDatabasePool } from "../../internal/db";
 import postgres from "postgres";
 
-type CreateBookingResponse = {
+interface CreateBookingResponse {
   readonly id: BookingID;
   readonly status: string;
   readonly provider_id: ProviderID;
@@ -13,7 +12,20 @@ type CreateBookingResponse = {
   readonly start_time: string;
   readonly end_time: string;
   readonly is_duplicate: boolean;
-};
+}
+
+interface BookingRow {
+  readonly booking_id: BookingID;
+  readonly status: string;
+}
+
+interface PatientRow {
+  readonly patient_id: PatientID;
+}
+
+interface ServiceRow {
+  readonly duration_minutes: number;
+}
 
 export async function main(rawInput: unknown): Promise<Result<CreateBookingResponse, Error>> {
   // 1. Boundary Validation
@@ -25,39 +37,40 @@ export async function main(rawInput: unknown): Promise<Result<CreateBookingRespo
   const input = inputParsed.data;
 
   try {
-    const sql = getDbPool();
+    const sql = getDatabasePool();
 
     // 2. Generate Idempotency Key
     const idempotencyKey = `${input.service_id}-${input.start_time}-${input.chat_id}`;
 
     // 3. TRANSACTIONAL SAFETY (Serializable)
-    return await sql.begin(async (tx) => {
+    return await sql.begin(async (tx): Promise<Result<CreateBookingResponse, Error>> => {
       // Set transaction isolation level
       await tx`SET TRANSACTION ISOLATION LEVEL SERIALIZABLE`;
       
       // A. Check Idempotency
-      const existing = await tx`
+      const existing = await tx<BookingRow[]>`
         SELECT booking_id, status 
         FROM bookings 
         WHERE idempotency_key = ${idempotencyKey}
       `;
 
       if (existing.length > 0) {
-        // Safe cast as we checked length
-        const row = existing[0] as { booking_id: BookingID, status: string };
-        return ok({
-          id: row.booking_id,
-          status: row.status,
-          provider_id: input.provider_id,
-          service_id: input.service_id,
-          start_time: input.start_time,
-          end_time: input.start_time, // Approximate, we don't have it here
-          is_duplicate: true
-        });
+        const row = existing[0];
+        if (row) {
+          return ok({
+            id: row.booking_id,
+            status: row.status,
+            provider_id: input.provider_id,
+            service_id: input.service_id,
+            start_time: input.start_time,
+            end_time: input.start_time,
+            is_duplicate: true
+          });
+        }
       }
 
       // B. Resolve Patient ID (Create if not exists)
-      const patientRows = await tx`
+      const patientRows = await tx<PatientRow[]>`
         INSERT INTO patients (name, email, telegram_chat_id)
         VALUES (
           ${input.user_name ?? 'Paciente'}, 
@@ -68,30 +81,28 @@ export async function main(rawInput: unknown): Promise<Result<CreateBookingRespo
         RETURNING patient_id
       `;
       
-      if (patientRows.length === 0) {
+      const patientId = patientRows[0]?.patient_id;
+      if (!patientId) {
         throw new Error("Failed to resolve patient_id");
       }
-      const patientId = patientRows[0]!.patient_id as PatientID;
 
       // C. Get Service Duration to calculate End Time
-      const serviceRows = await tx`
+      const serviceRows = await tx<ServiceRow[]>`
         SELECT duration_minutes 
         FROM services 
         WHERE service_id = ${input.service_id} AND is_active = true
       `;
 
-      if (serviceRows.length === 0) {
+      const durationMinutes = serviceRows[0]?.duration_minutes;
+      if (durationMinutes === undefined) {
         throw new Error("Service not found or inactive");
       }
       
-      const durationMinutes = Number(serviceRows[0]!.duration_minutes);
       const startTimeDate = new Date(input.start_time);
-      const endTimeDate = new Date(startTimeDate.getTime() + durationMinutes * 60000);
+      const endTimeDate = new Date(startTimeDate.getTime() + Number(durationMinutes) * 60_000);
       const endTimeStr = endTimeDate.toISOString();
 
       // D. Check Availability with lock
-      // Postgres EXCLUDE constraint handles the actual overlap check,
-      // but we do a fast check here.
       const overlapCheck = await tx`
         SELECT booking_id 
         FROM bookings 
@@ -107,7 +118,7 @@ export async function main(rawInput: unknown): Promise<Result<CreateBookingRespo
       }
 
       // E. Create Booking
-      const bookingRows = await tx`
+      const bookingRows = await tx<BookingRow[]>`
         INSERT INTO bookings (
           provider_id,
           patient_id,
@@ -130,16 +141,15 @@ export async function main(rawInput: unknown): Promise<Result<CreateBookingRespo
         RETURNING booking_id, status
       `;
 
-      if (bookingRows.length === 0) {
+      const createdRow = bookingRows[0];
+      if (!createdRow) {
         throw new Error("Failed to insert booking");
       }
 
-      const row = bookingRows[0] as { booking_id: BookingID, status: string };
-
       // Return result
       return ok({
-        id: row.booking_id,
-        status: row.status,
+        id: createdRow.booking_id,
+        status: createdRow.status,
         provider_id: input.provider_id,
         service_id: input.service_id,
         start_time: input.start_time,
@@ -149,14 +159,13 @@ export async function main(rawInput: unknown): Promise<Result<CreateBookingRespo
     });
 
   } catch (e: unknown) {
-    // We catch exceptions from the DB driver or our manual throws inside the transaction,
-    // translating them into the Result monad pattern.
-    if (e instanceof postgres.PostgresError) {
-      if (e.code === '23P01' || e.code === '40001') { // Exclusion constraint or Serialization failure
+    const error = e instanceof Error ? e : new Error(String(e));
+    if (error instanceof postgres.PostgresError) {
+      if (error.code === '23P01' || error.code === '40001') {
         return err(new Error("Slot unavailable - concurrency conflict"));
       }
-      return err(new Error(`Database error: ${e.message}`));
+      return err(new Error(`Database error: ${error.message}`));
     }
-    return err(e instanceof Error ? e : new Error(String(e)));
+    return err(error);
   }
 }

@@ -175,7 +175,7 @@ const CONFIDENCE_THRESHOLDS: Record<string, number> = {
   urgent_care: 0.5,
   cancel_appointment: 0.3,
   reschedule_appointment: 0.3,
-  check_availability: 0.0,
+  check_availability: 0,
   create_appointment: 0.3,
   greeting: 0.5,
   farewell: 0.5,
@@ -377,7 +377,7 @@ function detectIntentWithFewShot(text: string): {
 } {
   const urgencyScore = scoreKeywords(text, URGENCY_KEYWORDS);
   if (urgencyScore >= 1) {
-    const conf = Math.min(1.0, urgencyScore / 2.0);
+    const conf = Math.min(1, urgencyScore / 2);
     return {
       detectedIntent: INTENTS.URGENT_CARE,
       confidence: conf,
@@ -414,7 +414,7 @@ function detectIntentWithFewShot(text: string): {
     }
   }
 
-  const confidence = maxWeightedScore > 0 ? Math.min(1.0, maxWeightedScore / 6.0) : 0.3;
+  const confidence = maxWeightedScore > 0 ? Math.min(1, maxWeightedScore / 6) : 0.3;
 
   return {
     detectedIntent: bestIntent,
@@ -427,7 +427,7 @@ function scoreKeywords(text: string, keywords: readonly string[]): number {
   let score = 0;
   for (const kw of keywords) {
     // Escape regex characters just in case, though our keywords are simple
-    const escapedKw = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const escapedKw = kw.replaceAll(/[$()*+.?[\\\]^{|}]/g, '\\$&');
     if (new RegExp(`(?:^|\\W)${escapedKw}(?:$|\\W)`, 'i').test(text)) {
       score++;
     }
@@ -461,25 +461,25 @@ function extractEntities(text: string): AIAgentEntities {
   let time: string | null = null;
   let date_range: string | null = null;
 
-  const providerMatch = text.match(/proveedor\s*(\d+)/i) || text.match(/(\d+)\s*(proveedor)/i);
-  if (providerMatch && providerMatch[1]) {
+  const providerMatch = text.match(/proveedor\s*(\d+)/i) ?? text.match(/(\d+)\s*(proveedor)/i);
+  if (providerMatch?.[1]) {
     provider_id = providerMatch[1];
   }
 
-  const serviceMatch = text.match(/servicio\s*(\d+)/i) || text.match(/(\d+)\s*(servicio)/i);
-  if (serviceMatch && serviceMatch[1]) {
+  const serviceMatch = text.match(/servicio\s*(\d+)/i) ?? text.match(/(\d+)\s*(servicio)/i);
+  if (serviceMatch?.[1]) {
     service_id = serviceMatch[1];
   }
 
   const datePatterns = [
-    /(\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2})/,
-    /(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/,
-    /(\d{1,2}[\/\-]\d{1,2})/
+    /(\d{4}(?:[/\-]\d{1,2}){2})/,
+    /((?:\d{1,2}[/\-]){2}\d{2,4})/,
+    /(\d{1,2}[/\-]\d{1,2})/
   ];
 
   for (const pattern of datePatterns) {
     const match = text.match(pattern);
-    if (match && match[1]) {
+    if (match?.[1]) {
       date = match[1];
       break;
     }
@@ -501,7 +501,7 @@ function extractEntities(text: string): AIAgentEntities {
 
   for (const pattern of timePatterns) {
     const match = text.match(pattern);
-    if (match && match[1]) {
+    if (match?.[1]) {
       time = match[1];
       start_time = match[1];
       break;
@@ -586,17 +586,13 @@ function validateIntentResult(intent: string, confidence: number, context: Avail
     errors.push('Contradiction: is_today and is_tomorrow cannot both be true');
   }
 
-  if (entities.date !== null) {
-    if (!isValidDate(entities.date)) {
+  if (entities.date !== null && !isValidDate(entities.date)) {
       errors.push(`Invalid date format: ${entities.date}`);
     }
-  }
 
-  if (entities.time !== null) {
-    if (!isValidTime(entities.time)) {
+  if (entities.time !== null && !isValidTime(entities.time)) {
       errors.push(`Invalid time format: ${entities.time}`);
     }
-  }
 
   return { passed: errors.length === 0, errors };
 }
@@ -607,7 +603,7 @@ function isValidDate(dateStr: string): boolean {
   
   const datePatterns = [
     /^\d{4}-\d{2}-\d{2}$/,
-    /^\d{2}\/\d{2}\/\d{4}$/,
+    /^(?:\d{2}\/){2}\d{4}$/,
     /^\d{1,2}\/\d{1,2}$/,
     /^\d{1,2}-\d{1,2}$/
   ];
@@ -633,27 +629,35 @@ function suggestResponseType(
   }
 
   switch (intent) {
-    case INTENTS.GREETING: return 'greeting_response';
-    case INTENTS.FAREWELL: return 'fallback';
-    case INTENTS.THANK_YOU: return 'fallback';
-    case INTENTS.CANCEL_APPOINTMENT: return 'cancellation_flow';
-    case INTENTS.RESCHEDULE_APPOINTMENT: return 'reschedule_flow';
+    case INTENTS.GREETING: { return 'greeting_response';
+    }
+    case INTENTS.FAREWELL: { return 'fallback';
+    }
+    case INTENTS.THANK_YOU: { return 'fallback';
+    }
+    case INTENTS.CANCEL_APPOINTMENT: { return 'cancellation_flow';
+    }
+    case INTENTS.RESCHEDULE_APPOINTMENT: { return 'reschedule_flow';
+    }
     
-    case INTENTS.CREATE_APPOINTMENT:
+    case INTENTS.CREATE_APPOINTMENT: {
       if (context.is_flexible) return 'general_search';
       if (context.day_preference !== null || context.time_preference !== 'any') return 'filtered_search';
       if (entities.date === null && entities.time === null) return 'clarifying_question';
       return 'booking_confirmation';
+    }
 
-    case INTENTS.CHECK_AVAILABILITY:
+    case INTENTS.CHECK_AVAILABILITY: {
       if (context.is_today || context.is_tomorrow) return 'no_availability_today';
       if (context.day_preference !== null || context.time_preference !== 'any') return 'filtered_search';
       if (context.is_specific_date) return 'availability_list';
       if (context.is_flexible) return 'general_search';
       return 'general_search';
+    }
       
-    default:
+    default: {
       return 'fallback';
+    }
   }
 }
 
@@ -677,64 +681,76 @@ function generateAIResponse(
 
   let aiResponse = '';
   switch (responseType) {
-    case 'urgent_options':
+    case 'urgent_options': {
       aiResponse = `🚨 Entiendo que es **urgente**. Veo las opciones disponibles:\n\n1️⃣ **Lista de espera prioritaria**\n2️⃣ **Primera hora mañana**\n3️⃣ **Consulta express**\n\n¿Cuál opción prefieres?`;
       break;
+    }
 
-    case 'availability_list':
-      aiResponse = `📅 Déjame verificar la disponibilidad${entities.date !== null ? ` para ${entities.date}` : ''}...\n\n✨ Un momento, estoy consultando la agenda...`;
+    case 'availability_list': {
+      aiResponse = `📅 Déjame verificar la disponibilidad${entities.date === null ? '' : ` para ${entities.date}`}...\n\n✨ Un momento, estoy consultando la agenda...`;
       break;
+    }
 
-    case 'no_availability_today':
+    case 'no_availability_today': {
       aiResponse = `😅 Lo siento, pero hoy estamos completamente reservados.\n\n📅 Pero tengo buenas noticias:\n\n✅ **Mañana** tengo estas horas disponibles:\n   🕙 09:00 - Disponible\n   🕚 11:00 - Disponible\n   🕐 14:00 - Disponible\n\n¿Te gustaría reservar para mañana?`;
       break;
+    }
 
-    case 'no_availability_extended':
+    case 'no_availability_extended': {
       aiResponse = `😓 Lo siento, estamos completamente reservados por los próximos 7 días.\n\n📋 Opciones:\n1️⃣ **Lista de Espera**\n2️⃣ **Próxima disponibilidad**`;
       break;
+    }
 
-    case 'general_search':
+    case 'general_search': {
       aiResponse = `📅 Te ayudo a buscar disponibilidad.\n\n${context.is_flexible ? '✨ Veo que eres flexible, eso es bueno! ' : ''}¿Tienes alguna preferencia de día u horario?`;
       needsMoreInfo = true;
       followUpQuestion = followUpQuestion ?? '¿Qué día u horario prefieres?';
       break;
+    }
 
-    case 'filtered_search':
-      aiResponse = `📅 Entendido! Busco disponibilidad${context.day_preference !== null ? ` los ${context.day_preference}` : ''}${context.time_preference !== 'any' ? ` por la ${context.time_preference}` : ''}.\n\nDéjame consultar la agenda...`;
+    case 'filtered_search': {
+      aiResponse = `📅 Entendido! Busco disponibilidad${context.day_preference === null ? '' : ` los ${context.day_preference}`}${context.time_preference === 'any' ? '' : ` por la ${context.time_preference}`}.\n\nDéjame consultar la agenda...`;
       break;
+    }
 
-    case 'booking_confirmation':
+    case 'booking_confirmation': {
       aiResponse = `✅ ¡Claro! Puedo ayudarte a agendar una cita.\n\n📋 **Detalles:**\n- 📅 Fecha: ${entities.date ?? 'Por definir'}\n- 🕐 Hora: ${entities.time ?? 'Por definir'}\n\n${isFirstTime ? '👋 Veo que es tu primera vez por aquí! ' : ''}¿Confirmas estos detalles?`;
       break;
+    }
 
-    case 'cancellation_flow':
+    case 'cancellation_flow': {
       aiResponse = `❌ Entiendo que necesitas cancelar una cita.\n\nPor favor proporcióname el ID de tu reserva o fecha.`;
       needsMoreInfo = true;
       followUpQuestion = followUpQuestion ?? '¿Cuál es el ID de tu reserva?';
       break;
+    }
 
-    case 'reschedule_flow':
+    case 'reschedule_flow': {
       aiResponse = `🔄 Quieres reprogramar tu cita. Entendido!\n\nNecesito saber tu reserva actual y para cuándo la quieres cambiar.`;
       needsMoreInfo = true;
       followUpQuestion = followUpQuestion ?? '¿Cuál es tu reserva actual?';
       break;
+    }
 
-    case 'clarifying_question':
+    case 'clarifying_question': {
       aiResponse = `🤔 Para ayudarte mejor, necesito un poco más de información.\n\n¿Qué tipo de servicio estás buscando y cuándo?`;
       needsMoreInfo = true;
       followUpQuestion = followUpQuestion ?? '¿Qué servicio necesitas y cuándo prefieres?';
       break;
+    }
 
-    case 'greeting_response':
+    case 'greeting_response': {
       aiResponse = `👋 ¡Hola! ${isFirstTime ? '¡Bienvenido! Veo que es tu primera vez por aquí.' : '¡qué bueno verte de nuevo!'}\n\nSoy tu asistente virtual de reservas. ¿En qué puedo ayudarte hoy?`;
       break;
+    }
 
     case 'fallback':
-    default:
+    default: {
       aiResponse = `🤔 No estoy seguro de entender completamente. ¿Podrías ser más específico?`;
       needsMoreInfo = true;
       followUpQuestion = followUpQuestion ?? '¿Qué tipo de ayuda necesitas?';
       break;
+    }
   }
 
   return { aiResponse, needsMoreInfo, followUpQuestion };

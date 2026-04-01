@@ -1,15 +1,19 @@
-import { z } from "zod";
 import "@total-typescript/ts-reset";
 import { CancelBookingRequestSchema } from "../../internal/schemas";
 import { Result, ok, err, BookingID } from "../../internal/types/domain";
-import { getDbPool } from "../../internal/db";
+import { getDatabasePool } from "../../internal/db";
 import postgres from "postgres";
 
-type CancelBookingResponse = {
+interface CancelBookingResponse {
   readonly booking_id: BookingID;
   readonly status: string;
   readonly cancelled: boolean;
-};
+}
+
+interface BookingRow {
+  readonly booking_id: BookingID;
+  readonly status: string;
+}
 
 export async function main(rawInput: unknown): Promise<Result<CancelBookingResponse, Error>> {
   // 1. Boundary Validation
@@ -21,24 +25,25 @@ export async function main(rawInput: unknown): Promise<Result<CancelBookingRespo
   const input = inputParsed.data;
 
   try {
-    const sql = getDbPool();
+    const sql = getDatabasePool();
 
     // 2. TRANSACTIONAL SAFETY
-    return await sql.begin(async (tx) => {
+    return await sql.begin(async (tx): Promise<Result<CancelBookingResponse, Error>> => {
       
       // A. Check if booking exists
-      const existing = await tx`
+      const existing = await tx<BookingRow[]>`
         SELECT booking_id, status 
         FROM bookings 
         WHERE booking_id = ${input.booking_id}
         FOR UPDATE
       `;
 
-      if (existing.length === 0) {
+      const row = existing[0];
+      if (!row) {
         throw new Error("Booking not found");
       }
 
-      const currentStatus = String(existing[0]!.status);
+      const currentStatus = String(row.status);
 
       // B. Check if already cancelled
       if (currentStatus === 'cancelled') {
@@ -46,7 +51,7 @@ export async function main(rawInput: unknown): Promise<Result<CancelBookingRespo
       }
 
       // C. Cancel Booking
-      const updateRows = await tx`
+      const updateRows = await tx<BookingRow[]>`
         UPDATE bookings 
         SET 
           status = 'cancelled',
@@ -57,23 +62,25 @@ export async function main(rawInput: unknown): Promise<Result<CancelBookingRespo
         RETURNING booking_id, status
       `;
 
-      if (updateRows.length === 0) {
+      const updatedRow = updateRows[0];
+      if (!updatedRow) {
         throw new Error("Failed to cancel booking - update returned no rows");
       }
 
-      const row = updateRows[0] as { booking_id: BookingID, status: string };
-
       return ok({
-        booking_id: row.booking_id,
-        status: row.status,
+        booking_id: updatedRow.booking_id,
+        status: updatedRow.status,
         cancelled: true
       });
     });
 
-  } catch (error: unknown) {
+  } catch (e: unknown) {
+    const error = e instanceof Error ? e : new Error(String(e));
+    
+    // Check for postgres error specifically without unsafe member access
     if (error instanceof postgres.PostgresError) {
       return err(new Error(`Database error: ${error.message}`));
     }
-    return err(error instanceof Error ? error : new Error(String(error)));
+    return err(error);
   }
 }

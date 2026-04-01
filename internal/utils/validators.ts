@@ -1,16 +1,15 @@
-import { z } from "zod";
 import { Result, ok, err } from "../types/domain";
 
 // UUIDRegex - Strict UUID validation (lowercase hex only)
-export const UUIDRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+export const UUIDRegex = /^[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}$/;
 
 // IdempotencyKeyRegex - Allow alphanumeric, dash, underscore (no SQL chars)
-export const IdempotencyKeyRegex = /^[a-zA-Z0-9_-]+$/;
+export const IdempotencyKeyRegex = /^[\w-]+$/;
 
-export type ValidationError = {
+export interface ValidationError {
   code: string;
   message: string;
-};
+}
 
 export const ValidateUUIDStrict = (value: string, fieldName: string): Result<true, ValidationError> => {
   if (value === "") {
@@ -40,7 +39,7 @@ export const ValidateIdempotencyKey = (key: string): Result<true, ValidationErro
     return err({ code: "KEY_TOO_SHORT", message: `idempotency_key must be >= 5 chars (got ${key.length})` });
   }
 
-  if (key.includes("\x00")) {
+  if (key.includes("\u0000")) {
     return err({ code: "NULL_BYTE", message: "idempotency_key cannot contain null bytes" });
   }
 
@@ -63,12 +62,13 @@ export const ValidateStringSafe = (value: string, fieldName: string, maxLength: 
     return err({ code: "STRING_TOO_LONG", message: `${fieldName} must be <= ${maxLength} chars (got ${value.length})` });
   }
 
-  if (value.includes("\x00")) {
+  if (value.includes("\u0000")) {
     return err({ code: "NULL_BYTE", message: `${fieldName} cannot contain null bytes` });
   }
 
-  for (let i = 0; i < value.length; i++) {
-    const code = value.charCodeAt(i);
+  for (let index = 0; index < value.length; index++) {
+    const code = value.codePointAt(index);
+    if (code === undefined) continue;
     // Reject unicode control characters (except common whitespace)
     if (code < 32 && code !== 9 && code !== 10 && code !== 13) {
         return err({
@@ -113,15 +113,15 @@ export const ValidateTimezoneOffset = (offset: string): Result<true, ValidationE
     return err({ code: "INVALID_TZ_SEPARATOR", message: "timezone offset must have : at position 4" });
   }
 
-  const hour = offset.substring(1, 3);
-  const minute = offset.substring(4, 6);
+  const hour = offset.slice(1, 3);
+  const minute = offset.slice(4, 6);
 
   if (!/^\d{2}$/.test(hour) || !/^\d{2}$/.test(minute)) {
     return err({ code: "INVALID_TZ_NUMERIC", message: "timezone offset hours and minutes must be numeric" });
   }
 
-  const hourInt = parseInt(hour, 10);
-  const minuteInt = parseInt(minute, 10);
+  const hourInt = Number.parseInt(hour, 10);
+  const minuteInt = Number.parseInt(minute, 10);
 
   if (hourInt > 14) { // Only checking positive max since sign is separate
     return err({ code: "INVALID_TZ_HOUR", message: "timezone offset hours must be between -14 and +14" });
@@ -161,8 +161,7 @@ export const ValidateHoursArray = (hours: number[]): Result<true, ValidationErro
     return err({ code: "HOURS_TOO_MANY", message: "hours array cannot have more than 24 entries" });
   }
 
-  for (let i = 0; i < hours.length; i++) {
-    const hour = hours[i];
+  for (const [i, hour] of hours.entries()) {
     if (hour === undefined || hour < 0 || hour > 23 || !Number.isInteger(hour)) {
       return err({ code: "INVALID_HOUR", message: `hour at index ${i} must be integer 0-23 (got ${hour})` });
     }

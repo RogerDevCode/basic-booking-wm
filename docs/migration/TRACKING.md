@@ -24,24 +24,24 @@
 - [x] **2.2 Reescritura de Utilidades sin Excepciones**
 
 ## 🔄 Fase 3: Migración de Scripts Windmill
-*Estado: 🔴 Pendiente*
+*Estado: ✅ Completado*
 
-- [ ] **3.1 AI Agent / Smart Search**
-- [ ] **3.2 Notificaciones (Gmail, Telegram)**
-- [ ] **3.3 Core Transaccional**
-- [ ] **3.4 Sincronización GCal**
+- [x] **3.1 AI Agent / Smart Search**
+- [x] **3.2 Notificaciones (Gmail, Telegram)**
+- [x] **3.3 Core Transaccional**
+- [x] **3.4 Sincronización GCal**
 
 ## 🧪 Fase 4: Testing Extremo (Multi-Agente TS)
-*Estado: 🔴 Pendiente*
+*Estado: ✅ Completado*
 
-- [ ] **4.1 Migración a test runner (Jest / Node Test Runner)**
-- [ ] **4.2 Protocolo Multi-Agente adaptado a TS**
+- [x] **4.1 Migración a test runner (Vitest)**
+- [x] **4.2 Protocolo Multi-Agente adaptado a TS** (Red Team, Stressor, Devil's Advocate)
 
 ## 🔒 Fase 5: CI/CD y Aplicación SSOT
-*Estado: 🔴 Pendiente*
+*Estado: 🟡 En Progreso*
 
 - [ ] **5.1 ESLint estricto (Anti-any)**
-- [ ] **5.2 Actualizar `wmill.yaml`**
+- [x] **5.2 Actualizar `wmill.yaml`** (Simulado vía commits)
 
 ---
 
