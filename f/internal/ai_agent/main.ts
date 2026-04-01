@@ -75,19 +75,49 @@ const INTENT_KEYWORDS: Record<string, { readonly keywords: readonly string[]; re
 };
 
 const NORMALIZATION_MAP: Record<string, string> = {
-  'ajendar': 'agendar', 'sitа': 'cita', 'sita': 'cita', 'reserbar': 'reservar',
-  'reserba': 'reserva', 'kanselar': 'cancelar', 'kambiar': 'cambiar',
-  'disponiblidad': 'disponibilidad', 'konsulta': 'consulta', 'ora': 'hora',
-  'lugr': 'lugar', 'truno': 'turno', 'urjente': 'urgente', 'reporgramar': 'reprogramar',
-  'cancelsr': 'cancelar', 'anualr': 'anular', 'disponsible': 'disponible',
+  // Spelling errors (vocales cambiadas)
+  'ajendar': 'agendar', 'sitа': 'cita', 'sita': 'cita', 'kita': 'cita',
+  'reserbar': 'reservar', 'reserba': 'reserva',
+  'kanselar': 'cancelar', 'kansela': 'cancela', 'cancelsr': 'cancelar', 'canelar': 'cancelar',
+  'kambiar': 'cambiar', 'kambia': 'cambia',
+  'disponiblidad': 'disponibilidad', 'disponsible': 'disponible',
+  'konsulta': 'consulta', 'konsulto': 'consulto', 'cosulta': 'consulta',
+  'ora': 'hora', 'oras': 'horas',
+  'lugr': 'lugar', 'lugare': 'lugar',
+  'truno': 'turno', 'trunos': 'turnos',
+  'urjente': 'urgente', 'urjencia': 'urgencia',
+  'reporgramar': 'reprogramar',
+  'anualr': 'anular', 'anular': 'anular',
+  'resera': 'reserva', 'reserba': 'reserva',
+  // Regionales/phonetic
+  'grasias': 'gracias', 'ola': 'hola', 'holaa': 'hola',
+  'chao': 'chau', 'adios': 'adiós',
+  'dond': 'donde', 'dnde': 'donde',
+  'cuant': 'cuánto', 'cuanto': 'cuánto',
+  'cual': 'cuál', 'donde': 'dónde',
+  'quien': 'quién', 'como': 'cómo',
+  'que': 'qué', 'dia': 'día', 'mas': 'más',
+  'qiero': 'quiero', 'necesito': 'necesito',
 };
 
 const PROFANITY_TO_IGNORE = ['carajo', 'puta', 'puto', 'mierda', 'coño', 'joder', 'boludo', 'pelotudo'];
 
 const OFF_TOPIC_PATTERNS = [
-  '¿qué tiempo hace', '¿cuál es la capital', '¿me puedes contar', '¿qué hora es',
-  '¿quién es el', '¿cómo se hace', '¿qué películas', '¿cuánto es', '¿dónde queda',
-  'chiste', 'broma', 'receta', 'cocinar', 'noticias',
+  '¿qué tiempo hace', 'que tiempo hace', 'cómo está el clima', 'como esta el clima',
+  '¿cuál es la capital', 'cual es la capital', '¿dónde queda', 'donde queda',
+  '¿me puedes contar', '¿me puedes decir', '¿sabes', '¿puedes decirme',
+  '¿qué hora es', 'que hora es', '¿tienes hora', 'tienes hora',
+  '¿quién es el', 'quien es el', '¿quién ganó', 'quien gano',
+  '¿cómo se hace', 'como se hace', '¿cómo hacer', 'como hacer',
+  '¿qué películas', 'que peliculas', '¿qué series', 'que series',
+  '¿cuánto es', 'cuanto es', '¿cuánto cuesta', 'cuanto cuesta',
+  '¿dónde está', 'donde esta', '¿dónde queda', 'donde queda',
+  '¿qué equipo', 'que equipo', '¿quién gana', 'quien gana',
+  'chiste', 'broma', 'acertijo', 'adivinanza',
+  'receta', 'cocinar', 'preparar', 'cómo hacer', 'como hacer',
+  'noticias', 'periódico', 'diario', 'prensa',
+  'fútbol', 'película', 'cine', 'tele', 'televisión',
+  'presidente', 'gobierno', 'política', 'economia',
 ];
 
 function removeProfanity(text: string): string {
@@ -181,6 +211,10 @@ export async function main(rawInput: unknown): Promise<{ readonly success: boole
 
     const { intent, confidence } = detectIntent(input.data.text);
 
+    // Detect context
+    const is_today = input.data.text.includes('hoy');
+    const is_tomorrow = input.data.text.includes('mañana') || input.data.text.includes('manana');
+
     return {
       success: true,
       data: {
@@ -188,8 +222,18 @@ export async function main(rawInput: unknown): Promise<{ readonly success: boole
         confidence,
         chat_id: input.data.chat_id,
         entities: {},
-        context: { is_urgent: intent === INTENTS.URGENT_CARE },
-        suggested_response_type: intent === INTENTS.GREETING ? 'greeting_response' : 'fallback',
+        context: { 
+          is_urgent: intent === INTENTS.URGENT_CARE,
+          is_today,
+          is_tomorrow,
+          is_flexible: input.data.text.includes('cualquier') || input.data.text.includes('lo que'),
+          is_specific_date: false,
+          time_preference: 'any' as const,
+          day_preference: null
+        },
+        suggested_response_type: intent === INTENTS.GREETING ? 'greeting_response' : 
+                                 intent === INTENTS.FAREWELL ? 'fallback' :
+                                 intent === INTENTS.THANK_YOU ? 'fallback' : 'fallback',
         ai_response: `Intent: ${intent}, Confidence: ${confidence.toFixed(2)}`,
         needs_more_info: false,
         follow_up_question: null,
