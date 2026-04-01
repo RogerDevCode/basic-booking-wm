@@ -1,7 +1,10 @@
 // ============================================================================
-// TELEGRAM SEND — Notification Service with Inline Keyboard Support
+// TELEGRAM SEND — Notification Service with ReplyMarkup Support
 // ============================================================================
-// Sends Telegram messages with optional inline keyboard buttons for actions.
+// Sends Telegram messages with three keyboard modes:
+// 1. inline_keyboard — action buttons (confirm/cancel/reschedule)
+// 2. reply_keyboard — persistent menu bar (main navigation)
+// 3. force_reply — text input toggle (wizard step prompts)
 // Uses Telegram Bot API with retry (3 attempts, exponential backoff).
 // ============================================================================
 
@@ -19,6 +22,8 @@ const InputSchema = z.object({
     'reminder_30min',
     'no_show',
     'provider_schedule_change',
+    'main_menu',
+    'wizard_prompt',
     'custom',
   ]),
   booking_details: z.record(z.string(), z.unknown()).optional().default({}),
@@ -28,6 +33,10 @@ const InputSchema = z.object({
       callback_data: z.string().max(64),
     })
   ).optional().default([]),
+  reply_keyboard: z.array(z.array(z.string())).optional(),
+  force_reply: z.boolean().optional().default(false),
+  reply_placeholder: z.string().optional().default('Escribe aquí...'),
+  remove_keyboard: z.boolean().optional().default(false),
   parse_mode: z.enum(['MarkdownV2', 'HTML', 'None']).optional().default('MarkdownV2'),
 });
 
@@ -81,6 +90,12 @@ function buildMessage(
     case 'provider_schedule_change':
       return `📢 *Cambio de Horario*\n\nEl horario de ${esc(providerName)} ha cambiado.\nSi tienes citas próximas, te contactaremos para reprogramar.`;
 
+    case 'main_menu':
+      return `📋 *Menú Principal*\n\nElige una opción:\n\n📅 *Agendar cita* — Reserva tu próxima consulta\n📋 *Mis citas* — Ver citas próximas\n🔔 *Recordatorios* — Configurar avisos\n❓ *Información* — Datos del consultorio\n\nToca un botón o escribe el número de la opción.`;
+
+    case 'wizard_prompt':
+      return String(details['prompt'] ?? '¿Qué deseas hacer?');
+
     case 'custom':
       return customMessage;
 
@@ -89,22 +104,47 @@ function buildMessage(
   }
 }
 
-function buildInlineKeyboard(buttons: InlineButton[]): Record<string, unknown> | undefined {
-  if (buttons.length === 0) return undefined;
+function buildReplyMarkup(options: {
+  inline_buttons?: InlineButton[];
+  reply_keyboard?: string[][];
+  force_reply?: boolean;
+  reply_placeholder?: string;
+  remove_keyboard?: boolean;
+}): Record<string, unknown> | undefined {
+  const { inline_buttons = [], reply_keyboard, force_reply = false, reply_placeholder = 'Escribe aquí...', remove_keyboard = false } = options;
 
-  const rows: InlineButton[][] = [];
-  for (let i = 0; i < buttons.length; i += 2) {
-    rows.push(buttons.slice(i, i + 2));
+  if (remove_keyboard) {
+    return { remove_keyboard: true };
   }
 
-  return {
-    inline_keyboard: rows.map(row =>
-      row.map(btn => ({
-        text: btn.text,
-        callback_data: btn.callback_data,
-      }))
-    ),
-  };
+  if (reply_keyboard && reply_keyboard.length > 0) {
+    return {
+      keyboard: reply_keyboard.map(row => row.map(text => ({ text }))),
+      resize_keyboard: true,
+      one_time_keyboard: force_reply,
+    };
+  }
+
+  if (force_reply) {
+    return {
+      force_reply: true,
+      input_field_placeholder: reply_placeholder,
+    };
+  }
+
+  if (inline_buttons.length > 0) {
+    const rows: InlineButton[][] = [];
+    for (let i = 0; i < inline_buttons.length; i += 2) {
+      rows.push(inline_buttons.slice(i, i + 2));
+    }
+    return {
+      inline_keyboard: rows.map(row =>
+        row.map(btn => ({ text: btn.text, callback_data: btn.callback_data }))
+      ),
+    };
+  }
+
+  return undefined;
 }
 
 async function sendWithRetry(
@@ -177,15 +217,21 @@ export async function main(rawInput: unknown): Promise<{ success: boolean; data:
       return { success: false, data: null, error_message: `Invalid input: ${parsed.error.message}` };
     }
 
-    const { chat_id, message_type, booking_details, inline_buttons, parse_mode } = parsed.data;
+    const { chat_id, message_type, booking_details, inline_buttons, reply_keyboard, force_reply, reply_placeholder, remove_keyboard, parse_mode } = parsed.data;
 
-    const botToken = process.env.TELEGRAM_BOT_TOKEN;
+    const botToken = process.env['TELEGRAM_BOT_TOKEN'];
     if (!botToken) {
       return { success: false, data: null, error_message: 'TELEGRAM_BOT_TOKEN not configured' };
     }
 
     const message = buildMessage(message_type, booking_details, parse_mode);
-    const replyMarkup = buildInlineKeyboard(inline_buttons);
+    const replyMarkup = buildReplyMarkup({
+      inline_buttons,
+      reply_keyboard,
+      force_reply,
+      reply_placeholder,
+      remove_keyboard,
+    });
 
     const result = await sendWithRetry(botToken, chat_id, message, replyMarkup, parse_mode);
 
