@@ -28,11 +28,11 @@ import {
 } from './guardrails';
 import { trace, buildTrace } from './tracing';
 import {
-  TypedTypedAIAgentInputSchema,
+  AIAgentInputSchema,
   EntityMapSchema,
   AvailabilityContextSchema,
   IntentResultSchema,
-  type TypedTypedAIAgentInput,
+  type AIAgentInput,
   type EntityMap,
   type AvailabilityContext,
   type IntentResult,
@@ -415,26 +415,9 @@ function tryFastPath(text: string): { intent: IntentType; confidence: number } |
 // MAIN FUNCTION — Hybrid LLM + Rules
 // ============================================================================
 
-export interface TypedTypedAIAgentInput {
-  chat_id: string;
-  text: string;
-  user_profile?: {
-    is_first_time: boolean;
-    booking_count: number;
-  };
-}
-
 export async function main(rawInput: unknown): Promise<{ readonly success: boolean; readonly data: unknown | null; readonly error_message: string | null; readonly error_code?: string }> {
   try {
-    const inputSchema = z.object({
-      chat_id: z.string().min(1),
-      text: z.string().trim().min(1),
-      user_profile: z.object({
-        is_first_time: z.boolean(),
-        booking_count: z.number()
-      }).optional()
-    });
-    const input = inputSchema.safeParse(rawInput);
+    const input = AIAgentInputSchema.safeParse(rawInput);
     if (!input.success) {
       return { success: false, data: null, error_code: 'VALIDATION_ERROR', error_message: `Invalid input: ${input.error.message}` };
     }

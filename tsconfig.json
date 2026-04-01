@@ -21,7 +21,6 @@
     "noUnusedParameters": true
   },
   "include": [
-    "f/**/*.ts",
-    "internal/**/*.ts"
+    "f/**/*.ts"
   ]
 }

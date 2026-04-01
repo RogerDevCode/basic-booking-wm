@@ -10,9 +10,9 @@
     "test:ui": "vitest --ui",
     "typecheck": "tsc --noEmit -p tsconfig.strict.json",
     "typecheck:watch": "tsc --noEmit -p tsconfig.strict.json --watch",
-    "lint": "eslint f/ internal/ cmd/ pkg/ --ext .ts",
-    "lint:fix": "eslint f/ internal/ cmd/ pkg/ --ext .ts --fix",
-    "lint:strict": "eslint f/ internal/ cmd/ pkg/ --ext .ts --max-warnings 0",
+    "lint": "eslint f/ --ext .ts",
+    "lint:fix": "eslint f/ --ext .ts --fix",
+    "lint:strict": "eslint f/ --ext .ts --max-warnings 0",
     "build": "tsc -p tsconfig.strict.json",
     "dev": "tsx watch f/internal/ai_agent/main.ts",
     "check:all": "npm run typecheck && npm run lint:strict && npm run test"
