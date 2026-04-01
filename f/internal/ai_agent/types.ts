@@ -29,6 +29,8 @@ export const EntityMapSchema = z.object({
   service_type: z.string().nullable().describe("Tipo de servicio"),
   service_id: z.string().nullable().describe("ID del servicio"),
   booking_id: z.string().nullable().describe("ID de reserva existente"),
+  channel: z.string().nullable().describe("Canal de notificación (telegram, gmail, email, ambos)"),
+  reminder_window: z.string().nullable().describe("Ventana de recordatorio (24h, 2h, 30min)"),
 });
 
 export const AvailabilityContextSchema = z.object({

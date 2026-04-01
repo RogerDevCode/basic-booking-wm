@@ -52,6 +52,31 @@ ${INTENT.THANK_YOU}: Agradecimiento puro.
 
 ${INTENT.UNKNOWN}: No se puede determinar con confianza o mensaje sin sentido.
   ✅ SÍ: "asdkjhaskjd", "¿Qué tiempo hace?", "'; DROP TABLE bookings;--"
+
+${INTENT.ACTIVATE_REMINDERS}: El usuario quiere ACTIVAR recordatorios/notificaciones para sus citas.
+  ✅ SÍ: "Activa mis recordatorios", "Quiero que me avisen de mis citas", "Activa notificaciones"
+  ❌ NO: "¿A qué hora es mi cita?" (eso es general_question)
+  ❌ NO: "No quiero recordatorios" (eso es deactivate_reminders)
+
+${INTENT.DEACTIVATE_REMINDERS}: El usuario quiere DESACTIVAR recordatorios/notificaciones.
+  ✅ SÍ: "Desactiva mis recordatorios", "No me avisen más", "Quita los recordatorios", "No quiero avisos"
+  ❌ NO: "No necesito la cita" (eso es cancel_appointment)
+  ❌ NO: "Activa recordatorios" (eso es activate_reminders)
+
+${INTENT.REMINDER_PREFERENCES}: El usuario quiere CONFIGURAR o CONSULTAR sus preferencias de recordatorios.
+  ✅ SÍ: "¿Cómo configuro mis recordatorios?", "Quiero cambiar mis preferencias de aviso", "¿Qué opciones de recordatorio hay?"
+  ❌ NO: "Activa recordatorios" (eso es activate_reminders, acción directa)
+  ❌ NO: "Desactiva todo" (eso es deactivate_reminders, acción directa)
+
+${INTENT.SHOW_MAIN_MENU}: El usuario quiere ver el menú principal o las opciones disponibles.
+  ✅ SÍ: "Menú", "Inicio", "Opciones", "¿Qué puedo hacer?", "Volver al menú", "Ayuda"
+  ❌ NO: "Quiero agendar" (eso es create_appointment, acción directa)
+  ❌ NO: "Cancelar cita" (eso es cancel_appointment)
+
+${INTENT.WIZARD_STEP}: El usuario está interactuando con un wizard/formulario multi-paso.
+  ✅ SÍ: "Siguiente", "Continuar", "Confirmar", "Elegir otro", "Volver", "Otro horario"
+  ❌ NO: "Quiero agendar desde cero" (eso es create_appointment)
+  ❌ NO: "Cancelar mi cita" (eso es cancel_appointment)
 `;
 
 const DISAMBIGUATION_RULES = `
@@ -65,7 +90,12 @@ REGLAS DE DESEMPATE (aplicar en orden, de mayor a menor prioridad):
 5. Verbo de cambio (cambiar, mover, reprogramar, reagendar, trasladar) + cita existente → ${INTENT.RESCHEDULE}
 6. Verbo de anulación (cancelar, anular, eliminar, dar de baja, ya no voy) + cita existente → ${INTENT.CANCEL_APPOINTMENT}
 7. Si el mensaje menciona "mi cita", "la reserva", "el turno del viernes" → NO es create_appointment
-8. Si no hay contexto suficiente → ${INTENT.UNKNOWN} + needs_more=true
+8. "Activar/Quiero recordatorio/aviso/notificación" → ${INTENT.ACTIVATE_REMINDERS}
+9. "Desactivar/No quiero/Quitar recordatorio/aviso" → ${INTENT.DEACTIVATE_REMINDERS}
+10. "Configurar/Preferencias/Opciones de recordatorio" → ${INTENT.REMINDER_PREFERENCES}
+11. "Menú/Inicio/Opciones/¿Qué puedo hacer?" → ${INTENT.SHOW_MAIN_MENU}
+12. "Siguiente/Continuar/Confirmar/Volver" dentro de un wizard → ${INTENT.WIZARD_STEP}
+13. Si no hay contexto suficiente → ${INTENT.UNKNOWN} + needs_more=true
 `;
 
 const ENTITY_SPEC = `
@@ -75,6 +105,8 @@ EXTRAE solo estas entidades si están presentes en el mensaje:
 - booking_id: códigos de reserva (ABC-123, #456, reserva 789)
 - patient_name: nombre del paciente si se menciona explícitamente
 - service_type: tipo de servicio (consulta, limpieza, cardiología)
+- channel: canal de notificación preferido (telegram, gmail, email, ambos)
+- reminder_window: ventana de recordatorio (24h, 2h, 30min)
 `;
 
 const FEW_SHOT_EXAMPLES = `
@@ -124,6 +156,33 @@ User: "Quiero cancelar my appointment"
 
 User: "Me sirve cualquier día"
 → {"intent":"${INTENT.CHECK_AVAILABILITY}","confidence":0.75,"entities":{},"needs_more":true,"follow_up":"¿Prefieres esta semana o la próxima?"}
+
+User: "Activa mis recordatorios"
+→ {"intent":"${INTENT.ACTIVATE_REMINDERS}","confidence":0.95,"entities":{},"needs_more":false,"follow_up":null}
+
+User: "No quiero que me envíen recordatorios"
+→ {"intent":"${INTENT.DEACTIVATE_REMINDERS}","confidence":0.90,"entities":{},"needs_more":false,"follow_up":null}
+
+User: "¿Cómo configuro mis preferencias de recordatorio?"
+→ {"intent":"${INTENT.REMINDER_PREFERENCES}","confidence":0.90,"entities":{},"needs_more":false,"follow_up":null}
+
+User: "Quiero recibir avisos por Telegram pero no por email"
+→ {"intent":"${INTENT.REMINDER_PREFERENCES}","confidence":0.85,"entities":{"channel":"telegram"},"needs_more":false,"follow_up":null}
+
+User: "Menú principal"
+→ {"intent":"${INTENT.SHOW_MAIN_MENU}","confidence":0.95,"entities":{},"needs_more":false,"follow_up":null}
+
+User: "¿Qué opciones tengo?"
+→ {"intent":"${INTENT.SHOW_MAIN_MENU}","confidence":0.85,"entities":{},"needs_more":false,"follow_up":null}
+
+User: "Siguiente"
+→ {"intent":"${INTENT.WIZARD_STEP}","confidence":0.90,"entities":{},"needs_more":false,"follow_up":null}
+
+User: "Confirmar cita"
+→ {"intent":"${INTENT.WIZARD_STEP}","confidence":0.95,"entities":{},"needs_more":false,"follow_up":null}
+
+User: "Volver"
+→ {"intent":"${INTENT.WIZARD_STEP}","confidence":0.85,"entities":{},"needs_more":false,"follow_up":null}
 `;
 
 const OUTPUT_SCHEMA = `

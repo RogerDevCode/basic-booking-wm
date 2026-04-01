@@ -578,4 +578,108 @@ describe('AI Agent v2.0 - Enhanced Availability Context', () => {
       expect(result.data?.follow_up_question).toContain('reserva actual');
     });
   });
+
+  // ============================================================================
+  // TESTS DE RECORDATORIOS (Reminder Intents)
+  // ============================================================================
+
+  describe('Reminder Intents', () => {
+    test('Debe detectar activate_reminders', async () => {
+      const input: AIAgentInput = {
+        chat_id: '123456',
+        text: 'Activa mis recordatorios'
+      };
+      
+      const result = await main(input);
+      
+      expect(result.success).toBe(true);
+      expect(result.data?.intent).toBe('activate_reminders');
+    });
+
+    test('Debe detectar deactivate_reminders', async () => {
+      const input: AIAgentInput = {
+        chat_id: '123456',
+        text: 'Desactiva mis recordatorios'
+      };
+      
+      const result = await main(input);
+      
+      expect(result.success).toBe(true);
+      expect(result.data?.intent).toBe('deactivate_reminders');
+    });
+
+    test('Debe detectar reminder_preferences', async () => {
+      const input: AIAgentInput = {
+        chat_id: '123456',
+        text: '¿Cómo configuro mis preferencias de recordatorio?'
+      };
+      
+      const result = await main(input);
+      
+      expect(result.success).toBe(true);
+      expect(result.data?.intent).toBe('reminder_preferences');
+    });
+
+    test('Debe extraer canal de notificación', async () => {
+      const input: AIAgentInput = {
+        chat_id: '123456',
+        text: 'Quiero recibir avisos por Telegram pero no por email'
+      };
+      
+      const result = await main(input);
+      
+      expect(result.success).toBe(true);
+      expect(result.data?.entities.channel).toBe('telegram');
+    });
+
+    test('Debe extraer ventana de recordatorio 30min', async () => {
+      const input: AIAgentInput = {
+        chat_id: '123456',
+        text: 'Activa mis recordatorios de 30min antes'
+      };
+      
+      const result = await main(input);
+      
+      expect(result.success).toBe(true);
+      expect(result.data?.entities.reminder_window).toBe('30min');
+    });
+
+    test('Debe generar respuesta para activate_reminders', async () => {
+      const input: AIAgentInput = {
+        chat_id: '123456',
+        text: 'Quiero que me avisen de mis citas'
+      };
+      
+      const result = await main(input);
+      
+      expect(result.success).toBe(true);
+      expect(result.data?.suggested_response_type).toBe('activate_reminders_response');
+      expect(result.data?.ai_response).toContain('recordatorio');
+    });
+
+    test('Debe generar respuesta para deactivate_reminders', async () => {
+      const input: AIAgentInput = {
+        chat_id: '123456',
+        text: 'Desactiva mis recordatorios'
+      };
+      
+      const result = await main(input);
+      
+      expect(result.success).toBe(true);
+      expect(result.data?.suggested_response_type).toBe('deactivate_reminders_response');
+    });
+
+    test('Debe generar respuesta con follow_up para reminder_preferences', async () => {
+      const input: AIAgentInput = {
+        chat_id: '123456',
+        text: 'Quiero cambiar mis preferencias de aviso'
+      };
+      
+      const result = await main(input);
+      
+      expect(result.success).toBe(true);
+      expect(result.data?.suggested_response_type).toBe('reminder_preferences_response');
+      expect(result.data?.needs_more_info).toBe(true);
+    });
+  });
 });

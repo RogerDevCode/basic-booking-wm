@@ -13,6 +13,11 @@ export const INTENT = {
   GREETING: 'greeting',
   FAREWELL: 'farewell',
   THANK_YOU: 'thank_you',
+  ACTIVATE_REMINDERS: 'activate_reminders',
+  DEACTIVATE_REMINDERS: 'deactivate_reminders',
+  REMINDER_PREFERENCES: 'reminder_preferences',
+  SHOW_MAIN_MENU: 'show_main_menu',
+  WIZARD_STEP: 'wizard_step',
   UNKNOWN: 'unknown',
 } as const;
 
@@ -33,6 +38,11 @@ export const CONFIDENCE_THRESHOLDS: Record<IntentType, number> = {
   [INTENT.FAREWELL]: 0.5,
   [INTENT.THANK_YOU]: 0.5,
   [INTENT.GENERAL_QUESTION]: 0.5,
+  [INTENT.ACTIVATE_REMINDERS]: 0.5,
+  [INTENT.DEACTIVATE_REMINDERS]: 0.5,
+  [INTENT.REMINDER_PREFERENCES]: 0.5,
+  [INTENT.SHOW_MAIN_MENU]: 0.5,
+  [INTENT.WIZARD_STEP]: 0.5,
   [INTENT.UNKNOWN]: 0.0,
 };
 
@@ -60,6 +70,26 @@ export const INTENT_KEYWORDS: Record<string, { readonly keywords: readonly strin
   [INTENT.CREATE_APPOINTMENT]: {
     keywords: ['reservar', 'agendar', 'cita', 'turno', 'sacar', 'pedir hora', 'necesito hora', 'consulta', 'visita', 'ver al doctor'],
     weight: 3,
+  },
+  [INTENT.ACTIVATE_REMINDERS]: {
+    keywords: ['activar recordatorio', 'activar recordatorios', 'activar notificación', 'activar notificaciones', 'quiero recordatorio', 'activar aviso', 'activar alerta', 'activa recordatorio', 'activa mis recordatorios', 'activa mis recordatorio', 'activa notificacion', 'activa notificaciones', 'quiero que me avisen', 'activa aviso', 'activa alerta'],
+    weight: 4,
+  },
+  [INTENT.DEACTIVATE_REMINDERS]: {
+    keywords: ['desactivar recordatorio', 'desactivar recordatorios', 'desactivar notificación', 'desactivar notificaciones', 'no quiero recordatorio', 'quitar recordatorio', 'no me avisen', 'silenciar recordatorio', 'desactiva recordatorio', 'desactiva mis recordatorios', 'desactiva notificacion', 'desactiva notificaciones', 'no quiero avisos', 'desactiva aviso', 'quitar aviso', 'silenciar aviso'],
+    weight: 4,
+  },
+  [INTENT.REMINDER_PREFERENCES]: {
+    keywords: ['preferencia de recordatorio', 'configurar recordatorio', 'preferencias de notificación', 'cómo configuro recordatorios', 'ajustes de recordatorio', 'personalizar recordatorio', 'preferencias de recordatorio', 'configurar notificacion', 'cambiar mis preferencias de aviso', 'ajustes de aviso', 'configurar aviso'],
+    weight: 4,
+  },
+  [INTENT.SHOW_MAIN_MENU]: {
+    keywords: ['menu principal', 'menu', 'inicio', 'opciones', 'volver al inicio', 'volver al menu', 'mostrar menu', 'que puedo hacer', 'ayuda'],
+    weight: 4,
+  },
+  [INTENT.WIZARD_STEP]: {
+    keywords: ['siguiente', 'continuar', 'adelante', 'confirmar cita', 'si confirmar', 'elegir otro', 'otro horario', 'otro dia', 'volver', 'atras', 'cancelar wizard'],
+    weight: 4,
   },
 };
 

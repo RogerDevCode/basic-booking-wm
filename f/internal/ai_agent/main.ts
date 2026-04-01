@@ -53,6 +53,8 @@ function extractEntities(text: string): EntityMap {
   let service_type: string | null = null;
   let service_id: string | null = null;
   let booking_id: string | null = null;
+  let channel: string | null = null;
+  let reminder_window: string | null = null;
 
   for (const relDate of RELATIVE_DATES) {
     if (lowerText.includes(relDate)) { date = relDate; break; }
@@ -114,7 +116,15 @@ function extractEntities(text: string): EntityMap {
     if (match?.[1]) { booking_id = match[1]; break; }
   }
 
-  return { date, time, provider_name, provider_id, service_type, service_id, booking_id };
+  if (lowerText.includes('telegram')) { channel = 'telegram'; }
+  else if (lowerText.includes('gmail') || lowerText.includes('email') || lowerText.includes('correo')) { channel = 'gmail'; }
+  else if (lowerText.includes('ambos') || lowerText.includes('todos')) { channel = 'both'; }
+
+  if (lowerText.includes('30min') || lowerText.includes('30 min') || lowerText.includes('media hora')) { reminder_window = '30min'; }
+  else if (lowerText.includes('2h') || lowerText.includes('2 horas') || lowerText.includes('dos horas')) { reminder_window = '2h'; }
+  else if (lowerText.includes('24h') || lowerText.includes('24 horas') || lowerText.includes('un día') || lowerText.includes('un dia')) { reminder_window = '24h'; }
+
+  return { date, time, provider_name, provider_id, service_type, service_id, booking_id, channel, reminder_window };
 }
 
 // ============================================================================
@@ -163,6 +173,11 @@ type SuggestedResponseType =
   | 'reschedule_flow'
   | 'clarifying_question'
   | 'greeting_response'
+  | 'activate_reminders_response'
+  | 'deactivate_reminders_response'
+  | 'reminder_preferences_response'
+  | 'main_menu_response'
+  | 'wizard_step_response'
   | 'fallback';
 
 function suggestResponseType(
@@ -176,6 +191,13 @@ function suggestResponseType(
   if (intent === INTENT.THANK_YOU) return 'fallback';
   if (intent === INTENT.CANCEL_APPOINTMENT) return 'cancellation_flow';
   if (intent === INTENT.RESCHEDULE) return 'reschedule_flow';
+  if (intent === INTENT.ACTIVATE_REMINDERS) return 'activate_reminders_response';
+  if (intent === INTENT.DEACTIVATE_REMINDERS) return 'deactivate_reminders_response';
+  if (intent === INTENT.REMINDER_PREFERENCES) return 'reminder_preferences_response';
+  if (intent === INTENT.SHOW_MAIN_MENU) return 'main_menu_response';
+  if (intent === INTENT.WIZARD_STEP) return 'wizard_step_response';
+  if (intent === INTENT.SHOW_MAIN_MENU) return 'main_menu_response';
+  if (intent === INTENT.WIZARD_STEP) return 'wizard_step_response';
 
   if (intent === INTENT.CREATE_APPOINTMENT) {
     if (context.is_flexible) return 'general_search';
@@ -257,6 +279,23 @@ function generateAIResponse(
       break;
     case 'filtered_search':
       aiResponse = `📅 ¡Entendido! Busco disponibilidad${context.day_preference ? ` los ${context.day_preference}` : ''}${context.time_preference !== 'any' ? ` por la ${context.time_preference}` : ''}.\n\nDéjame consultar la agenda con esos filtros...`;
+      break;
+    case 'activate_reminders_response':
+      aiResponse = `🔔 ¡Perfecto! He activado tus recordatorios de citas.\n\nRecibirás avisos en:\n- ⏰ 24 horas antes (Telegram + Email)\n- ⏰ 2 horas antes (Telegram)\n- ⏰ 30 minutos antes (Telegram)\n\nSi deseas cambiar tus preferencias, escribe "configurar recordatorios".`;
+      break;
+    case 'deactivate_reminders_response':
+      aiResponse = `🔕 Entendido. He desactivado tus recordatorios de citas.\n\nYa no recibirás avisos automáticos. Si cambias de opinión, escribe "activar recordatorios" en cualquier momento.`;
+      break;
+    case 'reminder_preferences_response':
+      aiResponse = `⚙️ **Preferencias de Recordatorios**\n\nPuedes configurar cuándo y cómo recibir avisos:\n\n📱 **Canales disponibles:**\n- Telegram (mensajes instantáneos)\n- Email (correo electrónico)\n\n⏰ **Ventanas de tiempo:**\n- 24 horas antes de tu cita\n- 2 horas antes de tu cita\n- 30 minutos antes de tu cita\n\n💡 **Ejemplos:**\n- "Activa recordatorios por Telegram"\n- "Desactiva avisos por email"\n- "Solo quiero aviso de 30 minutos"\n\n¿Qué prefieres configurar?`;
+      needsMoreInfo = true;
+      followUpQuestion = '¿Qué canal o ventana de tiempo deseas configurar?';
+      break;
+    case 'main_menu_response':
+      aiResponse = `📋 **Menú Principal**\n\nElige una opción:\n\n📅 *Agendar cita* — Reserva tu próxima consulta\n📋 *Mis citas* — Ver citas próximas\n🔔 *Recordatorios* — Configurar avisos\n❓ *Información* — Datos del consultorio\n\nEscribe el número o nombre de la opción, o usa los botones de abajo.`;
+      break;
+    case 'wizard_step_response':
+      aiResponse = `✅ Entendido. Continuemos con el siguiente paso.\n\n¿En qué puedo ayudarte?`;
       break;
     default:
       aiResponse = `🤔 No estoy seguro de entender completamente.\n\nPuedo ayudarte con:\n- 📅 Agendar una cita\n- ❌ Cancelar una reserva\n- 🔄 Reprogramar una cita\n- 📋 Ver disponibilidad\n\n¿Podrías ser más específico? Ej: *"Quiero reservar una cita para mañana a las 3pm"*`;
@@ -349,11 +388,22 @@ function detectIntentRules(text: string): { intent: IntentType; confidence: numb
   const greeting = detectGreetingOrFarewell(normalizedText);
   if (greeting) return greeting as { intent: IntentType; confidence: number };
 
-  let bestIntent: IntentType = INTENT.UNKNOWN;
-  let maxScore = 0;
   const lowerNorm = normalizedText.toLowerCase();
 
   if (/\breagendar\b/.test(lowerNorm)) return { intent: INTENT.RESCHEDULE, confidence: 1.0 };
+
+  const hasActivate = /\bactiva\b/.test(lowerNorm) && !/\bdesactiva\b/.test(lowerNorm);
+  const hasDeactivate = /\bdesactiva\b/.test(lowerNorm) || /\bno quiero recordatorio\b/.test(lowerNorm) || /\bno me avisen\b/.test(lowerNorm) || /\bquitar recordatorio\b/.test(lowerNorm) || /\bsilenciar recordatorio\b/.test(lowerNorm);
+  const hasPrefs = /\bpreferencia\b/.test(lowerNorm) || /\bconfigurar\b/.test(lowerNorm) || /\bajuste\b/.test(lowerNorm) || /\bpersonalizar\b/.test(lowerNorm);
+
+  const hasReminderWord = /\brecordatorio/.test(lowerNorm) || /\bnotificacion/.test(lowerNorm) || /\baviso/.test(lowerNorm) || /\balerta/.test(lowerNorm) || /\bavisen/.test(lowerNorm) || /\bavisos/.test(lowerNorm);
+
+  const activateMatch = hasActivate && hasReminderWord;
+  const deactivateMatch = hasDeactivate && hasReminderWord;
+  const prefsMatch = hasPrefs && hasReminderWord;
+
+  let bestIntent: IntentType = INTENT.UNKNOWN;
+  let maxScore = 0;
 
   for (const [intent, config] of Object.entries(INTENT_KEYWORDS)) {
     let score = 0;
@@ -376,6 +426,16 @@ function detectIntentRules(text: string): { intent: IntentType; confidence: numb
         if (score > maxScore) { maxScore = score; bestIntent = intent as IntentType; }
       }
     }
+  }
+
+  if (activateMatch && maxScore < 5) {
+    bestIntent = INTENT.ACTIVATE_REMINDERS; maxScore = 5;
+  }
+  if (deactivateMatch && maxScore < 5) {
+    bestIntent = INTENT.DEACTIVATE_REMINDERS; maxScore = 5;
+  }
+  if (prefsMatch && maxScore < 5) {
+    bestIntent = INTENT.REMINDER_PREFERENCES; maxScore = 5;
   }
 
   const threshold = CONFIDENCE_THRESHOLDS[bestIntent] ?? 0.3;
@@ -518,6 +578,23 @@ export async function main(rawInput: unknown): Promise<{ readonly success: boole
       fallbackUsed = true;
     }
 
+    // Step 4b: Post-LLM correction for reminder intents
+    // LLM often confuses activate/deactivate, so we use rules to correct
+    const lowerText = text.toLowerCase();
+    const hasReminderContext = lowerText.includes('recordatorio') || lowerText.includes('notificacion') || lowerText.includes('aviso') || lowerText.includes('alerta');
+    if (hasReminderContext) {
+      if (/\bdesactiva\b/.test(lowerText) || /\bno quiero\b/.test(lowerText) || /\bquitar\b/.test(lowerText) || /\bsilenciar\b/.test(lowerText)) {
+        intent = INTENT.DEACTIVATE_REMINDERS;
+        confidence = Math.max(confidence, 0.8);
+      } else if (/\bpreferencia/.test(lowerText) || /\bconfigurar\b/.test(lowerText) || /\bajuste/.test(lowerText) || /\bpersonalizar\b/.test(lowerText)) {
+        intent = INTENT.REMINDER_PREFERENCES;
+        confidence = Math.max(confidence, 0.8);
+      } else if (/\bactiva\b/.test(lowerText) && !/\bdesactiva\b/.test(lowerText)) {
+        intent = INTENT.ACTIVATE_REMINDERS;
+        confidence = Math.max(confidence, 0.8);
+      }
+    }
+
     // Step 5: Extract entities (rules are more reliable for regex patterns)
     const entities = extractEntities(text);
 
@@ -530,6 +607,8 @@ export async function main(rawInput: unknown): Promise<{ readonly success: boole
       service_type: entities.service_type ?? (llmEntities['service_type'] as string | null) ?? null,
       service_id: entities.service_id,
       booking_id: entities.booking_id ?? (llmEntities['booking_id'] as string | null) ?? null,
+      channel: entities.channel ?? (llmEntities['channel'] as string | null) ?? null,
+      reminder_window: entities.reminder_window ?? (llmEntities['reminder_window'] as string | null) ?? null,
     };
 
     // Step 6: Context detection
