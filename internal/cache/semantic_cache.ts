@@ -44,7 +44,7 @@ export const defaultConfig = (): SemanticCacheConfig => ({
   redisDB: 0,
   similarityThreshold: 0.95, // High threshold for booking domain
   ttl: 3600, // 1 hour
-  maxSize: 10000,
+  maxSize: 10_000,
   enableStats: true,
 });
 
@@ -90,7 +90,7 @@ export interface CacheStats {
 export class SemanticCache {
   private readonly client: Redis;
   private readonly config: SemanticCacheConfig;
-  private stats: CacheStats;
+  private readonly stats: CacheStats;
   private readonly ctx: AbortController;
 
   /**
@@ -137,7 +137,7 @@ export class SemanticCache {
    * Obtiene una respuesta del cache (exact match + semantic)
    * Equivalente a Go: func (c *Cache) Get(prompt string) (*CacheEntry, bool)
    */
-  public get(prompt: string): Result<CacheEntry, Error> {
+  public get(prompt: string): Result<CacheEntry> {
     const startTime = Date.now();
 
     try {
@@ -180,7 +180,7 @@ export class SemanticCache {
     prompt: string,
     response: Record<string, unknown>,
     embedding: readonly number[]
-  ): Result<null, Error> {
+  ): Result<null> {
     const entry: CacheEntry = {
       promptHash: this.generatePromptHash(prompt),
       prompt,
@@ -226,7 +226,7 @@ export class SemanticCache {
    * Elimina una entrada del cache
    * Equivalente a Go: func (c *Cache) Delete(prompt string) error
    */
-  public delete(prompt: string): Result<null, Error> {
+  public delete(prompt: string): Result<null> {
     try {
       const promptHash = this.generatePromptHash(prompt);
       const exactKey = `cache:exact:${promptHash}`;
@@ -246,7 +246,7 @@ export class SemanticCache {
    * Limpia todo el cache
    * Equivalente a Go: func (c *Cache) Clear() error
    */
-  public clear(): Result<null, Error> {
+  public clear(): Result<null> {
     try {
       const pattern = 'cache:exact:*';
       let cursor = 0;
@@ -287,7 +287,7 @@ export class SemanticCache {
    * Cierra la conexión con Redis
    * Equivalente a Go: func (c *Cache) Close() error
    */
-  public async close(): Promise<Result<null, Error>> {
+  public async close(): Promise<Result<null>> {
     try {
       this.ctx.abort();
       await this.client.quit();
@@ -381,7 +381,7 @@ export class SemanticCache {
     this.client.setex(exactKey, this.config.ttl, entryJSON);
   }
 
-  private enforceMaxSize(): Result<null, Error> {
+  private enforceMaxSize(): Result<null> {
     // Get current cache size
     let cursor = 0;
     const entries: CacheEntry[] = [];
@@ -461,11 +461,7 @@ export class SemanticCache {
     const latency = Date.now() - startTime;
     
     // Simple moving average
-    if (this.stats.avgLatencyMs === 0) {
-      this.stats.avgLatencyMs = latency;
-    } else {
-      this.stats.avgLatencyMs = (this.stats.avgLatencyMs * 0.9) + (latency * 0.1);
-    }
+    this.stats.avgLatencyMs = this.stats.avgLatencyMs === 0 ? latency : (this.stats.avgLatencyMs * 0.9) + (latency * 0.1);
   }
 
   private updateHitRate(): void {
@@ -489,7 +485,7 @@ export class SemanticCache {
       } while (cursor !== 0);
 
       this.stats.size = size;
-    }, 60000); // Every minute
+    }, 60_000); // Every minute
 
     // Cleanup on abort
     this.ctx.signal.addEventListener('abort', () => {
@@ -508,7 +504,7 @@ export class SemanticCache {
  */
 export const createSemanticCache = (
   config: SemanticCacheConfig = defaultConfig()
-): Result<SemanticCache, Error> => {
+): Result<SemanticCache> => {
   try {
     const cache = new SemanticCache(config);
     return ok(cache);

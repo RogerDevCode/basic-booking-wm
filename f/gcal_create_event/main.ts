@@ -27,7 +27,7 @@ export const GCalResourceSchema = z.object({
 export async function main(
   rawInput: unknown,
   rawResource: unknown
-): Promise<Result<{ readonly created: boolean; readonly event_id: string; readonly html_link: string }, Error>> {
+): Promise<Result<{ readonly created: boolean; readonly event_id: string; readonly html_link: string }>> {
   
   // 1. Boundary Validation
   const inputParsed = GCalCreateInputSchema.safeParse(rawInput);
@@ -52,7 +52,7 @@ export async function main(
 
   // Calculate end_time (default 1 hour)
   const startTimeObj = new Date(input.start_time);
-  const endTimeObj = new Date(startTimeObj.getTime() + 60 * 60000);
+  const endTimeObj = new Date(startTimeObj.getTime() + 60 * 60_000);
 
   // 2. Auth Client Initialization
   let auth;
@@ -62,7 +62,7 @@ export async function main(
       credentials,
       scopes: ["https://www.googleapis.com/auth/calendar.events"],
     });
-  } catch (error) {
+  } catch {
     return err(new Error("Failed to parse Google credentials JSON"));
   }
 

@@ -18,12 +18,12 @@ export const TelegramResourceSchema = z.object({
   bot_token: z.string().min(1),
 }).strict();
 
-type TelegramResponse = {
+interface TelegramResponse {
   readonly ok: boolean;
   readonly result?: unknown;
   readonly error_code?: number;
   readonly description?: string;
-};
+}
 
 // ============================================================================
 // MAIN HANDLER
@@ -32,7 +32,7 @@ type TelegramResponse = {
 export async function main(
   rawInput: unknown,
   rawResource: unknown
-): Promise<Result<{ readonly message_id: number; readonly chat_id: string; readonly status: string }, Error>> {
+): Promise<Result<{ readonly message_id: number; readonly chat_id: string; readonly status: string }>> {
   
   // 1. Boundary Validation
   const inputParsed = TelegramSendInputSchema.safeParse(rawInput);
@@ -99,7 +99,7 @@ export async function main(
 // HELPER FUNCTIONS
 // ============================================================================
 
-async function attemptSend(apiUrl: string, body: URLSearchParams): Promise<Result<{ readonly message_id: number; readonly chat_id: string; readonly status: string }, Error>> {
+async function attemptSend(apiUrl: string, body: URLSearchParams): Promise<Result<{ readonly message_id: number; readonly chat_id: string; readonly status: string }>> {
   try {
     const response = await fetch(apiUrl, {
       method: "POST",

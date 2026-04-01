@@ -83,7 +83,7 @@ export async function main(rawInput: unknown): Promise<Result<CreateBookingRespo
       
       const patientId = patientRows[0]?.patient_id;
       if (!patientId) {
-        throw new Error("Failed to resolve patient_id");
+        return err(new Error("Failed to resolve patient_id"));
       }
 
       // C. Get Service Duration to calculate End Time
@@ -95,7 +95,7 @@ export async function main(rawInput: unknown): Promise<Result<CreateBookingRespo
 
       const durationMinutes = serviceRows[0]?.duration_minutes;
       if (durationMinutes === undefined) {
-        throw new Error("Service not found or inactive");
+        return err(new Error("Service not found or inactive"));
       }
       
       const startTimeDate = new Date(input.start_time);

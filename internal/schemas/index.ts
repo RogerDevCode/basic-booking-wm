@@ -36,7 +36,7 @@ export const BookingSchema = z.object({
   start_time: z.string().datetime(),
   end_time: z.string().datetime(),
   status: BookingStatusSchema,
-  idempotency_key: z.string().regex(/^[a-zA-Z0-9-]+$/),
+  idempotency_key: z.string().regex(/^[\dA-Za-z-]+$/),
   gcal_event_id: z.string().nullable(),
   gcal_provider_event_id: z.string().nullable(),
   gcal_patient_event_id: z.string().nullable(),

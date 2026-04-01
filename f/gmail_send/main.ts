@@ -36,7 +36,7 @@ export const GmailResourceSchema = z.object({
 export async function main(
   rawInput: unknown,
   rawResource: unknown
-): Promise<Result<{ readonly message_id: string; readonly accepted: readonly string[] }, Error>> {
+): Promise<Result<{ readonly message_id: string; readonly accepted: readonly string[] }>> {
   
   // 1. Boundary Validation
   const inputParsed = GmailSendInputSchema.safeParse(rawInput);
@@ -62,7 +62,7 @@ export async function main(
       username: envUser,
       password: envPass,
       smtp_host: process.env.SMTP_HOST ?? "smtp.gmail.com",
-      smtp_port: process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT, 10) : 465,
+      smtp_port: process.env.SMTP_PORT ? Number.parseInt(process.env.SMTP_PORT, 10) : 465,
       from_email: process.env.GMAIL_FROM_EMAIL ?? envUser,
       from_name: process.env.GMAIL_FROM_NAME ?? "Booking Titanium"
     };
@@ -141,12 +141,12 @@ export async function main(
 async function attemptSend(
   transporter: nodemailer.Transporter, 
   mailOptions: nodemailer.SendMailOptions
-): Promise<Result<{ readonly message_id: string; readonly accepted: readonly string[] }, Error>> {
+): Promise<Result<{ readonly message_id: string; readonly accepted: readonly string[] }>> {
   try {
     const info = await transporter.sendMail(mailOptions);
     return ok({
       message_id: info.messageId,
-      accepted: info.accepted.map(a => String(a))
+      accepted: info.accepted.map(String)
     });
   } catch (error) {
     return err(error instanceof Error ? error : new Error(String(error)));

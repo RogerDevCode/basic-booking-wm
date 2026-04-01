@@ -40,14 +40,14 @@ export async function main(rawInput: unknown): Promise<Result<CancelBookingRespo
 
       const row = existing[0];
       if (!row) {
-        throw new Error("Booking not found");
+        return err(new Error("Booking not found"));
       }
 
       const currentStatus = String(row.status);
 
       // B. Check if already cancelled
       if (currentStatus === 'cancelled') {
-         throw new Error("Booking is already cancelled");
+         return err(new Error("Booking is already cancelled"));
       }
 
       // C. Cancel Booking

@@ -46,7 +46,7 @@ export async function main(input: MessageParserInput): Promise<MessageParserResp
     }
     
     const idNum = Number(idStr);
-    if (idNum < 0 || idNum > 9007199254740991) {
+    if (idNum < 0 || idNum > 9_007_199_254_740_991) {
       return { valid: false, error: 'chat_id out of valid range' };
     }
     
@@ -54,7 +54,7 @@ export async function main(input: MessageParserInput): Promise<MessageParserResp
   }
 
   // Text validation: 1-500 chars, printable characters only
-  const TEXT_RE = /^[\x20-\x7E\u00C0-\u017F\u0400-\u04FF\u0600-\u06FF\u4E00-\u9FFF\u3040-\u309F\u30A0-\u30FF\n\r\t]{1,500}$/;
+  const TEXT_RE = /^[\t\n\r\u0020-\u007E\u00C0-\u017F\u0400-\u04FF\u0600-\u06FF\u3040-\u30FF\u4E00-\u9FFF]{1,500}$/;
   function validateText(txt: string): { valid: boolean; error?: string; value?: string } {
     if (!txt || txt === null || txt === undefined) {
       return { valid: false, error: 'text is required' };
@@ -98,9 +98,9 @@ export async function main(input: MessageParserInput): Promise<MessageParserResp
 
   // === SANITIZE FOR SQL ===
   const safeText = textResult.value!
-    .replace(/\\/g, '\\\\')
-    .replace(/'/g, "''")
-    .substring(0, 500);
+    .replaceAll('\\', '\\\\')
+    .replaceAll('\'', "''")
+    .slice(0, 500);
 
   const safeUsername = "User";
 

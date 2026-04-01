@@ -224,7 +224,7 @@ function detectIntent(text: string): { detectedIntent: string; confidence: numbe
     maxScore = Math.max(maxScore, urgencyScore);
   }
 
-  const confidence = maxScore > 0 ? Math.min(maxScore / 3, 1.0) : 0.3;
+  const confidence = maxScore > 0 ? Math.min(maxScore / 3, 1) : 0.3;
 
   return { detectedIntent, confidence };
 }
@@ -246,8 +246,8 @@ function extractEntities(text: string): AIAgentEntities {
 
   // Extract date (enhanced with relative dates)
   const datePatterns = [
-    /(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/,  // DD/MM/YYYY or DD-MM-YYYY
-    /(\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2})/,     // YYYY-MM-DD
+    /((?:\d{1,2}[/\-]){2}\d{2,4})/,  // DD/MM/YYYY or DD-MM-YYYY
+    /(\d{4}(?:[/\-]\d{1,2}){2})/,     // YYYY-MM-DD
   ];
 
   for (const pattern of datePatterns) {
@@ -405,7 +405,7 @@ function generateAIResponse(
   const bookingCount = user_profile?.booking_count ?? 0;
 
   switch (responseType) {
-    case 'urgent_options':
+    case 'urgent_options': {
       aiResponse = `🚨 Entiendo que es **urgente**. Veo las opciones disponibles:
       
 1️⃣ **Lista de espera prioritaria**: Te aviso si se libera algo en las próximas 24hs (60% de éxito)
@@ -416,14 +416,16 @@ function generateAIResponse(
 
 📞 Para urgencias reales, también puedes llamar al +54 11 1234-5678`;
       break;
+    }
 
-    case 'availability_list':
+    case 'availability_list': {
       aiResponse = `📅 Déjame verificar la disponibilidad${entities.date ? ` para ${entities.date}` : ''}...
       
 ✨ Un momento, estoy consultando la agenda...`;
       break;
+    }
 
-    case 'no_availability_today':
+    case 'no_availability_today': {
       aiResponse = `😅 Lo siento, pero **hoy** estamos completamente reservados.
 
 📅 Pero tengo buenas noticias:
@@ -435,8 +437,9 @@ function generateAIResponse(
 
 ¿Te gustaría reservar para mañana?`;
       break;
+    }
 
-    case 'no_availability_extended':
+    case 'no_availability_extended': {
       aiResponse = `😓 Lo siento, estamos completamente reservados por los próximos 7 días.
 
 📋 Opciones que te puedo ofrecer:
@@ -447,8 +450,9 @@ function generateAIResponse(
 
 ¿Cuál opción prefieres? (1-3)`;
       break;
+    }
 
-    case 'general_search':
+    case 'general_search': {
       aiResponse = `📅 Te ayudo a buscar disponibilidad. 
 
 ${context.is_flexible ? 'Veo que eres flexible, eso es bueno! ' : ''}¿Tienes alguna preferencia de:
@@ -458,14 +462,16 @@ ${context.is_flexible ? 'Veo que eres flexible, eso es bueno! ' : ''}¿Tienes al
       needsMoreInfo = true;
       followUpQuestion = '¿Qué día u horario prefieres?';
       break;
+    }
 
-    case 'filtered_search':
-      aiResponse = `📅 Entendido! Buscas disponibilidad${context.day_preference ? ` los ${context.day_preference}` : ''}${context.time_preference !== 'any' ? ` por la ${context.time_preference}` : ''}.
+    case 'filtered_search': {
+      aiResponse = `📅 Entendido! Buscas disponibilidad${context.day_preference ? ` los ${context.day_preference}` : ''}${context.time_preference === 'any' ? '' : ` por la ${context.time_preference}`}.
       
 Déjame consultar la agenda con esos filtros...`;
       break;
+    }
 
-    case 'booking_confirmation':
+    case 'booking_confirmation': {
       aiResponse = `✅ ¡Claro! Puedo ayudarte a agendar una cita.
       
 📋 **Detalles:**
@@ -475,8 +481,9 @@ ${entities.service_id ? `- 🏥 Servicio: ${entities.service_id}` : '- 🏥 Serv
 
 ${isFirstTime ? '👋 Veo que es tu primera vez! ' : ''}${bookingCount > 5 ? '🌟 Gracias por tu confianza! ' : ''}¿Confirmas estos detalles para reservar?`;
       break;
+    }
 
-    case 'cancellation_flow':
+    case 'cancellation_flow': {
       aiResponse = `❌ Entiendo que necesitas cancelar una cita.
       
 Por favor proporcióname:
@@ -487,8 +494,9 @@ Por favor proporcióname:
       needsMoreInfo = true;
       followUpQuestion = '¿Cuál es el ID de tu reserva o la fecha de la cita?';
       break;
+    }
 
-    case 'reschedule_flow':
+    case 'reschedule_flow': {
       aiResponse = `🔄 Quieres reprogramar tu cita. Entendido!
       
 Necesito saber:
@@ -499,8 +507,9 @@ Necesito saber:
       needsMoreInfo = true;
       followUpQuestion = '¿Cuál es tu reserva actual y cuándo te gustaría cambiar?';
       break;
+    }
 
-    case 'clarifying_question':
+    case 'clarifying_question': {
       aiResponse = `🤔 Para ayudarte mejor, necesito un poco más de información:
 
 ¿Qué tipo de servicio estás buscando?
@@ -512,8 +521,9 @@ Necesito saber:
       needsMoreInfo = true;
       followUpQuestion = '¿Qué servicio necesitas y cuándo prefieres?';
       break;
+    }
 
-    case 'greeting_response':
+    case 'greeting_response': {
       aiResponse = `👋 ¡Hola! ${isFirstTime ? '¡Bienvenido! ' : '¡Qué bueno verte de nuevo! '}
 
 Soy tu asistente virtual de reservas. Estoy aquí para ayudarte a agendar, cancelar o reprogramar tus citas.
@@ -525,9 +535,10 @@ Soy tu asistente virtual de reservas. Estoy aquí para ayudarte a agendar, cance
 - "¿Tienen disponibilidad para hoy?"
 - "Necesito cancelar mi reserva"`;
       break;
+    }
 
     case 'fallback':
-    default:
+    default: {
       aiResponse = `🤔 No estoy seguro de entender completamente. 
 
 Puedo ayudarte con:
@@ -540,6 +551,7 @@ Puedo ayudarte con:
       needsMoreInfo = true;
       followUpQuestion = '¿Qué tipo de ayuda necesitas?';
       break;
+    }
   }
 
   return { aiResponse, needsMoreInfo, followUpQuestion };
