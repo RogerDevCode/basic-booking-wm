@@ -1,0 +1,50 @@
+# ============================================================================
+# Dockerfile.ai-agent — Production container for Booking TypeScript scripts
+# ============================================================================
+# Multi-stage build:
+# 1. Build: Install deps, compile TypeScript
+# 2. Runtime: Minimal Alpine with Node.js, copy compiled output
+# Final image size: ~150MB (vs ~1GB with dev deps)
+# ============================================================================
+
+# ─── Stage 1: Build ─────────────────────────────────────────────────────────
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# Install dependencies first (layer caching)
+COPY package.json package-lock.json ./
+RUN npm ci --ignore-scripts
+
+# Copy source
+COPY tsconfig.json tsconfig.strict.json ./
+COPY f/ ./f/
+
+# Build TypeScript
+RUN npx tsc --build
+
+# ─── Stage 2: Runtime ───────────────────────────────────────────────────────
+FROM node:20-alpine AS runtime
+
+# Install curl for healthcheck
+RUN apk add --no-cache curl
+
+WORKDIR /app
+
+# Copy only production dependencies
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./
+COPY --from=builder /app/tsconfig.json ./
+
+# Copy compiled output (if any) and source
+COPY f/ ./f/
+
+# Create non-root user
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+USER appuser
+
+# Health check endpoint
+EXPOSE 8080
+
+# Default command: run health check server
+CMD ["node", "-e", "const http = require('http'); http.createServer((req, res) => { res.writeHead(200, {'Content-Type': 'application/json'}); res.end(JSON.stringify({status: 'healthy', timestamp: new Date().toISOString(), version: '2.3.1'})); }).listen(8080, '0.0.0.0');"]

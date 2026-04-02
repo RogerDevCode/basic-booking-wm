@@ -40,7 +40,7 @@ export async function main(rawInput: unknown): Promise<{
   try {
     // Build WHERE clauses dynamically based on provided filters
     const conditions: string[] = [];
-    const params: unknown[] = [];
+    const params: postgres.ParameterOrJSON<never>[] = [];
     let paramIdx = 1;
 
     if (input.provider_id !== undefined) {
@@ -79,7 +79,7 @@ export async function main(rawInput: unknown): Promise<{
     // Count total
     const countRows = await sql.unsafe(
       'SELECT COUNT(*) as total FROM bookings b ' + whereClause,
-      params
+      params as postgres.ParameterOrJSON<never>[]
     );
     const countRow: Record<string, unknown> | undefined = countRows[0] as Record<string, unknown> | undefined;
     const total = countRow !== undefined ? Number(countRow['total']) : 0;
@@ -96,7 +96,7 @@ export async function main(rawInput: unknown): Promise<{
       ' ' + whereClause +
       ' ORDER BY b.start_time DESC' +
       ' LIMIT $' + paramIdx + ' OFFSET $' + (paramIdx + 1),
-      params.concat([input.limit, input.offset])
+      params.concat([input.limit, input.offset]) as postgres.ParameterOrJSON<never>[] as postgres.ParameterOrJSON<never>[]
     );
 
     return {
