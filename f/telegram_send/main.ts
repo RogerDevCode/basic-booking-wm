@@ -171,6 +171,11 @@ async function sendWithRetry(
   const apiUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
+    // Rate limiting: Telegram limit is 30 msg/s per bot
+    // Add 50ms delay between sends to stay well under limit
+    if (attempt > 0) {
+      await new Promise(resolve => setTimeout(resolve, 50 * attempt));
+    }
     try {
       const body: Record<string, unknown> = {
         chat_id: chatId,
@@ -206,6 +211,15 @@ async function sendWithRetry(
 
       if (errorCode >= 400 && errorCode < 500 && errorCode !== 429) {
         return { sent: false, message_id: null, error: `Permanent error (${String(errorCode)}): ${errorDesc}` };
+      }
+
+      // Handle rate limiting (429) — respect Retry-After header
+      if (errorCode === 429) {
+        const retryAfter = typeof data['parameters'] === 'object' && data['parameters'] !== null
+          ? Number((data['parameters'] as Record<string, unknown>)['retry_after'] ?? 1)
+          : 1;
+        const waitMs = Math.min(retryAfter * 1000, 30000);
+        await new Promise(resolve => setTimeout(resolve, waitMs));
       }
 
       lastError = `${String(errorCode)}: ${errorDesc}`;
