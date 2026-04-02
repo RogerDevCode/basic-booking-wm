@@ -1,374 +1,154 @@
-# 📘 Booking Titanium - Windmill (Go/Golang)
+# 📘 Booking Titanium - Windmill (TypeScript)
 
-**Estado:** 🟢 98% Complete - Production Ready
-**Versión:** 1.0.0
-**Lenguaje:** Go 1.25+
-**Basado en:** Workflows n8n NN_01, WF1, WF2
+**Estado:** 🟢 Production Ready (Strict Mode Certified)
+**Versión:** 2.0.0
+**Lenguaje:** TypeScript (Strict Mode)
+**Plataforma:** Windmill Serverless Platform
 
 ---
 
 ## 📋 Descripción
 
-Sistema de reservas de citas implementado en **Go/Golang** para Windmill.
-Incluye las operaciones core de creación, cancelación y reagendamiento de reservas.
+Sistema de reservas de citas implementado nativamente en **TypeScript** para la plataforma **Windmill**. 
+Incluye las operaciones core de creación, cancelación y reagendamiento de reservas médicas o de servicios, utilizando validaciones estrictas y tipado seguro.
 
 ### ✅ Features Completas
 
-- **API HTTP** completa con endpoints de booking
-- **Telegram Webhook** para recibir mensajes de usuarios
-- **AI Agent** para detección de intenciones (create/cancel/reschedule)
-- **17 Windmill Scripts** en Go (package inner, func main)
-- **Circuit Breaker** para resiliencia
-- **Distributed Lock** para prevenir double-booking
-- **Google Calendar** integration
-- **Telegram/Gmail** para notificaciones
-- **45/47 tests** migrados (96%)
+- **Telegram Webhook** para recibir mensajes de pacientes en tiempo real.
+- **AI Agent (LLM)** para detección de intenciones avanzadas (create, cancel, reschedule, reminders) y extracción de entidades.
+- **Google Calendar Integration** (Sincronización Bidireccional Activa y Pasiva).
+- **Notificaciones (Telegram / Gmail)** para avisos a proveedores y pacientes.
+- **Tipado Estricto (TypeScript Strict Mode)** en todas las interacciones con base de datos, usando `postgres.js` v3 tagged templates con tipado estático `RowInterface`.
+- **Arquitectura Transaccional Atómica** para proteger operaciones de escritura (`booking_create`, `booking_cancel`, etc.) y prevenir race conditions.
+- **Circuit Breaker & Retry queues** (`gcal_reconcile`) para evitar pérdida de sincronización en fallos de red.
+- **Vitest Unit & Integration Suites** que garantizan robustez.
 
 ---
 
-## 🏗️ Arquitectura
+## 🏗️ Arquitectura & Flujos
 
-### Flujo Principal (API → Booking)
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    API Gateway (HTTP)                        │
-│                   /book-appointment                          │
-│                  (cmd/api/main.go)                           │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│                  Booking Orchestrator                        │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
-│  │   Circuit    │→ │    Lock      │→ │ Availability │      │
-│  │   Breaker    │  │   acquire    │  │    check     │      │
-│  └──────────────┘  └──────────────┘  └──────────────┘      │
-│                              │                               │
-│                              ▼                               │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
-│  │  GCal Create │→ │  DB Create   │→ │   Lock       │      │
-│  │   Event      │  │   Booking    │  │   release    │      │
-│  └──────────────┘  └──────────────┘  └──────────────┘      │
-└─────────────────────────────────────────────────────────────┘
+### Flujo Principal de Telegram (Webhook → AI → Acción)
+```mermaid
+graph TD
+    User([Telegram User]) -->|Message| Webhook[telegram_callback]
+    Webhook --> AI_Agent[AI Agent Intent Parser]
+    
+    AI_Agent -->|create_booking| CreateFlow[booking_create + GCal Sync]
+    AI_Agent -->|cancel_booking| CancelFlow[booking_cancel + GCal Sync]
+    AI_Agent -->|reschedule| ReschFlow[booking_reschedule + GCal Sync]
+    
+    CreateFlow --> DB[(PostgreSQL)]
+    CancelFlow --> DB
+    ReschFlow --> DB
+    
+    CreateFlow --> TelegramSend[telegram_send]
+    CancelFlow --> TelegramSend
+    ReschFlow --> TelegramSend
+    TelegramSend --> User
 ```
 
-### Flujo Telegram Webhook (Nuevo ✨)
+### Arquitectura de Sincronización Google Calendar (Eventual Consistency)
+```mermaid
+sequenceDiagram
+    participant App as Creador Reserva
+    participant DB as PostgresSQL
+    participant GSync as gcal_sync (Realtime)
+    participant Recon as gcal_reconcile (Cron)
+    participant GCal as Google Calendar API
 
-```
-┌──────────────┐     ┌───────────────────┐     ┌─────────────────┐
-│   Usuario    │────▶│  Telegram Bot     │────▶│  API Gateway    │
-│  envía msg   │     │   (Cloudflare)    │     │ /api/telegram/  │
-└──────────────┘     └───────────────────┘     │    webhook      │
-                                               └────────┬────────┘
-                                                        │
-                        ┌───────────────────────────────┼──────────┐
-                        │                               ▼          │
-                        │                    ┌─────────────────┐  │
-                        │                    │  Windmill Flow  │  │
-                        │                    │ telegram-webhook│  │
-                        │                    └────────┬────────┘  │
-                        │                             │           │
-                        │              ┌──────────────┼────────┐ │
-                        │              │              │        │ │
-                        ▼              ▼              ▼        ▼ ▼
-              ┌─────────────┐ ┌─────────────┐ ┌─────────────────┐
-              │  AI Agent   │ │   Booking   │ │   Telegram      │
-              │  (intent)   │ │ Orchestrator│ │   Send          │
-              └─────────────┘ └─────────────┘ └─────────────────┘
+    App->>DB: Crea Reserva (Txn atómica)
+    App->>GSync: Dispara sincronización
+    GSync->>GCal: POST/PUT event
+    alt OK
+        GCal-->>GSync: 200 OK
+        GSync->>DB: Marcar 'synced', graba event_id
+    else Retry loop fallido
+        GSync->>DB: Marcar 'pending_sync'
+    end
+
+    Note over Recon: Cron cada 5 minutos
+    Recon->>DB: Seleccionar 'pending_sync' limit 50
+    loop Por cada reserva
+        Recon->>GCal: Re-intenta POST/PUT
+        GCal-->>Recon: 200 OK
+        Recon->>DB: Marcar 'synced', update retry_count
+    end
 ```
 
 ---
 
 ## 📁 Estructura del Proyecto
 
-```
+```text
 booking-titanium-wm/
-├── cmd/                           # Aplicaciones principales
-│   ├── api/                       # API HTTP server
-│   │   └── main.go                # ✅ +telegramWebhookHandler
-│   └── workers/                   # Background workers
-│       └── main.go
+├── f/                             # Windmill Scripts & Flows
+│   ├── internal/                  # Lógica compartida (No expuesta como endpoint directo)
+│   │   ├── ai_agent/              # Motor de inteligencia artificial para intents & NLP
+│   │   ├── gcal_utils/            # Utilidades compartidas para construcción de eventos GCal
+│   │   └── shared_types/          # Tipos compartidos
+│   ├── booking_create/            # Operación y Flow de creación atómica
+│   ├── booking_cancel/            # Operación de cancelación
+│   ├── booking_reschedule/        # Operación de re-agendamiento seguro
+│   ├── availability_check/        # Búsqueda de disponibilidad
+│   ├── gcal_sync/                 # Sincronización Realtime con GCal
+│   ├── gcal_reconcile/            # Cronjob para retry de sincros fallidas
+│   ├── telegram_callback/         # Webhook handler nativo para bot de Telegram
+│   ├── telegram_send/             # Emisor de mensajes de Telegram
+│   └── cron_reminders/            # Disparador de mensajes 24hs/2hs antes de la cita
 │
-├── internal/                      # Código privado de la aplicación
-│   ├── core/                      # Core utilities
-│   │   ├── db.go                  # Database connection
-│   │   └── config.go              # Configuration
-│   │
-│   ├── booking/                   # Booking operations
-│   │   ├── create.go              # Create booking
-│   │   ├── cancel.go              # Cancel booking
-│   │   └── reschedule.go          # Reschedule booking
-│   │
-│   ├── availability/              # Availability operations
-│   │   └── check.go               # Check availability
-│   │
-│   ├── infrastructure/            # Infrastructure
-│   │   ├── circuit_breaker.go     # Circuit breaker
-│   │   ├── distributed_lock.go    # Distributed locks
-│   │   └── rollback.go            # Rollback operations
-│   │
-│   ├── communication/             # External communication
-│   │   ├── telegram.go            # Telegram bot
-│   │   ├── gcal.go                # Google Calendar
-│   │   └── gmail.go               # Gmail
-│   │
-│   ├── providers/                 # Providers & services
-│   │   ├── get_providers.go
-│   │   └── get_services.go
-│   │
-│   ├── ai/                        # AI agents
-│   │   └── agent.go
-│   │
-│   ├── message/                   # Message parsing
-│   │   └── parser.go              # Parse Telegram messages
-│   │
-│   ├── rag/                       # RAG / Vector search
-│   │   └── retrieve.go
-│   │
-│   └── seed/                      # Seed/provisioning
-│       └── provisioning.go
+├── docs/                          # Documentación Arquitectónica y Certificaciones
+│   ├── AUDIT_REPORTS/
+│   └── CERTIFIED_WORKFLOWS.json
 │
-├── pkg/                           # Código público/reutilizable
-│   ├── types/                     # Type definitions
-│   │   └── types.go
-│   │
-│   └── utils/                     # Utility functions
-│       ├── response.go            # Standard contract
-│       └── validators.go          # Input validators
-│
-├── f/                             # Windmill Scripts (17 scripts)
-│   ├── booking-orchestrator/      # Orchestrator principal
-│   ├── booking-create/            # Crear reserva
-│   ├── booking-cancel/            # Cancelar reserva
-│   ├── booking-reschedule/        # Reagendar reserva
-│   ├── availability-check/        # Verificar disponibilidad
-│   ├── circuit-breaker-check/     # Check estado circuit breaker
-│   ├── circuit-breaker-record/    # Registrar éxito/fracaso
-│   ├── distributed-lock-acquire/  # Adquirir lock
-│   ├── distributed-lock-release/  # Liberar lock
-│   ├── gcal-create-event/         # Crear evento GCal
-│   ├── gcal-delete-event/         # Eliminar evento GCal
-│   ├── gmail-send/                # Enviar email
-│   ├── telegram-send/             # Enviar mensaje Telegram
-│   ├── get-providers/             # Listar proveedores
-│   ├── get-services/              # Listar servicios
-│   ├── get-providers-by-service/  # Filtrar por servicio
-│   └── get-services-by-provider/  # Filtrar por proveedor
-│
-├── f/telegram-webhook__flow/      # ✅ NUEVO: Flow Telegram Webhook
-│   └── flow.yaml                  # Definición del flow
-│
-├── f/internal/                    # ✅ NUEVO: Scripts internos
-│   ├── message_parser/            # Parsear mensajes (NN_02)
-│   │   └── main.ts
-│   └── ai_agent/                  # AI Agent (NN_03)
-│       └── main.ts
-│
-├── tests/                         # Tests
-│   ├── unit/                      # Unit tests
-│   ├── integration/               # Integration tests
-│   └── e2e/                       # E2E tests
-│
-├── docs/                          # Documentación
-│   ├── LLM_CONTEXT.md             # Contexto para AI/LLM
-│   ├── LLM_CONTEXT_MINI.md        # Contexto mínimo
-│   ├── DOCKER_DEPLOYMENT.md       # Deploy con Docker
-│   ├── DOCKER_COMPOSE_GUIDE.md    # Guía Docker Compose
-│   ├── PROJECT_STRUCTURE.md       # Estructura del proyecto
-│   └── TELEGRAM_WEBHOOK_SETUP.md  # ✅ NUEVO: Setup Telegram
-│
-├── workflows-n8n/                 # Workflows originales n8n (ref)
-│   ├── NN_01_Booking_Gateway.json
-│   ├── NN_02_Message_Parser.json
-│   ├── NN_03_AI_Agent.json
-│   └── ...
-│
-├── go.mod                         # Go module definition
-├── go.sum                         # Go dependencies
-├── Makefile                       # Build commands
-├── .env.example                   # Environment template
-├── .gitignore                     # Git ignore
-└── README.md                      # This file
+├── docker-compose.*               # Definición de entornos (Dev/Prod)
+├── package.json                   # Dependencias de TS: zod, vitest, postgres...
+├── tsconfig.json                  # Conf estricta base
+├── tsconfig.strict.json           # Conf estricta de auditoría (noUncheckedIndexedAccess)
+└── .env                           # Variables de Entorno (Windmill y Locales)
 ```
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Quick Start (Development)
 
-### 1. Instalar dependencias
-```bash
-cd booking-titanium-wm
-go mod download
-```
-
-### 2. Configurar variables de entorno
+### 1. Variables de Entorno y Dependencias
+Clona el `.env.example` y prepara la configuración del entorno para los scripts de Windmill en tu sistema local o subiéndolo como resource en WM.
 ```bash
 cp .env.example .env
-# Editar .env con tus credenciales
+npm install                 # Para descargar zod, postgres.js, vitest, etc.
 ```
 
-### 3. Configurar base de datos
+### 2. Base de Datos / Infraestructura Local
+Puedes levantar la BD local con el docker-compose incluido:
 ```bash
-# Asegurar que la DB existe y las tablas están creadas
-export DATABASE_URL="postgresql://user:password@localhost:5432/bookings?sslmode=disable"
+docker-compose -f docker-compose.dev.yml up -d db
 ```
 
-### 4. Build del proyecto
-```bash
-go build -o bin/api ./cmd/api
-go build -o bin/workers ./cmd/workers
-```
+### 3. Ejecutar Suites de Pruebas Automáticas (Vitest)
+El core lógico se puede testear a nivel local utilizando Vitest en modo estricto. Particularmente útil para la lógica del LLM (ai_agent) y callback handlers.
 
-### 5. Ejecutar tests
 ```bash
-go test ./...
-```
+# Validacion base
+npm run test
 
-### 6. Ejecutar en desarrollo
-```bash
-go run ./cmd/api/main.go
+# Para modo Type Strict Check (vital para prevenir errores de postgres.js v3)
+npm run typecheck
+# ó
+npx tsc --noEmit
 ```
 
 ---
 
-## 📡 Endpoints HTTP
+## 🧱 Guidelines de Desarrollo / Code Standards
 
-### POST /book-appointment
-```bash
-curl -X POST http://localhost:8080/book-appointment \
-  -H "Content-Type: application/json" \
-  -d '{
-    "action": "create_booking",
-    "provider_id": 1,
-    "service_id": 1,
-    "start_time": "2026-03-25T10:00:00-03:00",
-    "chat_id": "123456789",
-    "user_name": "Juan Pérez",
-    "user_email": "juan@example.com"
-  }'
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "error_code": null,
-  "error_message": null,
-  "data": {
-    "id": "uuid-del-booking",
-    "status": "CONFIRMED",
-    "is_duplicate": false
-  },
-  "_meta": {
-    "source": "DB_Create_Booking",
-    "timestamp": "2026-03-24T16:00:00Z",
-    "version": "1.0.0"
-  }
-}
-```
-
-### POST /book-appointment (Cancelar)
-```bash
-curl -X POST http://localhost:8080/book-appointment \
-  -H "Content-Type: application/json" \
-  -d '{
-    "action": "cancel_booking",
-    "booking_id": "uuid-del-booking",
-    "cancellation_reason": "El cliente canceló"
-  }'
-```
-
-### POST /book-appointment (Check Availability)
-```bash
-curl -X POST http://localhost:8080/book-appointment \
-  -H "Content-Type: application/json" \
-  -d '{
-    "action": "check_availability",
-    "provider_id": 1,
-    "service_id": 1,
-    "date": "2026-03-25"
-  }'
-```
+1. **Tipado Estricto (Obligatorio en Postgres):** Al usar `postgres.js`, TODAS las queries deben incluir explícitamente el tipado del registro de respuesta mediante interfaces, garantizando seguridad estática (`TS4111`).
+   ```typescript
+   interface UserRow { id: string, name: string }
+   const res = await sql<UserRow[]>`SELECT id, name FROM users`;
+   console.log(res[0].name); // ✅ Typo Safe
+   ```
+2. **Sin Accesos Inseguros a Arrays:** `noUncheckedIndexedAccess` está activo. No debes acceder a elementos de un array sin chequear existencia o utilizar *Optional Chaining* (`arr[0]?.id`).
+3. **Validación Zod:** Toda entrada (los parámetros de las funciones `main()` en Windmill) debe ser validada con un schema `.safeParse()` de Zod.
 
 ---
-
-## 🧪 Testing
-
-### Tests Unitarios
-```bash
-go test ./internal/booking/... -v
-go test ./pkg/utils/... -v
-```
-
-### Tests de Integración
-```bash
-go test ./tests/integration/... -v
-```
-
-### Test con Coverage
-```bash
-go test ./... -coverprofile=coverage.out
-go tool cover -html=coverage.out
-```
-
----
-
-## 📊 Estado de la Migración a Go
-
-| Componente | Archivo Go | Estado |
-|------------|-----------|--------|
-| **Types** | `pkg/types/types.go` | ✅ Completado |
-| **Utils/Response** | `pkg/utils/response.go` | ✅ Completado |
-| **Utils/Validators** | `pkg/utils/validators.go` | ✅ Completado |
-| **Core/DB** | `internal/core/db.go` | ✅ Completado |
-| **Booking/Create** | `internal/booking/create.go` | ✅ Completado |
-| **Booking/Cancel** | `internal/booking/cancel.go` | ✅ Completado |
-| **Booking/Reschedule** | `internal/booking/reschedule.go` | ✅ Completado |
-| **API Gateway** | `cmd/api/main.go` | ⏳ Pendiente |
-| **Circuit Breaker** | `internal/infrastructure/circuit_breaker.go` | ⏳ Pendiente |
-| **Distributed Lock** | `internal/infrastructure/distributed_lock.go` | ⏳ Pendiente |
-| **Rollback** | `internal/infrastructure/rollback.go` | ⏳ Pendiente |
-| **GCal** | `internal/communication/gcal.go` | ⏳ Pendiente |
-| **Telegram** | `internal/communication/telegram.go` | ⏳ Pendiente |
-
-**Progreso:** 7/13 componentes completados (54%)
-
----
-
-## 🔧 Próximos Pasos
-
-### Fase 1 (Completada) ✅
-- [x] Types definitions
-- [x] Utils (response, validators)
-- [x] Database connection
-- [x] Booking scripts (create, cancel, reschedule)
-
-### Fase 2 (En Progreso) ⏳
-- [ ] API Gateway HTTP server
-- [ ] Circuit Breaker script
-- [ ] Distributed Lock script
-- [ ] Rollback script
-- [ ] Google Calendar integration
-- [ ] Gmail integration
-
-### Fase 3 (Pendiente) ⏳
-- [ ] Telegram integration
-- [ ] AI Agent integration
-- [ ] RAG integration
-- [ ] Seed/Provisioning scripts
-- [ ] Tests E2E
-
----
-
-## 📞 Soporte
-
-- **Documentación Go:** https://go.dev/doc/
-- **Documentación Windmill:** https://www.windmill.dev/docs
-- **Slack:** #booking-titanium
-
----
-
-**Última actualización:** 2026-03-24  
-**Mantenido por:** Booking Titanium Team
-# basic-booking-wm
+**Mantenido por:** Booking Titanium Team (2026)

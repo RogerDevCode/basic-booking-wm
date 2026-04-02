@@ -1,9 +1,10 @@
 // ============================================================================
-// LLM CLIENT — Groq (primary) + OpenAI (fallback)
+// LLM CLIENT — Groq (primary) + OpenAI (fallback) (v3.1)
 // Temperature 0.0, max_tokens 512, timeout 15s, 2 retries
+// Pattern: Precision Architecture, No 'any', Errors as Values
 // ============================================================================
 
-declare const wmill: { env: Record<string, string> } | undefined;
+declare const wmill: { readonly env: Readonly<Record<string, string>> } | undefined;
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
@@ -16,43 +17,52 @@ const BACKOFF_MS = 500;
 const TIMEOUT_MS = 15000;
 
 interface ChatMessage {
-  role: 'system' | 'user' | 'assistant';
-  content: string;
+  readonly role: 'system' | 'user' | 'assistant';
+  readonly content: string;
 }
 
-interface LLMResponse {
-  content: string;
-  provider: 'groq' | 'openai';
-  tokens_in: number;
-  tokens_out: number;
-  latency_ms: number;
+export interface LLMResponse {
+  readonly content: string;
+  readonly provider: 'groq' | 'openai';
+  readonly tokens_in: number;
+  readonly tokens_out: number;
+  readonly latency_ms: number;
+}
+
+interface ProviderInternalResult {
+  readonly content: string;
+  readonly tokens_in: number;
+  readonly tokens_out: number;
 }
 
 function getGroqKey(): string | null {
-  if (typeof wmill !== 'undefined' && wmill?.env?.['GROQ_API_KEY']) {
+  if (typeof wmill !== 'undefined' && wmill?.env?.['GROQ_API_KEY'] != null) {
     return wmill.env['GROQ_API_KEY'];
   }
-  if (typeof process !== 'undefined' && process.env?.GROQ_API_KEY) {
-    return process.env.GROQ_API_KEY;
+  if (typeof process !== 'undefined' && process.env?.['GROQ_API_KEY'] != null) {
+    return process.env['GROQ_API_KEY'] ?? null;
   }
   return null;
 }
 
 function getOpenAIKey(): string | null {
-  if (typeof wmill !== 'undefined' && wmill?.env?.['OPENAI_API_KEY']) {
+  if (typeof wmill !== 'undefined' && wmill?.env?.['OPENAI_API_KEY'] != null) {
     return wmill.env['OPENAI_API_KEY'];
   }
-  if (typeof process !== 'undefined' && process.env?.OPENAI_API_KEY) {
-    return process.env.OPENAI_API_KEY;
+  if (typeof process !== 'undefined' && process.env?.['OPENAI_API_KEY'] != null) {
+    return process.env['OPENAI_API_KEY'] ?? null;
   }
   return null;
 }
 
-async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: number): Promise<Response> {
+async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: number): Promise<[Error | null, Response | null]> {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    return await fetch(url, { ...options, signal: controller.signal });
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    return [null, response];
+  } catch (e) {
+    return [e instanceof Error ? e : new Error(String(e)), null];
   } finally {
     clearTimeout(id);
   }
@@ -62,9 +72,9 @@ async function callProvider(
   url: string,
   apiKey: string,
   model: string,
-  messages: ChatMessage[],
-): Promise<{ content: string; tokens_in: number; tokens_out: number }> {
-  const response = await fetchWithTimeout(url, {
+  messages: ReadonlyArray<ChatMessage>,
+): Promise<[Error | null, ProviderInternalResult | null]> {
+  const [err, response] = await fetchWithTimeout(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -79,85 +89,85 @@ async function callProvider(
     }),
   }, TIMEOUT_MS);
 
+  if (err != null || response == null) {
+    return [err ?? new Error("Fetch failed without error object"), null];
+  }
+
   if (!response.ok) {
-    const body = await response.text().catch(() => '');
-    throw new Error(`LLM API error ${response.status}: ${body}`);
+    const body = await response.text().catch(() => 'No error body');
+    return [new Error(`LLM API error ${response.status}: ${body}`), null];
   }
 
   const data = await response.json() as {
-    choices: Array<{ message: { content: string } }>;
-    usage?: { prompt_tokens: number; completion_tokens: number };
+    readonly choices: ReadonlyArray<{ readonly message: { readonly content: string } }>;
+    readonly usage?: { readonly prompt_tokens: number; readonly completion_tokens: number };
   };
 
-  const choice = data.choices?.[0];
-  if (!choice?.message?.content) {
-    throw new Error('LLM API returned empty response');
+  const choice = data.choices[0];
+  if (choice?.message?.content == null) {
+    return [new Error('LLM API returned empty response'), null];
   }
 
-  return {
+  return [null, {
     content: choice.message.content,
     tokens_in: data.usage?.prompt_tokens ?? 0,
     tokens_out: data.usage?.completion_tokens ?? 0,
-  };
+  }];
 }
 
 async function callWithRetry(
   url: string,
   apiKey: string,
   model: string,
-  messages: ChatMessage[],
+  messages: ReadonlyArray<ChatMessage>,
   provider: 'groq' | 'openai',
-): Promise<LLMResponse> {
+): Promise<[Error | null, LLMResponse | null]> {
   let lastError: Error | null = null;
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     const start = Date.now();
-    try {
-      const result = await callProvider(url, apiKey, model, messages);
-      return {
+    const [err, result] = await callProvider(url, apiKey, model, messages);
+    
+    if (err == null && result != null) {
+      return [null, {
         content: result.content,
         provider,
         tokens_in: result.tokens_in,
         tokens_out: result.tokens_out,
         latency_ms: Date.now() - start,
-      };
-    } catch (e) {
-      lastError = e instanceof Error ? e : new Error(String(e));
-      if (attempt < MAX_RETRIES) {
-        await new Promise(r => setTimeout(r, BACKOFF_MS * (attempt + 1)));
-      }
+      }];
+    }
+    
+    lastError = err;
+    if (attempt < MAX_RETRIES) {
+      await new Promise(r => setTimeout(r, BACKOFF_MS * (attempt + 1)));
     }
   }
 
-  throw new Error(`${provider} failed after ${MAX_RETRIES + 1} attempts: ${lastError?.message}`);
+  return [new Error(`${provider} failed after ${MAX_RETRIES + 1} attempts: ${lastError?.message ?? 'Unknown'}`), null];
 }
 
 export async function callLLM(
   systemPrompt: string,
   userMessage: string,
 ): Promise<LLMResponse> {
-  const messages: ChatMessage[] = [
+  const messages: ReadonlyArray<ChatMessage> = [
     { role: 'system', content: systemPrompt },
     { role: 'user', content: userMessage },
   ];
 
-  // Try Groq first
   const groqKey = getGroqKey();
-  if (groqKey) {
-    try {
-      return await callWithRetry(GROQ_API_URL, groqKey, GROQ_MODEL, messages, 'groq');
-    } catch {
-      // Fall through to OpenAI
-    }
+  if (groqKey != null) {
+    const [err, res] = await callWithRetry(GROQ_API_URL, groqKey, GROQ_MODEL, messages, 'groq');
+    if (err == null && res != null) return res;
   }
 
-  // Fallback to OpenAI
   const openaiKey = getOpenAIKey();
-  if (openaiKey) {
-    return await callWithRetry(OPENAI_API_URL, openaiKey, OPENAI_MODEL, messages, 'openai');
+  if (openaiKey != null) {
+    const [err, res] = await callWithRetry(OPENAI_API_URL, openaiKey, OPENAI_MODEL, messages, 'openai');
+    if (err == null && res != null) return res;
+    throw err ?? new Error("OpenAI failed without error object");
   }
 
   throw new Error('No LLM provider configured (set GROQ_API_KEY or OPENAI_API_KEY)');
 }
-
-export type { LLMResponse };

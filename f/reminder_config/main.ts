@@ -8,7 +8,9 @@
 // ============================================================================
 
 import { z } from 'zod';
-import * as postgres from 'postgres';
+import postgres from 'postgres';
+
+type SqlClient = postgres.Sql;
 
 const InputSchema = z.object({
   action: z.enum(['show', 'toggle_channel', 'toggle_window', 'deactivate_all', 'activate_all', 'back']),
@@ -60,7 +62,7 @@ function toggleValue(prefs: ReminderPrefs, key: string): ReminderPrefs {
   return prefs;
 }
 
-function setAll(prefs: ReminderPrefs, value: boolean): ReminderPrefs {
+function setAll(_prefs: ReminderPrefs, value: boolean): ReminderPrefs {
   return {
     telegram_24h: value,
     gmail_24h: value,
@@ -69,11 +71,15 @@ function setAll(prefs: ReminderPrefs, value: boolean): ReminderPrefs {
   };
 }
 
-async function savePreferences(sql: postgres.Sql, patientId: string, prefs: ReminderPrefs): Promise<boolean> {
+async function savePreferences(sql: SqlClient, patientId: string, prefs: ReminderPrefs): Promise<boolean> {
   try {
     await sql`
       UPDATE patients
-      SET reminder_preferences = ${JSON.stringify(prefs)}::jsonb,
+      SET metadata = jsonb_set(
+            COALESCE(metadata, '{}'::jsonb),
+            '{reminder_preferences}',
+            ${JSON.stringify(prefs)}::jsonb
+          ),
           updated_at = NOW()
       WHERE patient_id = ${patientId}::uuid
     `;
@@ -83,7 +89,7 @@ async function savePreferences(sql: postgres.Sql, patientId: string, prefs: Remi
   }
 }
 
-async function loadPreferences(sql: postgres.Sql, patientId: string): Promise<ReminderPrefs> {
+async function loadPreferences(sql: SqlClient, patientId: string): Promise<ReminderPrefs> {
   const defaults: ReminderPrefs = {
     telegram_24h: true,
     gmail_24h: true,
@@ -92,17 +98,22 @@ async function loadPreferences(sql: postgres.Sql, patientId: string): Promise<Re
   };
 
   try {
-    const rows = await sql<{ reminder_preferences: Record<string, unknown> | null }[]>`
-      SELECT reminder_preferences FROM patients WHERE patient_id = ${patientId}::uuid LIMIT 1
+    type Row = { metadata: Record<string, unknown> | null };
+    const rows = await sql<Row[]>`
+      SELECT metadata FROM patients WHERE patient_id = ${patientId}::uuid LIMIT 1
     `;
-    if (rows.length === 0 || !rows[0].reminder_preferences) return defaults;
+    const firstRow = rows[0];
+    if (!firstRow?.metadata) return defaults;
 
-    const raw = rows[0].reminder_preferences;
+    const raw = firstRow.metadata;
+    const reminderPrefs = raw['reminder_preferences'] as Record<string, unknown> | undefined;
+    if (!reminderPrefs) return defaults;
+
     return {
-      telegram_24h: Boolean(raw['telegram_24h'] ?? true),
-      gmail_24h: Boolean(raw['gmail_24h'] ?? true),
-      telegram_2h: Boolean(raw['telegram_2h'] ?? true),
-      telegram_30min: Boolean(raw['telegram_30min'] ?? true),
+      telegram_24h: Boolean(reminderPrefs['telegram_24h'] ?? true),
+      gmail_24h: Boolean(reminderPrefs['gmail_24h'] ?? true),
+      telegram_2h: Boolean(reminderPrefs['telegram_2h'] ?? true),
+      telegram_30min: Boolean(reminderPrefs['telegram_30min'] ?? true),
     };
   } catch {
     return defaults;

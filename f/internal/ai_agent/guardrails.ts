@@ -1,11 +1,13 @@
 // ============================================================================
-// GUARDRAILS — Input/Output validation for LLM pipeline
+// GUARDRAILS — Input/Output validation for LLM pipeline (v3.1)
+// Pattern: Zero mocks, strict validation, no assertions
 // ============================================================================
 
 import { INTENT, URGENCY_WORDS } from './constants';
+import type { GuardrailResult, IntentResult, IntentType } from './types';
 
 // Prompt injection patterns
-const INJECTION_PATTERNS = [
+const INJECTION_PATTERNS: ReadonlyArray<RegExp> = [
   /ignore\s+(all\s+)?previous\s+instructions?/i,
   /developer\s+mode/i,
   /reveal\s+(the\s+)?system\s+prompt/i,
@@ -16,7 +18,7 @@ const INJECTION_PATTERNS = [
 ];
 
 // Unicode attack vectors
-const DANGEROUS_UNICODE = [
+const DANGEROUS_UNICODE: ReadonlyArray<string> = [
   '\u200B', // zero-width space
   '\u200E', // left-to-right mark
   '\u200F', // right-to-left mark
@@ -28,7 +30,7 @@ const DANGEROUS_UNICODE = [
 ];
 
 // System prompt leakage patterns
-const LEAKAGE_PATTERNS = [
+const LEAKAGE_PATTERNS: ReadonlyArray<string> = [
   'SYSTEM_INSTRUCTIONS',
   'UNTRUSTED INPUT',
   'BEGIN USER DATA',
@@ -37,149 +39,82 @@ const LEAKAGE_PATTERNS = [
   'REGLAS DE DESEMPATE',
 ];
 
-export interface ValidationResult {
-  valid: boolean;
-  reason?: string;
-}
-
-export function validateInput(text: string): ValidationResult {
-  if (!text || text.trim().length === 0) {
-    return { valid: false, reason: 'Empty input' };
+export function validateInput(text: string): GuardrailResult {
+  const trimmed = text.trim();
+  if (trimmed.length === 0) {
+    return { kind: "blocked", reason: "Empty input", category: "length" };
   }
-  if (text.length > 500) {
-    return { valid: false, reason: 'Input too long (max 500 chars)' };
+  if (trimmed.length > 500) {
+    return { kind: "blocked", reason: "Input too long (max 500 chars)", category: "length" };
   }
 
-  // Check for prompt injection
   for (const pattern of INJECTION_PATTERNS) {
-    if (pattern.test(text)) {
-      return { valid: false, reason: 'Potential prompt injection detected' };
+    if (pattern.test(trimmed)) {
+      return { kind: "blocked", reason: "Potential prompt injection detected", category: "injection" };
     }
   }
 
-  // Check for dangerous unicode
   for (const char of DANGEROUS_UNICODE) {
-    if (text.includes(char)) {
-      return { valid: false, reason: 'Dangerous unicode character detected' };
+    if (trimmed.includes(char)) {
+      return { kind: "blocked", reason: "Dangerous unicode character detected", category: "unicode" };
     }
   }
 
-  return { valid: true };
+  return { kind: "pass" };
 }
 
-export function validateOutput(content: string): ValidationResult {
-  if (!content || content.trim().length === 0) {
-    return { valid: false, reason: 'Empty LLM response' };
+export function validateOutput(content: string): GuardrailResult {
+  const trimmed = content.trim();
+  if (trimmed.length === 0) {
+    return { kind: "blocked", reason: "Empty LLM response", category: "length" };
   }
-  if (content.length > 2000) {
-    return { valid: false, reason: 'LLM response too long' };
+  if (trimmed.length > 4000) {
+    return { kind: "blocked", reason: "LLM response too long", category: "length" };
   }
 
-  // Check for system prompt leakage
   for (const pattern of LEAKAGE_PATTERNS) {
-    if (content.includes(pattern)) {
-      return { valid: false, reason: 'System prompt leakage detected' };
+    if (trimmed.includes(pattern)) {
+      return { kind: "blocked", reason: "System prompt leakage detected", category: "leakage" };
     }
   }
 
-  return { valid: true };
+  return { kind: "pass" };
 }
 
 export function sanitizeJSONResponse(raw: string): string {
   let cleaned = raw.trim();
 
-  // Remove markdown code blocks
   cleaned = cleaned.replace(/^```json\s*/i, '');
   cleaned = cleaned.replace(/^```\s*/i, '');
   cleaned = cleaned.replace(/\s*```$/i, '');
   cleaned = cleaned.trim();
 
-  // Remove any preamble before first {
   const firstBrace = cleaned.indexOf('{');
-  if (firstBrace > 0) {
-    cleaned = cleaned.substring(firstBrace);
-  }
-
-  // Remove any trailing text after last }
   const lastBrace = cleaned.lastIndexOf('}');
-  if (lastBrace >= 0 && lastBrace < cleaned.length - 1) {
-    cleaned = cleaned.substring(0, lastBrace + 1);
+
+  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+    return cleaned.substring(firstBrace, lastBrace + 1);
   }
 
   return cleaned;
 }
 
-export interface ParsedIntentResult {
-  intent: typeof INTENT[keyof typeof INTENT];
-  confidence: number;
-  entities: Record<string, unknown>;
-  needs_more: boolean;
-  follow_up: string | null;
-}
-
-export function parseAndValidateLLMResult(raw: string): ParsedIntentResult | null {
-  const cleaned = sanitizeJSONResponse(raw);
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(cleaned);
-  } catch {
-    return null;
-  }
-
-  if (typeof parsed !== 'object' || parsed === null) {
-    return null;
-  }
-
-  const obj = parsed as Record<string, unknown>;
-
-  // Validate intent
-  const intent = obj['intent'];
-  if (typeof intent !== 'string') {
-    return null;
-  }
-  const validIntents = Object.values(INTENT) as string[];
-  if (!validIntents.includes(intent)) {
-    return null;
-  }
-
-  // Validate confidence
-  const confidence = typeof obj['confidence'] === 'number' ? obj['confidence'] : 0.5;
-  const clampedConfidence = Math.max(0.0, Math.min(1.0, confidence));
-
-  // Validate entities
-  const entities = typeof obj['entities'] === 'object' && obj['entities'] !== null
-    ? obj['entities'] as Record<string, unknown>
-    : {};
-
-  // Validate needs_more
-  const needs_more = typeof obj['needs_more'] === 'boolean' ? obj['needs_more'] : false;
-
-  // Validate follow_up
-  const follow_up = typeof obj['follow_up'] === 'string'
-    ? obj['follow_up'].substring(0, 200)
-    : null;
-
-  return {
-    intent: intent as typeof INTENT[keyof typeof INTENT],
-    confidence: clampedConfidence,
-    entities,
-    needs_more,
-    follow_up,
-  };
-}
-
-export function crossCheckUrgency(result: ParsedIntentResult, text: string): ParsedIntentResult {
-  // If LLM says urgent_care but no urgency words found, lower confidence
+/**
+ * Cross-checks urgency intent against text content.
+ * Returns a tuple style [Error | null, IntentResult | null]
+ */
+export function verifyUrgency(result: IntentResult, text: string): IntentResult {
   if (result.intent === INTENT.URGENT_CARE) {
     const lower = text.toLowerCase();
     const hasUrgency = URGENCY_WORDS.some(w => lower.includes(w));
     if (!hasUrgency) {
-      return { ...result, confidence: Math.min(result.confidence, 0.5) };
+      return { 
+        ...result, 
+        confidence: Math.min(result.confidence, 0.4),
+        validation_passed: false,
+        validation_errors: [...result.validation_errors, "Urgency intent detected but no urgency words found in text"]
+      };
     }
   }
-
-  // If there ARE urgency words but LLM didn't detect urgent_care, it might be wrong
-  // but we don't override — just log (handled in main)
   return result;
 }

@@ -1,9 +1,26 @@
 {
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "_comment": "Booking Titanium - TypeScript 6.0 Configuration",
+  "_version": "6.0.0",
+  
   "compilerOptions": {
-    "target": "ESNext",
-    "module": "ESNext",
-    "moduleResolution": "node",
+    // ============================================================================
+    // TYPESCRIPT 6.0 STRICT MODE (enabled by default in 6.0)
+    // ============================================================================
     "strict": true,
+    
+    // ============================================================================
+    // TARGET & MODULE (TS6 defaults)
+    // ============================================================================
+    "target": "ES2025",
+    "lib": ["ES2025"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "moduleDetection": "force",
+    
+    // ============================================================================
+    // STRICT TYPE CHECKING (TS6 enhanced)
+    // ============================================================================
     "noImplicitAny": true,
     "strictNullChecks": true,
     "strictFunctionTypes": true,
@@ -11,6 +28,10 @@
     "strictPropertyInitialization": true,
     "noImplicitThis": true,
     "useUnknownInCatchVariables": true,
+    
+    // ============================================================================
+    // PROHIBICIONES EXPLÍCITAS (Go-level type safety)
+    // ============================================================================
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
     "noUncheckedIndexedAccess": true,
@@ -18,9 +39,52 @@
     "noImplicitOverride": true,
     "exactOptionalPropertyTypes": true,
     "noUnusedLocals": true,
-    "noUnusedParameters": true
+    "noUnusedParameters": true,
+    
+    // ============================================================================
+    // ROOTS & TYPES (TS6 new defaults)
+    // ============================================================================
+    "rootDir": ".",
+    "types": ["node"],
+    
+    // ============================================================================
+    // EMIT & INTEROP
+    // ============================================================================
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "resolveJsonModule": true,
+    "allowImportingTsExtensions": true,
+    
+    // ============================================================================
+    // SKIP CHECKES (libs externas)
+    // ============================================================================
+    "skipLibCheck": true,
+    "skipDefaultLibCheck": true,
+    
+    // ============================================================================
+    // NO EMIT (Windmill runtime - scripts run directly)
+    // ============================================================================
+    "noEmit": true
   },
+  
   "include": [
-    "f/**/*.ts"
+    "f/**/*.ts",
+    "internal/**/*.ts",
+    "cmd/**/*.ts",
+    "pkg/**/*.ts"
+  ],
+  
+  "exclude": [
+    "node_modules",
+    "dist",
+    "coverage",
+    "**/*.test.ts",
+    "**/*.spec.ts",
+    "**/backup/*.ts",
+    "**/v2.0_backup.ts",
+    "**/v2.1_backup.ts"
   ]
 }

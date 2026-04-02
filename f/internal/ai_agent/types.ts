@@ -19,19 +19,19 @@ export const AIAgentInputSchema = z.object({
     is_first_time: z.boolean().describe("Si es la primera interacción"),
     booking_count: z.number().int().min(0).describe("Número de citas previas"),
   }).optional().describe("Perfil del usuario para respuestas contextualizadas"),
-});
+}).readonly();
 
 export const EntityMapSchema = z.object({
-  date: z.string().nullable().describe("Fecha relativa o absoluta extraída"),
-  time: z.string().nullable().describe("Hora preferida"),
-  provider_name: z.string().nullable().describe("Nombre del profesional"),
-  provider_id: z.string().nullable().describe("ID del proveedor"),
-  service_type: z.string().nullable().describe("Tipo de servicio"),
-  service_id: z.string().nullable().describe("ID del servicio"),
-  booking_id: z.string().nullable().describe("ID de reserva existente"),
-  channel: z.string().nullable().describe("Canal de notificación (telegram, gmail, email, ambos)"),
-  reminder_window: z.string().nullable().describe("Ventana de recordatorio (24h, 2h, 30min)"),
-});
+  date: z.string().nullable().catch(null),
+  time: z.string().nullable().catch(null),
+  provider_name: z.string().nullable().catch(null),
+  provider_id: z.string().nullable().catch(null),
+  service_type: z.string().nullable().catch(null),
+  service_id: z.string().nullable().catch(null),
+  booking_id: z.string().nullable().catch(null),
+  channel: z.string().nullable().catch(null),
+  reminder_window: z.string().nullable().catch(null),
+}).readonly();
 
 export const AvailabilityContextSchema = z.object({
   is_today: z.boolean(),
@@ -41,30 +41,30 @@ export const AvailabilityContextSchema = z.object({
   is_specific_date: z.boolean(),
   time_preference: z.enum(["morning", "afternoon", "evening", "any"]),
   day_preference: z.string().nullable(),
-});
+}).readonly();
 
 export const IntentResultSchema = z.object({
   intent: z.enum(Object.values(INTENT) as [string, ...string[]]),
   confidence: z.number().min(0).max(1),
   entities: EntityMapSchema,
   context: AvailabilityContextSchema,
-  suggested_response_type: z.string(),
-  ai_response: z.string(),
+  suggested_response_type: z.string().min(1),
+  ai_response: z.string().min(1),
   needs_more_info: z.boolean(),
-  follow_up_question: z.string().nullable(),
-  cot_reasoning: z.string().describe("Razonamiento del LLM o motivo de fallback"),
+  follow_up_question: z.string().nullable().catch(null),
+  cot_reasoning: z.string().min(1),
   validation_passed: z.boolean(),
   validation_errors: z.array(z.string()),
-});
+}).readonly();
 
 // ============================================================================
 // INFERRED TYPES — NUNCA duplicar manualmente
 // ============================================================================
 
-export type AIAgentInput = z.infer<typeof AIAgentInputSchema>;
-export type EntityMap = z.infer<typeof EntityMapSchema>;
-export type AvailabilityContext = z.infer<typeof AvailabilityContextSchema>;
-export type IntentResult = z.infer<typeof IntentResultSchema>;
+export type AIAgentInput = Readonly<z.infer<typeof AIAgentInputSchema>>;
+export type EntityMap = Readonly<z.infer<typeof EntityMapSchema>>;
+export type AvailabilityContext = Readonly<z.infer<typeof AvailabilityContextSchema>>;
+export type IntentResult = Readonly<z.infer<typeof IntentResultSchema>>;
 export type IntentType = typeof INTENT[keyof typeof INTENT];
 
 // ============================================================================
@@ -73,31 +73,31 @@ export type IntentType = typeof INTENT[keyof typeof INTENT];
 // ============================================================================
 
 export type LLMCallResult =
-  | { kind: "success"; content: string; provider: "groq" | "openai"; tokens_in: number; tokens_out: number; latency_ms: number }
-  | { kind: "provider_error"; error: string; provider: "groq" | "openai"; retry_count: number }
-  | { kind: "no_provider"; error: "No LLM API keys configured" };
+  | { readonly kind: "success"; readonly content: string; readonly provider: "groq" | "openai"; readonly tokens_in: number; readonly tokens_out: number; readonly latency_ms: number }
+  | { readonly kind: "provider_error"; readonly error: string; readonly provider: "groq" | "openai"; readonly retry_count: number }
+  | { readonly kind: "no_provider"; readonly error: string };
 
 export type GuardrailResult =
-  | { kind: "pass" }
-  | { kind: "blocked"; reason: string; category: "injection" | "unicode" | "length" | "leakage" };
+  | { readonly kind: "pass" }
+  | { readonly kind: "blocked"; readonly reason: string; readonly category: "injection" | "unicode" | "length" | "leakage" };
 
 export type ClassificationResult =
-  | { kind: "llm_classified"; intent: IntentType; confidence: number; provider: string }
-  | { kind: "rule_classified"; intent: IntentType; confidence: number; reason: string }
-  | { kind: "unknown"; confidence: number };
+  | { readonly kind: "llm_classified"; readonly intent: IntentType; readonly confidence: number; readonly provider: string }
+  | { readonly kind: "rule_classified"; readonly intent: IntentType; readonly confidence: number; readonly reason: string }
+  | { readonly kind: "unknown"; readonly confidence: number };
 
 // ============================================================================
 // PROMPT SPEC — Typed Prompt Engineering (TypeScript.Page 2026)
 // ============================================================================
 
 export interface PromptSpec<I, O> {
-  name: string;
-  version: string;
-  systemPrompt: (input: I) => string;
-  outputSchema: z.ZodType<O>;
+  readonly name: string;
+  readonly version: string;
+  readonly systemPrompt: (input: I) => string;
+  readonly outputSchema: z.ZodType<O>;
 }
 
-export const IntentClassifierSpec: PromptSpec<{ userMessage: string; ragContext?: string }, IntentResult> = {
+export const IntentClassifierSpec: PromptSpec<{ readonly userMessage: string; readonly ragContext?: string }, IntentResult> = {
   name: "intent_classifier",
   version: "1.0",
   systemPrompt: () => "", // Se construye dinámicamente en prompt-builder.ts

@@ -40,27 +40,36 @@ const InputSchema = z.object({
   parse_mode: z.enum(['MarkdownV2', 'HTML', 'None']).optional().default('MarkdownV2'),
 });
 
-type InlineButton = { text: string; callback_data: string };
+type InlineButton = Readonly<{ text: string; callback_data: string }>;
 
 function sanitizeForMarkdownV2(text: string): string {
-  return text.replace(/([_*\[\]()~`>#+\-=|{}.!\\])/g, '\\$1');
+  return text.replace(/([_*[\]()~`>#+\-=|{}.!\\])/g, '\\$1');
+}
+
+// Type-safe string extractor - prevents [object Object] issues
+function safeString(value: unknown, fallback = ''): string {
+  if (value === null || value === undefined) return fallback;
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  return fallback; // Objects/Arrays fall back to default
 }
 
 function buildMessage(
   messageType: string,
-  details: Record<string, unknown>,
+  details: Readonly<Record<string, unknown>>,
   parseMode: string
 ): string {
   const isMd = parseMode === 'MarkdownV2';
   const esc = isMd ? sanitizeForMarkdownV2 : (s: string) => s;
 
-  const date = String(details['date'] ?? 'Por confirmar');
-  const time = String(details['time'] ?? 'Por confirmar');
-  const providerName = String(details['provider_name'] ?? 'Tu doctor');
-  const service = String(details['service'] ?? 'Consulta');
-  const bookingId = String(details['booking_id'] ?? '');
-  const cancellationReason = details['cancellation_reason'] ? String(details['cancellation_reason']) : '';
-  const customMessage = details['message'] ? String(details['message']) : '';
+  const date = safeString(details['date'], 'Por confirmar');
+  const time = safeString(details['time'], 'Por confirmar');
+  const providerName = safeString(details['provider_name'], 'Tu doctor');
+  const service = safeString(details['service'], 'Consulta');
+  const bookingId = safeString(details['booking_id'], '');
+  const cancellationReason = safeString(details['cancellation_reason'], '');
+  const customMessage = safeString(details['message'], '');
+  const promptText = safeString(details['prompt'], '¿Qué deseas hacer?');
 
   switch (messageType) {
     case 'booking_created':
@@ -94,13 +103,15 @@ function buildMessage(
       return `📋 *Menú Principal*\n\nElige una opción:\n\n📅 *Agendar cita* — Reserva tu próxima consulta\n📋 *Mis citas* — Ver citas próximas\n🔔 *Recordatorios* — Configurar avisos\n❓ *Información* — Datos del consultorio\n\nToca un botón o escribe el número de la opción.`;
 
     case 'wizard_prompt':
-      return String(details['prompt'] ?? '¿Qué deseas hacer?');
+      return promptText;
 
     case 'custom':
       return customMessage;
 
-    default:
-      return `📋 Notificación: ${esc(JSON.stringify(details))}`;
+    default: {
+      const detailsStr = JSON.stringify(details);
+      return `📋 Notificación: ${esc(detailsStr)}`;
+    }
   }
 }
 
@@ -180,37 +191,38 @@ async function sendWithRetry(
 
       const data = await response.json() as Record<string, unknown>;
 
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       if (response.ok && typeof data === 'object' && data !== null && 'result' in data) {
         const result = data['result'] as Record<string, unknown>;
         return {
           sent: true,
-          message_id: typeof result?.['message_id'] === 'number' ? result['message_id'] : null,
+          message_id: typeof result['message_id'] === 'number' ? result['message_id'] : null,
           error: null,
         };
       }
 
-      const errorDesc = typeof data?.['description'] === 'string' ? data['description'] : 'Unknown error';
-      const errorCode = typeof data?.['error_code'] === 'number' ? data['error_code'] : 0;
+      const errorDesc = typeof data['description'] === 'string' ? data['description'] : 'Unknown error';
+      const errorCode = typeof data['error_code'] === 'number' ? data['error_code'] : 0;
 
       if (errorCode >= 400 && errorCode < 500 && errorCode !== 429) {
-        return { sent: false, message_id: null, error: `Permanent error (${errorCode}): ${errorDesc}` };
+        return { sent: false, message_id: null, error: `Permanent error (${String(errorCode)}): ${errorDesc}` };
       }
 
-      lastError = `${errorCode}: ${errorDesc}`;
+      lastError = `${String(errorCode)}: ${errorDesc}`;
     } catch (e) {
       lastError = e instanceof Error ? e.message : String(e);
     }
 
     if (attempt < maxRetries - 1) {
-      const backoff = Math.pow(3, attempt) * 1000;
+      const backoff = 3 ** attempt * 1000;
       await new Promise(resolve => setTimeout(resolve, backoff));
     }
   }
 
-  return { sent: false, message_id: null, error: `Failed after ${maxRetries} retries: ${lastError}` };
+  return { sent: false, message_id: null, error: `Failed after ${String(maxRetries)} retries: ${lastError ?? 'Unknown error'}` };
 }
 
-export async function main(rawInput: unknown): Promise<{ success: boolean; data: unknown | null; error_message: string | null }> {
+export async function main(rawInput: unknown): Promise<{ success: boolean; data: Record<string, unknown> | null; error_message: string | null }> {
   try {
     const parsed = InputSchema.safeParse(rawInput);
     if (!parsed.success) {
@@ -227,7 +239,7 @@ export async function main(rawInput: unknown): Promise<{ success: boolean; data:
     const message = buildMessage(message_type, booking_details, parse_mode);
     const replyMarkup = buildReplyMarkup({
       inline_buttons,
-      reply_keyboard,
+      ...(reply_keyboard !== undefined ? { reply_keyboard } : {}),
       force_reply,
       reply_placeholder,
       remove_keyboard,

@@ -9,7 +9,7 @@ import { z } from 'zod';
 import * as nodemailer from 'nodemailer';
 
 const InputSchema = z.object({
-  recipient_email: z.string().email(),
+  recipient_email: z.email(),
   message_type: z.enum([
     'booking_created',
     'booking_confirmed',
@@ -26,25 +26,35 @@ const InputSchema = z.object({
   action_links: z.array(
     z.object({
       text: z.string(),
-      url: z.string().url(),
+      url: z.url(),
       style: z.enum(['primary', 'secondary', 'danger']).optional().default('primary'),
     })
   ).optional().default([]),
 });
 
-type ActionLink = { text: string; url: string; style: 'primary' | 'secondary' | 'danger' };
+interface ActionLink { text: string; url: string; style: 'primary' | 'secondary' | 'danger' }
+
+// Type-safe string extractor - prevents [object Object] issues
+function safeString(value: unknown, fallback = ''): string {
+  if (value === null || value === undefined) return fallback;
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  return fallback; // Objects/Arrays fall back to default
+}
 
 function buildEmailContent(
   messageType: string,
-  details: Record<string, unknown>,
+  details: Readonly<Record<string, unknown>>,
   actionLinks: ActionLink[]
 ): { subject: string; html: string } {
-  const date = String(details['date'] ?? 'Por confirmar');
-  const time = String(details['time'] ?? 'Por confirmar');
-  const providerName = String(details['provider_name'] ?? 'Tu doctor');
-  const service = String(details['service'] ?? 'Consulta');
-  const bookingId = String(details['booking_id'] ?? '');
-  const cancellationReason = details['cancellation_reason'] ? String(details['cancellation_reason']) : '';
+  const date = safeString(details['date'], 'Por confirmar');
+  const time = safeString(details['time'], 'Por confirmar');
+  const providerName = safeString(details['provider_name'], 'Tu doctor');
+  const service = safeString(details['service'], 'Consulta');
+  const bookingId = safeString(details['booking_id'], '');
+  const cancellationReason = safeString(details['cancellation_reason'], '');
+  const customSubject = safeString(details['subject'], '');
+  const customHtmlBody = safeString(details['html_body'], '');
 
   let subject = '';
   let body = '';
@@ -188,13 +198,15 @@ function buildEmailContent(
       break;
 
     case 'custom':
-      subject = String(details['subject'] ?? 'Notificación del Sistema de Citas');
-      body = String(details['html_body'] ?? '<p>Tienes una notificación.</p>');
+      subject = customSubject || 'Notificación del Sistema de Citas';
+      body = customHtmlBody || '<p>Tienes una notificación.</p>';
       break;
 
-    default:
+    default: {
+      const detailsStr = JSON.stringify(details);
       subject = 'Notificación del Sistema de Citas';
-      body = `<p>Tienes una notificación: ${JSON.stringify(details)}</p>`;
+      body = `<p>Tienes una notificación: ${detailsStr}</p>`;
+    }
   }
 
   const buttonsHtml = actionLinks.length > 0

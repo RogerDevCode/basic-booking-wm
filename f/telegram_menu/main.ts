@@ -38,7 +38,7 @@ function parseUserOption(input: string): string | null {
   return null;
 }
 
-export async function main(rawInput: unknown): Promise<{ success: boolean; data: unknown | null; error_message: string | null }> {
+export function main(rawInput: unknown): { success: boolean; data: Record<string, unknown> | null; error_message: string | null } {
   try {
     const parsed = InputSchema.safeParse(rawInput);
     if (!parsed.success) {
@@ -49,9 +49,9 @@ export async function main(rawInput: unknown): Promise<{ success: boolean; data:
 
     let message = '';
     let reply_keyboard: string[][] | undefined;
-    let inline_buttons: Array<{ text: string; callback_data: string }> | undefined;
+    let inline_buttons: { text: string; callback_data: string }[] | undefined;
     let force_reply = false;
-    let reply_placeholder = '';
+    const reply_placeholder = '';
     let route_to: string | null = null;
 
     switch (action) {
@@ -100,7 +100,7 @@ export async function main(rawInput: unknown): Promise<{ success: boolean; data:
             break;
 
           case 'info':
-            message = `❓ *Información del Consultorio*\n\n📍 Dirección: Calle Principal 123\n📞 Teléfono: +54 11 1234-5678\n🕐 Horario: Lun-Vie 8:00-18:00\n\n💡 *Comandos rápidos:*\n/menu — Menú principal\n/cancelar — Cancelar cita\n/estado — Estado de tu cita`;
+            message = `❓ *Información del Consultorio*\n\n💡 *Comandos rápidos:*\n/menu — Menú principal\n/cancelar — Cancelar cita\n/estado — Estado de tu cita`;
             reply_keyboard = MAIN_MENU_KEYBOARD;
             break;
         }

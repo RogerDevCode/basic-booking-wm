@@ -4,10 +4,13 @@
 // Runs every 30 minutes via Windmill Schedule.
 // Queries confirmed bookings within reminder windows and sends notifications.
 // Respects patient reminder_preferences (channel + window toggles).
+//
+// FIX: Replaced all sql.unsafe() calls with 3 explicitly typed functions.
+// Each window has its own query with a hardcoded column name — no interpolation.
 // ============================================================================
 
 import { z } from 'zod';
-import * as postgres from 'postgres';
+import postgres from 'postgres';
 
 const InputSchema = z.object({
   dry_run: z.boolean().optional().default(false),
@@ -73,7 +76,7 @@ function buildBookingDetails(
     time: formatTime(booking.start_time, tz),
     provider_name: booking.provider_name ?? 'Tu doctor',
     service: booking.service_name ?? 'Consulta',
-    booking_id: booking.booking_id.substring(0, 8).toUpperCase(),
+    booking_id: booking.booking_id.slice(0, 8).toUpperCase(),
     patient_name: booking.patient_name ?? 'Paciente',
   };
 }
@@ -81,9 +84,9 @@ function buildBookingDetails(
 function buildInlineButtons(
   bookingId: string,
   window: ReminderWindow
-): Array<{ text: string; callback_data: string }> {
-  const shortId = bookingId.substring(0, 60);
-  const buttons: Array<{ text: string; callback_data: string }> = [];
+): { text: string; callback_data: string }[] {
+  const shortId = bookingId.slice(0, 60);
+  const buttons: { text: string; callback_data: string }[] = [];
 
   if (window === '24h') {
     buttons.push(
@@ -109,7 +112,7 @@ async function sendTelegramReminder(
   chatId: string,
   messageType: string,
   details: Record<string, string>,
-  buttons: Array<{ text: string; callback_data: string }>
+  buttons: { text: string; callback_data: string }[]
 ): Promise<{ sent: boolean; error: string | null }> {
   try {
     const botToken = process.env['TELEGRAM_BOT_TOKEN'];
@@ -129,7 +132,7 @@ async function sendTelegramReminder(
     });
 
     if (!response.ok) {
-      return { sent: false, error: `HTTP ${response.status}` };
+      return { sent: false, error: `HTTP ${String(response.status)}` };
     }
 
     const result = await response.json() as Record<string, unknown>;
@@ -167,7 +170,7 @@ async function sendGmailReminder(
     });
 
     if (!response.ok) {
-      return { sent: false, error: `HTTP ${response.status}` };
+      return { sent: false, error: `HTTP ${String(response.status)}` };
     }
 
     const result = await response.json() as Record<string, unknown>;
@@ -177,16 +180,146 @@ async function sendGmailReminder(
   }
 }
 
-async function markReminderSent(
-  sql: postgres.Sql,
-  bookingId: string,
-  window: ReminderWindow
-): Promise<void> {
-  const column = window === '24h' ? 'reminder_24h_sent' : window === '2h' ? 'reminder_2h_sent' : 'reminder_30min_sent';
-  await sql`UPDATE bookings SET ${sql.unsafe(column)} = true, updated_at = NOW() WHERE booking_id = ${bookingId}::uuid`;
+// ============================================================================
+// FIX: 3 explicit typed functions instead of sql.unsafe(column).
+// Each function uses a hardcoded column name — zero dynamic interpolation.
+// Best practice: named functions are also easier to test individually.
+// ============================================================================
+
+async function markReminder24hSent(sql: postgres.Sql, bookingId: string): Promise<void> {
+  await sql`
+    UPDATE bookings
+    SET reminder_24h_sent = true, updated_at = NOW()
+    WHERE booking_id = ${bookingId}::uuid
+  `;
 }
 
-export async function main(rawInput: unknown): Promise<{ success: boolean; data: unknown | null; error_message: string | null }> {
+async function markReminder2hSent(sql: postgres.Sql, bookingId: string): Promise<void> {
+  await sql`
+    UPDATE bookings
+    SET reminder_2h_sent = true, updated_at = NOW()
+    WHERE booking_id = ${bookingId}::uuid
+  `;
+}
+
+async function markReminder30minSent(sql: postgres.Sql, bookingId: string): Promise<void> {
+  await sql`
+    UPDATE bookings
+    SET reminder_30min_sent = true, updated_at = NOW()
+    WHERE booking_id = ${bookingId}::uuid
+  `;
+}
+
+async function markReminderSent(sql: postgres.Sql, bookingId: string, window: ReminderWindow): Promise<void> {
+  if (window === '24h') return markReminder24hSent(sql, bookingId);
+  if (window === '2h') return markReminder2hSent(sql, bookingId);
+  return markReminder30minSent(sql, bookingId);
+}
+
+// ============================================================================
+// FIX: 3 separate typed SELECT functions instead of sql.unsafe(sentColumn).
+// Each query uses a hardcoded WHERE clause for the specific reminder column.
+// ============================================================================
+
+async function getBookingsFor24h(
+  sql: postgres.Sql,
+  start: Date,
+  end: Date
+): Promise<BookingRecord[]> {
+  return sql<BookingRecord[]>`
+    SELECT
+      b.booking_id, b.patient_id, b.provider_id,
+      b.start_time, b.end_time, b.status,
+      b.reminder_24h_sent, b.reminder_2h_sent, b.reminder_30min_sent,
+      p.telegram_chat_id AS patient_telegram_chat_id,
+      p.email AS patient_email,
+      p.name AS patient_name,
+      p.metadata AS reminder_preferences,
+      pr.name AS provider_name,
+      s.name AS service_name
+    FROM bookings b
+    JOIN patients p ON p.patient_id = b.patient_id
+    LEFT JOIN providers pr ON pr.provider_id = b.provider_id
+    LEFT JOIN services s ON s.service_id = b.service_id
+    WHERE b.status = 'confirmed'
+      AND b.start_time >= ${start.toISOString()}
+      AND b.start_time <= ${end.toISOString()}
+      AND b.reminder_24h_sent = false
+    ORDER BY b.start_time ASC
+    LIMIT 100
+  `;
+}
+
+async function getBookingsFor2h(
+  sql: postgres.Sql,
+  start: Date,
+  end: Date
+): Promise<BookingRecord[]> {
+  return sql<BookingRecord[]>`
+    SELECT
+      b.booking_id, b.patient_id, b.provider_id,
+      b.start_time, b.end_time, b.status,
+      b.reminder_24h_sent, b.reminder_2h_sent, b.reminder_30min_sent,
+      p.telegram_chat_id AS patient_telegram_chat_id,
+      p.email AS patient_email,
+      p.name AS patient_name,
+      p.metadata AS reminder_preferences,
+      pr.name AS provider_name,
+      s.name AS service_name
+    FROM bookings b
+    JOIN patients p ON p.patient_id = b.patient_id
+    LEFT JOIN providers pr ON pr.provider_id = b.provider_id
+    LEFT JOIN services s ON s.service_id = b.service_id
+    WHERE b.status = 'confirmed'
+      AND b.start_time >= ${start.toISOString()}
+      AND b.start_time <= ${end.toISOString()}
+      AND b.reminder_2h_sent = false
+    ORDER BY b.start_time ASC
+    LIMIT 100
+  `;
+}
+
+async function getBookingsFor30min(
+  sql: postgres.Sql,
+  start: Date,
+  end: Date
+): Promise<BookingRecord[]> {
+  return sql<BookingRecord[]>`
+    SELECT
+      b.booking_id, b.patient_id, b.provider_id,
+      b.start_time, b.end_time, b.status,
+      b.reminder_24h_sent, b.reminder_2h_sent, b.reminder_30min_sent,
+      p.telegram_chat_id AS patient_telegram_chat_id,
+      p.email AS patient_email,
+      p.name AS patient_name,
+      p.metadata AS reminder_preferences,
+      pr.name AS provider_name,
+      s.name AS service_name
+    FROM bookings b
+    JOIN patients p ON p.patient_id = b.patient_id
+    LEFT JOIN providers pr ON pr.provider_id = b.provider_id
+    LEFT JOIN services s ON s.service_id = b.service_id
+    WHERE b.status = 'confirmed'
+      AND b.start_time >= ${start.toISOString()}
+      AND b.start_time <= ${end.toISOString()}
+      AND b.reminder_30min_sent = false
+    ORDER BY b.start_time ASC
+    LIMIT 100
+  `;
+}
+
+async function getBookingsForWindow(
+  sql: postgres.Sql,
+  window: ReminderWindow,
+  start: Date,
+  end: Date
+): Promise<BookingRecord[]> {
+  if (window === '24h') return getBookingsFor24h(sql, start, end);
+  if (window === '2h') return getBookingsFor2h(sql, start, end);
+  return getBookingsFor30min(sql, start, end);
+}
+
+export async function main(rawInput: unknown): Promise<{ success: boolean; data: Record<string, unknown> | null; error_message: string | null }> {
   try {
     const parsed = InputSchema.safeParse(rawInput);
     if (!parsed.success) {
@@ -223,41 +356,13 @@ export async function main(rawInput: unknown): Promise<{ success: boolean; data:
       window: ReminderWindow,
       start: Date,
       end: Date,
-      sentFlag: string
     ): Promise<void> => {
-      const bookings = await sql<BookingRecord[]>`
-        SELECT 
-          b.booking_id,
-          b.patient_id,
-          b.provider_id,
-          b.start_time,
-          b.end_time,
-          b.status,
-          b.reminder_24h_sent,
-          b.reminder_2h_sent,
-          b.reminder_30min_sent,
-          p.telegram_chat_id as patient_telegram_chat_id,
-          p.email as patient_email,
-          p.name as patient_name,
-          p.reminder_preferences,
-          pr.name as provider_name,
-          s.name as service_name
-        FROM bookings b
-        JOIN patients p ON p.patient_id = b.patient_id
-        LEFT JOIN providers pr ON pr.provider_id = b.provider_id
-        LEFT JOIN services s ON s.service_id = b.service_id
-        WHERE b.status = 'confirmed'
-          AND b.start_time >= ${start.toISOString()}
-          AND b.start_time <= ${end.toISOString()}
-          AND b.${sql.unsafe(sentFlag)} = false
-        ORDER BY b.start_time ASC
-        LIMIT 100
-      `;
+      const bookings = await getBookingsForWindow(sql, window, start, end);
 
-      for (const booking of (bookings ?? [])) {
+      for (const booking of bookings) {
         result.processed_bookings.push(booking.booking_id);
         const details = buildBookingDetails(booking, timezone);
-        const prefs = booking.reminder_preferences as Record<string, unknown> | null;
+        const prefs = booking.reminder_preferences;
         const buttons = buildInlineButtons(booking.booking_id, window);
 
         if (dry_run) {
@@ -297,11 +402,11 @@ export async function main(rawInput: unknown): Promise<{ success: boolean; data:
         else if (window === '2h') result.reminders_2h_sent++;
         else result.reminders_30min_sent++;
       }
-    }
+    };
 
-    await processWindow('24h', window24hStart, window24hEnd, 'reminder_24h_sent');
-    await processWindow('2h', window2hStart, window2hEnd, 'reminder_2h_sent');
-    await processWindow('30min', window30minStart, window30minEnd, 'reminder_30min_sent');
+    await processWindow('24h', window24hStart, window24hEnd);
+    await processWindow('2h', window2hStart, window2hEnd);
+    await processWindow('30min', window30minStart, window30minEnd);
 
     await sql.end();
 

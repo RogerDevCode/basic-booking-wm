@@ -1,52 +1,52 @@
 // ============================================================================
-// TRACING — Structured request logging for observability
+// TRACING — Request tracing and observability (v3.1)
+// Pattern: Precision Architecture, No 'any', Immutability
 // ============================================================================
 
-declare const wmill: { log: (msg: string, level?: string) => void } | undefined;
+import type { IntentType } from './types';
 
-interface TraceEntry {
-  chat_id: string;
-  intent: string;
-  confidence: number;
-  provider: string;
-  latency_ms: number;
-  tokens_in: number;
-  tokens_out: number;
-  cached: boolean;
-  fallback_used: boolean;
-  timestamp: string;
+export interface TraceData {
+  readonly chat_id: string;
+  readonly intent: IntentType;
+  readonly confidence: number;
+  readonly provider: "groq" | "openai" | "fallback" | "fast-path";
+  readonly latency_ms: number;
+  readonly tokens_in?: number;
+  readonly tokens_out?: number;
+  readonly cached?: boolean;
+  readonly fallback_used: boolean;
+  readonly timestamp: string;
 }
 
-export function trace(entry: TraceEntry): void {
-  const msg = JSON.stringify(entry);
-  if (typeof wmill !== 'undefined' && wmill?.log) {
-    wmill.log(msg, 'info');
-  } else {
-    console.log(`[AI-TRACE] ${msg}`);
-  }
+/**
+ * Records a trace of the AI Agent execution.
+ * In production, this would go to a database or monitoring system.
+ */
+export async function trace(data: TraceData): Promise<void> {
+  const logEntry = JSON.stringify(data);
+  
+  // En Windmill, console.log es capturado como log estructurado
+  console.log(`[AI-TRACE] ${logEntry}`);
+  
+  // Simulación de persistencia asíncrona segura
+  await Promise.resolve();
 }
 
 export function buildTrace(
-  chatId: string,
-  intent: string,
+  chat_id: string,
+  intent: IntentType,
   confidence: number,
-  provider: string,
-  latencyMs: number,
-  tokensIn: number,
-  tokensOut: number,
-  cached: boolean,
-  fallbackUsed: boolean,
-): TraceEntry {
+  provider: TraceData["provider"],
+  latency_ms: number,
+  fallback_used: boolean
+): TraceData {
   return {
-    chat_id: chatId,
+    chat_id,
     intent,
     confidence,
     provider,
-    latency_ms: latencyMs,
-    tokens_in: tokensIn,
-    tokens_out: tokensOut,
-    cached,
-    fallback_used: fallbackUsed,
-    timestamp: new Date().toISOString(),
+    latency_ms,
+    fallback_used,
+    timestamp: new Date().toISOString()
   };
 }

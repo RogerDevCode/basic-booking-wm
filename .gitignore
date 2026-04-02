@@ -1,11 +1,11 @@
-# Go
+# Build artifacts
 bin/
 main
-*.test
 *.out
 
 # Environment & Secrets
 .env
+.env.test
 .env.local
 .env.*.local
 .secrets/
@@ -32,3 +32,4 @@ Thumbs.db
 logs/
 *.log
 temp/
+node_modules
