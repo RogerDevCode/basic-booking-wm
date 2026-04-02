@@ -25,8 +25,6 @@ const InputSchema = z.object({
   timezone: z.string().optional().default('America/Argentina/Buenos_Aires'),
 }).readonly();
 
-type WizardInput = Readonly<z.infer<typeof InputSchema>>;
-
 function formatDate(dateStr: string, tz: string): string {
   const d = new Date(dateStr);
   return d.toLocaleDateString('es-AR', {

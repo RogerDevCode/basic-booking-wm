@@ -107,8 +107,6 @@ export async function main(rawInput: unknown): Promise<{
     }
 
     // Create new patient
-    const idempotencyKey = parsed.data.idempotency_key ?? "patient-" + name + "-" + Date.now();
-
     const rows = await sql`
       INSERT INTO patients (name, email, phone, telegram_chat_id, timezone)
       VALUES (${name}, ${email ?? null}, ${phone ?? null}, ${telegram_chat_id ?? null}, ${timezone})

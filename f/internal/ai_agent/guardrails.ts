@@ -4,7 +4,7 @@
 // ============================================================================
 
 import { INTENT, URGENCY_WORDS } from './constants';
-import type { GuardrailResult, IntentResult, IntentType } from './types';
+import type { GuardrailResult, IntentResult } from './types';
 
 // Prompt injection patterns
 const INJECTION_PATTERNS: ReadonlyArray<RegExp> = [

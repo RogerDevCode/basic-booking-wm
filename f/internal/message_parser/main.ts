@@ -10,8 +10,6 @@ const MessageParserInputSchema = z.object({
   text: z.string().trim().min(1).max(500),
 }).readonly();
 
-type MessageParserInput = Readonly<z.infer<typeof MessageParserInputSchema>>;
-
 export interface MessageParserData {
   readonly chat_id: number;
   readonly text: string;

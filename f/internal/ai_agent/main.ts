@@ -3,14 +3,11 @@
 // Pattern: Precision Architecture, No 'any', Errors as Values
 // ============================================================================
 
-import { z } from "zod";
 import "@total-typescript/ts-reset";
 import {
   INTENT,
   CONFIDENCE_THRESHOLDS,
   INTENT_KEYWORDS,
-  NORMALIZATION_MAP,
-  PROFANITY_TO_IGNORE,
   OFF_TOPIC_PATTERNS,
   THANK_YOU_WORDS,
   URGENCY_WORDS,
@@ -30,7 +27,6 @@ import {
 import { trace } from './tracing';
 import {
   AIAgentInputSchema,
-  IntentResultSchema,
   type AIAgentInput,
   type EntityMap,
   type AvailabilityContext,
@@ -181,8 +177,8 @@ function suggestResponseType(intent: IntentType, context: AvailabilityContext, e
 
 function generateAIResponse(
   intent: IntentType, 
-  entities: EntityMap, 
-  context: AvailabilityContext, 
+  _entities: EntityMap, 
+  _context: AvailabilityContext, 
   responseType: string,
   userProfile?: AIAgentInput['user_profile']
 ): { readonly aiResponse: string; readonly needsMoreInfo: boolean; readonly followUpQuestion: string | null } {
@@ -229,9 +225,10 @@ function detectIntentRules(text: string): { readonly intent: IntentType; readonl
   
   if (URGENCY_WORDS.some(w => lower.includes(w))) return { intent: INTENT.URGENT_CARE, confidence: 0.9 };
   
-  for (const [intent, keywords] of Object.entries(INTENT_KEYWORDS)) {
+  for (const [intent, config] of Object.entries(INTENT_KEYWORDS)) {
     const typedIntent = intent as IntentType;
-    const matchCount = keywords.filter(k => lower.includes(k)).length;
+    const keywords = config.keywords;
+    const matchCount = keywords.filter((k: string) => lower.includes(k)).length;
     if (matchCount > 0) {
       const confidence = Math.min(0.33 * matchCount, 0.9);
       if (confidence >= (CONFIDENCE_THRESHOLDS[typedIntent] ?? 0.5)) {
@@ -324,7 +321,7 @@ export async function main(rawInput: unknown): Promise<{ readonly success: boole
   // Tracing
   await trace({
     chat_id,
-    intent: verifiedResult.intent,
+    intent: verifiedResult.intent as IntentType,
     confidence: verifiedResult.confidence,
     provider,
     latency_ms: Date.now() - startMs,
