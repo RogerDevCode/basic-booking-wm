@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Booking Titanium — Iniciar Sesión</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/variables.css">
+  <link rel="stylesheet" href="assets/css/base.css">
+  <link rel="stylesheet" href="assets/css/components.css">
+  <link rel="stylesheet" href="assets/css/layouts.css">
+  <link rel="stylesheet" href="assets/css/animations.css">
+</head>
+<body class="auth-layout">
+  <div class="auth-card fade-in-up">
+    <div class="auth-logo">
+      <svg class="auth-logo-icon" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="2" y="2" width="36" height="36" rx="8" fill="#043696"/>
+        <path d="M20 10v20M10 20h20" stroke="white" stroke-width="4" stroke-linecap="round"/>
+        <circle cx="30" cy="10" r="4" fill="#D52B1E"/>
+      </svg>
+      <span class="auth-logo-text">Booking Titanium</span>
+    </div>
+
+    <!-- LOGIN FORM -->
+    <div id="login-section">
+      <h1 class="auth-title">Iniciar Sesión</h1>
+      <p class="auth-subtitle">Accede a tu cuenta de salud</p>
+
+      <div id="login-error" class="alert alert-error hidden" role="alert"></div>
+      <div id="login-success" class="alert alert-success hidden" role="alert"></div>
+
+      <form id="login-form" novalidate>
+        <div class="form-group">
+          <label class="form-label form-label-required" for="login-email">Email</label>
+          <input class="form-input" type="email" id="login-email" placeholder="tu@email.com" autocomplete="email" required>
+          <span class="form-error hidden" id="login-email-error"></span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label form-label-required" for="login-password">Contraseña</label>
+          <input class="form-input" type="password" id="login-password" placeholder="Tu contraseña" autocomplete="current-password" required>
+          <span class="form-error hidden" id="login-password-error"></span>
+        </div>
+
+        <button class="btn btn-primary btn-block btn-lg" type="submit" id="login-btn">
+          <span id="login-btn-text">Iniciar Sesión</span>
+          <span id="login-btn-loading" class="hidden">
+            <span class="spinner spinner-sm"></span>
+          </span>
+        </button>
+      </form>
+
+      <div class="auth-footer">
+        ¿No tienes cuenta? <a href="#" id="show-register">Registrarse</a>
+      </div>
+    </div>
+
+    <!-- REGISTER FORM -->
+    <div id="register-section" class="hidden">
+      <h1 class="auth-title">Crear Cuenta</h1>
+      <p class="auth-subtitle">Regístrate para agendar tus citas</p>
+
+      <div id="register-error" class="alert alert-error hidden" role="alert"></div>
+      <div id="register-success" class="alert alert-success hidden" role="alert"></div>
+
+      <form id="register-form" novalidate>
+        <div class="form-group">
+          <label class="form-label form-label-required" for="reg-name">Nombre Completo</label>
+          <input class="form-input" type="text" id="reg-name" placeholder="Juan Pérez" minlength="3" required>
+          <span class="form-error hidden" id="reg-name-error"></span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label form-label-required" for="reg-rut">RUT</label>
+          <input class="form-input" type="text" id="reg-rut" placeholder="12.345.678-5" maxlength="12" required>
+          <span class="form-error hidden" id="reg-rut-error"></span>
+          <span class="form-success hidden" id="reg-rut-success">RUT válido ✓</span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label form-label-required" for="reg-email">Email</label>
+          <input class="form-input" type="email" id="reg-email" placeholder="tu@email.com" autocomplete="email" required>
+          <span class="form-error hidden" id="reg-email-error"></span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label form-label-required" for="reg-address">Dirección</label>
+          <input class="form-input" type="text" id="reg-address" placeholder="Calle 123, Ciudad" required>
+          <span class="form-error hidden" id="reg-address-error"></span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label form-label-required" for="reg-phone">Teléfono</label>
+          <input class="form-input" type="tel" id="reg-phone" placeholder="+56 9 1234 5678" required>
+          <span class="form-error hidden" id="reg-phone-error"></span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label form-label-required" for="reg-password">Contraseña</label>
+          <input class="form-input" type="password" id="reg-password" placeholder="Mínimo 8 caracteres" minlength="8" autocomplete="new-password" required>
+          <span class="form-error hidden" id="reg-password-error"></span>
+          <span class="form-hint">Mínimo 8 caracteres, 1 mayúscula, 1 número, 1 especial</span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label form-label-required" for="reg-password-confirm">Confirmar Contraseña</label>
+          <input class="form-input" type="password" id="reg-password-confirm" placeholder="Repite tu contraseña" minlength="8" autocomplete="new-password" required>
+          <span class="form-error hidden" id="reg-password-confirm-error"></span>
+        </div>
+
+        <button class="btn btn-primary btn-block btn-lg" type="submit" id="register-btn">
+          <span id="register-btn-text">Crear Cuenta</span>
+          <span id="register-btn-loading" class="hidden">
+            <span class="spinner spinner-sm"></span>
+          </span>
+        </button>
+      </form>
+
+      <div class="auth-footer">
+        ¿Ya tienes cuenta? <a href="#" id="show-login">Iniciar sesión</a>
+      </div>
+    </div>
+
+    <!-- COMPLETE PROFILE FORM (for Telegram users) -->
+    <div id="complete-profile-section" class="hidden">
+      <h1 class="auth-title">Completar Perfil</h1>
+      <p class="auth-subtitle" id="complete-profile-subtitle">Completa tus datos para acceder a la web</p>
+
+      <div id="complete-profile-error" class="alert alert-error hidden" role="alert"></div>
+      <div id="complete-profile-success" class="alert alert-success hidden" role="alert"></div>
+
+      <form id="complete-profile-form" novalidate>
+        <div class="form-group">
+          <label class="form-label" for="cp-chat-id">Telegram Chat ID</label>
+          <input class="form-input" type="text" id="cp-chat-id" placeholder="123456789" required>
+          <span class="form-error hidden" id="cp-chat-id-error"></span>
+          <span class="form-hint">Lo encuentras en el mensaje del bot</span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label form-label-required" for="cp-rut">RUT</label>
+          <input class="form-input" type="text" id="cp-rut" placeholder="12.345.678-5" maxlength="12" required>
+          <span class="form-error hidden" id="cp-rut-error"></span>
+          <span class="form-success hidden" id="cp-rut-success">RUT válido ✓</span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label form-label-required" for="cp-email">Email</label>
+          <input class="form-input" type="email" id="cp-email" placeholder="tu@email.com" autocomplete="email" required>
+          <span class="form-error hidden" id="cp-email-error"></span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label form-label-required" for="cp-address">Dirección</label>
+          <input class="form-input" type="text" id="cp-address" placeholder="Calle 123, Ciudad" required>
+          <span class="form-error hidden" id="cp-address-error"></span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label form-label-required" for="cp-phone">Teléfono</label>
+          <input class="form-input" type="tel" id="cp-phone" placeholder="+56 9 1234 5678" required>
+          <span class="form-error hidden" id="cp-phone-error"></span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label form-label-required" for="cp-password">Contraseña</label>
+          <input class="form-input" type="password" id="cp-password" placeholder="Mínimo 8 caracteres" minlength="8" autocomplete="new-password" required>
+          <span class="form-error hidden" id="cp-password-error"></span>
+          <span class="form-hint">Mínimo 8 caracteres, 1 mayúscula, 1 número, 1 especial</span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label form-label-required" for="cp-password-confirm">Confirmar Contraseña</label>
+          <input class="form-input" type="password" id="cp-password-confirm" placeholder="Repite tu contraseña" minlength="8" autocomplete="new-password" required>
+          <span class="form-error hidden" id="cp-password-confirm-error"></span>
+        </div>
+
+        <button class="btn btn-primary btn-block btn-lg" type="submit" id="complete-profile-btn">
+          <span id="complete-profile-btn-text">Completar y Acceder</span>
+          <span id="complete-profile-btn-loading" class="hidden">
+            <span class="spinner spinner-sm"></span>
+          </span>
+        </button>
+      </form>
+
+      <div class="auth-footer">
+        ¿No tienes cuenta de Telegram? <a href="#" id="show-register-from-cp">Registrarse</a>
+      </div>
+    </div>
+  </div>
+
+  <script src="assets/js/utils.js"></script>
+  <script src="assets/js/api.js"></script>
+  <script src="assets/js/auth.js"></script>
+</body>
+</html>

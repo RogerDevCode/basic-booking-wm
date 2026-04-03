@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Booking Titanium — Panel del Profesional</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/variables.css">
+  <link rel="stylesheet" href="assets/css/base.css">
+  <link rel="stylesheet" href="assets/css/components.css">
+  <link rel="stylesheet" href="assets/css/layouts.css">
+  <link rel="stylesheet" href="assets/css/animations.css">
+</head>
+<body>
+  <div class="dashboard-layout">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <svg class="sidebar-logo" viewBox="0 0 40 40" fill="none">
+          <rect x="2" y="2" width="36" height="36" rx="8" fill="#043696"/>
+          <path d="M20 10v20M10 20h20" stroke="white" stroke-width="4" stroke-linecap="round"/>
+          <circle cx="30" cy="10" r="4" fill="#D52B1E"/>
+        </svg>
+        <span class="sidebar-brand">Booking Titanium</span>
+      </div>
+      <nav class="sidebar-nav">
+        <div class="sidebar-section">
+          <div class="sidebar-section-title">Panel Profesional</div>
+          <a href="provider-dashboard.html" class="sidebar-link active">
+            <svg class="sidebar-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1"/></svg>
+            Mi Agenda
+          </a>
+          <a href="#" class="sidebar-link" id="nav-patients">
+            <svg class="sidebar-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+            Pacientes
+          </a>
+        </div>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="sidebar-user">
+          <div class="avatar" id="user-avatar">DR</div>
+          <div class="sidebar-user-info">
+            <div class="sidebar-user-name" id="user-name">Cargando...</div>
+            <div class="sidebar-user-role" id="user-role">Profesional</div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <header class="top-header">
+        <h2 class="top-header-title">Panel del Profesional</h2>
+        <div class="top-header-actions">
+          <button class="btn btn-ghost btn-sm" id="logout-btn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+            Cerrar Sesión
+          </button>
+        </div>
+      </header>
+
+      <div class="page-content">
+        <div id="provider-alert" class="alert alert-error hidden" role="alert"></div>
+
+        <!-- Stats -->
+        <div class="grid grid-4 mb-8 stagger-children" id="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label">Citas Hoy</div>
+            <div class="stat-value" id="stat-today-count">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Próxima Cita</div>
+            <div class="stat-value" id="stat-next-time">—</div>
+            <div class="stat-change" id="stat-next-patient"></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Total Semana</div>
+            <div class="stat-value" id="stat-week-total">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Completadas</div>
+            <div class="stat-value" id="stat-completed">0</div>
+          </div>
+        </div>
+
+        <!-- Today's Agenda -->
+        <div class="card mb-8">
+          <div class="card-header">
+            <h3 class="card-title">Agenda de Hoy</h3>
+            <span class="badge badge-confirmed" id="today-date-badge"></span>
+          </div>
+          <div id="agenda-list">
+            <div class="empty-state" id="agenda-empty">
+              <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+              <h4 class="empty-state-title">Sin citas para hoy</h4>
+              <p class="empty-state-text">No tienes citas programadas para hoy</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Week Overview -->
+        <div class="card mb-8">
+          <div class="card-header">
+            <h3 class="card-title">Resumen Semanal</h3>
+            <div>
+              <button class="btn btn-outline btn-sm" id="week-prev">« Anterior</button>
+              <button class="btn btn-outline btn-sm" id="week-next">Siguiente »</button>
+            </div>
+          </div>
+          <div id="week-overview">
+            <div class="table-container">
+              <table class="table" id="week-table">
+                <thead>
+                  <tr>
+                    <th>Día</th>
+                    <th>Fecha</th>
+                    <th>Citas</th>
+                    <th>Estado</th>
+                  </tr>
+                </thead>
+                <tbody id="week-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Recent Patients -->
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">Pacientes Recientes</h3>
+          </div>
+          <div id="patients-list">
+            <div class="empty-state" id="patients-empty">
+              <svg class="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+              <h4 class="empty-state-title">Sin pacientes recientes</h4>
+              <p class="empty-state-text">Tus pacientes aparecerán aquí después de las consultas</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Booking Action Modal -->
+  <div class="modal-overlay" id="action-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title" id="action-modal-title">Acción</h3>
+        <button class="modal-close" id="action-modal-close">&times;</button>
+      </div>
+      <div class="modal-body" id="action-modal-body"></div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" id="action-modal-cancel">Cancelar</button>
+        <button class="btn btn-primary" id="action-modal-confirm">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="assets/js/utils.js"></script>
+  <script src="assets/js/api.js"></script>
+  <script src="assets/js/provider.js"></script>
+</body>
+</html>

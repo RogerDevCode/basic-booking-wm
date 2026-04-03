@@ -1,0 +1,67 @@
+:root {
+  /* Chile Flag Primary */
+  --chile-blue: #043696;
+  --chile-blue-dark: #032a73;
+  --chile-blue-light: #0a47b8;
+  --chile-red: #D52B1E;
+  --chile-red-dark: #b8231a;
+  --chile-red-light: #e8453a;
+  --chile-white: #FFFFFF;
+
+  /* Medical Neutrals */
+  --bg-primary: #F8FAFC;
+  --bg-secondary: #EEF2F7;
+  --bg-card: #FFFFFF;
+  --text-primary: #0F172A;
+  --text-secondary: #475569;
+  --text-muted: #94A3B8;
+  --border: #E2E8F0;
+  --border-focus: #043696;
+
+  /* Semantic */
+  --success: #059669;
+  --success-light: #d1fae5;
+  --warning: #D97706;
+  --warning-light: #fef3c7;
+  --error: #D52B1E;
+  --error-light: #fee2e2;
+  --info: #043696;
+  --info-light: #dbeafe;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(4, 54, 150, 0.05);
+  --shadow-md: 0 4px 12px rgba(4, 54, 150, 0.08);
+  --shadow-lg: 0 8px 30px rgba(4, 54, 150, 0.12);
+  --shadow-xl: 0 20px 60px rgba(4, 54, 150, 0.15);
+
+  /* Border Radius */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 9999px;
+
+  /* Spacing Scale */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+
+  /* Transitions */
+  --transition-fast: 150ms ease;
+  --transition-base: 200ms ease;
+  --transition-slow: 300ms ease;
+
+  /* Z-Index Scale */
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-overlay: 300;
+  --z-modal: 400;
+  --z-toast: 500;
+}

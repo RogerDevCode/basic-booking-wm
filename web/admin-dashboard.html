@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Booking Titanium — Panel de Administración</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/variables.css">
+  <link rel="stylesheet" href="assets/css/base.css">
+  <link rel="stylesheet" href="assets/css/components.css">
+  <link rel="stylesheet" href="assets/css/layouts.css">
+  <link rel="stylesheet" href="assets/css/animations.css">
+</head>
+<body>
+  <div class="dashboard-layout">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <svg class="sidebar-logo" viewBox="0 0 40 40" fill="none">
+          <rect x="2" y="2" width="36" height="36" rx="8" fill="#043696"/>
+          <path d="M20 10v20M10 20h20" stroke="white" stroke-width="4" stroke-linecap="round"/>
+          <circle cx="30" cy="10" r="4" fill="#D52B1E"/>
+        </svg>
+        <span class="sidebar-brand">Booking Titanium</span>
+      </div>
+      <nav class="sidebar-nav">
+        <div class="sidebar-section">
+          <div class="sidebar-section-title">Administración</div>
+          <a href="admin-dashboard.html" class="sidebar-link active">
+            <svg class="sidebar-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1"/></svg>
+            Dashboard
+          </a>
+          <a href="#" class="sidebar-link" id="nav-users">
+            <svg class="sidebar-link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+            Usuarios
+          </a>
+        </div>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="sidebar-user">
+          <div class="avatar" id="user-avatar">AD</div>
+          <div class="sidebar-user-info">
+            <div class="sidebar-user-name" id="user-name">Cargando...</div>
+            <div class="sidebar-user-role" id="user-role">Administrador</div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <header class="top-header">
+        <h2 class="top-header-title">Panel de Administración</h2>
+        <div class="top-header-actions">
+          <button class="btn btn-ghost btn-sm" id="logout-btn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+            Cerrar Sesión
+          </button>
+        </div>
+      </header>
+
+      <div class="page-content">
+        <div id="admin-alert" class="alert alert-error hidden" role="alert"></div>
+
+        <!-- KPI Cards -->
+        <div class="grid grid-4 mb-8 stagger-children" id="kpi-grid">
+          <div class="stat-card">
+            <div class="stat-label">Total Usuarios</div>
+            <div class="stat-value" id="kpi-total-users">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Total Citas</div>
+            <div class="stat-value" id="kpi-total-bookings">—</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Citas Hoy</div>
+            <div class="stat-value" id="kpi-today-bookings">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Profesionales Activos</div>
+            <div class="stat-value" id="kpi-active-providers">0</div>
+          </div>
+        </div>
+
+        <!-- User Management -->
+        <div class="card mb-8">
+          <div class="card-header">
+            <h3 class="card-title">Gestión de Usuarios</h3>
+            <div>
+              <input class="form-input" type="text" id="user-search" placeholder="Buscar usuario..." style="width: 240px; display: inline-block;">
+              <button class="btn btn-primary btn-sm" id="add-user-btn" style="margin-left: 8px;">+ Nuevo Usuario</button>
+            </div>
+          </div>
+          <div class="table-container">
+            <table class="table" id="users-table">
+              <thead>
+                <tr>
+                  <th>Usuario</th>
+                  <th>Email</th>
+                  <th>RUT</th>
+                  <th>Rol</th>
+                  <th>Estado</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="users-tbody">
+                <tr id="users-loading">
+                  <td colspan="6" style="text-align: center;">
+                    <div class="spinner"></div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Recent Bookings -->
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">Citas Recientes</h3>
+          </div>
+          <div class="table-container">
+            <table class="table" id="recent-bookings-table">
+              <thead>
+                <tr>
+                  <th>Paciente</th>
+                  <th>Profesional</th>
+                  <th>Servicio</th>
+                  <th>Fecha</th>
+                  <th>Estado</th>
+                </tr>
+              </thead>
+              <tbody id="recent-bookings-tbody">
+                <tr id="recent-bookings-loading">
+                  <td colspan="5" style="text-align: center;">
+                    <div class="spinner"></div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Role Change Modal -->
+  <div class="modal-overlay" id="role-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title">Cambiar Rol de Usuario</h3>
+        <button class="modal-close" id="role-modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-4">Usuario: <strong id="role-modal-user"></strong></p>
+        <div class="form-group">
+          <label class="form-label form-label-required" for="role-select">Nuevo Rol</label>
+          <select class="form-input form-select" id="role-select">
+            <option value="patient">Paciente</option>
+            <option value="provider">Profesional</option>
+            <option value="admin">Administrador</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" id="role-modal-cancel">Cancelar</button>
+        <button class="btn btn-primary" id="role-modal-confirm">Cambiar Rol</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add User Modal -->
+  <div class="modal-overlay" id="add-user-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title">Nuevo Usuario</h3>
+        <button class="modal-close" id="add-user-modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="add-user-error" class="alert alert-error hidden" role="alert"></div>
+        <div class="form-group">
+          <label class="form-label form-label-required" for="add-user-name">Nombre Completo</label>
+          <input class="form-input" type="text" id="add-user-name" placeholder="Juan Pérez">
+          <span class="form-error hidden" id="add-user-name-error"></span>
+        </div>
+        <div class="form-group">
+          <label class="form-label form-label-required" for="add-user-email">Email</label>
+          <input class="form-input" type="email" id="add-user-email" placeholder="tu@email.com">
+          <span class="form-error hidden" id="add-user-email-error"></span>
+        </div>
+        <div class="form-group">
+          <label class="form-label form-label-required" for="add-user-rut">RUT</label>
+          <input class="form-input" type="text" id="add-user-rut" placeholder="12.345.678-5" maxlength="12">
+          <span class="form-error hidden" id="add-user-rut-error"></span>
+        </div>
+        <div class="form-group">
+          <label class="form-label form-label-required" for="add-user-role">Rol</label>
+          <select class="form-input form-select" id="add-user-role">
+            <option value="patient">Paciente</option>
+            <option value="provider">Profesional</option>
+            <option value="admin">Administrador</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" id="add-user-modal-cancel">Cancelar</button>
+        <button class="btn btn-primary" id="add-user-modal-confirm">Crear Usuario</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="assets/js/utils.js"></script>
+  <script src="assets/js/api.js"></script>
+  <script src="assets/js/admin.js"></script>
+</body>
+</html>
