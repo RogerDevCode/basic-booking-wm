@@ -29,7 +29,7 @@ interface ProfileResult {
 
 export async function main(rawInput: unknown): Promise<[Error | null, ProfileResult | null]> {
   const parsed = InputSchema.safeParse(rawInput);
-  if (parsed.success === false) {
+  if (!parsed.success) {
     return [new Error('Validation error: ' + parsed.error.message), null];
   }
 
@@ -54,7 +54,7 @@ export async function main(rawInput: unknown): Promise<[Error | null, ProfileRes
     }
 
     const userEmail = String(userRow['email']);
-    let patientRows = await sql`
+    const patientRows = await sql`
       SELECT patient_id, name, email, phone, telegram_chat_id, timezone, gcal_calendar_id
       FROM patients
       WHERE patient_id = ${user_id}::uuid OR email = ${userEmail}
@@ -87,26 +87,26 @@ export async function main(rawInput: unknown): Promise<[Error | null, ProfileRes
       const values: string[] = [];
 
       if (parsed.data.name !== undefined) {
-        updates.push('name = $' + (values.length + 1));
+        updates.push('name = $' + String(values.length + 1));
         values.push(parsed.data.name);
       }
       if (parsed.data.email !== undefined) {
-        updates.push('email = $' + (values.length + 1));
+        updates.push('email = $' + String(values.length + 1));
         values.push(parsed.data.email);
       }
       if (parsed.data.phone !== undefined) {
-        updates.push('phone = $' + (values.length + 1));
+        updates.push('phone = $' + String(values.length + 1));
         values.push(parsed.data.phone);
       }
       if (parsed.data.timezone !== undefined) {
-        updates.push('timezone = $' + (values.length + 1));
+        updates.push('timezone = $' + String(values.length + 1));
         values.push(parsed.data.timezone);
       }
 
       if (updates.length > 0) {
         updates.push('updated_at = NOW()');
         const patientId = String(patientRow['patient_id']);
-        const queryText = 'UPDATE patients SET ' + updates.join(', ') + ' WHERE patient_id = $' + (values.length + 1) + '::uuid RETURNING patient_id, name, email, phone, telegram_chat_id, timezone, gcal_calendar_id';
+        const queryText = 'UPDATE patients SET ' + updates.join(', ') + ' WHERE patient_id = $' + String(values.length + 1) + '::uuid RETURNING patient_id, name, email, phone, telegram_chat_id, timezone, gcal_calendar_id';
         values.push(patientId);
 
         const updateResult = await sql.unsafe(queryText, values);

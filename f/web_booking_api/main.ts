@@ -29,7 +29,7 @@ interface BookingResult {
 
 export async function main(rawInput: unknown): Promise<[Error | null, BookingResult | null]> {
   const parsed = InputSchema.safeParse(rawInput);
-  if (parsed.success === false) {
+  if (!parsed.success) {
     return [new Error('Validation error: ' + parsed.error.message), null];
   }
 
@@ -226,7 +226,7 @@ export async function main(rawInput: unknown): Promise<[Error | null, BookingRes
       }];
     }
 
-    return [new Error('Unknown action: ' + action), null];
+    return [new Error('Unknown action: ' + String(action)), null];
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     if (message.includes('duplicate key') || message.includes('unique constraint') || message.includes('conflicting key value violates exclusion constraint')) {

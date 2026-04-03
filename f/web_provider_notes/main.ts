@@ -27,13 +27,13 @@ interface NoteResult {
 }
 
 interface NotesListResult {
-  readonly notes: ReadonlyArray<NoteResult>;
+  readonly notes: readonly NoteResult[];
   readonly message: string;
 }
 
 export async function main(rawInput: unknown): Promise<[Error | null, NoteResult | NotesListResult | null]> {
   const parsed = InputSchema.safeParse(rawInput);
-  if (parsed.success === false) {
+  if (!parsed.success) {
     return [new Error('Validation error: ' + parsed.error.message), null];
   }
 
@@ -189,7 +189,7 @@ export async function main(rawInput: unknown): Promise<[Error | null, NoteResult
       return [null, { notes: notes, message: 'OK' }];
     }
 
-    return [new Error('Unknown action: ' + action), null];
+    return [new Error('Unknown action: ' + String(action)), null];
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     return [new Error('Internal error: ' + message), null];

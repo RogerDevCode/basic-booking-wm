@@ -30,14 +30,14 @@ interface WaitlistEntry {
 }
 
 interface WaitlistResult {
-  readonly entries: ReadonlyArray<WaitlistEntry>;
+  readonly entries: readonly WaitlistEntry[];
   readonly position: number | null;
   readonly message: string;
 }
 
 export async function main(rawInput: unknown): Promise<[Error | null, WaitlistResult | null]> {
   const parsed = InputSchema.safeParse(rawInput);
-  if (parsed.success === false) {
+  if (!parsed.success) {
     return [new Error('Validation error: ' + parsed.error.message), null];
   }
 
@@ -120,7 +120,7 @@ export async function main(rawInput: unknown): Promise<[Error | null, WaitlistRe
       return [null, {
         entries: [],
         position: position,
-        message: 'Joined waitlist at position ' + position,
+        message: 'Joined waitlist at position ' + String(position),
       }];
     }
 
@@ -194,11 +194,11 @@ export async function main(rawInput: unknown): Promise<[Error | null, WaitlistRe
       return [null, {
         entries: [],
         position: Number(row['position']),
-        message: 'Your position: ' + row['position'],
+        message: 'Your position: ' + String(row['position']),
       }];
     }
 
-    return [new Error('Unknown action: ' + action), null];
+    return [new Error('Unknown action: ' + String(action)), null];
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     return [new Error('Internal error: ' + message), null];

@@ -30,7 +30,7 @@ interface CompleteProfileResult {
 }
 
 function validateRut(rut: string): boolean {
-  const clean = rut.replace(/[.\-]/g, '').toUpperCase();
+  const clean = rut.replace(/[.]/g, '').replace(/-/g, '').toUpperCase();
   if (clean.length < 2) return false;
 
   const body = clean.slice(0, -1);
@@ -71,7 +71,7 @@ function hashPasswordSync(password: string): string {
 
 export async function main(rawInput: unknown): Promise<[Error | null, CompleteProfileResult | null]> {
   const parsed = InputSchema.safeParse(rawInput);
-  if (parsed.success === false) {
+  if (!parsed.success) {
     return [new Error('Validation error: ' + parsed.error.message), null];
   }
 
