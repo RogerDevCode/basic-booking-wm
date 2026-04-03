@@ -29,14 +29,14 @@ interface BookingInfo {
 }
 
 interface BookingsResult {
-  readonly upcoming: ReadonlyArray<BookingInfo>;
-  readonly past: ReadonlyArray<BookingInfo>;
+  readonly upcoming: readonly BookingInfo[];
+  readonly past: readonly BookingInfo[];
   readonly total: number;
 }
 
 export async function main(rawInput: unknown): Promise<[Error | null, BookingsResult | null]> {
   const parsed = InputSchema.safeParse(rawInput);
-  if (parsed.success === false) {
+  if (!parsed.success) {
     return [new Error('Validation error: ' + parsed.error.message), null];
   }
 

@@ -25,7 +25,7 @@ interface AgendaDay {
   readonly schedule_end: string | null;
   readonly is_blocked: boolean;
   readonly block_reason: string | null;
-  readonly bookings: Array<Record<string, unknown>>;
+  readonly bookings: Record<string, unknown>[];
   readonly total_bookings: number;
 }
 
@@ -35,7 +35,7 @@ export async function main(rawInput: unknown): Promise<{
   error_message: string | null;
 }> {
   const parsed = InputSchema.safeParse(rawInput);
-  if (parsed.success === false) {
+  if (!parsed.success) {
     return { success: false, data: null, error_message: 'Validation error: ' + parsed.error.message };
   }
 
@@ -115,7 +115,7 @@ export async function main(rawInput: unknown): Promise<{
           ORDER BY b.start_time ASC
         `;
       }
-      const bookings = bookingQuery as Array<Record<string, unknown>>;
+      const bookings = bookingQuery as Record<string, unknown>[];
 
       days.push({
         date: dateStr,

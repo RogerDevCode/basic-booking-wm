@@ -48,7 +48,7 @@ async function checkGCal(accessToken: string): Promise<ComponentStatus> {
     if (response.ok) {
       return { component: 'gcal', status: 'healthy', latency_ms: latency, message: 'OK' };
     }
-    return { component: 'gcal', status: 'degraded', latency_ms: latency, message: 'HTTP ' + response.status };
+    return { component: 'gcal', status: 'degraded', latency_ms: latency, message: 'HTTP ' + String(response.status) };
   } catch (e) {
     const latency = Date.now() - start;
     const message = e instanceof Error ? e.message : String(e);
@@ -69,7 +69,7 @@ async function checkTelegram(botToken: string): Promise<ComponentStatus> {
     if (response.ok) {
       return { component: 'telegram', status: 'healthy', latency_ms: latency, message: 'OK' };
     }
-    return { component: 'telegram', status: 'degraded', latency_ms: latency, message: 'HTTP ' + response.status };
+    return { component: 'telegram', status: 'degraded', latency_ms: latency, message: 'HTTP ' + String(response.status) };
   } catch (e) {
     const latency = Date.now() - start;
     const message = e instanceof Error ? e.message : String(e);
@@ -83,7 +83,7 @@ export async function main(rawInput: unknown): Promise<{
   error_message: string | null;
 }> {
   const parsed = InputSchema.safeParse(rawInput);
-  if (parsed.success === false) {
+  if (!parsed.success) {
     return { success: false, data: null, error_message: 'Validation error: ' + parsed.error.message };
   }
 

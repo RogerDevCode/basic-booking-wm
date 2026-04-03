@@ -32,13 +32,13 @@ interface UserInfo {
 }
 
 interface UsersListResult {
-  readonly users: ReadonlyArray<UserInfo>;
+  readonly users: readonly UserInfo[];
   readonly total: number;
 }
 
 export async function main(rawInput: unknown): Promise<[Error | null, UserInfo | UsersListResult | null]> {
   const parsed = InputSchema.safeParse(rawInput);
-  if (parsed.success === false) {
+  if (!parsed.success) {
     return [new Error('Validation error: ' + parsed.error.message), null];
   }
 
@@ -139,19 +139,19 @@ export async function main(rawInput: unknown): Promise<[Error | null, UserInfo |
       const values: string[] = [];
 
       if (parsed.data.full_name !== undefined) {
-        updates.push('full_name = $' + (values.length + 1));
+        updates.push('full_name = $' + String(values.length + 1));
         values.push(parsed.data.full_name);
       }
       if (parsed.data.email !== undefined) {
-        updates.push('email = $' + (values.length + 1));
+        updates.push('email = $' + String(values.length + 1));
         values.push(parsed.data.email);
       }
       if (parsed.data.phone !== undefined) {
-        updates.push('phone = $' + (values.length + 1));
+        updates.push('phone = $' + String(values.length + 1));
         values.push(parsed.data.phone);
       }
       if (parsed.data.role !== undefined) {
-        updates.push('role = $' + (values.length + 1));
+        updates.push('role = $' + String(values.length + 1));
         values.push(parsed.data.role);
       }
 
@@ -162,7 +162,7 @@ export async function main(rawInput: unknown): Promise<[Error | null, UserInfo |
       updates.push('updated_at = NOW()');
       values.push(targetId);
 
-      const queryText = 'UPDATE users SET ' + updates.join(', ') + ' WHERE user_id = $' + values.length + '::uuid RETURNING user_id, full_name, email, rut, phone, role, is_active, telegram_chat_id, last_login, created_at';
+      const queryText = 'UPDATE users SET ' + updates.join(', ') + ' WHERE user_id = $' + String(values.length) + '::uuid RETURNING user_id, full_name, email, rut, phone, role, is_active, telegram_chat_id, last_login, created_at';
       const rows = await sql.unsafe(queryText, values);
 
       const row = rows[0];
@@ -217,7 +217,7 @@ export async function main(rawInput: unknown): Promise<[Error | null, UserInfo |
       }];
     }
 
-    return [new Error('Unknown action: ' + action), null];
+    return [new Error('Unknown action: ' + String(action)), null];
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     if (message.includes('duplicate key') || message.includes('unique constraint')) {

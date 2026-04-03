@@ -29,7 +29,7 @@ interface UserProfileResult {
 
 export async function main(rawInput: unknown): Promise<[Error | null, UserProfileResult | null]> {
   const parsed = InputSchema.safeParse(rawInput);
-  if (parsed.success === false) {
+  if (!parsed.success) {
     return [new Error('Validation error: ' + parsed.error.message), null];
   }
 

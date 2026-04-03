@@ -37,7 +37,7 @@ function verifyPasswordSync(password: string, storedHash: string): boolean {
 
 export async function main(rawInput: unknown): Promise<[Error | null, LoginResult | null]> {
   const parsed = InputSchema.safeParse(rawInput);
-  if (parsed.success === false) {
+  if (!parsed.success) {
     return [new Error('Validation error: ' + parsed.error.message), null];
   }
 

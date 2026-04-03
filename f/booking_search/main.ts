@@ -21,11 +21,11 @@ const InputSchema = z.object({
 
 export async function main(rawInput: unknown): Promise<{
   success: boolean;
-  data: { bookings: Array<Record<string, unknown>>; total: number; offset: number; limit: number } | null;
+  data: { bookings: Record<string, unknown>[]; total: number; offset: number; limit: number } | null;
   error_message: string | null;
 }> {
   const parsed = InputSchema.safeParse(rawInput);
-  if (parsed.success === false) {
+  if (!parsed.success) {
     return { success: false, data: null, error_message: 'Validation error: ' + parsed.error.message };
   }
 
@@ -44,32 +44,32 @@ export async function main(rawInput: unknown): Promise<{
     let paramIdx = 1;
 
     if (input.provider_id !== undefined) {
-      conditions.push('b.provider_id = $' + paramIdx + '::uuid');
+      conditions.push('b.provider_id = $' + String(paramIdx) + '::uuid');
       params.push(input.provider_id);
       paramIdx++;
     }
     if (input.patient_id !== undefined) {
-      conditions.push('b.patient_id = $' + paramIdx + '::uuid');
+      conditions.push('b.patient_id = $' + String(paramIdx) + '::uuid');
       params.push(input.patient_id);
       paramIdx++;
     }
     if (input.status !== undefined) {
-      conditions.push('b.status = $' + paramIdx);
+      conditions.push('b.status = $' + String(paramIdx));
       params.push(input.status);
       paramIdx++;
     }
     if (input.date_from !== undefined) {
-      conditions.push('b.start_time >= $' + paramIdx + '::date');
+      conditions.push('b.start_time >= $' + String(paramIdx) + '::date');
       params.push(input.date_from);
       paramIdx++;
     }
     if (input.date_to !== undefined) {
-      conditions.push('b.start_time < ($' + paramIdx + '::date + INTERVAL \'1 day\')');
+      conditions.push('b.start_time < ($' + String(paramIdx) + '::date + INTERVAL \'1 day\')');
       params.push(input.date_to);
       paramIdx++;
     }
     if (input.service_id !== undefined) {
-      conditions.push('b.service_id = $' + paramIdx + '::uuid');
+      conditions.push('b.service_id = $' + String(paramIdx) + '::uuid');
       params.push(input.service_id);
       paramIdx++;
     }
@@ -79,7 +79,7 @@ export async function main(rawInput: unknown): Promise<{
     // Count total
     const countRows = await sql.unsafe(
       'SELECT COUNT(*) as total FROM bookings b ' + whereClause,
-      params as postgres.ParameterOrJSON<never>[]
+      params
     );
     const countRow: Record<string, unknown> | undefined = countRows[0] as Record<string, unknown> | undefined;
     const total = countRow !== undefined ? Number(countRow['total']) : 0;
@@ -95,14 +95,14 @@ export async function main(rawInput: unknown): Promise<{
       ' JOIN services s ON s.service_id = b.service_id' +
       ' ' + whereClause +
       ' ORDER BY b.start_time DESC' +
-      ' LIMIT $' + paramIdx + ' OFFSET $' + (paramIdx + 1),
-      params.concat([input.limit, input.offset]) as postgres.ParameterOrJSON<never>[] as postgres.ParameterOrJSON<never>[]
+      ' LIMIT $' + String(paramIdx) + ' OFFSET $' + String(paramIdx + 1),
+      params.concat([input.limit, input.offset])
     );
 
     return {
       success: true,
       data: {
-        bookings: bookingRows as Array<Record<string, unknown>>,
+        bookings: bookingRows as Record<string, unknown>[],
         total: total,
         offset: input.offset,
         limit: input.limit,

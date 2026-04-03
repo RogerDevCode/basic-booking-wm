@@ -44,9 +44,9 @@ function extractEntities(text: string): EntityMap {
   let date: string | null = null;
   let time: string | null = null;
   let provider_name: string | null = null;
-  let provider_id: string | null = null;
+  const provider_id: string | null = null;
   let service_type: string | null = null;
-  let service_id: string | null = null;
+  const service_id: string | null = null;
   let booking_id: string | null = null;
 
   for (const relDate of RELATIVE_DATES) {
@@ -54,10 +54,10 @@ function extractEntities(text: string): EntityMap {
   }
 
   if (date == null) {
-    const datePatterns: ReadonlyArray<RegExp> = [
-      /\b(\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2})\b/,
-      /\b(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})\b/,
-      /\b(\d{1,2}[\/\-]\d{1,2})\b/,
+    const datePatterns: readonly RegExp[] = [
+      /\b(\d{4}[-/]\d{1,2}[-/]\d{1,2})\b/,
+      /\b(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})\b/,
+      /\b(\d{1,2}[-/]\d{1,2})\b/,
     ];
     for (const pattern of datePatterns) {
       const match = text.match(pattern);
@@ -72,7 +72,7 @@ function extractEntities(text: string): EntityMap {
     }
   }
 
-  const timePatterns: ReadonlyArray<RegExp> = [
+  const timePatterns: readonly RegExp[] = [
     /(\d{1,2}:\d{2}\s*(am|pm|hrs|horas)?)/i,
     /(\d{1,2}\s*(am|pm|hrs|horas))/i,
     /las\s*(\d{1,2})\s*(am|pm|horas)?/i,
@@ -83,7 +83,7 @@ function extractEntities(text: string): EntityMap {
     if (val != null) { time = val.trim(); break; }
   }
 
-  const providerPatterns: ReadonlyArray<RegExp> = [
+  const providerPatterns: readonly RegExp[] = [
     /(?:dr|doctor|doctora)\.?\s+([A-Z][a-z]+)/i,
     /(?:con|para)\s+el\s+(?:dr|doctor)\.?\s+([A-Z][a-z]+)/i,
   ];
@@ -97,7 +97,7 @@ function extractEntities(text: string): EntityMap {
     if (lowerText.includes(service)) { service_type = service; break; }
   }
 
-  const bookingPatterns: ReadonlyArray<RegExp> = [
+  const bookingPatterns: readonly RegExp[] = [
     /\b([A-Z]{2,3}-\d{3,4})\b/,
     /#(\d{3,6})\b/,
     /reserva\s+(\d{3,6})\b/i,

@@ -20,7 +20,7 @@ export async function main(rawInput: unknown): Promise<{
   error_message: string | null;
 }> {
   const parsed = InputSchema.safeParse(rawInput);
-  if (parsed.success === false) {
+  if (!parsed.success) {
     return { success: false, data: null, error_message: 'Validation error: ' + parsed.error.message };
   }
 

@@ -34,13 +34,13 @@ interface DashboardResult {
   readonly provider_id: string;
   readonly provider_name: string;
   readonly specialty: string;
-  readonly agenda: ReadonlyArray<AgendaItem>;
+  readonly agenda: readonly AgendaItem[];
   readonly stats: ProviderStats;
 }
 
 export async function main(rawInput: unknown): Promise<[Error | null, DashboardResult | null]> {
   const parsed = InputSchema.safeParse(rawInput);
-  if (parsed.success === false) {
+  if (!parsed.success) {
     return [new Error('Validation error: ' + parsed.error.message), null];
   }
 
@@ -106,8 +106,8 @@ export async function main(rawInput: unknown): Promise<[Error | null, DashboardR
       });
     }
 
-    const monthStart = targetDate.substring(0, 8) + '01T00:00:00';
-    const monthEnd = targetDate.substring(0, 8) + '31T23:59:59';
+    const monthStart = targetDate.slice(0, 8) + '01T00:00:00';
+    const monthEnd = targetDate.slice(0, 8) + '31T23:59:59';
 
     const statsRows = await sql`
       SELECT

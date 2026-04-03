@@ -60,7 +60,7 @@ export async function main(rawInput: unknown): Promise<{
   error_message: string | null;
 }> {
   const parsed = InputSchema.safeParse(rawInput);
-  if (parsed.success === false) {
+  if (!parsed.success) {
     return { success: false, data: null, error_message: "Validation error: " + parsed.error.message };
   }
 
@@ -124,7 +124,7 @@ export async function main(rawInput: unknown): Promise<{
         `;
         const row: Record<string, unknown> | undefined = rows[0] as Record<string, unknown> | undefined;
         if (row === undefined) {
-          return { success: false, data: null, error_message: "DLQ entry " + dlq_id + " not found or not pending" };
+          return { success: false, data: null, error_message: "DLQ entry " + String(dlq_id) + " not found or not pending" };
         }
 
         await sql`

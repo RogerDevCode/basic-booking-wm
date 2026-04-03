@@ -35,8 +35,8 @@ function formatDate(dateStr: string, tz: string): string {
   });
 }
 
-function getWeekDates(offset: number): ReadonlyArray<{ readonly date: string; readonly label: string; readonly dayName: string }> {
-  const dates: Array<{ date: string; label: string; dayName: string }> = [];
+function getWeekDates(offset: number): readonly { readonly date: string; readonly label: string; readonly dayName: string }[] {
+  const dates: { date: string; label: string; dayName: string }[] = [];
   const today = new Date();
   today.setDate(today.getDate() + offset);
 
@@ -52,7 +52,7 @@ function getWeekDates(offset: number): ReadonlyArray<{ readonly date: string; re
   return dates;
 }
 
-function generateTimeSlots(startHour: number, endHour: number, durationMin: number): ReadonlyArray<string> {
+function generateTimeSlots(startHour: number, endHour: number, durationMin: number): readonly string[] {
   const slots: string[] = [];
   for (let h = startHour; h < endHour; h++) {
     for (let m = 0; m < 60; m += durationMin) {
@@ -69,9 +69,9 @@ async function getAvailableSlots(
   providerId: string,
   dateStr: string,
   durationMin: number
-): Promise<ReadonlyArray<string>> {
+): Promise<readonly string[]> {
   interface BookedRow { readonly start_time: Date }
-  const booked = await sql<ReadonlyArray<BookedRow>>`
+  const booked = await sql<readonly BookedRow[]>`
     SELECT start_time FROM bookings
     WHERE provider_id = ${providerId}::uuid
       AND DATE(start_time) = ${dateStr}::date
@@ -88,7 +88,7 @@ async function getAvailableSlots(
 
 interface StepView {
   readonly message: string;
-  readonly reply_keyboard: ReadonlyArray<ReadonlyArray<string>>;
+  readonly reply_keyboard: readonly (readonly string[])[];
   readonly new_state: WizardState;
 }
 
@@ -120,7 +120,7 @@ function buildDateSelection(state: WizardState, weekOffset: number): StepView {
   };
 }
 
-function buildTimeSelection(state: WizardState, availableSlots: ReadonlyArray<string>): StepView {
+function buildTimeSelection(state: WizardState, availableSlots: readonly string[]): StepView {
   const keyboard: string[][] = [];
   for (let i = 0; i < availableSlots.length; i += 3) {
     keyboard.push(Array.from(availableSlots.slice(i, i + 3)));
@@ -188,14 +188,14 @@ async function createBookingInDB(
     const bookingId = await sql.begin(async (tx) => {
       const q = tx as unknown as postgres.Sql;
       interface SvcDurRow { readonly duration_minutes: number }
-      const [service] = await q<ReadonlyArray<SvcDurRow>>`
+      const [service] = await q<readonly SvcDurRow[]>`
         SELECT duration_minutes FROM services
         WHERE service_id = ${serviceId}::uuid AND is_active = true LIMIT 1
       `;
       const durationMin: number = service?.duration_minutes ?? 30;
 
       interface BookingIdRow { readonly booking_id: string }
-      const [booking] = await q<ReadonlyArray<BookingIdRow>>`
+      const [booking] = await q<readonly BookingIdRow[]>`
         INSERT INTO bookings (
           patient_id, provider_id, service_id, start_time, end_time,
           status, idempotency_key, gcal_sync_status, notification_sent,
@@ -259,7 +259,7 @@ export async function main(rawInput: unknown): Promise<{ readonly success: boole
     let serviceDurationMin = 30;
     if (service_id != null) {
       interface SvcRow { readonly duration_minutes: number }
-      const [svc] = await sql<ReadonlyArray<SvcRow>>`
+      const [svc] = await sql<readonly SvcRow[]>`
         SELECT duration_minutes FROM services WHERE service_id = ${service_id}::uuid AND is_active = true LIMIT 1
       `;
       if (svc == null) {
@@ -270,7 +270,7 @@ export async function main(rawInput: unknown): Promise<{ readonly success: boole
     }
 
     let message = '';
-    let reply_keyboard: ReadonlyArray<ReadonlyArray<string>> | undefined;
+    let reply_keyboard: readonly (readonly string[])[] | undefined;
     let force_reply = false;
     let reply_placeholder = '';
 
@@ -331,11 +331,11 @@ export async function main(rawInput: unknown): Promise<{ readonly success: boole
           let providerName = 'Tu doctor';
           let serviceName = 'Consulta';
           if (provider_id != null) {
-            const [p] = await sql<ReadonlyArray<{ name: string }>>`SELECT name FROM providers WHERE provider_id = ${provider_id}::uuid LIMIT 1`;
+            const [p] = await sql<readonly { name: string }[]>`SELECT name FROM providers WHERE provider_id = ${provider_id}::uuid LIMIT 1`;
             if (p != null) providerName = p.name;
           }
           if (service_id != null) {
-            const [s] = await sql<ReadonlyArray<{ name: string }>>`SELECT name FROM services WHERE service_id = ${service_id}::uuid LIMIT 1`;
+            const [s] = await sql<readonly { name: string }[]>`SELECT name FROM services WHERE service_id = ${service_id}::uuid LIMIT 1`;
             if (s != null) serviceName = s.name;
           }
           ({ message, reply_keyboard, new_state: state } = buildConfirmation(state, providerName, serviceName));

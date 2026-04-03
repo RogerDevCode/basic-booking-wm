@@ -7,7 +7,7 @@ import { INTENT, URGENCY_WORDS } from './constants';
 import type { GuardrailResult, IntentResult } from './types';
 
 // Prompt injection patterns
-const INJECTION_PATTERNS: ReadonlyArray<RegExp> = [
+const INJECTION_PATTERNS: readonly RegExp[] = [
   /ignore\s+(all\s+)?previous\s+instructions?/i,
   /developer\s+mode/i,
   /reveal\s+(the\s+)?system\s+prompt/i,
@@ -18,7 +18,7 @@ const INJECTION_PATTERNS: ReadonlyArray<RegExp> = [
 ];
 
 // Unicode attack vectors
-const DANGEROUS_UNICODE: ReadonlyArray<string> = [
+const DANGEROUS_UNICODE: readonly string[] = [
   '\u200B', // zero-width space
   '\u200E', // left-to-right mark
   '\u200F', // right-to-left mark
@@ -30,7 +30,7 @@ const DANGEROUS_UNICODE: ReadonlyArray<string> = [
 ];
 
 // System prompt leakage patterns
-const LEAKAGE_PATTERNS: ReadonlyArray<string> = [
+const LEAKAGE_PATTERNS: readonly string[] = [
   'SYSTEM_INSTRUCTIONS',
   'UNTRUSTED INPUT',
   'BEGIN USER DATA',

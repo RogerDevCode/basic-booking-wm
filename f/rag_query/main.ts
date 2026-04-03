@@ -23,9 +23,9 @@ interface KBEntry {
 }
 
 // Simple keyword-based fallback when no embedding API is available
-function keywordSearch(query: string, entries: Array<Record<string, unknown>>): KBEntry[] {
+function keywordSearch(query: string, entries: Record<string, unknown>[]): KBEntry[] {
   const terms = query.toLowerCase().split(/\s+/).filter(function(t: string): boolean { return t.length > 2; });
-  const scored: Array<{ entry: KBEntry; score: number }> = [];
+  const scored: { entry: KBEntry; score: number }[] = [];
 
   for (const row of entries) {
     const title = String(row['title'] ?? '').toLowerCase();
@@ -63,7 +63,7 @@ export async function main(rawInput: unknown): Promise<{
   error_message: string | null;
 }> {
   const parsed = InputSchema.safeParse(rawInput);
-  if (parsed.success === false) {
+  if (!parsed.success) {
     return { success: false, data: null, error_message: 'Validation error: ' + parsed.error.message };
   }
 
@@ -102,7 +102,7 @@ export async function main(rawInput: unknown): Promise<{
         `;
       }
 
-      const entries: Array<Record<string, unknown>> = query as Array<Record<string, unknown>>;
+      const entries: Record<string, unknown>[] = query as Record<string, unknown>[];
       const results = keywordSearch(input.query, entries).slice(0, input.top_k);
       return { success: true, data: { entries: results, count: results.length, method: 'keyword' }, error_message: null };
     }
@@ -124,7 +124,7 @@ export async function main(rawInput: unknown): Promise<{
       `;
     }
 
-    const entries: Array<Record<string, unknown>> = query as Array<Record<string, unknown>>;
+    const entries: Record<string, unknown>[] = query as Record<string, unknown>[];
     const results = keywordSearch(input.query, entries).slice(0, input.top_k);
     return { success: true, data: { entries: results, count: results.length, method: 'keyword' }, error_message: null };
   } catch (e) {

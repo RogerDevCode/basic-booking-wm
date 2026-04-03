@@ -20,7 +20,7 @@ async function fetchCalendarEvents(
   calendarId: string,
   accessToken: string,
   syncToken: string | null
-): Promise<{ events: Array<Record<string, unknown>>; nextSyncToken: string | null; error: string | null }> {
+): Promise<{ events: Record<string, unknown>[]; nextSyncToken: string | null; error: string | null }> {
   const url = GCAL_BASE + '/calendars/' + encodeURIComponent(calendarId) + '/events';
   const params: string[] = ['maxResults=50', 'showDeleted=true'];
   if (syncToken) params.push('syncToken=' + encodeURIComponent(syncToken));
@@ -35,13 +35,13 @@ async function fetchCalendarEvents(
     if (!response.ok) {
       const text = await response.text().catch(function(): string { return ''; });
       if (response.status === 410 && syncToken) {
-        return fetchCalendarEvents(calendarId, accessToken, null);
+        return await fetchCalendarEvents(calendarId, accessToken, null);
       }
-      return { events: [], nextSyncToken: null, error: 'GCal API ' + response.status + ': ' + text };
+      return { events: [], nextSyncToken: null, error: 'GCal API ' + String(response.status) + ': ' + text };
     }
 
     const data = await response.json() as Record<string, unknown>;
-    const events = (data['items'] ?? []) as Array<Record<string, unknown>>;
+    const events = (data['items'] ?? []) as Record<string, unknown>[];
     const nextSyncToken = typeof data['nextSyncToken'] === 'string' ? data['nextSyncToken'] : null;
     return { events: events, nextSyncToken: nextSyncToken, error: null };
   } catch (e) {
@@ -55,7 +55,7 @@ export async function main(rawInput: unknown): Promise<{
   error_message: string | null;
 }> {
   const parsed = InputSchema.safeParse(rawInput);
-  if (parsed.success === false) {
+  if (!parsed.success) {
     return { success: false, data: null, error_message: 'Validation error: ' + parsed.error.message };
   }
 
@@ -99,15 +99,15 @@ export async function main(rawInput: unknown): Promise<{
       return { success: false, data: null, error_message: 'GCal fetch error: ' + result.error };
     }
 
-    const changes: Array<{ booking_id: string | null; event_id: string; status: string; action: string }> = [];
+    const changes: { booking_id: string | null; event_id: string; status: string; action: string }[] = [];
 
     for (const event of result.events) {
       const eventId = String(event['id'] ?? '');
       const status = String(event['status'] ?? 'confirmed');
       const description = String(event['description'] ?? '');
 
-      const match = description.match(/ID de cita:\s*`?([0-9a-f-]+)`?/i);
-      const bookingId: string | null = match !== null && match[1] !== undefined ? match[1] : null;
+      const match = /ID de cita:\s*`?([0-9a-f-]+)`?/i.exec(description);
+      const bookingId: string | null = match?.[1] !== undefined ? match[1] : null;
 
       if (status === 'cancelled') {
         changes.push({ booking_id: bookingId, event_id: eventId, status: status, action: 'deleted' });

@@ -36,7 +36,7 @@ interface ProviderInternalResult {
 }
 
 function getGroqKey(): string | null {
-  if (typeof wmill !== 'undefined' && wmill?.env?.['GROQ_API_KEY'] != null) {
+  if (wmill?.env?.['GROQ_API_KEY'] != null) {
     return wmill.env['GROQ_API_KEY'];
   }
   if (typeof process !== 'undefined' && process.env?.['GROQ_API_KEY'] != null) {
@@ -46,7 +46,7 @@ function getGroqKey(): string | null {
 }
 
 function getOpenAIKey(): string | null {
-  if (typeof wmill !== 'undefined' && wmill?.env?.['OPENAI_API_KEY'] != null) {
+  if (wmill?.env?.['OPENAI_API_KEY'] != null) {
     return wmill.env['OPENAI_API_KEY'];
   }
   if (typeof process !== 'undefined' && process.env?.['OPENAI_API_KEY'] != null) {
@@ -57,7 +57,7 @@ function getOpenAIKey(): string | null {
 
 async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: number): Promise<[Error | null, Response | null]> {
   const controller = new AbortController();
-  const id = setTimeout(() => controller.abort(), timeoutMs);
+  const id = setTimeout(() => { controller.abort(); }, timeoutMs);
   try {
     const response = await fetch(url, { ...options, signal: controller.signal });
     return [null, response];
@@ -72,7 +72,7 @@ async function callProvider(
   url: string,
   apiKey: string,
   model: string,
-  messages: ReadonlyArray<ChatMessage>,
+  messages: readonly ChatMessage[],
 ): Promise<[Error | null, ProviderInternalResult | null]> {
   const [err, response] = await fetchWithTimeout(url, {
     method: 'POST',
@@ -99,7 +99,7 @@ async function callProvider(
   }
 
   const data = await response.json() as {
-    readonly choices: ReadonlyArray<{ readonly message: { readonly content: string } }>;
+    readonly choices: readonly { readonly message: { readonly content: string } }[];
     readonly usage?: { readonly prompt_tokens: number; readonly completion_tokens: number };
   };
 
@@ -119,7 +119,7 @@ async function callWithRetry(
   url: string,
   apiKey: string,
   model: string,
-  messages: ReadonlyArray<ChatMessage>,
+  messages: readonly ChatMessage[],
   provider: 'groq' | 'openai',
 ): Promise<[Error | null, LLMResponse | null]> {
   let lastError: Error | null = null;
@@ -151,7 +151,7 @@ export async function callLLM(
   systemPrompt: string,
   userMessage: string,
 ): Promise<LLMResponse> {
-  const messages: ReadonlyArray<ChatMessage> = [
+  const messages: readonly ChatMessage[] = [
     { role: 'system', content: systemPrompt },
     { role: 'user', content: userMessage },
   ];
