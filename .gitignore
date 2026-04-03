@@ -1,35 +1,278 @@
-# Build artifacts
-bin/
-main
-*.out
+# =============================================================================
+# .gitignore — Booking Titanium Windmill Project
+# Best practices: https://github.com/github/gitignore/blob/main/Node.gitignore
+# =============================================================================
 
-# Environment & Secrets
+# =============================================================================
+# DEPENDENCIES & PACKAGE MANAGER
+# =============================================================================
+# Node.js / npm
+node_modules/
+/.pnp
+.pnp.js
+.yarn/
+.yarnrc.yml
+
+# Bun (alternative runtime)
+bun.lockb
+bun.lock
+
+# Deno (alternative runtime)
+deno.lock
+
+# Package manager caches
+.npm/
+.npx/
+.pnpm-store/
+
+# =============================================================================
+# BUILD OUTPUT & ARTIFACTS
+# =============================================================================
+# Compiled output
+dist/
+build/
+out/
+bin/
+*.out
+*.exe
+*.js.map
+*.tsbuildinfo
+
+# Generated Windmill metadata (auto-created on sync)
+*.script.yaml
+*.script.lock
+wmll-lock.yaml
+
+# =============================================================================
+# ENVIRONMENT & SECRETS (NEVER COMMIT)
+# =============================================================================
+# Environment files
 .env
-.env.test
-.env.local
-.env.*.local
+.env.*
+!.env.example
+!.env.test.example
+
+# Secrets & credentials
 .secrets/
 .secrets_wm/
 *.secrets
+*.key
+*.pem
+*.p12
+*.pfx
+*.jks
+*.crt
+*.cer
+
+# Cloud provider credentials
+.aws/
+.gcloud/
+.azure/
+
+# SSH keys
+.ssh/
+id_rsa
+id_ed25519
+id_ecdsa
+id_dsa
+
+# =============================================================================
+# DATABASE & DATA FILES
+# =============================================================================
+# Local databases
+*.sqlite
+*.sqlite3
+*.db
+*.db-journal
+*.db-wal
+
+# Windmill resources (may contain credentials)
 resources/*.json
+resources/*.yaml
 
-# Windmill
-.windmill/
-wmill-lock.yaml
-main.script.lock
-
-# IDEs
+# =============================================================================
+# IDEs & EDITORS
+# =============================================================================
+# JetBrains (WebStorm, IntelliJ, etc.)
 .idea/
+*.iml
+*.iws
+*.ipr
+
+# VS Code
 .vscode/
+!.vscode/extensions.json
+*.code-workspace
+
+# Vim / Neovim
 *.swp
 *.swo
+*~
+.un~
+Session.vim
 
-# OS
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+
+# Sublime Text
+*.sublime-workspace
+*.sublime-project
+
+# Other editors
+*.project
+*.settings/
+*.classpath
+*.c9/
+*.ls
+
+# =============================================================================
+# AI ASSISTANTS (local context, not project code)
+# =============================================================================
+.claude/
+.qwen/
+.kilo/
+.cursor/
+.windsurfrules
+.amp/
+
+# =============================================================================
+# OPERATING SYSTEM
+# =============================================================================
+# macOS
 .DS_Store
-Thumbs.db
+.AppleDouble
+.LSOverride
+._*
 
-# Logs
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+
+# Linux
+*.directory
+.Trash-*
+.fuse_hidden*
+
+# =============================================================================
+# LOGS & TEMP FILES
+# =============================================================================
+# Application logs
 logs/
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+pnpm-debug.log*
+
+# Temporary files
 temp/
-node_modules
+tmp/
+*.tmp
+*.temp
+.cache/
+.parcel-cache/
+
+# Heap snapshots & traces
+*.heapsnapshot
+*.trace
+profile-*
+
+# =============================================================================
+# TEST & COVERAGE
+# =============================================================================
+# Coverage reports
+coverage/
+.nyc_output/
+.vitest/
+.junit/
+test-results/
+playwright-report/
+playwright/.cache/
+
+# =============================================================================
+# WINDMILL-SPECIFIC
+# =============================================================================
+# Local Windmill state (auto-generated, not needed in repo)
+.windmill/cache/
+.windmill/logs/
+.windmill/tmp/
+
+# Keep workspace config but ignore runtime state
+!.windmill/workspace.json
+
+# Auto-generated script metadata (regenerated on sync)
+# Note: These are currently tracked for sync purposes, but should be
+# regenerated. Uncomment after team agrees on workflow.
+# *.script.yaml
+# *.script.lock
+
+# =============================================================================
+# DOCKER
+# =============================================================================
+# Docker volumes
+docker-data/
+volumes/
+
+# Docker Compose overrides
+docker-compose.override.yml
+docker-compose.*.local.yml
+
+# =============================================================================
+# CI/CD & CLOUD
+# =============================================================================
+# Cloudflare
+.wrangler/
+.cloudflare/
+
+# Vercel
+.vercel
+
+# Netlify
+.netlify/
+
+# AWS SAM
+.aws-sam/
+
+# =============================================================================
+# MISC
+# =============================================================================
+# Debug files
+debug.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# TypeScript cache (generated)
+tsconfig.tsbuildinfo
+
+# Lock files (keep package-lock.json, ignore others)
+yarn.lock
+pnpm-lock.yaml
+
+# =============================================================================
+# DOCUMENTATION (generated reports, keep docs/)
+# =============================================================================
+docs/report_temp.md
+docs/report_*.md
+docs/audit-*.md
+docs/temp-*.md
+docs/draft-*.md
