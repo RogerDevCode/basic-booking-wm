@@ -9,12 +9,12 @@ import { z } from 'zod';
 import postgres from 'postgres';
 
 const InputSchema = z.object({
-  provider_id: z.string().uuid().optional(),
-  patient_id: z.string().uuid().optional(),
+  provider_id: z.uuid().optional(),
+  patient_id: z.uuid().optional(),
   status: z.enum(['pending', 'confirmed', 'in_service', 'completed', 'cancelled', 'no_show', 'rescheduled']).optional(),
   date_from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   date_to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  service_id: z.string().uuid().optional(),
+  service_id: z.uuid().optional(),
   offset: z.number().int().min(0).default(0),
   limit: z.number().int().min(1).max(100).default(20),
 });

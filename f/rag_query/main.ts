@@ -28,9 +28,9 @@ function keywordSearch(query: string, entries: Record<string, unknown>[]): KBEnt
   const scored: { entry: KBEntry; score: number }[] = [];
 
   for (const row of entries) {
-    const title = String(row['title'] ?? '').toLowerCase();
-    const content = String(row['content'] ?? '').toLowerCase();
-    const category = String(row['category'] ?? '').toLowerCase();
+    const title = typeof row['title'] === 'string' ? row['title'].toLowerCase() : '';
+    const content = typeof row['content'] === 'string' ? row['content'].toLowerCase() : '';
+    const category = typeof row['category'] === 'string' ? row['category'].toLowerCase() : '';
     let score = 0;
 
     for (const term of terms) {
@@ -80,13 +80,13 @@ export async function main(rawInput: unknown): Promise<{
     const extRows = await sql`
       SELECT extname FROM pg_extension WHERE extname = 'vector' LIMIT 1
     `;
-    const hasVector = (extRows ?? []).length > 0;
+    const hasVector = extRows.length > 0;
 
     if (hasVector) {
       // Try vector search with cosine similarity
       // Note: In production, generate embedding via OpenAI/Groq API first
       // For now, use keyword search as fallback
-      const categoryFilter = input.category !== undefined ? input.category : null;
+      const categoryFilter = input.category ?? null;
       let query;
       if (categoryFilter !== null) {
         query = await sql`
@@ -108,7 +108,7 @@ export async function main(rawInput: unknown): Promise<{
     }
 
     // Fallback: keyword search without pgvector
-    const categoryFilter = input.category !== undefined ? input.category : null;
+    const categoryFilter = input.category ?? null;
     let query;
     if (categoryFilter !== null) {
       query = await sql`

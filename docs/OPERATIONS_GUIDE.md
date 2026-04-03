@@ -11,7 +11,7 @@ El sistema opera bajo un esquema de alta disponibilidad y resiliencia:
 - **Reverse Proxy:** Nginx maneja el rate limiting (10 r/s) y seguridad de headers.
 - **Tunneling:** Cloudflare Tunnel expone la API (`windmill.stax.ink`) sin abrir puertos.
 - **Cache:** Redis gestiona el **Semantic Caching** y los **Distributed Locks**.
-- **Resiliencia:** Implementación de **Circuit Breakers** (Sony/Gobreaker) para proteger las APIs de GCal, Telegram y Gmail.
+- **Resiliencia:** Implementación de **Circuit Breakers** (clase TypeScript nativa con persistencia en PostgreSQL) para proteger las APIs de GCal, Telegram y Gmail.
 - **Deduplicación:** Idempotencia forzada en bookings vía SHA256 de parámetros.
 
 ---

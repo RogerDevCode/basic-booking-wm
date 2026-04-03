@@ -4,7 +4,7 @@
 // Pattern: Precision Architecture, No 'any', Errors as Values
 // ============================================================================
 
-declare const wmill: { readonly env: Readonly<Record<string, string>> } | undefined;
+declare const wmill: { readonly env: Readonly<Record<string, string>> };
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
@@ -36,20 +36,20 @@ interface ProviderInternalResult {
 }
 
 function getGroqKey(): string | null {
-  if (wmill?.env?.['GROQ_API_KEY'] != null) {
+  if (wmill.env['GROQ_API_KEY'] != null) {
     return wmill.env['GROQ_API_KEY'];
   }
-  if (typeof process !== 'undefined' && process.env?.['GROQ_API_KEY'] != null) {
+  if (typeof process !== 'undefined' && process.env['GROQ_API_KEY'] != null) {
     return process.env['GROQ_API_KEY'] ?? null;
   }
   return null;
 }
 
 function getOpenAIKey(): string | null {
-  if (wmill?.env?.['OPENAI_API_KEY'] != null) {
+  if (wmill.env['OPENAI_API_KEY'] != null) {
     return wmill.env['OPENAI_API_KEY'];
   }
-  if (typeof process !== 'undefined' && process.env?.['OPENAI_API_KEY'] != null) {
+  if (typeof process !== 'undefined' && process.env['OPENAI_API_KEY'] != null) {
     return process.env['OPENAI_API_KEY'] ?? null;
   }
   return null;
@@ -95,7 +95,7 @@ async function callProvider(
 
   if (!response.ok) {
     const body = await response.text().catch(() => 'No error body');
-    return [new Error(`LLM API error ${response.status}: ${body}`), null];
+    return [new Error(`LLM API error ${String(response.status)}: ${body}`), null];
   }
 
   const data = await response.json() as {
@@ -104,7 +104,7 @@ async function callProvider(
   };
 
   const choice = data.choices[0];
-  if (choice?.message?.content == null) {
+  if (choice == null || choice.message.content === '') {
     return [new Error('LLM API returned empty response'), null];
   }
 
@@ -144,7 +144,7 @@ async function callWithRetry(
     }
   }
 
-  return [new Error(`${provider} failed after ${MAX_RETRIES + 1} attempts: ${lastError?.message ?? 'Unknown'}`), null];
+  return [new Error(`${provider} failed after ${String(MAX_RETRIES + 1)} attempts: ${lastError?.message ?? 'Unknown'}`), null];
 }
 
 export async function callLLM(

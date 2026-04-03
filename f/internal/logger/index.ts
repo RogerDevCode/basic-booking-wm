@@ -61,5 +61,6 @@ export const logger = {
 
 export function failFast(module: string, message: string, error?: unknown): never {
   logger.error(module, `FATAL: ${message}`, error);
-  throw new Error(`[${module}] FATAL: ${message}${error ? ` -- ${error instanceof Error ? error.message : String(error)}` : ''}`);
+  const errorMsg = error instanceof Error ? error.message : typeof error === 'object' && error != null ? JSON.stringify(error) : String(error);
+  throw new Error(`[${module}] FATAL: ${message}${error != null ? ` -- ${errorMsg}` : ''}`);
 }

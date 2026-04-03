@@ -231,7 +231,7 @@ function detectIntentRules(text: string): { readonly intent: IntentType; readonl
     const matchCount = keywords.filter((k: string) => lower.includes(k)).length;
     if (matchCount > 0) {
       const confidence = Math.min(0.33 * matchCount, 0.9);
-      if (confidence >= (CONFIDENCE_THRESHOLDS[typedIntent] ?? 0.5)) {
+      if (confidence >= CONFIDENCE_THRESHOLDS[typedIntent]) {
         return { intent: typedIntent, confidence };
       }
     }

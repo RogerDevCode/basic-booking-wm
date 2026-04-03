@@ -8,7 +8,7 @@ import { z } from 'zod';
 import postgres from 'postgres';
 
 const InputSchema = z.object({
-  admin_user_id: z.string().uuid(),
+  admin_user_id: z.uuid(),
 });
 
 interface AdminDashboardResult {

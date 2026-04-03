@@ -47,7 +47,7 @@ export async function main(rawInput: unknown): Promise<{
     let marked = 0;
     let skipped = 0;
 
-    for (const r of (rows ?? [])) {
+    for (const r of rows) {
       const row = r as Record<string, unknown>;
       const bookingId = String(row['booking_id']);
 
@@ -74,7 +74,7 @@ export async function main(rawInput: unknown): Promise<{
 
     return {
       success: true,
-      data: { processed: rows !== null ? rows.length : 0, marked: marked, skipped: skipped, booking_ids: bookingIds },
+      data: { processed: rows.length, marked: marked, skipped: skipped, booking_ids: bookingIds },
       error_message: null,
     };
   } catch (e) {

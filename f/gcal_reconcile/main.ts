@@ -126,12 +126,13 @@ async function syncBookingToGCal(
 
   // Sync to provider calendar
   if (booking.provider_calendar_id) {
+    const providerCalId = booking.provider_calendar_id;
     const providerResult = await retryWithBackoff(
       () => {
         if (result.providerEventId) {
-          return callGCalAPI('PUT', booking.provider_calendar_id!, `events/${result.providerEventId}`, eventBody);
+          return callGCalAPI('PUT', providerCalId, `events/${result.providerEventId}`, eventBody);
         }
-        return callGCalAPI('POST', booking.provider_calendar_id!, 'events', eventBody);
+        return callGCalAPI('POST', providerCalId, 'events', eventBody);
       },
       maxRetries
     );
@@ -145,12 +146,13 @@ async function syncBookingToGCal(
 
   // Sync to patient calendar
   if (booking.patient_calendar_id) {
+    const patientCalId = booking.patient_calendar_id;
     const patientResult = await retryWithBackoff(
       () => {
         if (result.patientEventId) {
-          return callGCalAPI('PUT', booking.patient_calendar_id!, `events/${result.patientEventId}`, eventBody);
+          return callGCalAPI('PUT', patientCalId, `events/${result.patientEventId}`, eventBody);
         }
-        return callGCalAPI('POST', booking.patient_calendar_id!, 'events', eventBody);
+        return callGCalAPI('POST', patientCalId, 'events', eventBody);
       },
       maxRetries
     );
@@ -165,8 +167,10 @@ async function syncBookingToGCal(
   // Handle cancelled bookings - delete events
   if (booking.status === 'cancelled') {
     if (result.providerEventId && booking.provider_calendar_id) {
+      const providerCalId = booking.provider_calendar_id;
+      const eventId = result.providerEventId;
       const deleteResult = await retryWithBackoff(
-        () => callGCalAPI('DELETE', booking.provider_calendar_id!, `events/${result.providerEventId}`),
+        () => callGCalAPI('DELETE', providerCalId, `events/${eventId}`),
         maxRetries
       );
       if (deleteResult.ok) {
@@ -176,8 +180,10 @@ async function syncBookingToGCal(
       }
     }
     if (result.patientEventId && booking.patient_calendar_id) {
+      const patientCalId = booking.patient_calendar_id;
+      const eventId = result.patientEventId;
       const deleteResult = await retryWithBackoff(
-        () => callGCalAPI('DELETE', booking.patient_calendar_id!, `events/${result.patientEventId}`),
+        () => callGCalAPI('DELETE', patientCalId, `events/${eventId}`),
         maxRetries
       );
       if (deleteResult.ok) {
@@ -239,7 +245,7 @@ export async function main(rawInput: unknown): Promise<{
         errors: [],
       };
 
-      for (const booking of (bookings ?? [])) {
+      for (const booking of bookings) {
         result.processed++;
 
         if (dry_run) {

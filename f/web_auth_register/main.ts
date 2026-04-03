@@ -13,7 +13,7 @@ import crypto from 'crypto';
 const InputSchema = z.object({
   full_name: z.string().min(3).max(200),
   rut: z.string().min(1).max(12),
-  email: z.string().email(),
+  email: z.email(),
   address: z.string().min(1).max(300),
   phone: z.string().min(1).max(50),
   password: z.string().min(8).max(128),

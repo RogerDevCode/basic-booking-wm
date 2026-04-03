@@ -9,7 +9,7 @@ import { z } from 'zod';
 import postgres from 'postgres';
 
 const InputSchema = z.object({
-  user_id: z.string().uuid(),
+  user_id: z.uuid(),
 });
 
 interface UserProfileResult {

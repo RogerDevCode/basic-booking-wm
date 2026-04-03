@@ -16,15 +16,15 @@ const InputSchema = z.object({
     'set_override', 'remove_override',
   ]),
   // Provider fields
-  provider_id: z.string().uuid().optional(),
+  provider_id: z.uuid().optional(),
   name: z.string().min(1).max(200).optional(),
-  email: z.string().email().optional(),
+  email: z.email().optional(),
   phone: z.string().max(50).optional(),
   specialty: z.string().max(100).optional(),
   timezone: z.string().optional(),
   is_active: z.boolean().optional(),
   // Service fields
-  service_id: z.string().uuid().optional(),
+  service_id: z.uuid().optional(),
   service_name: z.string().max(200).optional(),
   description: z.string().optional(),
   duration_minutes: z.number().int().min(5).max(480).optional(),
@@ -43,7 +43,7 @@ const InputSchema = z.object({
 
 export async function main(rawInput: unknown): Promise<{
   success: boolean;
-  data: unknown | null;
+  data: Record<string, unknown> | null;
   error_message: string | null;
 }> {
   const parsed = InputSchema.safeParse(rawInput);

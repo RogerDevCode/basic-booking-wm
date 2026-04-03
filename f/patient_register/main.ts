@@ -10,7 +10,7 @@ import postgres from 'postgres';
 
 const InputSchema = z.object({
   name: z.string().min(1).max(200),
-  email: z.string().email().optional(),
+  email: z.email().optional(),
   phone: z.string().max(50).optional(),
   telegram_chat_id: z.string().optional(),
   timezone: z.string().default('America/Argentina/Buenos_Aires'),

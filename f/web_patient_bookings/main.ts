@@ -9,7 +9,7 @@ import { z } from 'zod';
 import postgres from 'postgres';
 
 const InputSchema = z.object({
-  patient_user_id: z.string().uuid(),
+  patient_user_id: z.uuid(),
   status: z.enum(['all', 'pending', 'confirmed', 'in_service', 'completed', 'cancelled', 'no_show', 'rescheduled']).default('all'),
   limit: z.number().int().min(1).max(100).default(50),
   offset: z.number().int().min(0).default(0),
@@ -101,9 +101,7 @@ export async function main(rawInput: unknown): Promise<[Error | null, BookingsRe
     const upcoming: BookingInfo[] = [];
     const past: BookingInfo[] = [];
 
-    for (let i = 0; i < bookingRows.length; i++) {
-      const row = bookingRows[i];
-      if (row === undefined) continue;
+    for (const row of bookingRows) {
       const booking: BookingInfo = {
         booking_id: String(row['booking_id']),
         provider_name: String(row['provider_name']),

@@ -56,7 +56,7 @@ function parseDLQRow(row: Record<string, unknown>): DLQEntry {
 
 export async function main(rawInput: unknown): Promise<{
   success: boolean;
-  data: unknown | null;
+  data: Record<string, unknown> | null;
   error_message: string | null;
 }> {
   const parsed = InputSchema.safeParse(rawInput);
@@ -89,7 +89,7 @@ export async function main(rawInput: unknown): Promise<{
           LIMIT 100
         `;
         const entries: DLQEntry[] = [];
-        for (const r of (rows ?? [])) {
+        for (const r of rows) {
           entries.push(parseDLQRow(r as Record<string, unknown>));
         }
         return { success: true, data: { entries, total: entries.length }, error_message: null };
@@ -104,7 +104,7 @@ export async function main(rawInput: unknown): Promise<{
             LIMIT 10
           `;
           const retried: number[] = [];
-          for (const r of (rows ?? [])) {
+          for (const r of rows) {
             const entry = r as Record<string, unknown>;
             const id = Number(entry['dlq_id']);
             await sql`
@@ -178,7 +178,7 @@ export async function main(rawInput: unknown): Promise<{
           GROUP BY status
         `;
         const stats: Record<string, number> = {};
-        for (const r of (rows ?? [])) {
+        for (const r of rows) {
           const row = r as Record<string, unknown>;
           stats[String(row['status'])] = Number(row['count']);
         }

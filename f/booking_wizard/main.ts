@@ -276,7 +276,7 @@ export async function main(rawInput: unknown): Promise<{ readonly success: boole
 
     switch (action) {
       case 'start':
-        state = { ...state, step: 1, chat_id: String(wizard_state?.['chat_id'] ?? ''), patient_id: String(wizard_state?.['patient_id'] ?? '') };
+        state = { ...state, step: 1, chat_id: typeof wizard_state?.['chat_id'] === 'string' ? wizard_state['chat_id'] : '', patient_id: typeof wizard_state?.['patient_id'] === 'string' ? wizard_state['patient_id'] : '' };
         ({ message, reply_keyboard, new_state: state } = buildDateSelection(state, 0));
         break;
 

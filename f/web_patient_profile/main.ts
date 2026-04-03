@@ -9,10 +9,10 @@ import { z } from 'zod';
 import postgres from 'postgres';
 
 const InputSchema = z.object({
-  user_id: z.string().uuid(),
+  user_id: z.uuid(),
   action: z.enum(['get', 'update']).default('get'),
   name: z.string().min(1).max(200).optional(),
-  email: z.string().email().optional(),
+  email: z.email().optional(),
   phone: z.string().max(50).optional(),
   timezone: z.string().optional(),
 });

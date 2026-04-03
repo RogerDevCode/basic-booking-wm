@@ -250,11 +250,11 @@ async function sendWithRetry(
         to,
         subject,
         html,
-      });
+      }) as { messageId?: string };
 
       return {
         sent: true,
-        message_id: info.messageId ?? null,
+        message_id: typeof info.messageId === 'string' ? info.messageId : null,
         error: null,
       };
     } catch (e) {
@@ -275,10 +275,10 @@ async function sendWithRetry(
     }
   }
 
-  return { sent: false, message_id: null, error: `Failed after ${maxRetries} retries: ${lastError}` };
+  return { sent: false, message_id: null, error: `Failed after ${String(maxRetries)} retries: ${lastError ?? 'Unknown'}` };
 }
 
-export async function main(rawInput: unknown): Promise<{ success: boolean; data: unknown | null; error_message: string | null }> {
+export async function main(rawInput: unknown): Promise<{ success: boolean; data: Record<string, unknown> | null; error_message: string | null }> {
   try {
     const parsed = InputSchema.safeParse(rawInput);
     if (!parsed.success) {

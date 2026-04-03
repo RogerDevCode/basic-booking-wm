@@ -35,7 +35,7 @@ async function checkDatabase(dbUrl: string): Promise<ComponentStatus> {
 }
 
 async function checkGCal(accessToken: string): Promise<ComponentStatus> {
-  if (accessToken === undefined || accessToken === '') {
+  if (accessToken === '') {
     return { component: 'gcal', status: 'not_configured', latency_ms: 0, message: 'GCAL_ACCESS_TOKEN not set' };
   }
   const start = Date.now();
@@ -57,7 +57,7 @@ async function checkGCal(accessToken: string): Promise<ComponentStatus> {
 }
 
 async function checkTelegram(botToken: string): Promise<ComponentStatus> {
-  if (botToken === undefined || botToken === '') {
+  if (botToken === '') {
     return { component: 'telegram', status: 'not_configured', latency_ms: 0, message: 'TELEGRAM_BOT_TOKEN not set' };
   }
   const start = Date.now();

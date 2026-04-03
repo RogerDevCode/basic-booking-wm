@@ -11,7 +11,7 @@ import postgres from 'postgres';
 import crypto from 'crypto';
 
 const InputSchema = z.object({
-  email: z.string().email(),
+  email: z.email(),
   password: z.string().min(1),
 });
 

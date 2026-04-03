@@ -56,7 +56,7 @@ export async function retryWithBackoff<T>(
       if (isPermanentError(error)) {
         return {
           success: false,
-          error: new Error(`${options.operationName}: permanent error on attempt ${attempt + 1}: ${error.message}`),
+          error: new Error(`${options.operationName}: permanent error on attempt ${String(attempt + 1)}: ${error.message}`),
           attempts: attempt + 1,
           isPermanent: true,
         };
@@ -71,7 +71,7 @@ export async function retryWithBackoff<T>(
 
   return {
     success: false,
-    error: new Error(`${options.operationName}: failed after ${maxAttempts} attempts. Last error: ${lastError?.message ?? 'unknown'}`),
+    error: new Error(`${options.operationName}: failed after ${String(maxAttempts)} attempts. Last error: ${lastError?.message ?? 'unknown'}`),
     attempts: maxAttempts,
     isPermanent: false,
   };

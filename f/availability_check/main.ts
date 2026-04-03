@@ -235,7 +235,7 @@ export async function main(rawInput: unknown): Promise<{
       let scheduleStart: string | null = null;
       let scheduleEnd: string | null = null;
 
-      if (override && override.start_time && override.end_time) {
+      if (override?.start_time != null && override.end_time != null) {
         scheduleStart = override.start_time;
         scheduleEnd = override.end_time;
       } else {

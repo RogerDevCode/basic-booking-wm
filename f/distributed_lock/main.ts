@@ -13,8 +13,8 @@ const InputSchema = z.object({
   action: z.enum(['acquire', 'release', 'check', 'cleanup']),
   lock_key: z.string().min(1),
   owner_token: z.string().min(1).optional(),
-  provider_id: z.string().uuid().optional(),
-  start_time: z.string().datetime().optional(),
+  provider_id: z.uuid().optional(),
+  start_time: z.iso.datetime().optional(),
   ttl_seconds: z.number().int().min(1).max(3600).default(30),
 });
 
@@ -30,7 +30,7 @@ interface LockInfo {
 
 export async function main(rawInput: unknown): Promise<{
   success: boolean;
-  data: unknown | null;
+  data: Record<string, unknown> | null;
   error_message: string | null;
 }> {
   const parsed = InputSchema.safeParse(rawInput);

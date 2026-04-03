@@ -12,7 +12,7 @@ import { z } from 'zod';
 import postgres from 'postgres';
 
 const InputSchema = z.object({
-  provider_id: z.string().uuid(),
+  provider_id: z.uuid(),
   date_from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   date_to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   include_patient_details: z.boolean().default(false),

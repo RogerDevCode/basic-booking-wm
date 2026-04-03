@@ -93,7 +93,7 @@ export function sanitizeJSONResponse(raw: string): string {
   const lastBrace = cleaned.lastIndexOf('}');
 
   if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-    return cleaned.substring(firstBrace, lastBrace + 1);
+    return cleaned.slice(firstBrace, lastBrace + 1);
   }
 
   return cleaned;

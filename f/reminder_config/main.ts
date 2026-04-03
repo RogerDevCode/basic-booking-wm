@@ -120,7 +120,7 @@ async function loadPreferences(sql: SqlClient, patientId: string): Promise<Remin
   }
 }
 
-export async function main(rawInput: unknown): Promise<{ success: boolean; data: unknown | null; error_message: string | null }> {
+export async function main(rawInput: unknown): Promise<{ success: boolean; data: Record<string, unknown> | null; error_message: string | null }> {
   try {
     const parsed = InputSchema.safeParse(rawInput);
     if (!parsed.success) {

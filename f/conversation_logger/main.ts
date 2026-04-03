@@ -10,7 +10,7 @@ import { z } from 'zod';
 import postgres from 'postgres';
 
 const InputSchema = z.object({
-  patient_id: z.string().uuid().optional(),
+  patient_id: z.uuid().optional(),
   channel: z.enum(['telegram', 'web', 'api']),
   direction: z.enum(['incoming', 'outgoing']),
   content: z.string().min(1).max(2000),

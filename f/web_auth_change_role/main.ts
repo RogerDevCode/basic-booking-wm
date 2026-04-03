@@ -10,8 +10,8 @@ import { z } from 'zod';
 import postgres from 'postgres';
 
 const InputSchema = z.object({
-  admin_user_id: z.string().uuid(),
-  target_user_id: z.string().uuid(),
+  admin_user_id: z.uuid(),
+  target_user_id: z.uuid(),
   new_role: z.enum(['patient', 'provider', 'admin']),
 });
 

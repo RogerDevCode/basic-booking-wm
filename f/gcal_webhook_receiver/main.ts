@@ -51,7 +51,7 @@ async function fetchCalendarEvents(
 
 export async function main(rawInput: unknown): Promise<{
   success: boolean;
-  data: unknown | null;
+  data: Record<string, unknown> | null;
   error_message: string | null;
 }> {
   const parsed = InputSchema.safeParse(rawInput);
@@ -81,7 +81,7 @@ export async function main(rawInput: unknown): Promise<{
     `;
 
     let targetProvider: Record<string, unknown> | null = null;
-    for (const r of (providerRows ?? [])) {
+    for (const r of providerRows) {
       const row = r as Record<string, unknown>;
       if (String(row['provider_id']) === channelId) {
         targetProvider = row;
@@ -102,12 +102,12 @@ export async function main(rawInput: unknown): Promise<{
     const changes: { booking_id: string | null; event_id: string; status: string; action: string }[] = [];
 
     for (const event of result.events) {
-      const eventId = String(event['id'] ?? '');
-      const status = String(event['status'] ?? 'confirmed');
-      const description = String(event['description'] ?? '');
+      const eventId = typeof event['id'] === 'string' ? event['id'] : '';
+      const status = typeof event['status'] === 'string' ? event['status'] : 'confirmed';
+      const description = typeof event['description'] === 'string' ? event['description'] : '';
 
       const match = /ID de cita:\s*`?([0-9a-f-]+)`?/i.exec(description);
-      const bookingId: string | null = match?.[1] !== undefined ? match[1] : null;
+      const bookingId: string | null = match?.[1] ?? null;
 
       if (status === 'cancelled') {
         changes.push({ booking_id: bookingId, event_id: eventId, status: status, action: 'deleted' });

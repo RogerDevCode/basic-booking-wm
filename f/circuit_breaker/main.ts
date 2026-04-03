@@ -69,7 +69,7 @@ async function initService(sql: postgres.Sql, serviceId: string): Promise<void> 
 
 export async function main(rawInput: unknown): Promise<{
   success: boolean;
-  data: unknown | null;
+  data: Record<string, unknown> | CircuitState | null;
   error_message: string | null;
 }> {
   const parsed = InputSchema.safeParse(rawInput);
@@ -158,7 +158,7 @@ export async function main(rawInput: unknown): Promise<{
             SET state = 'open', opened_at = NOW(), updated_at = NOW()
             WHERE service_id = ${service_id}
           `;
-          return { success: true, data: { state: 'opened', message: `Circuit opened for ${service_id} after ${state.failure_count} failures` }, error_message: null };
+          return { success: true, data: { state: 'opened', message: `Circuit opened for ${service_id} after ${String(state.failure_count)} failures` }, error_message: null };
         }
 
         return { success: true, data: { state: 'failure recorded', failure_count: state?.failure_count ?? 0 }, error_message: null };

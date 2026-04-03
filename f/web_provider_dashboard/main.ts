@@ -8,7 +8,7 @@ import { z } from 'zod';
 import postgres from 'postgres';
 
 const InputSchema = z.object({
-  provider_user_id: z.string().uuid(),
+  provider_user_id: z.uuid(),
   date: z.string().optional(),
 });
 
@@ -92,9 +92,7 @@ export async function main(rawInput: unknown): Promise<[Error | null, DashboardR
     `;
 
     const agenda: AgendaItem[] = [];
-    for (let i = 0; i < agendaRows.length; i++) {
-      const r = agendaRows[i];
-      if (r === undefined) continue;
+    for (const r of agendaRows) {
       agenda.push({
         booking_id: String(r['booking_id']),
         patient_name: String(r['patient_name']),

@@ -255,7 +255,7 @@ async function handleListAvailable(
 async function handleGetMyBookings(
   input: z.infer<typeof InputSchema>
 ): Promise<OrchestratorResult> {
-  const patientId = input.patient_id || (input.entities['patient_id'] as string | undefined);
+  const patientId = input.patient_id ?? (input.entities['patient_id'] as string | undefined);
 
   if (!patientId) {
     return {
@@ -296,14 +296,14 @@ async function handleGetMyBookings(
       };
     }
 
-    const bookingList = (bookings ?? [])
+    const bookingList = bookings
       .map((b: Record<string, unknown>) => {
         const d = new Date(b['start_time'] as string);
         const dateStr = d.toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric', month: 'short' });
         const timeStr = d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
-        const providerName = String(b['provider_name'] ?? 'Unknown');
-        const serviceName = String(b['service_name'] ?? 'Unknown');
-        const status = String(b['status'] ?? 'Unknown');
+        const providerName = typeof b['provider_name'] === 'string' ? b['provider_name'] : 'Unknown';
+        const serviceName = typeof b['service_name'] === 'string' ? b['service_name'] : 'Unknown';
+        const status = typeof b['status'] === 'string' ? b['status'] : 'Unknown';
         return `• ${dateStr} ${timeStr} - ${providerName} (${serviceName}) [${status}]`;
       })
       .join('\n');
@@ -343,8 +343,10 @@ export async function main(rawInput: unknown): Promise<{
         return { success: true, data: await handleListAvailable(input), error_message: null };
       case 'get_my_bookings':
         return { success: true, data: await handleGetMyBookings(input), error_message: null };
-      default:
-        return { success: false, data: null, error_message: `Unknown intent: ${input.intent}` };
+      default: {
+        const _exhaustiveCheck: never = input.intent;
+        return { success: false, data: null, error_message: `Unknown intent: ${String(_exhaustiveCheck)}` };
+      }
     }
   } catch (e) {
     const error = e instanceof Error ? e : new Error(String(e));

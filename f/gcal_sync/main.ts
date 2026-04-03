@@ -170,8 +170,10 @@ export async function main(rawInput: unknown): Promise<{
       // Step 2: Handle delete action
       if (action === 'delete') {
         if (booking.gcal_provider_event_id && booking.provider_calendar_id) {
+          const calId = booking.provider_calendar_id;
+          const eventId = booking.gcal_provider_event_id;
           const deleteResult = await retryWithBackoff(
-            () => callGCalAPI('DELETE', `events/${booking.gcal_provider_event_id}`, booking.provider_calendar_id!),
+            () => callGCalAPI('DELETE', `events/${eventId}`, calId),
             max_retries
           );
           if (!deleteResult.ok) {
@@ -179,8 +181,10 @@ export async function main(rawInput: unknown): Promise<{
           }
         }
         if (booking.gcal_patient_event_id && booking.patient_calendar_id) {
+          const calId = booking.patient_calendar_id;
+          const eventId = booking.gcal_patient_event_id;
           const deleteResult = await retryWithBackoff(
-            () => callGCalAPI('DELETE', `events/${booking.gcal_patient_event_id}`, booking.patient_calendar_id!),
+            () => callGCalAPI('DELETE', `events/${eventId}`, calId),
             max_retries
           );
           if (!deleteResult.ok) {
@@ -214,12 +218,13 @@ export async function main(rawInput: unknown): Promise<{
 
       // Step 3: Create/update provider event
       if (booking.provider_calendar_id) {
+        const calId = booking.provider_calendar_id;
         const providerResult = await retryWithBackoff(
           () => {
             if (booking.gcal_provider_event_id) {
-              return callGCalAPI('PUT', `events/${booking.gcal_provider_event_id}`, booking.provider_calendar_id!, eventBody);
+              return callGCalAPI('PUT', `events/${booking.gcal_provider_event_id}`, calId, eventBody);
             }
-            return callGCalAPI('POST', 'events', booking.provider_calendar_id!, eventBody);
+            return callGCalAPI('POST', 'events', calId, eventBody);
           },
           max_retries
         );
@@ -233,12 +238,13 @@ export async function main(rawInput: unknown): Promise<{
 
       // Step 4: Create/update patient event
       if (booking.patient_calendar_id) {
+        const calId = booking.patient_calendar_id;
         const patientResult = await retryWithBackoff(
           () => {
             if (booking.gcal_patient_event_id) {
-              return callGCalAPI('PUT', `events/${booking.gcal_patient_event_id}`, booking.patient_calendar_id!, eventBody);
+              return callGCalAPI('PUT', `events/${booking.gcal_patient_event_id}`, calId, eventBody);
             }
-            return callGCalAPI('POST', 'events', booking.patient_calendar_id!, eventBody);
+            return callGCalAPI('POST', 'events', calId, eventBody);
           },
           max_retries
         );
