@@ -11,8 +11,7 @@
 
 import { z } from 'zod';
 import postgres from 'postgres';
-
-type SqlClient = postgres.Sql;
+import { getAvailability } from '../internal/scheduling-engine';
 
 const InputSchema = z.object({
   provider_id: z.uuid(),
@@ -33,11 +32,11 @@ interface AvailabilityResult {
   provider_name: string;
   date: string;
   timezone: string;
-  slots: TimeSlot[];
+  slots: readonly TimeSlot[];
   total_available: number;
   total_booked: number;
   is_blocked: boolean;
-  block_reason?: string;
+  block_reason: string | undefined;
 }
 
 // Typed row interfaces for postgres queries — avoids index signature issues
@@ -47,128 +46,12 @@ interface ProviderRow {
   timezone: string;
 }
 
-interface ServiceRow {
-  service_id: string;
-  duration_minutes: number;
-  buffer_minutes: number;
-}
-
-interface ScheduleRow {
-  start_time: string;
-  end_time: string;
-}
-
-interface OverrideRow {
-  is_blocked: boolean;
-  start_time: string | null;
-  end_time: string | null;
-  reason: string | null;
-}
-
-interface BookingSlotRow {
-  start_time: string;
-  end_time: string;
-}
-
-async function getProviderSchedule(
-  sql: SqlClient,
-  providerId: string,
-  dayOfWeek: number
-): Promise<ScheduleRow | null> {
-  const [schedule] = await sql<ScheduleRow[]>`
-    SELECT start_time, end_time FROM provider_schedules
-    WHERE provider_id = ${providerId}::uuid
-      AND day_of_week = ${dayOfWeek}
-      AND is_active = true
-    LIMIT 1
+async function getDefaultServiceId(sql: postgres.Sql, providerId: string): Promise<string | null> {
+  const rows = await sql`
+    SELECT service_id FROM services WHERE provider_id = ${providerId}::uuid AND is_active = true LIMIT 1
   `;
-  return schedule ?? null;
-}
-
-async function getScheduleOverride(
-  sql: SqlClient,
-  providerId: string,
-  date: string
-): Promise<OverrideRow | null> {
-  const [override] = await sql<OverrideRow[]>`
-    SELECT is_blocked, start_time, end_time, reason FROM schedule_overrides
-    WHERE provider_id = ${providerId}::uuid AND override_date = ${date}::date
-    LIMIT 1
-  `;
-  return override ?? null;
-}
-
-async function getExistingBookings(
-  sql: SqlClient,
-  providerId: string,
-  date: string
-): Promise<BookingSlotRow[]> {
-  return await sql<BookingSlotRow[]>`
-    SELECT start_time, end_time FROM bookings
-    WHERE provider_id = ${providerId}::uuid
-      AND status NOT IN ('cancelled', 'no_show', 'rescheduled')
-      AND start_time >= ${date}::date
-      AND start_time < (${date}::date + INTERVAL '1 day')
-    ORDER BY start_time ASC
-  `;
-}
-
-function generateSlots(
-  dateStr: string,
-  startTime: string,
-  endTime: string,
-  durationMinutes: number,
-  bufferMinutes: number,
-  bookedSlots: BookingSlotRow[]
-): TimeSlot[] {
-  const slots: TimeSlot[] = [];
-
-  const startParts = startTime.split(':');
-  const endParts = endTime.split(':');
-
-  if (startParts.length !== 2 || endParts.length !== 2) {
-    throw new Error(`Invalid schedule format from database: ${startTime}-${endTime}`);
-  }
-
-  const startH = parseInt(startParts[0]!, 10);
-  const startM = parseInt(startParts[1]!, 10);
-  const endH = parseInt(endParts[0]!, 10);
-  const endM = parseInt(endParts[1]!, 10);
-
-  if (isNaN(startH) || isNaN(startM) || isNaN(endH) || isNaN(endM)) {
-    throw new Error(`Non-numeric schedule values: ${startTime}-${endTime}`);
-  }
-
-  const baseDate = new Date(`${dateStr}T00:00:00`);
-  const dayStart = new Date(baseDate);
-  dayStart.setHours(startH, startM, 0, 0);
-  const dayEnd = new Date(baseDate);
-  dayEnd.setHours(endH, endM, 0, 0);
-
-  const durationMs = durationMinutes * 60 * 1000;
-  const bufferMs = bufferMinutes * 60 * 1000;
-
-  let current = new Date(dayStart);
-
-  while (current.getTime() + durationMs <= dayEnd.getTime()) {
-    const slotEnd = new Date(current.getTime() + durationMs);
-
-    const isBooked = bookedSlots.some((b) => {
-      const bookedStart = new Date(b.start_time);
-      const bookedEnd = new Date(b.end_time);
-      return current.getTime() < bookedEnd.getTime() && bookedStart.getTime() < slotEnd.getTime();
-    });
-
-    slots.push({
-      start: current.toISOString(),
-      end: slotEnd.toISOString(),
-      available: !isBooked,
-    });
-
-    current = new Date(slotEnd.getTime() + bufferMs);
-  }
-
-  return slots;
+  const firstRow = rows[0];
+  return firstRow != null ? String(firstRow['service_id']) : null;
 }
 
 export async function main(rawInput: unknown): Promise<{
@@ -182,7 +65,7 @@ export async function main(rawInput: unknown): Promise<{
       return { success: false, data: null, error_message: `Validation error: ${parsed.error.message}` };
     }
 
-    const { provider_id, date, service_id, duration_minutes, buffer_minutes } = parsed.data;
+    const { provider_id, date, service_id } = parsed.data;
 
     const dbUrl = process.env['DATABASE_URL'];
     if (!dbUrl) {
@@ -203,106 +86,38 @@ export async function main(rawInput: unknown): Promise<{
         return { success: false, data: null, error_message: `Provider ${provider_id} not found or inactive` };
       }
 
-      // Step 2: Get service duration/buffer if service_id provided (typed query)
-      let effectiveDuration: number = duration_minutes ?? 30;
-      let effectiveBuffer: number = buffer_minutes ?? 10;
-
-      if (service_id) {
-        const [service] = await sql<ServiceRow[]>`
-          SELECT service_id, duration_minutes, buffer_minutes FROM services
-          WHERE service_id = ${service_id}::uuid AND is_active = true
-          LIMIT 1
-        `;
-        if (service) {
-          effectiveDuration = service.duration_minutes;
-          effectiveBuffer = service.buffer_minutes;
-        }
+      // Step 2: Use scheduling engine for availability computation
+      const effectiveServiceId = service_id ?? (await getDefaultServiceId(sql, provider_id));
+      if (effectiveServiceId == null) {
+        return { success: false, data: null, error_message: 'No services available for this provider' };
       }
 
-      // Step 3: Get day of week
-      const dateObj = new Date(`${date}T00:00:00`);
-      const dayOfWeek = dateObj.getUTCDay();
-
-      // Step 4: Check for schedule override
-      const override = await getScheduleOverride(sql, provider_id, date);
-
-      if (override?.is_blocked) {
-        return {
-          success: true,
-          data: {
-            provider_id,
-            provider_name: provider.name,
-            date,
-            timezone: provider.timezone,
-            slots: [],
-            total_available: 0,
-            total_booked: 0,
-            is_blocked: true,
-            block_reason: override.reason ?? 'Provider unavailable on this date',
-          },
-          error_message: null,
-        };
-      }
-
-      // Step 5: Get schedule (override hours or default)
-      let scheduleStart: string | null = null;
-      let scheduleEnd: string | null = null;
-
-      if (override?.start_time != null && override.end_time != null) {
-        scheduleStart = override.start_time;
-        scheduleEnd = override.end_time;
-      } else {
-        const schedule = await getProviderSchedule(sql, provider_id, dayOfWeek);
-        if (schedule) {
-          scheduleStart = schedule.start_time;
-          scheduleEnd = schedule.end_time;
-        }
-      }
-
-      if (!scheduleStart || !scheduleEnd) {
-        return {
-          success: true,
-          data: {
-            provider_id,
-            provider_name: provider.name,
-            date,
-            timezone: provider.timezone,
-            slots: [],
-            total_available: 0,
-            total_booked: 0,
-            is_blocked: true,
-            block_reason: 'Provider does not work on this day of week',
-          },
-          error_message: null,
-        };
-      }
-
-      // Step 6: Get existing bookings
-      const bookedSlots = await getExistingBookings(sql, provider_id, date);
-
-      // Step 7: Generate slots
-      const allSlots = generateSlots(
+      const [err, result] = await getAvailability(sql, {
+        provider_id,
         date,
-        scheduleStart,
-        scheduleEnd,
-        effectiveDuration,
-        effectiveBuffer,
-        bookedSlots
-      );
+        service_id: effectiveServiceId,
+      });
 
-      const availableSlots = allSlots.filter((s) => s.available);
+      if (err != null) {
+        return { success: false, data: null, error_message: `Scheduling error: ${err.message}` };
+      }
+
+      if (result == null) {
+        return { success: false, data: null, error_message: 'No availability data returned' };
+      }
 
       return {
         success: true,
         data: {
           provider_id,
           provider_name: provider.name,
-          date,
+          date: result.date,
           timezone: provider.timezone,
-          slots: allSlots,
-          total_available: availableSlots.length,
-          total_booked: allSlots.length - availableSlots.length,
-          is_blocked: false,
+          slots: result.slots,
+          total_available: result.total_available,
+          total_booked: result.total_booked,
+          is_blocked: result.is_blocked,
+          block_reason: result.block_reason ?? undefined,
         },
         error_message: null,
       };
