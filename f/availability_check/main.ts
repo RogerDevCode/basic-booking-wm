@@ -123,14 +123,27 @@ function generateSlots(
 ): TimeSlot[] {
   const slots: TimeSlot[] = [];
 
-  const [startH, startM] = startTime.split(':').map(Number);
-  const [endH, endM] = endTime.split(':').map(Number);
+  const startParts = startTime.split(':');
+  const endParts = endTime.split(':');
+
+  if (startParts.length !== 2 || endParts.length !== 2) {
+    throw new Error(`Invalid schedule format from database: ${startTime}-${endTime}`);
+  }
+
+  const startH = parseInt(startParts[0]!, 10);
+  const startM = parseInt(startParts[1]!, 10);
+  const endH = parseInt(endParts[0]!, 10);
+  const endM = parseInt(endParts[1]!, 10);
+
+  if (isNaN(startH) || isNaN(startM) || isNaN(endH) || isNaN(endM)) {
+    throw new Error(`Non-numeric schedule values: ${startTime}-${endTime}`);
+  }
 
   const baseDate = new Date(`${dateStr}T00:00:00`);
   const dayStart = new Date(baseDate);
-  dayStart.setHours(startH ?? 9, startM ?? 0, 0, 0);
+  dayStart.setHours(startH, startM, 0, 0);
   const dayEnd = new Date(baseDate);
-  dayEnd.setHours(endH ?? 17, endM ?? 0, 0, 0);
+  dayEnd.setHours(endH, endM, 0, 0);
 
   const durationMs = durationMinutes * 60 * 1000;
   const bufferMs = bufferMinutes * 60 * 1000;

@@ -131,4 +131,74 @@ CREATE TABLE bookings (
 2. Si la solución es sólida, entrega el código TypeScript completo.
 3. El código debe contener un único punto de entrada: `export async function main(params: InputType): Promise<[Error | null, ReturnType | null]>`.
 
-¿Deseas que profundicemos en la estructuración del script del Cron Job de reconciliación asíncrona, o prefieres enfocarte primero en la función principal de inserción de reservas con el patrón de transaccionalidad DB pura?
+## §6 — MULTI-TENANT DATA ISOLATION (POSTGRES RLS MANDATE)
+
+**PARADIGMA INVIOLABLE:** La capa de aplicación (TypeScript) es inherentemente insegura y no confiable para el aislamiento de datos. Prohibido depender de cláusulas `WHERE provider_id = $1` como único mecanismo de seguridad. El aislamiento Multi-Tenant DEBE ser forzado físicamente por el motor de PostgreSQL mediante Row-Level Security (RLS).
+
+### REGLAS DE EJECUCIÓN (BASE DE DATOS):
+1. **Identidad Obligatoria:** Toda tabla transaccional (`bookings`, `patients`, `services`) debe tener una columna `provider_id UUID NOT NULL`.
+2. **Activación RLS:** Toda tabla debe tener RLS forzado:
+   `ALTER TABLE table_name ENABLE ROW LEVEL SECURITY;`
+   `ALTER TABLE table_name FORCE ROW LEVEL SECURITY;`
+3. **Política Estricta:** La política de acceso debe leer exclusivamente de la variable de entorno transaccional, JAMÁS de un rol de base de datos genérico:
+   `CREATE POLICY tenant_isolation ON table_name USING (provider_id = current_setting('app.current_tenant', true)::uuid);`
+
+### REGLAS DE EJECUCIÓN (TYPESCRIPT EN WINDMILL):
+1. **Transaccionalidad Atada al Tenant:** Prohibido ejecutar consultas sueltas (`pool.query`). Toda operación a la base de datos debe ocurrir dentro de una transacción que inyecte el ID del tenant primero.
+2. **Contexto Aislado (`SET LOCAL`):** Es obligatorio usar `SET LOCAL` (no `SET`) para garantizar que la variable de sesión muera cuando termine la transacción.
+3. **Patrón de Inyección:** El código generado debe utilizar estrictamente el siguiente patrón de función de orden superior (Higher-Order Function) para envolver las consultas:
+
+```typescript
+// ESTÁNDAR OBLIGATORIO DE EJECUCIÓN MULTI-TENANT
+export type Result<T> = [Error | null, T | null];
+
+// Interfaz del cliente de BD proporcionado por Windmill
+interface DBClient {
+    query(sql: string, params?: any[]): Promise<any>;
+}
+
+/**
+ * Ejecuta lógica de BD bajo el contexto estricto de un Tenant (RLS).
+ * Garantiza aislamiento transaccional y limpieza del contexto.
+ */
+async function withTenantContext<T>(
+    client: DBClient,
+    tenantId: string,
+    operation: () => Promise<Result<T>>
+): Promise<Result<T>> {
+    try {
+        await client.query("BEGIN");
+
+        // Inyección del contexto RLS (SET LOCAL asegura que solo vive en esta transacción)
+        await client.query("SELECT set_config('app.current_tenant', $1, true)", [tenantId]);
+
+        // Ejecución de la lógica de negocio
+        const [err, result] = await operation();
+
+        if (err !== null) {
+            await client.query("ROLLBACK");
+            return [err, null];
+        }
+
+        await client.query("COMMIT");
+        return [null, result];
+    } catch (error: unknown) {
+        await client.query("ROLLBACK").catch(() => {}); // Failsafe
+        const msg = error instanceof Error ? error.message : String(error);
+        return [new Error(`transaction_failed: ${msg}`), null];
+    }
+}
+
+CRITERIOS DE RECHAZO RLS (AUTO-CRÍTICA):
+Antes de entregar el código, verifica:
+
+¿Escribí un SELECT * FROM tabla WHERE provider_id = ... fuera de la función withTenantContext? Si es sí, reescribe.
+
+¿Usé SET en lugar de SET LOCAL o set_config(..., true)? Si es sí, corrige. Un SET global causará fuga de datos entre ejecuciones concurrentes en el mismo worker.
+
+----------------------------------------------------
+**REGLA DE EJECUCIÓN INVIOLABLE:**
+PROHIBIDO estrictamente el uso de simulaciones, mocks, valores hardcodeados, datos ficticios o
+placeholders (ej. `// lógica aquí`). Todo el código y las respuestas deben ser 100% dinámicos,
+funcionales y listos para producción real. Si falta contexto para una implementación definitiva,
+PREGUNTA, no inventes ni asumas.

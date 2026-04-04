@@ -3,16 +3,16 @@ import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 const mockInsert = vi.fn().mockReturnValue([{ booking_id: 'test-booking-uuid-12345' }]);
 const mockEnd = vi.fn();
 
-const sql = vi.fn(async (strings: TemplateStringsArray, ...values: unknown[]) => {
+const sql = vi.fn(async (strings: TemplateStringsArray, ..._values: unknown[]) => {
   const query = strings.join('?');
   if (query.includes('SELECT') && query.includes('services')) {
-    return [{ duration_minutes: 30 }];
+    return [{ name: 'Test Service', duration_minutes: 30 }];
   }
   if (query.includes('SELECT') && query.includes('providers')) {
     return [{ name: 'Dr. Test' }];
   }
   if (query.includes('INSERT')) {
-    return mockInsert(...values);
+    return mockInsert(..._values);
   }
   return [];
 });
@@ -105,6 +105,8 @@ describe('Booking Wizard', () => {
       action: 'select_time',
       wizard_state: { step: 2, patient_id: 'p1', chat_id: '123', selected_date: '2026-04-15', selected_time: null },
       user_input: '10:00',
+      provider_id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+      service_id: 'b2c3d4e5-f6a7-8901-bcde-f12345678901',
     });
     expect(result.success).toBe(true);
     const data = result.data as { wizard_state: { step: number; selected_time: string }; message: string };
@@ -201,7 +203,7 @@ describe('Booking Wizard', () => {
     expect(dateData.wizard_state['step']).toBe(2);
     state = dateData.wizard_state;
 
-    const timeResult = await main({ action: 'select_time', wizard_state: state, user_input: '10:00' });
+    const timeResult = await main({ action: 'select_time', wizard_state: state, user_input: '10:00', provider_id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', service_id: 'b2c3d4e5-f6a7-8901-bcde-f12345678901' });
     expect(timeResult.success).toBe(true);
     const timeData = timeResult.data as { wizard_state: Record<string, unknown>; message: string };
     expect(timeData.wizard_state['step']).toBe(3);

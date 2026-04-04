@@ -20,16 +20,11 @@ export interface TraceData {
 
 /**
  * Records a trace of the AI Agent execution.
- * In production, this would go to a database or monitoring system.
+ * Windmill captures console.log as structured telemetry.
  */
-export async function trace(data: TraceData): Promise<void> {
+export function trace(data: TraceData): void {
   const logEntry = JSON.stringify(data);
-  
-  // En Windmill, console.log es capturado como log estructurado
   console.log(`[AI-TRACE] ${logEntry}`);
-  
-  // Simulación de persistencia asíncrona segura
-  await Promise.resolve();
 }
 
 export function buildTrace(

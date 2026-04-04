@@ -12,6 +12,8 @@ const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 const GROQ_MODEL = 'llama-3.3-70b-versatile';
 const OPENAI_MODEL = 'gpt-4o-mini';
 
+import { cacheGet, cacheSet } from '../cache';
+
 const MAX_RETRIES = 2;
 const BACKOFF_MS = 500;
 const TIMEOUT_MS = 15000;
@@ -27,6 +29,7 @@ export interface LLMResponse {
   readonly tokens_in: number;
   readonly tokens_out: number;
   readonly latency_ms: number;
+  readonly cached?: boolean;
 }
 
 interface ProviderInternalResult {
@@ -41,6 +44,16 @@ function getGroqKey(): string | null {
   }
   if (typeof process !== 'undefined' && process.env['GROQ_API_KEY'] != null) {
     return process.env['GROQ_API_KEY'] ?? null;
+  }
+  return null;
+}
+
+function getGroqKey2(): string | null {
+  if (wmill.env['GROQ_API_KEY_2'] != null) {
+    return wmill.env['GROQ_API_KEY_2'];
+  }
+  if (typeof process !== 'undefined' && process.env['GROQ_API_KEY_2'] != null) {
+    return process.env['GROQ_API_KEY_2'] ?? null;
   }
   return null;
 }
@@ -151,6 +164,19 @@ export async function callLLM(
   systemPrompt: string,
   userMessage: string,
 ): Promise<LLMResponse> {
+  // Check cache first
+  const [cacheErr, cachedEntry] = await cacheGet(userMessage);
+  if (cacheErr == null && cachedEntry != null) {
+    return {
+      content: cachedEntry.response,
+      provider: 'groq',
+      tokens_in: 0,
+      tokens_out: 0,
+      latency_ms: 0,
+      cached: true,
+    };
+  }
+
   const messages: readonly ChatMessage[] = [
     { role: 'system', content: systemPrompt },
     { role: 'user', content: userMessage },
@@ -159,13 +185,29 @@ export async function callLLM(
   const groqKey = getGroqKey();
   if (groqKey != null) {
     const [err, res] = await callWithRetry(GROQ_API_URL, groqKey, GROQ_MODEL, messages, 'groq');
-    if (err == null && res != null) return res;
+    if (err == null && res != null) {
+      void cacheSet(userMessage, res.content, 'unknown');
+      return res;
+    }
+  }
+
+  // Second Groq key as fallback
+  const groqKey2 = getGroqKey2();
+  if (groqKey2 != null) {
+    const [err, res] = await callWithRetry(GROQ_API_URL, groqKey2, GROQ_MODEL, messages, 'groq');
+    if (err == null && res != null) {
+      void cacheSet(userMessage, res.content, 'unknown');
+      return res;
+    }
   }
 
   const openaiKey = getOpenAIKey();
   if (openaiKey != null) {
     const [err, res] = await callWithRetry(OPENAI_API_URL, openaiKey, OPENAI_MODEL, messages, 'openai');
-    if (err == null && res != null) return res;
+    if (err == null && res != null) {
+      void cacheSet(userMessage, res.content, 'unknown');
+      return res;
+    }
     throw err ?? new Error("OpenAI failed without error object");
   }
 

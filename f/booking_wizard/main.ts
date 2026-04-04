@@ -323,13 +323,14 @@ export async function main(rawInput: unknown): Promise<{ readonly success: boole
           }
         }
         if (state.selected_time == null) {
-          message = '⚠️ Selecciona un horario o escribe la hora (ej: 10:00).';
+          message = '⚠️ Por favor selecciona un horario o escribe la hora (ej: 10:00).';
           force_reply = true;
           reply_placeholder = 'Escribe la hora (ej: 10:00)';
           reply_keyboard = [['« Volver a fechas', '❌ Cancelar']];
         } else {
-          let providerName = 'Tu doctor';
-          let serviceName = 'Consulta';
+          // Explicit lookup required - no generic fallbacks
+          let providerName: string | null = null;
+          let serviceName: string | null = null;
           if (provider_id != null) {
             const [p] = await sql<readonly { name: string }[]>`SELECT name FROM providers WHERE provider_id = ${provider_id}::uuid LIMIT 1`;
             if (p != null) providerName = p.name;
@@ -338,23 +339,39 @@ export async function main(rawInput: unknown): Promise<{ readonly success: boole
             const [s] = await sql<readonly { name: string }[]>`SELECT name FROM services WHERE service_id = ${service_id}::uuid LIMIT 1`;
             if (s != null) serviceName = s.name;
           }
-          ({ message, reply_keyboard, new_state: state } = buildConfirmation(state, providerName, serviceName));
+
+          if (providerName == null || serviceName == null) {
+            message = '⚠️ No se pudo recuperar la información del profesional o servicio. Por favor, reintenta.';
+            reply_keyboard = [['« Volver a fechas', '❌ Cancelar']];
+          } else {
+            ({ message, reply_keyboard, new_state: state } = buildConfirmation(state, providerName, serviceName));
+          }
         }
         break;
       }
 
       case 'confirm': {
         if (state.selected_date == null || state.selected_time == null || provider_id == null || service_id == null) {
-          message = '⚠️ Faltan datos. Reiniciando...';
+          message = '⚠️ Faltan datos críticos para confirmar. Reiniciando agendamiento...';
           ({ message, reply_keyboard, new_state: state } = buildDateSelection({ ...state, selected_date: null, selected_time: null }, 0));
         } else {
+          // Final verification of names before confirmation to ensure data authenticity
+          const [pRow] = await sql<readonly { name: string }[]>`SELECT name FROM providers WHERE provider_id = ${provider_id}::uuid LIMIT 1`;
+          const [sRow] = await sql<readonly { name: string }[]>`SELECT name FROM services WHERE service_id = ${service_id}::uuid LIMIT 1`;
+          
+          if (pRow == null || sRow == null) {
+            message = '❌ Error de integridad: no se pudo verificar el profesional o servicio. Reintente.';
+            state = { ...state, step: 0, selected_date: null, selected_time: null };
+            break;
+          }
+
           const [err, bookingId] = await createBookingInDB(sql, state.patient_id, provider_id, service_id, state.selected_date, state.selected_time, timezone);
           if (err != null) {
-            message = `❌ Error: ${err.message}. Intenta otro horario.`;
+            message = `❌ Error al agendar: ${err.message}. Intenta con otro horario.`;
             reply_keyboard = [['📅 Agendar otra', '📋 Mis citas']];
             state = { ...state, step: 0, selected_date: null, selected_time: null };
           } else {
-            message = `🎉 *¡Cita Agendada!*\n\n🆔 ID: \`${bookingId ?? ''}\`.\n\n📅 ${formatDate(state.selected_date, timezone)}\n🕐 ${state.selected_time}`;
+            message = `🎉 *¡Cita Agendada!*\n\n🆔 ID: \`${bookingId ?? ''}\`\n📅 Fecha: ${formatDate(state.selected_date, timezone)}\n🕐 Hora: ${state.selected_time}\n👨‍⚕️ Profesional: ${pRow.name}\n📋 Servicio: ${sRow.name}\n\nTu cita ha sido registrada exitosamente.`;
             reply_keyboard = [['📅 Agendar otra', '📋 Mis citas']];
             state = { ...state, step: 99 };
           }

@@ -52,15 +52,15 @@ export const CONFIDENCE_THRESHOLDS: Record<IntentType, number> = {
 
 export const INTENT_KEYWORDS: Record<string, { readonly keywords: readonly string[]; readonly weight: number }> = {
   [INTENT.URGENT_CARE]: {
-    keywords: ['urgente', 'emergencia', 'urgencia', 'ya mismo', 'ahora mismo', 'inmediato', 'dolor', 'sangrando', 'no puedo esperar'],
+    keywords: ['urgente', 'emergencia', 'urgencia', 'ya mismo', 'ahora mismo', 'inmediato', 'dolor', 'sangrando', 'no puedo esperar', 'urjente', 'urgnete', 'urjencia', 'nececito atencion', 'necesito atencion', 'necesito atencion ya', 'atencion urgente', 'atencion de emergencia'],
     weight: 10,
   },
   [INTENT.CANCEL_APPOINTMENT]: {
-    keywords: ['cancelar', 'anular', 'eliminar', 'borrar', 'dar de baja', 'no necesito'],
+    keywords: ['cancelar', 'anular', 'eliminar', 'borrar', 'dar de baja', 'no necesito', 'kanselar', 'cancelsr', 'anualr'],
     weight: 4,
   },
   [INTENT.RESCHEDULE]: {
-    keywords: ['reprogramar', 'reagendar', 'cambiar', 'mover', 'trasladar', 'pasar', 'modificar'],
+    keywords: ['reprogramar', 'reagendar', 'cambiar', 'mover', 'trasladar', 'pasar', 'modificar', 'reporgramar'],
     weight: 4,
   },
   [INTENT.CHECK_AVAILABILITY]: {
@@ -68,7 +68,7 @@ export const INTENT_KEYWORDS: Record<string, { readonly keywords: readonly strin
     weight: 3,
   },
   [INTENT.CREATE_APPOINTMENT]: {
-    keywords: ['reservar', 'agendar', 'cita', 'turno', 'sacar', 'pedir hora', 'necesito hora', 'consulta', 'visita', 'ver al doctor'],
+    keywords: ['reservar', 'agendar', 'cita', 'turno', 'sacar', 'pedir hora', 'necesito hora', 'consulta', 'visita', 'ver al doctor', 'ajendar', 'konsulta', 'cosulta', 'resevar', 'reserba', 'truno', 'sita'],
     weight: 3,
   },
   [INTENT.ACTIVATE_REMINDERS]: {
@@ -154,7 +154,7 @@ export const OFF_TOPIC_PATTERNS = [
 // Para fast-path detection (evita llamada LLM)
 // ============================================================================
 
-export const GREETINGS = ['hola', 'holaa', 'ola'];
+export const GREETINGS = ['hola', 'holaa', 'ola', 'saludos'];
 export const GREETING_PHRASES = ['buenos días', 'buenas tardes', 'buenas noches', 'buen día', 'qué tal'];
 export const FAREWELLS = ['chau', 'chao', 'adiós', 'adios'];
 export const FAREWELL_PHRASES = ['hasta luego', 'nos vemos', 'hasta pronto'];

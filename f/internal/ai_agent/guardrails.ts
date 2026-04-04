@@ -104,10 +104,12 @@ export function sanitizeJSONResponse(raw: string): string {
  * Returns a tuple style [Error | null, IntentResult | null]
  */
 export function verifyUrgency(result: IntentResult, text: string): IntentResult {
+  const lower = text.toLowerCase();
+  const hasUrgency = URGENCY_WORDS.some(w => lower.includes(w));
+  const hasUrgencyTypos = lower.includes('urjente') || lower.includes('urgnete') || lower.includes('urjencia') || lower.includes('nececito atencion');
+
   if (result.intent === INTENT.URGENT_CARE) {
-    const lower = text.toLowerCase();
-    const hasUrgency = URGENCY_WORDS.some(w => lower.includes(w));
-    if (!hasUrgency) {
+    if (!hasUrgency && !hasUrgencyTypos) {
       return { 
         ...result, 
         confidence: Math.min(result.confidence, 0.4),
@@ -115,6 +117,21 @@ export function verifyUrgency(result: IntentResult, text: string): IntentResult 
         validation_errors: [...result.validation_errors, "Urgency intent detected but no urgency words found in text"]
       };
     }
+    // Boost confidence when urgency words are found
+    if ((hasUrgency || hasUrgencyTypos) && result.confidence < 0.7) {
+      return { ...result, confidence: 0.75 };
+    }
   }
+
+  // Detect urgency even if LLM didn't catch it
+  if (result.intent !== INTENT.URGENT_CARE && (hasUrgency || hasUrgencyTypos) && result.confidence < 0.5) {
+    return {
+      ...result,
+      intent: INTENT.URGENT_CARE,
+      confidence: 0.75,
+      validation_errors: [...result.validation_errors, "Upgraded to urgent care based on urgency keywords"]
+    };
+  }
+
   return result;
 }
