@@ -18,6 +18,7 @@ export const INTENT = {
   REMINDER_PREFERENCES: 'reminder_preferences',
   SHOW_MAIN_MENU: 'show_main_menu',
   WIZARD_STEP: 'wizard_step',
+  GET_MY_BOOKINGS: 'get_my_bookings',
   UNKNOWN: 'unknown',
 } as const;
 
@@ -43,6 +44,7 @@ export const CONFIDENCE_THRESHOLDS: Record<IntentType, number> = {
   [INTENT.REMINDER_PREFERENCES]: 0.5,
   [INTENT.SHOW_MAIN_MENU]: 0.5,
   [INTENT.WIZARD_STEP]: 0.5,
+  [INTENT.GET_MY_BOOKINGS]: 0.5,
   [INTENT.UNKNOWN]: 0.0,
 };
 
@@ -56,19 +58,31 @@ export const INTENT_KEYWORDS: Record<string, { readonly keywords: readonly strin
     weight: 10,
   },
   [INTENT.CANCEL_APPOINTMENT]: {
-    keywords: ['cancelar', 'anular', 'eliminar', 'borrar', 'dar de baja', 'no necesito', 'kanselar', 'cancelsr', 'anualr'],
+    keywords: ['cancelar', 'anular', 'eliminar', 'borrar', 'dar de baja', 'no necesito', 'kanselar', 'cancelsr', 'anualr', 'no voy a poder', 'no voy a ir', 'ya no voy', 'cambié de opinión', 'cancela todo', 'no iré'],
     weight: 4,
   },
   [INTENT.RESCHEDULE]: {
-    keywords: ['reprogramar', 'reagendar', 'cambiar', 'mover', 'trasladar', 'pasar', 'modificar', 'reporgramar'],
+    keywords: ['reprogramar', 'reagendar', 'cambiar', 'mover', 'trasladar', 'pasar', 'modificar', 'reporgramar', 'mejor para', 'me equivoqué de hora', 'otro día', 'para otro'],
     weight: 4,
   },
   [INTENT.CHECK_AVAILABILITY]: {
-    keywords: ['disponibilidad', 'disponible', 'hueco', 'espacio', 'libre', 'tienen', 'lugar', 'horario', 'busco'],
+    keywords: ['disponibilidad', 'disponible', 'hueco', 'espacio', 'libre', 'tienen', 'lugar', 'horario', 'busco', 'atiende los', 'atiende los sábados'],
     weight: 3,
   },
   [INTENT.CREATE_APPOINTMENT]: {
-    keywords: ['reservar', 'agendar', 'cita', 'turno', 'sacar', 'pedir hora', 'necesito hora', 'consulta', 'visita', 'ver al doctor', 'ajendar', 'konsulta', 'cosulta', 'resevar', 'reserba', 'truno', 'sita'],
+    keywords: ['reservar', 'agendar', 'cita', 'turno', 'sacar', 'pedir hora', 'necesito hora', 'consulta', 'visita', 'ver al doctor', 'ajendar', 'konsulta', 'cosulta', 'resevar', 'reserba', 'truno', 'sita', 'chequeo general', 'sacarme la muela', 'dolor de guata', 'la hora con el doctor', 'que me den la hora', 'pasado mañana', 'próximo bisiesto', 'medianoche', 'estaba agendando'],
+    weight: 3,
+  },
+  [INTENT.GET_MY_BOOKINGS]: {
+    keywords: ['confirmame la cita', 'mis citas', 'mi cita', 'confirmación', 'no me llegó', 'no fui a mi cita', 'ya completé', 'certificado', 'pendiente', 'atendido', 'me cobraron', 'reprogramada automáticamente'],
+    weight: 4,
+  },
+  [INTENT.FAREWELL]: {
+    keywords: ['mejor no quiero', 'gracias', 'adiós', 'chao', 'chau', 'hasta luego', 'nos vemos'],
+    weight: 4,
+  },
+  [INTENT.GENERAL_QUESTION]: {
+    keywords: ['déjame pensarlo', 'espera', 'pregunta', 'saber si', 'me puedes decir'],
     weight: 3,
   },
   [INTENT.ACTIVATE_REMINDERS]: {

@@ -443,6 +443,7 @@ export async function main(rawInput: unknown): Promise<{ readonly success: boole
       provider = llmRes.provider;
       cot_reasoning = llmRes.cot_reasoning;
     } else {
+      if (llmErr != null) console.log('[LLM ERROR]', llmErr.message);
       const rules = detectIntentRules(text);
       intent = rules.intent;
       confidence = rules.confidence;

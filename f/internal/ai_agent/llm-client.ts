@@ -39,9 +39,7 @@ interface ProviderInternalResult {
 }
 
 function getGroqKey(): string | null {
-  if (wmill.env['GROQ_API_KEY'] != null) {
-    return wmill.env['GROQ_API_KEY'];
-  }
+  try { if (typeof wmill !== 'undefined' && wmill.env['GROQ_API_KEY'] != null) return wmill.env['GROQ_API_KEY']; } catch { /* wmill not available */ }
   if (typeof process !== 'undefined' && process.env['GROQ_API_KEY'] != null) {
     return process.env['GROQ_API_KEY'] ?? null;
   }
@@ -49,9 +47,7 @@ function getGroqKey(): string | null {
 }
 
 function getGroqKey2(): string | null {
-  if (wmill.env['GROQ_API_KEY_2'] != null) {
-    return wmill.env['GROQ_API_KEY_2'];
-  }
+  try { if (typeof wmill !== 'undefined' && wmill.env['GROQ_API_KEY_2'] != null) return wmill.env['GROQ_API_KEY_2']; } catch { /* wmill not available */ }
   if (typeof process !== 'undefined' && process.env['GROQ_API_KEY_2'] != null) {
     return process.env['GROQ_API_KEY_2'] ?? null;
   }
@@ -59,9 +55,7 @@ function getGroqKey2(): string | null {
 }
 
 function getOpenAIKey(): string | null {
-  if (wmill.env['OPENAI_API_KEY'] != null) {
-    return wmill.env['OPENAI_API_KEY'];
-  }
+  try { if (typeof wmill !== 'undefined' && wmill.env['OPENAI_API_KEY'] != null) return wmill.env['OPENAI_API_KEY']; } catch { /* wmill not available */ }
   if (typeof process !== 'undefined' && process.env['OPENAI_API_KEY'] != null) {
     return process.env['OPENAI_API_KEY'] ?? null;
   }
