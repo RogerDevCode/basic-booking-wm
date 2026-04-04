@@ -89,6 +89,16 @@ async function savePreferences(sql: SqlClient, patientId: string, prefs: Reminde
   }
 }
 
+interface PatientMetadataRow {
+  readonly metadata: Readonly<Record<string, unknown>> | null;
+}
+
+interface ReminderConfigResult {
+  readonly message: string;
+  readonly reply_keyboard: string[][] | undefined;
+  readonly preferences: ReminderPrefs;
+}
+
 async function loadPreferences(sql: SqlClient, patientId: string): Promise<ReminderPrefs> {
   const defaults: ReminderPrefs = {
     telegram_24h: true,
@@ -98,29 +108,28 @@ async function loadPreferences(sql: SqlClient, patientId: string): Promise<Remin
   };
 
   try {
-    type Row = { metadata: Record<string, unknown> | null };
-    const rows = await sql<Row[]>`
+    const rows = await sql<PatientMetadataRow[]>`
       SELECT metadata FROM patients WHERE patient_id = ${patientId}::uuid LIMIT 1
     `;
     const firstRow = rows[0];
     if (!firstRow?.metadata) return defaults;
 
     const raw = firstRow.metadata;
-    const reminderPrefs = raw['reminder_preferences'] as Record<string, unknown> | undefined;
+    const reminderPrefs = raw['reminder_preferences'] as ReminderPrefs | undefined;
     if (!reminderPrefs) return defaults;
 
     return {
-      telegram_24h: Boolean(reminderPrefs['telegram_24h'] ?? true),
-      gmail_24h: Boolean(reminderPrefs['gmail_24h'] ?? true),
-      telegram_2h: Boolean(reminderPrefs['telegram_2h'] ?? true),
-      telegram_30min: Boolean(reminderPrefs['telegram_30min'] ?? true),
+      telegram_24h: Boolean(reminderPrefs.telegram_24h ?? true),
+      gmail_24h: Boolean(reminderPrefs.gmail_24h ?? true),
+      telegram_2h: Boolean(reminderPrefs.telegram_2h ?? true),
+      telegram_30min: Boolean(reminderPrefs.telegram_30min ?? true),
     };
   } catch {
     return defaults;
   }
 }
 
-export async function main(rawInput: unknown): Promise<{ success: boolean; data: Record<string, unknown> | null; error_message: string | null }> {
+export async function main(rawInput: unknown): Promise<{ success: boolean; data: ReminderConfigResult | null; error_message: string | null }> {
   try {
     const parsed = InputSchema.safeParse(rawInput);
     if (!parsed.success) {
