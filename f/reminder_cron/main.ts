@@ -19,6 +19,16 @@ const InputSchema = z.object({
 
 type ReminderWindow = '24h' | '2h' | '30min';
 
+interface ReminderPrefs {
+  readonly telegram_24h?: boolean;
+  readonly telegram_2h?: boolean;
+  readonly telegram_30min?: boolean;
+  readonly email_24h?: boolean;
+  readonly email_2h?: boolean;
+  readonly email_30min?: boolean;
+  readonly [key: string]: unknown;
+}
+
 interface BookingRecord {
   booking_id: string;
   patient_id: string;
@@ -34,7 +44,7 @@ interface BookingRecord {
   patient_name: string | null;
   provider_name: string | null;
   service_name: string | null;
-  reminder_preferences: Record<string, unknown> | null;
+  reminder_preferences: ReminderPrefs | null;
 }
 
 function formatDate(date: Date, tz: string): string {
@@ -56,7 +66,7 @@ function formatTime(date: Date, tz: string): string {
 }
 
 function getPatientPreference(
-  prefs: Record<string, unknown> | null,
+  prefs: ReminderPrefs | null,
   channel: string,
   window: string
 ): boolean {
@@ -108,6 +118,11 @@ function buildInlineButtons(
   return buttons;
 }
 
+interface ScriptResponse {
+  readonly success?: boolean;
+  readonly error_message?: string | null;
+}
+
 async function sendTelegramReminder(
   chatId: string,
   messageType: string,
@@ -135,8 +150,8 @@ async function sendTelegramReminder(
       return { sent: false, error: `HTTP ${String(response.status)}` };
     }
 
-    const result = await response.json() as Record<string, unknown>;
-    return { sent: result['success'] === true, error: result['error_message'] as string | null };
+    const result = await response.json() as ScriptResponse;
+    return { sent: result.success === true, error: result.error_message ?? null };
   } catch (e) {
     return { sent: false, error: e instanceof Error ? e.message : String(e) };
   }
@@ -173,8 +188,8 @@ async function sendGmailReminder(
       return { sent: false, error: `HTTP ${String(response.status)}` };
     }
 
-    const result = await response.json() as Record<string, unknown>;
-    return { sent: result['success'] === true, error: result['error_message'] as string | null };
+    const result = await response.json() as ScriptResponse;
+    return { sent: result.success === true, error: result.error_message ?? null };
   } catch (e) {
     return { sent: false, error: e instanceof Error ? e.message : String(e) };
   }
@@ -319,7 +334,16 @@ async function getBookingsForWindow(
   return getBookingsFor30min(sql, start, end);
 }
 
-export async function main(rawInput: unknown): Promise<{ success: boolean; data: Record<string, unknown> | null; error_message: string | null }> {
+interface CronResult {
+  readonly reminders_24h_sent: number;
+  readonly reminders_2h_sent: number;
+  readonly reminders_30min_sent: number;
+  readonly errors: number;
+  readonly dry_run: boolean;
+  readonly processed_bookings: string[];
+}
+
+export async function main(rawInput: unknown): Promise<{ success: boolean; data: CronResult | null; error_message: string | null }> {
   try {
     const parsed = InputSchema.safeParse(rawInput);
     if (!parsed.success) {
