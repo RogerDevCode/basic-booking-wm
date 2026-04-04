@@ -18,6 +18,43 @@ const InputSchema = z.object({
   include_patient_details: z.boolean().default(false),
 });
 
+interface ProviderRow {
+  readonly provider_id: string;
+  readonly name: string;
+  readonly timezone: string;
+}
+
+interface ScheduleRow {
+  readonly start_time: string;
+  readonly end_time: string;
+  readonly is_active: boolean;
+}
+
+interface OverrideRow {
+  readonly is_blocked: boolean;
+  readonly reason: string | null;
+}
+
+interface BookingWithPatient {
+  readonly booking_id: string;
+  readonly start_time: string;
+  readonly end_time: string;
+  readonly status: string;
+  readonly patient_name: string;
+  readonly patient_email: string | null;
+  readonly service_name: string;
+}
+
+interface BookingWithoutPatient {
+  readonly booking_id: string;
+  readonly start_time: string;
+  readonly end_time: string;
+  readonly status: string;
+  readonly service_name: string;
+}
+
+type BookingEntry = BookingWithPatient | BookingWithoutPatient;
+
 interface AgendaDay {
   readonly date: string;
   readonly day_of_week: number;
@@ -25,13 +62,19 @@ interface AgendaDay {
   readonly schedule_end: string | null;
   readonly is_blocked: boolean;
   readonly block_reason: string | null;
-  readonly bookings: Record<string, unknown>[];
+  readonly bookings: BookingEntry[];
   readonly total_bookings: number;
+}
+
+interface AgendaResult {
+  readonly provider_id: string;
+  readonly provider_name: string;
+  readonly days: AgendaDay[];
 }
 
 export async function main(rawInput: unknown): Promise<{
   success: boolean;
-  data: { provider_id: string; provider_name: string; days: AgendaDay[] } | null;
+  data: AgendaResult | null;
   error_message: string | null;
 }> {
   const parsed = InputSchema.safeParse(rawInput);
@@ -49,11 +92,11 @@ export async function main(rawInput: unknown): Promise<{
 
   try {
     // 1. Verify provider exists
-    const providerRows = await sql`
+    const providerRows = await sql<ProviderRow[]>`
       SELECT provider_id, name, timezone FROM providers
       WHERE provider_id = ${input.provider_id}::uuid AND is_active = true LIMIT 1
     `;
-    const provider: Record<string, unknown> | undefined = providerRows[0] as Record<string, unknown> | undefined;
+    const provider = providerRows[0];
     if (provider === undefined) {
       return { success: false, data: null, error_message: 'Provider not found or inactive' };
     }
@@ -69,28 +112,28 @@ export async function main(rawInput: unknown): Promise<{
       const dayOfWeek = d.getUTCDay();
 
       // Get schedule for this day
-      const scheduleRows = await sql`
+      const scheduleRows = await sql<ScheduleRow[]>`
         SELECT start_time, end_time, is_active FROM provider_schedules
         WHERE provider_id = ${input.provider_id}::uuid AND day_of_week = ${dayOfWeek} AND is_active = true
         LIMIT 1
       `;
-      const scheduleRow: Record<string, unknown> | undefined = scheduleRows[0] as Record<string, unknown> | undefined;
-      const scheduleStart = scheduleRow !== undefined ? String(scheduleRow['start_time']) : null;
-      const scheduleEnd = scheduleRow !== undefined ? String(scheduleRow['end_time']) : null;
+      const scheduleRow = scheduleRows[0];
+      const scheduleStart = scheduleRow !== undefined ? scheduleRow.start_time : null;
+      const scheduleEnd = scheduleRow !== undefined ? scheduleRow.end_time : null;
 
       // Check for overrides
-      const overrideRows = await sql`
+      const overrideRows = await sql<OverrideRow[]>`
         SELECT is_blocked, reason FROM schedule_overrides
         WHERE provider_id = ${input.provider_id}::uuid AND override_date = ${dateStr}::date LIMIT 1
       `;
-      const overrideRow: Record<string, unknown> | undefined = overrideRows[0] as Record<string, unknown> | undefined;
-      const isBlocked = overrideRow !== undefined ? Boolean(overrideRow['is_blocked']) : false;
-      const blockReason = overrideRow !== undefined && typeof overrideRow['reason'] === 'string' ? overrideRow['reason'] : null;
+      const overrideRow = overrideRows[0];
+      const isBlocked = overrideRow !== undefined ? overrideRow.is_blocked : false;
+      const blockReason = overrideRow !== undefined ? overrideRow.reason : null;
 
       // Get bookings for this day
-      let bookingQuery;
+      let bookings: BookingEntry[];
       if (input.include_patient_details) {
-        bookingQuery = await sql`
+        bookings = await sql<BookingWithPatient[]>`
           SELECT b.booking_id, b.start_time, b.end_time, b.status,
                  p.name as patient_name, p.email as patient_email,
                  s.name as service_name
@@ -104,7 +147,7 @@ export async function main(rawInput: unknown): Promise<{
           ORDER BY b.start_time ASC
         `;
       } else {
-        bookingQuery = await sql`
+        bookings = await sql<BookingWithoutPatient[]>`
           SELECT b.booking_id, b.start_time, b.end_time, b.status, s.name as service_name
           FROM bookings b
           JOIN services s ON s.service_id = b.service_id
@@ -115,7 +158,6 @@ export async function main(rawInput: unknown): Promise<{
           ORDER BY b.start_time ASC
         `;
       }
-      const bookings = bookingQuery as Record<string, unknown>[];
 
       days.push({
         date: dateStr,
@@ -132,8 +174,8 @@ export async function main(rawInput: unknown): Promise<{
     return {
       success: true,
       data: {
-        provider_id: String(provider['provider_id']),
-        provider_name: String(provider['name']),
+        provider_id: provider.provider_id,
+        provider_name: provider.name,
         days: days,
       },
       error_message: null,
