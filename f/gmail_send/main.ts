@@ -34,6 +34,16 @@ const InputSchema = z.object({
 
 interface ActionLink { text: string; url: string; style: 'primary' | 'secondary' | 'danger' }
 
+type EmailDetails = Readonly<Record<string, unknown>>;
+
+interface GmailSendData {
+  readonly sent: boolean;
+  readonly message_id: string | null;
+  readonly recipient_email: string;
+  readonly message_type: string;
+  readonly subject: string;
+}
+
 // Type-safe string extractor - prevents [object Object] issues
 function safeString(value: unknown, fallback = ''): string {
   if (value === null || value === undefined) return fallback;
@@ -44,7 +54,7 @@ function safeString(value: unknown, fallback = ''): string {
 
 function buildEmailContent(
   messageType: string,
-  details: Readonly<Record<string, unknown>>,
+  details: EmailDetails,
   actionLinks: ActionLink[]
 ): { subject: string; html: string } {
   const date = safeString(details['date'], 'Por confirmar');
@@ -278,7 +288,7 @@ async function sendWithRetry(
   return { sent: false, message_id: null, error: `Failed after ${String(maxRetries)} retries: ${lastError ?? 'Unknown'}` };
 }
 
-export async function main(rawInput: unknown): Promise<{ success: boolean; data: Record<string, unknown> | null; error_message: string | null }> {
+export async function main(rawInput: unknown): Promise<{ success: boolean; data: GmailSendData | null; error_message: string | null }> {
   try {
     const parsed = InputSchema.safeParse(rawInput);
     if (!parsed.success) {
