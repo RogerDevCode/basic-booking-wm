@@ -7,7 +7,7 @@ dotenv.config({ path: ".env.test" });
 export default defineConfig({
   test: {
     globals: true,
-    include: ["f/**/*.test.ts"],
+    include: ["f/**/*.test.ts", "tests/**/*.test.ts"],
     exclude: ["node_modules", "dist"],
   },
   esbuild: {
