@@ -41,9 +41,25 @@ const InputSchema = z.object({
   override_reason: z.string().optional(),
 });
 
+interface ProviderRow {
+  readonly provider_id: string;
+  readonly name: string;
+  readonly email: string;
+  readonly phone: string | null;
+  readonly specialty: string;
+  readonly timezone: string;
+  readonly is_active: boolean;
+}
+
+interface ServiceRow {
+  readonly service_id: string;
+  readonly name: string;
+  readonly duration_minutes: number;
+}
+
 export async function main(rawInput: unknown): Promise<{
   success: boolean;
-  data: Record<string, unknown> | null;
+  data: Readonly<Record<string, unknown>> | null;
   error_message: string | null;
 }> {
   const parsed = InputSchema.safeParse(rawInput);
@@ -66,14 +82,14 @@ export async function main(rawInput: unknown): Promise<{
         if (input.name === undefined || input.email === undefined) {
           return { success: false, data: null, error_message: 'name and email are required' };
         }
-        const rows = await sql`
+        const rows = await sql<ProviderRow[]>`
           INSERT INTO providers (name, email, phone, specialty, timezone)
           VALUES (${input.name}, ${input.email}, ${input.phone ?? null}, ${input.specialty ?? 'Medicina General'}, ${input.timezone ?? 'America/Argentina/Buenos_Aires'})
           RETURNING provider_id, name, email, specialty, timezone, is_active
         `;
-        const row: Record<string, unknown> | undefined = rows[0] as Record<string, unknown> | undefined;
+        const row = rows[0];
         if (row === undefined) return { success: false, data: null, error_message: 'Failed to create provider' };
-        return { success: true, data: { created: true, provider_id: String(row['provider_id']), name: String(row['name']) }, error_message: null };
+        return { success: true, data: { created: true, provider_id: row.provider_id, name: row.name }, error_message: null };
       }
 
       case 'update_provider': {
@@ -103,14 +119,14 @@ export async function main(rawInput: unknown): Promise<{
         if (input.provider_id === undefined || input.service_name === undefined) {
           return { success: false, data: null, error_message: 'provider_id and service_name are required' };
         }
-        const rows = await sql`
+        const rows = await sql<ServiceRow[]>`
           INSERT INTO services (provider_id, name, description, duration_minutes, buffer_minutes, price_cents, currency)
           VALUES (${input.provider_id}::uuid, ${input.service_name}, ${input.description ?? null}, ${input.duration_minutes ?? 30}, ${input.buffer_minutes ?? 10}, ${input.price_cents ?? 0}, ${input.currency ?? 'MXN'})
           RETURNING service_id, name, duration_minutes
         `;
-        const row: Record<string, unknown> | undefined = rows[0] as Record<string, unknown> | undefined;
+        const row = rows[0];
         if (row === undefined) return { success: false, data: null, error_message: 'Failed to create service' };
-        return { success: true, data: { created: true, service_id: String(row['service_id']), name: String(row['name']) }, error_message: null };
+        return { success: true, data: { created: true, service_id: row.service_id, name: row.name }, error_message: null };
       }
 
       case 'update_service': {

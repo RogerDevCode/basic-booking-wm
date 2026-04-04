@@ -43,13 +43,18 @@ interface BookingRow {
 
 const GCAL_BASE = 'https://www.googleapis.com/calendar/v3';
 
+interface GCalDateTime {
+  readonly dateTime?: string;
+  readonly timeZone?: string;
+}
+
 interface GCalEventResponse {
   readonly id?: string;
   readonly status?: string;
   readonly htmlLink?: string;
   readonly summary?: string;
-  readonly start?: Readonly<Record<string, unknown>>;
-  readonly end?: Readonly<Record<string, unknown>>;
+  readonly start?: GCalDateTime;
+  readonly end?: GCalDateTime;
 }
 
 interface GCalAPIResult {
