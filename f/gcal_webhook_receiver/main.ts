@@ -16,11 +16,44 @@ const InputSchema = z.object({
 
 const GCAL_BASE = 'https://www.googleapis.com/calendar/v3';
 
+interface GCalEventItem {
+  readonly id?: string;
+  readonly status?: string;
+  readonly description?: string;
+  readonly summary?: string;
+  readonly start?: { dateTime?: string; date?: string };
+  readonly end?: { dateTime?: string; date?: string };
+}
+
+interface GCalEventsResponse {
+  readonly items?: GCalEventItem[];
+  readonly nextSyncToken?: string;
+  readonly nextPageToken?: string;
+}
+
+interface ProviderCalendarRow {
+  readonly provider_id: string;
+  readonly gcal_calendar_id: string | null;
+}
+
+interface GCalFetchResult {
+  readonly events: GCalEventItem[];
+  readonly nextSyncToken: string | null;
+  readonly error: string | null;
+}
+
+interface WebhookResult {
+  readonly acknowledged: boolean;
+  readonly reason?: string;
+  readonly changes_count?: number;
+  readonly changes?: { booking_id: string | null; event_id: string; status: string; action: string }[];
+}
+
 async function fetchCalendarEvents(
   calendarId: string,
   accessToken: string,
   syncToken: string | null
-): Promise<{ events: Record<string, unknown>[]; nextSyncToken: string | null; error: string | null }> {
+): Promise<GCalFetchResult> {
   const url = GCAL_BASE + '/calendars/' + encodeURIComponent(calendarId) + '/events';
   const params: string[] = ['maxResults=50', 'showDeleted=true'];
   if (syncToken) params.push('syncToken=' + encodeURIComponent(syncToken));
@@ -40,9 +73,9 @@ async function fetchCalendarEvents(
       return { events: [], nextSyncToken: null, error: 'GCal API ' + String(response.status) + ': ' + text };
     }
 
-    const data = await response.json() as Record<string, unknown>;
-    const events = (data['items'] ?? []) as Record<string, unknown>[];
-    const nextSyncToken = typeof data['nextSyncToken'] === 'string' ? data['nextSyncToken'] : null;
+    const data = await response.json() as GCalEventsResponse;
+    const events = data.items ?? [];
+    const nextSyncToken = typeof data.nextSyncToken === 'string' ? data.nextSyncToken : null;
     return { events: events, nextSyncToken: nextSyncToken, error: null };
   } catch (e) {
     return { events: [], nextSyncToken: null, error: e instanceof Error ? e.message : String(e) };
@@ -51,7 +84,7 @@ async function fetchCalendarEvents(
 
 export async function main(rawInput: unknown): Promise<{
   success: boolean;
-  data: Record<string, unknown> | null;
+  data: WebhookResult | null;
   error_message: string | null;
 }> {
   const parsed = InputSchema.safeParse(rawInput);
@@ -75,15 +108,14 @@ export async function main(rawInput: unknown): Promise<{
       return { success: false, data: null, error_message: 'Missing X-Goog-Channel-Id header' };
     }
 
-    const providerRows = await sql`
+    const providerRows = await sql<ProviderCalendarRow[]>`
       SELECT provider_id, gcal_calendar_id FROM providers
       WHERE gcal_calendar_id IS NOT NULL
     `;
 
-    let targetProvider: Record<string, unknown> | null = null;
-    for (const r of providerRows) {
-      const row = r as Record<string, unknown>;
-      if (String(row['provider_id']) === channelId) {
+    let targetProvider: ProviderCalendarRow | null = null;
+    for (const row of providerRows) {
+      if (row.provider_id === channelId) {
         targetProvider = row;
         break;
       }
@@ -93,7 +125,10 @@ export async function main(rawInput: unknown): Promise<{
       return { success: true, data: { acknowledged: true, reason: 'Unknown channel' }, error_message: null };
     }
 
-    const calendarId = String(targetProvider['gcal_calendar_id']);
+    const calendarId = targetProvider.gcal_calendar_id;
+    if (calendarId == null) {
+      return { success: true, data: { acknowledged: true, reason: 'No calendar configured' }, error_message: null };
+    }
     const result = await fetchCalendarEvents(calendarId, accessToken, null);
     if (result.error !== null) {
       return { success: false, data: null, error_message: 'GCal fetch error: ' + result.error };
@@ -102,9 +137,9 @@ export async function main(rawInput: unknown): Promise<{
     const changes: { booking_id: string | null; event_id: string; status: string; action: string }[] = [];
 
     for (const event of result.events) {
-      const eventId = typeof event['id'] === 'string' ? event['id'] : '';
-      const status = typeof event['status'] === 'string' ? event['status'] : 'confirmed';
-      const description = typeof event['description'] === 'string' ? event['description'] : '';
+      const eventId = typeof event.id === 'string' ? event.id : '';
+      const status = typeof event.status === 'string' ? event.status : 'confirmed';
+      const description = typeof event.description === 'string' ? event.description : '';
 
       const match = /ID de cita:\s*`?([0-9a-f-]+)`?/i.exec(description);
       const bookingId: string | null = match?.[1] ?? null;
