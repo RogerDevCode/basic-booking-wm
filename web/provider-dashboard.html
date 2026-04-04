@@ -348,24 +348,43 @@
 
     <script>
         // --- CONFIG & STATE ---
+        const urlParams = new URLSearchParams(window.location.search);
         const CONFIG = {
-            PROVIDER_ID: '00000000-0000-0000-0000-000000000000', // To be replaced dynamically
-            API_BASE: '/api/wmill', // Adjust to actual Windmill proxy path
+            PROVIDER_ID: urlParams.get('provider_id') || localStorage.getItem('titanium_provider_id'),
+            API_BASE: '/api/wmill/v1', // Windmill API Path
         };
+
+        if (!CONFIG.PROVIDER_ID) {
+            alert("Error: No provider_id found. Redirecting to login...");
+            // window.location.href = '/login.html';
+        }
 
         let activeView = 'agenda';
         let currentDate = new Date();
 
         // --- CORE FUNCTIONS ---
         async function fetchAPI(scriptPath, params) {
-            // Simulated call - in real Windmill env, this fetch would hit the script endpoint
-            console.log(`Calling ${scriptPath}`, params);
-            // Example real call:
-            // const resp = await fetch(`/api/v1/run/f/${scriptPath}`, { ... });
-            // return await resp.json();
+            const workspace = 'booking-titanium-wm'; // Workspace hardcoded for production context
+            const url = `${CONFIG.API_BASE}/run/script/f/${scriptPath}?workspace=${workspace}`;
             
-            // For demo purposes, we define static success
-            return { success: true, data: {} };
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(params)
+                });
+
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.error_message || 'API Error');
+                }
+
+                return await response.json();
+            } catch (e) {
+                console.error(`API Failure [${scriptPath}]:`, e);
+                showToast(e.message, true);
+                return { success: false, error_message: e.message };
+            }
         }
 
         function showToast(msg, isError = false) {
@@ -379,7 +398,8 @@
         function switchView(view) {
             activeView = view;
             document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
-            event.currentTarget.classList.add('active');
+            const target = Array.from(document.querySelectorAll('.nav-link')).find(l => l.innerText.toLowerCase().includes(view.slice(0,3)));
+            if (target) target.classList.add('active');
 
             const agendaPanel = document.getElementById('quick-action-panel');
             const configPanel = document.getElementById('config-panel');
@@ -387,7 +407,7 @@
             if (view === 'config' || view === 'services') {
                 agendaPanel.style.display = 'none';
                 configPanel.style.display = 'block';
-                document.getElementById('view-title').innerText = 'Configuración';
+                document.getElementById('view-title').innerText = view === 'config' ? 'Horarios Base' : 'Mis Servicios';
             } else {
                 agendaPanel.style.display = 'block';
                 configPanel.style.display = 'none';
@@ -397,13 +417,32 @@
         }
 
         async function refreshAgenda() {
+            const container = document.getElementById('agenda-content');
+            container.innerHTML = `<div class="glass mono" style="padding: 2rem; text-align: center;">SINCRONIZANDO CON DB...</div>`;
+
             const dateStr = currentDate.toISOString().split('T')[0];
             document.getElementById('current-date-display').innerText = dateStr.toUpperCase().replace(/-/g, ' ');
             
-            // Real fetch from f/provider_agenda
-            // const result = await fetchAPI('provider_agenda/main', { provider_id: CONFIG.PROVIDER_ID, date_from: dateStr, date_to: dateStr });
+            const result = await fetchAPI('provider_agenda/main', { 
+                provider_id: CONFIG.PROVIDER_ID, 
+                date_from: dateStr, 
+                date_to: dateStr,
+                include_patient_details: true
+            });
             
-            renderAgenda([]); // Pass real data
+            if (result.success && result.data && result.data.days) {
+                renderAgenda(result.data.days);
+                updateStats(result.data.days[0]);
+            } else {
+                container.innerHTML = `<div class="glass mono danger" style="padding: 2rem; text-align: center; color: var(--brand-danger);">ERROR DE SINCRONIZACIÓN: ${result.error_message || 'DB OFFLINE'}</div>`;
+            }
+        }
+
+        function updateStats(dayData) {
+            if (!dayData) return;
+            document.getElementById('stat-total').innerText = dayData.total_bookings;
+            const minutes = dayData.bookings.length * 30; // Estimated
+            document.getElementById('stat-time').innerText = `${Math.floor(minutes/60)}h ${minutes%60}m`;
         }
 
         function renderAgenda(days) {
@@ -413,22 +452,61 @@
             if (days.length === 0 || days[0].bookings.length === 0) {
                 container.innerHTML = `
                     <div class="glass" style="padding: 3rem; text-align: center; border-style: dashed;">
-                        <p class="mono" style="color: var(--text-dim)">No hay citas programadas para esta fecha</p>
+                        <p class="mono" style="color: var(--text-dim)">Agenda libre para esta fecha</p>
                     </div>
                 `;
                 return;
             }
 
-            // Logic to build cards from data...
+            days[0].bookings.forEach(booking => {
+                const start = new Date(booking.start_time).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+                const card = document.createElement('div');
+                card.className = `booking-card confirmed ${booking.status === 'urgent' ? 'urgent' : ''}`;
+                
+                card.innerHTML = `
+                    <div class="time-slot mono">${start}</div>
+                    <div class="patient-info">
+                        <h3>${booking.patient_name || 'Paciente Externo'}</h3>
+                        <p>${booking.service_name} • ${booking.status.toUpperCase()}</p>
+                    </div>
+                    <div class="actions">
+                        <button onclick="cancelBooking('${booking.booking_id}')" class="danger">Cancelar</button>
+                        <button onclick="rescheduleBooking('${booking.booking_id}')">Mover</button>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        async function cancelBooking(id) {
+            if (!confirm("¿Seguro que deseas cancelar esta reserva? Se notificará al paciente.")) return;
+            showToast("Cancelando...");
+            const res = await fetchAPI('booking_cancel/main', { booking_id: id, reason: "Cancelado por el proveedor" });
+            if (res.success) {
+                showToast("Reserva cancelada");
+                refreshAgenda();
+            }
         }
 
         // --- MODAL & ACTIONS ---
         function openBookingModal() {
             document.getElementById('booking-modal').style.display = 'flex';
+            loadServices();
         }
 
         function closeModal() {
             document.getElementById('booking-modal').style.display = 'none';
+        }
+
+        async function loadServices() {
+            const select = document.getElementById('modal-service-id');
+            const result = await fetchAPI('provider_manage/main', { action: 'list_services', provider_id: CONFIG.PROVIDER_ID });
+            if (result.success && result.data.services) {
+                select.innerHTML = result.data.services
+                    .filter(s => s.provider_id === CONFIG.PROVIDER_ID)
+                    .map(s => `<option value="${s.service_id}">${s.name} (${s.duration_minutes} min)</option>`)
+                    .join('');
+            }
         }
 
         async function submitManualBooking() {
@@ -441,16 +519,29 @@
                 return;
             }
 
-            // Call booking_orchestrator script
-            showToast('Procesando reserva...');
-            closeModal();
+            showToast('Creando reserva manual...');
+            // Real call to booking_create
+            const res = await fetchAPI('booking_create/main', {
+                provider_id: CONFIG.PROVIDER_ID,
+                service_id: serviceId,
+                start_time: datetime,
+                patient_email: email,
+                created_by: 'provider'
+            });
+
+            if (res.success) {
+                showToast('Cita agendada con éxito');
+                closeModal();
+                refreshAgenda();
+            } else {
+                showToast(res.error_message, true);
+            }
         }
 
         // --- INIT ---
         window.onload = () => {
-            refreshAgenda();
+            if (CONFIG.PROVIDER_ID) refreshAgenda();
             
-            // Setup listeners
             document.getElementById('next-day').onclick = () => {
                 currentDate.setDate(currentDate.getDate() + 1);
                 refreshAgenda();

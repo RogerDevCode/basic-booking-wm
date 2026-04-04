@@ -43,12 +43,27 @@ interface BookingRow {
 
 const GCAL_BASE = 'https://www.googleapis.com/calendar/v3';
 
+interface GCalEventResponse {
+  readonly id?: string;
+  readonly status?: string;
+  readonly htmlLink?: string;
+  readonly summary?: string;
+  readonly start?: Readonly<Record<string, unknown>>;
+  readonly end?: Readonly<Record<string, unknown>>;
+}
+
+interface GCalAPIResult {
+  readonly ok: boolean;
+  readonly data?: GCalEventResponse;
+  readonly error?: string;
+}
+
 async function callGCalAPI(
   method: string,
   calendarId: string,
   path: string,
   body?: object
-): Promise<{ ok: boolean; data?: Record<string, unknown>; error?: string }> {
+): Promise<GCalAPIResult> {
   const accessToken = process.env['GCAL_ACCESS_TOKEN'];
   if (!accessToken) {
     return { ok: false, error: 'GCAL_ACCESS_TOKEN not configured' };
@@ -63,7 +78,6 @@ async function callGCalAPI(
         'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
       },
-      // exactOptionalPropertyTypes: undefined is not assignable to BodyInit | null
       body: body !== undefined ? JSON.stringify(body) : null,
       signal: AbortSignal.timeout(15000),
     });
@@ -73,7 +87,7 @@ async function callGCalAPI(
       return { ok: false, error: `GCal API ${String(response.status)}: ${errorText}` };
     }
 
-    const data = await response.json() as Record<string, unknown>;
+    const data = await response.json() as GCalEventResponse;
     return { ok: true, data };
   } catch (e) {
     return { ok: false, error: `Network error: ${e instanceof Error ? e.message : String(e)}` };
@@ -138,7 +152,7 @@ async function syncBookingToGCal(
     );
 
     if (providerResult.ok && providerResult.data) {
-      result.providerEventId = providerResult.data['id'] as string;
+      result.providerEventId = providerResult.data.id ?? null;
     } else {
       result.errors.push(`Provider: ${providerResult.error ?? 'Unknown error'}`);
     }
@@ -158,7 +172,7 @@ async function syncBookingToGCal(
     );
 
     if (patientResult.ok && patientResult.data) {
-      result.patientEventId = patientResult.data['id'] as string;
+      result.patientEventId = patientResult.data.id ?? null;
     } else {
       result.errors.push(`Patient: ${patientResult.error ?? 'Unknown error'}`);
     }
