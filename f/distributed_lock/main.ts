@@ -28,9 +28,30 @@ interface LockInfo {
   readonly expires_at: string;
 }
 
+interface LockRow {
+  readonly lock_id: number;
+  readonly lock_key: string;
+  readonly owner_token: string;
+  readonly provider_id: string;
+  readonly start_time: string;
+  readonly acquired_at: string;
+  readonly expires_at: string;
+}
+
+interface LockResult {
+  readonly acquired?: boolean;
+  readonly released?: boolean;
+  readonly locked?: boolean;
+  readonly cleaned?: number;
+  readonly lock?: LockInfo;
+  readonly reason?: string;
+  readonly owner?: string;
+  readonly expires_at?: string;
+}
+
 export async function main(rawInput: unknown): Promise<{
   success: boolean;
-  data: Record<string, unknown> | null;
+  data: LockResult | null;
   error_message: string | null;
 }> {
   const parsed = InputSchema.safeParse(rawInput);
@@ -63,26 +84,26 @@ export async function main(rawInput: unknown): Promise<{
         const expiresAt = new Date(Date.now() + ttl_seconds * 1000);
 
         // Try to insert lock (unique constraint on lock_key prevents duplicates)
-        const rows = await sql`
+        const rows = await sql<LockRow[]>`
           INSERT INTO booking_locks (lock_key, owner_token, provider_id, start_time, expires_at)
           VALUES (${lock_key}, ${owner_token}, ${provider_id}::uuid, ${start_time}::timestamptz, ${expiresAt.toISOString()}::timestamptz)
           ON CONFLICT (lock_key) DO NOTHING
           RETURNING lock_id, lock_key, owner_token, provider_id, start_time, acquired_at, expires_at
         `;
 
-        const row: Record<string, unknown> | undefined = rows[0] as Record<string, unknown> | undefined;
+        const row = rows[0];
         if (row === undefined) {
           // Check if existing lock is expired (steal it)
-          const existingRows = await sql`
+          const existingRows = await sql<LockRow[]>`
             SELECT lock_id, lock_key, owner_token, provider_id, start_time, acquired_at, expires_at
             FROM booking_locks
             WHERE lock_key = ${lock_key} AND expires_at < NOW()
             LIMIT 1
           `;
-          const existing: Record<string, unknown> | undefined = existingRows[0] as Record<string, unknown> | undefined;
+          const existing = existingRows[0];
           if (existing !== undefined) {
             // Lock is expired — update it
-            const updatedRows = await sql`
+            const updatedRows = await sql<LockRow[]>`
               UPDATE booking_locks
               SET owner_token = ${owner_token},
                   expires_at = ${expiresAt.toISOString()}::timestamptz,
@@ -90,16 +111,16 @@ export async function main(rawInput: unknown): Promise<{
               WHERE lock_key = ${lock_key} AND expires_at < NOW()
               RETURNING lock_id, lock_key, owner_token, provider_id, start_time, acquired_at, expires_at
             `;
-            const updated: Record<string, unknown> | undefined = updatedRows[0] as Record<string, unknown> | undefined;
+            const updated = updatedRows[0];
             if (updated !== undefined) {
               const lockInfo: LockInfo = {
-                lock_id: Number(updated['lock_id']),
-                lock_key: String(updated['lock_key']),
-                owner_token: String(updated['owner_token']),
-                provider_id: String(updated['provider_id']),
-                start_time: String(updated['start_time']),
-                acquired_at: String(updated['acquired_at']),
-                expires_at: String(updated['expires_at']),
+                lock_id: updated.lock_id,
+                lock_key: updated.lock_key,
+                owner_token: updated.owner_token,
+                provider_id: updated.provider_id,
+                start_time: updated.start_time,
+                acquired_at: updated.acquired_at,
+                expires_at: updated.expires_at,
               };
               return { success: true, data: { acquired: true, lock: lockInfo }, error_message: null };
             }
@@ -108,13 +129,13 @@ export async function main(rawInput: unknown): Promise<{
         }
 
         const lockInfo: LockInfo = {
-          lock_id: Number(row['lock_id']),
-          lock_key: String(row['lock_key']),
-          owner_token: String(row['owner_token']),
-          provider_id: String(row['provider_id']),
-          start_time: String(row['start_time']),
-          acquired_at: String(row['acquired_at']),
-          expires_at: String(row['expires_at']),
+          lock_id: row.lock_id,
+          lock_key: row.lock_key,
+          owner_token: row.owner_token,
+          provider_id: row.provider_id,
+          start_time: row.start_time,
+          acquired_at: row.acquired_at,
+          expires_at: row.expires_at,
         };
         return { success: true, data: { acquired: true, lock: lockInfo }, error_message: null };
       }
@@ -129,7 +150,7 @@ export async function main(rawInput: unknown): Promise<{
           WHERE lock_key = ${lock_key} AND owner_token = ${owner_token}
           RETURNING lock_key
         `;
-        const row: Record<string, unknown> | undefined = rows[0] as Record<string, unknown> | undefined;
+        const row = rows[0];
         if (row === undefined) {
           return { success: true, data: { released: false, reason: 'Lock not found or wrong owner' }, error_message: null };
         }
@@ -137,17 +158,17 @@ export async function main(rawInput: unknown): Promise<{
       }
 
       case 'check': {
-        const rows = await sql`
+        const rows = await sql<LockRow[]>`
           SELECT lock_id, lock_key, owner_token, provider_id, start_time, acquired_at, expires_at
           FROM booking_locks
           WHERE lock_key = ${lock_key} AND expires_at > NOW()
           LIMIT 1
         `;
-        const row: Record<string, unknown> | undefined = rows[0] as Record<string, unknown> | undefined;
+        const row = rows[0];
         if (row === undefined) {
           return { success: true, data: { locked: false }, error_message: null };
         }
-        return { success: true, data: { locked: true, owner: String(row['owner_token']), expires_at: String(row['expires_at']) }, error_message: null };
+        return { success: true, data: { locked: true, owner: row.owner_token, expires_at: row.expires_at }, error_message: null };
       }
 
       case 'cleanup': {
