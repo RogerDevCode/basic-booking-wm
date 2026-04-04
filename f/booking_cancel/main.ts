@@ -69,30 +69,19 @@ export async function main(
 
   try {
     // 1. Find booking
-    const bookingRows = await sql`
+    const bookingRows = await sql<BookingLookup[]>`
       SELECT booking_id, status, patient_id, provider_id,
              gcal_provider_event_id, gcal_patient_event_id
       FROM bookings
       WHERE booking_id = ${input.booking_id}::uuid
       LIMIT 1
     `;
-    const bookingRow: Record<string, unknown> | undefined = bookingRows[0] as Record<string, unknown> | undefined;
+    const bookingRow = bookingRows[0];
     if (bookingRow === undefined) {
       return { success: false, data: null, error_message: `Booking ${input.booking_id} not found` };
     }
 
-    const booking: BookingLookup = {
-      booking_id: String(bookingRow['booking_id']),
-      status: String(bookingRow['status']),
-      patient_id: String(bookingRow['patient_id']),
-      provider_id: String(bookingRow['provider_id']),
-      gcal_provider_event_id: typeof bookingRow['gcal_provider_event_id'] === 'string'
-        ? bookingRow['gcal_provider_event_id']
-        : null,
-      gcal_patient_event_id: typeof bookingRow['gcal_patient_event_id'] === 'string'
-        ? bookingRow['gcal_patient_event_id']
-        : null,
-    };
+    const booking: BookingLookup = bookingRow;
 
     // 2. Validate cancellable state
     if (!CANCELLABLE_STATUSES.includes(booking.status)) {
@@ -128,7 +117,7 @@ export async function main(
           [input.actor, input.reason ?? null, input.booking_id]
         );
 
-        const updRow: Record<string, unknown> | undefined = updRows[0] as Record<string, unknown> | undefined;
+        const updRow: UpdatedBooking | undefined = updRows[0] as UpdatedBooking | undefined;
         if (updRow === undefined) {
           throw new Error('Failed to update booking status');
         }
@@ -150,12 +139,10 @@ export async function main(
         );
 
         return {
-          booking_id: String(updRow['booking_id']),
-          status: String(updRow['status']),
-          cancelled_by: String(updRow['cancelled_by']),
-          cancellation_reason: typeof updRow['cancellation_reason'] === 'string'
-            ? updRow['cancellation_reason']
-            : null,
+          booking_id: updRow.booking_id,
+          status: updRow.status,
+          cancelled_by: updRow.cancelled_by,
+          cancellation_reason: updRow.cancellation_reason,
         };
       });
     } catch (e) {
