@@ -17,6 +17,15 @@ const InputSchema = z.object({
   idempotency_key: z.string().min(1).optional(),
 });
 
+interface PatientRow {
+  readonly patient_id: string;
+  readonly name: string;
+  readonly email: string | null;
+  readonly phone: string | null;
+  readonly telegram_chat_id: string | null;
+  readonly timezone: string;
+}
+
 interface PatientResult {
   readonly patient_id: string;
   readonly name: string;
@@ -52,30 +61,30 @@ export async function main(rawInput: unknown): Promise<{
 
   try {
     // Try to find existing patient
-    let existingRow: Record<string, unknown> | undefined;
+    let existingRow: PatientRow | undefined;
 
     if (email !== undefined) {
-      const rows = await sql`
+      const rows = await sql<PatientRow[]>`
         SELECT patient_id, name, email, phone, telegram_chat_id, timezone
         FROM patients WHERE email = ${email} LIMIT 1
       `;
-      existingRow = rows[0] as Record<string, unknown> | undefined;
+      existingRow = rows[0];
     }
 
     if (existingRow === undefined && telegram_chat_id !== undefined) {
-      const rows = await sql`
+      const rows = await sql<PatientRow[]>`
         SELECT patient_id, name, email, phone, telegram_chat_id, timezone
         FROM patients WHERE telegram_chat_id = ${telegram_chat_id} LIMIT 1
       `;
-      existingRow = rows[0] as Record<string, unknown> | undefined;
+      existingRow = rows[0];
     }
 
     if (existingRow === undefined && phone !== undefined) {
-      const rows = await sql`
+      const rows = await sql<PatientRow[]>`
         SELECT patient_id, name, email, phone, telegram_chat_id, timezone
         FROM patients WHERE phone = ${phone} LIMIT 1
       `;
-      existingRow = rows[0] as Record<string, unknown> | undefined;
+      existingRow = rows[0];
     }
 
     if (existingRow !== undefined) {
@@ -88,17 +97,17 @@ export async function main(rawInput: unknown): Promise<{
             phone = COALESCE(${phone ?? null}, phone),
             telegram_chat_id = COALESCE(${telegram_chat_id ?? null}, telegram_chat_id),
             updated_at = NOW()
-        WHERE patient_id = ${String(existingRow['patient_id'])}::uuid
+        WHERE patient_id = ${existingRow.patient_id}::uuid
       `;
 
       return {
         success: true,
         data: {
-          patient_id: String(existingRow['patient_id']),
+          patient_id: existingRow.patient_id,
           name,
-          email: typeof existingRow['email'] === 'string' ? existingRow['email'] : null,
-          phone: typeof existingRow['phone'] === 'string' ? existingRow['phone'] : null,
-          telegram_chat_id: typeof existingRow['telegram_chat_id'] === 'string' ? existingRow['telegram_chat_id'] : null,
+          email: existingRow.email,
+          phone: existingRow.phone,
+          telegram_chat_id: existingRow.telegram_chat_id,
           timezone,
           created: false,
         },
@@ -107,7 +116,7 @@ export async function main(rawInput: unknown): Promise<{
     }
 
     // Create new patient
-    const rows = await sql`
+    const rows = await sql<PatientRow[]>`
       INSERT INTO patients (name, email, phone, telegram_chat_id, timezone)
       VALUES (${name}, ${email ?? null}, ${phone ?? null}, ${telegram_chat_id ?? null}, ${timezone})
       ON CONFLICT (email) DO UPDATE SET
@@ -117,7 +126,7 @@ export async function main(rawInput: unknown): Promise<{
       RETURNING patient_id, name, email, phone, telegram_chat_id, timezone
     `;
 
-    const newRow: Record<string, unknown> | undefined = rows[0] as Record<string, unknown> | undefined;
+    const newRow = rows[0];
     if (newRow === undefined) {
       return { success: false, data: null, error_message: 'Failed to create patient' };
     }
@@ -125,12 +134,12 @@ export async function main(rawInput: unknown): Promise<{
     return {
       success: true,
       data: {
-        patient_id: String(newRow['patient_id']),
-        name: String(newRow['name']),
-        email: typeof newRow['email'] === 'string' ? newRow['email'] : null,
-        phone: typeof newRow['phone'] === 'string' ? newRow['phone'] : null,
-        telegram_chat_id: typeof newRow['telegram_chat_id'] === 'string' ? newRow['telegram_chat_id'] : null,
-        timezone: String(newRow['timezone']),
+        patient_id: newRow.patient_id,
+        name: newRow.name,
+        email: newRow.email,
+        phone: newRow.phone,
+        telegram_chat_id: newRow.telegram_chat_id,
+        timezone: newRow.timezone,
         created: true,
       },
       error_message: null,
