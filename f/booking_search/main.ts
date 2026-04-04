@@ -19,9 +19,30 @@ const InputSchema = z.object({
   limit: z.number().int().min(1).max(100).default(20),
 });
 
+interface BookingSearchRow {
+  readonly booking_id: string;
+  readonly start_time: string;
+  readonly end_time: string;
+  readonly status: string;
+  readonly idempotency_key: string;
+  readonly gcal_sync_status: string;
+  readonly notification_sent: boolean;
+  readonly created_at: string;
+  readonly provider_name: string;
+  readonly patient_name: string;
+  readonly service_name: string;
+}
+
+interface BookingSearchResult {
+  readonly bookings: BookingSearchRow[];
+  readonly total: number;
+  readonly offset: number;
+  readonly limit: number;
+}
+
 export async function main(rawInput: unknown): Promise<{
   success: boolean;
-  data: { bookings: Record<string, unknown>[]; total: number; offset: number; limit: number } | null;
+  data: BookingSearchResult | null;
   error_message: string | null;
 }> {
   const parsed = InputSchema.safeParse(rawInput);
@@ -81,8 +102,8 @@ export async function main(rawInput: unknown): Promise<{
       'SELECT COUNT(*) as total FROM bookings b ' + whereClause,
       params
     );
-    const countRow: Record<string, unknown> | undefined = countRows[0] as Record<string, unknown> | undefined;
-    const total = countRow !== undefined ? Number(countRow['total']) : 0;
+    const countRow = countRows[0] as { total: string | number } | undefined;
+    const total = countRow !== undefined ? Number(countRow.total) : 0;
 
     // Fetch bookings
     const bookingRows = await sql.unsafe(
@@ -97,12 +118,12 @@ export async function main(rawInput: unknown): Promise<{
       ' ORDER BY b.start_time DESC' +
       ' LIMIT $' + String(paramIdx) + ' OFFSET $' + String(paramIdx + 1),
       params.concat([input.limit, input.offset])
-    );
+    ) as BookingSearchRow[];
 
     return {
       success: true,
       data: {
-        bookings: bookingRows as Record<string, unknown>[],
+        bookings: bookingRows,
         total: total,
         offset: input.offset,
         limit: input.limit,
