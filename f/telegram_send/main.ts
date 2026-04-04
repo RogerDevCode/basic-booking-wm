@@ -40,7 +40,40 @@ const InputSchema = z.object({
   parse_mode: z.enum(['MarkdownV2', 'HTML', 'None']).optional().default('MarkdownV2'),
 });
 
-type InlineButton = Readonly<{ text: string; callback_data: string }>;
+type BookingDetails = Readonly<Record<string, unknown>>;
+
+interface InlineButton {
+  readonly text: string;
+  readonly callback_data: string;
+}
+
+type ReplyMarkup =
+  | { readonly remove_keyboard: true }
+  | { readonly keyboard: Readonly<{ readonly text: string }[][]>; readonly resize_keyboard: true; readonly one_time_keyboard: boolean }
+  | { readonly force_reply: true; readonly input_field_placeholder: string }
+  | { readonly inline_keyboard: Readonly<InlineButton[][]> }
+  | undefined;
+
+interface TelegramApiResponse {
+  readonly ok: boolean;
+  readonly result?: { readonly message_id?: number };
+  readonly description?: string;
+  readonly error_code?: number;
+  readonly parameters?: { readonly retry_after?: number };
+}
+
+interface TelegramSendResult {
+  readonly sent: boolean;
+  readonly message_id: number | null;
+  readonly error: string | null;
+}
+
+interface TelegramSendData {
+  readonly sent: boolean;
+  readonly message_id: number | null;
+  readonly chat_id: string;
+  readonly message_type: string;
+}
 
 function sanitizeForMarkdownV2(text: string): string {
   return text.replace(/([_*[\]()~`>#+\-=|{}.!\\])/g, '\\$1');
@@ -56,7 +89,7 @@ function safeString(value: unknown, fallback = ''): string {
 
 function buildMessage(
   messageType: string,
-  details: Readonly<Record<string, unknown>>,
+  details: BookingDetails,
   parseMode: string
 ): string {
   const isMd = parseMode === 'MarkdownV2';
@@ -121,7 +154,7 @@ function buildReplyMarkup(options: {
   force_reply?: boolean;
   reply_placeholder?: string;
   remove_keyboard?: boolean;
-}): Record<string, unknown> | undefined {
+}): ReplyMarkup {
   const { inline_buttons = [], reply_keyboard, force_reply = false, reply_placeholder = 'Escribe aquí...', remove_keyboard = false } = options;
 
   if (remove_keyboard) {
@@ -162,9 +195,9 @@ async function sendWithRetry(
   botToken: string,
   chatId: string,
   message: string,
-  replyMarkup: Record<string, unknown> | undefined,
+  replyMarkup: ReplyMarkup,
   parseMode: string
-): Promise<{ sent: boolean; message_id: number | null; error: string | null }> {
+): Promise<TelegramSendResult> {
   const maxRetries = 3;
   let lastError: string | null = null;
 
@@ -194,30 +227,25 @@ async function sendWithRetry(
         signal: AbortSignal.timeout(10000),
       });
 
-      const data = await response.json() as Record<string, unknown>;
+      const data = await response.json() as TelegramApiResponse;
 
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-      if (response.ok && typeof data === 'object' && data !== null && 'result' in data) {
-        const result = data['result'] as Record<string, unknown>;
+      if (response.ok && data.result != null) {
         return {
           sent: true,
-          message_id: typeof result['message_id'] === 'number' ? result['message_id'] : null,
+          message_id: typeof data.result.message_id === 'number' ? data.result.message_id : null,
           error: null,
         };
       }
 
-      const errorDesc = typeof data['description'] === 'string' ? data['description'] : 'Unknown error';
-      const errorCode = typeof data['error_code'] === 'number' ? data['error_code'] : 0;
+      const errorDesc = typeof data.description === 'string' ? data.description : 'Unknown error';
+      const errorCode = typeof data.error_code === 'number' ? data.error_code : 0;
 
       if (errorCode >= 400 && errorCode < 500 && errorCode !== 429) {
         return { sent: false, message_id: null, error: `Permanent error (${String(errorCode)}): ${errorDesc}` };
       }
 
-      // Handle rate limiting (429) — respect Retry-After header
       if (errorCode === 429) {
-        const retryAfter = typeof data['parameters'] === 'object' && data['parameters'] !== null
-          ? Number((data['parameters'] as Record<string, unknown>)['retry_after'] ?? 1)
-          : 1;
+        const retryAfter = typeof data.parameters?.retry_after === 'number' ? data.parameters.retry_after : 1;
         const waitMs = Math.min(retryAfter * 1000, 30000);
         await new Promise(resolve => setTimeout(resolve, waitMs));
       }
@@ -236,7 +264,7 @@ async function sendWithRetry(
   return { sent: false, message_id: null, error: `Failed after ${String(maxRetries)} retries: ${lastError ?? 'Unknown error'}` };
 }
 
-export async function main(rawInput: unknown): Promise<{ success: boolean; data: Record<string, unknown> | null; error_message: string | null }> {
+export async function main(rawInput: unknown): Promise<{ success: boolean; data: TelegramSendData | null; error_message: string | null }> {
   try {
     const parsed = InputSchema.safeParse(rawInput);
     if (!parsed.success) {
