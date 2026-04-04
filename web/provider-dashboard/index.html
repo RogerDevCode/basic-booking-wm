@@ -7,11 +7,6 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Source+Sans+3:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
-    /* ═══════════════════════════════════════════════════════
-       CHILEAN PALETTE — Bandera de Chile
-       Rojo: #D52B1E  |  Azul: #0039A6  |  Blanco: #FFFFFF
-       ═══════════════════════════════════════════════════════ */
-
     :root {
       --chile-red: #D52B1E;
       --chile-red-dark: #B8241A;
@@ -30,464 +25,57 @@
       --gray-700: #343A40;
       --gray-800: #212529;
       --gray-900: #1A1D21;
-
       --success: #2B8A3E;
       --success-bg: #EBFBEE;
       --warning: #E67700;
       --warning-bg: #FFF4E6;
       --danger: var(--chile-red);
       --danger-bg: #FFF5F5;
-
       --font-display: 'DM Serif Display', Georgia, serif;
       --font-body: 'Source Sans 3', -apple-system, sans-serif;
       --font-mono: 'JetBrains Mono', monospace;
-
       --shadow-sm: 0 1px 2px rgba(0,0,0,0.04), 0 1px 3px rgba(0,0,0,0.06);
       --shadow-md: 0 4px 6px rgba(0,0,0,0.04), 0 2px 4px rgba(0,0,0,0.06);
       --shadow-lg: 0 10px 15px rgba(0,0,0,0.06), 0 4px 6px rgba(0,0,0,0.04);
-      --shadow-xl: 0 20px 25px rgba(0,0,0,0.08), 0 8px 10px rgba(0,0,0,0.04);
-
       --radius-sm: 6px;
       --radius-md: 10px;
       --radius-lg: 16px;
-      --radius-xl: 24px;
-
       --transition: 180ms cubic-bezier(0.4, 0, 0.2, 1);
     }
-
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: var(--font-body); background: var(--off-white); color: var(--gray-800); line-height: 1.6; min-height: 100vh; -webkit-font-smoothing: antialiased; }
 
-    body {
-      font-family: var(--font-body);
-      background: var(--off-white);
-      color: var(--gray-800);
-      line-height: 1.6;
-      min-height: 100vh;
-      -webkit-font-smoothing: antialiased;
+    /* ─── CONFIG OVERLAY ─────────────────────────────── */
+    .config-overlay {
+      position: fixed; inset: 0; z-index: 9999;
+      background: rgba(0,0,0,0.6);
+      display: flex; align-items: center; justify-content: center;
+      backdrop-filter: blur(4px);
     }
-
-    /* ─── HEADER ─────────────────────────────────────── */
-    .header {
-      background: linear-gradient(135deg, var(--chile-blue) 0%, var(--chile-blue-dark) 100%);
-      color: var(--white);
-      padding: 0 2rem;
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      box-shadow: 0 2px 12px rgba(0,57,166,0.25);
-    }
-
-    .header-inner {
-      max-width: 1400px;
-      margin: 0 auto;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      height: 64px;
-    }
-
-    .header-brand {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-    }
-
-    .header-logo {
-      width: 36px;
-      height: 36px;
-      background: var(--white);
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.1rem;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-    }
-
-    .header-title {
-      font-family: var(--font-display);
-      font-size: 1.25rem;
-      font-weight: 400;
-      letter-spacing: -0.01em;
-    }
-
-    .header-user {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      font-size: 0.875rem;
-      font-weight: 500;
-    }
-
-    .header-avatar {
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
-      background: rgba(255,255,255,0.15);
-      border: 2px solid rgba(255,255,255,0.3);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 600;
-      font-size: 0.8rem;
-    }
-
-    /* ─── NAV TABS ───────────────────────────────────── */
-    .nav-tabs {
-      background: var(--white);
-      border-bottom: 1px solid var(--gray-200);
-      padding: 0 2rem;
-    }
-
-    .nav-tabs-inner {
-      max-width: 1400px;
-      margin: 0 auto;
-      display: flex;
-      gap: 0;
-    }
-
-    .nav-tab {
-      padding: 0.875rem 1.25rem;
-      font-size: 0.875rem;
-      font-weight: 500;
-      color: var(--gray-500);
-      border: none;
-      background: none;
-      cursor: pointer;
-      border-bottom: 2px solid transparent;
-      transition: all var(--transition);
-      font-family: var(--font-body);
-    }
-
-    .nav-tab:hover { color: var(--gray-700); }
-
-    .nav-tab.active {
-      color: var(--chile-blue);
-      border-bottom-color: var(--chile-blue);
-      font-weight: 600;
-    }
-
-    /* ─── MAIN LAYOUT ────────────────────────────────── */
-    .main {
-      max-width: 1400px;
-      margin: 0 auto;
-      padding: 1.5rem 2rem 3rem;
-    }
-
-    .tab-content { display: none; }
-    .tab-content.active { display: block; }
-
-    /* ─── STATS ROW ──────────────────────────────────── */
-    .stats-row {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 1rem;
-      margin-bottom: 1.5rem;
-    }
-
-    .stat-card {
-      background: var(--white);
-      border-radius: var(--radius-md);
-      padding: 1.25rem 1.5rem;
-      box-shadow: var(--shadow-sm);
-      border: 1px solid var(--gray-100);
-      transition: all var(--transition);
-    }
-
-    .stat-card:hover {
-      box-shadow: var(--shadow-md);
-      transform: translateY(-1px);
-    }
-
-    .stat-label {
-      font-size: 0.75rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: var(--gray-500);
-      margin-bottom: 0.375rem;
-    }
-
-    .stat-value {
-      font-family: var(--font-display);
-      font-size: 1.75rem;
-      color: var(--gray-900);
-      line-height: 1.2;
-    }
-
-    .stat-value.accent { color: var(--chile-blue); }
-    .stat-value.danger { color: var(--chile-red); }
-    .stat-value.success { color: var(--success); }
-
-    /* ─── CALENDAR VIEW ──────────────────────────────── */
-    .calendar-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 1rem;
-    }
-
-    .calendar-nav {
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-    }
-
-    .calendar-month {
-      font-family: var(--font-display);
-      font-size: 1.5rem;
-      color: var(--gray-900);
-    }
-
-    .btn-icon {
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
-      border: 1px solid var(--gray-200);
-      background: var(--white);
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: all var(--transition);
-      color: var(--gray-600);
-      font-size: 1rem;
-    }
-
-    .btn-icon:hover {
-      background: var(--gray-50);
-      border-color: var(--gray-300);
-      color: var(--gray-800);
-    }
-
-    .btn-today {
-      padding: 0.5rem 1rem;
-      border-radius: var(--radius-sm);
-      border: 1px solid var(--chile-blue);
-      background: var(--white);
-      color: var(--chile-blue);
-      font-weight: 600;
-      font-size: 0.8rem;
-      cursor: pointer;
-      font-family: var(--font-body);
-      transition: all var(--transition);
-    }
-
-    .btn-today:hover {
-      background: var(--chile-blue);
-      color: var(--white);
-    }
-
-    /* ─── WEEK GRID ──────────────────────────────────── */
-    .week-grid {
-      display: grid;
-      grid-template-columns: repeat(7, 1fr);
-      gap: 0.5rem;
-      margin-bottom: 1.5rem;
-    }
-
-    .week-day {
-      background: var(--white);
-      border-radius: var(--radius-md);
-      padding: 1rem;
-      border: 1px solid var(--gray-100);
-      cursor: pointer;
-      transition: all var(--transition);
-      min-height: 120px;
-      display: flex;
-      flex-direction: column;
-    }
-
-    .week-day:hover {
-      border-color: var(--chile-blue-light);
-      box-shadow: var(--shadow-md);
-    }
-
-    .week-day.selected {
-      border-color: var(--chile-blue);
-      box-shadow: 0 0 0 2px rgba(0,57,166,0.15);
-    }
-
-    .week-day.blocked {
-      background: var(--gray-50);
-      border-color: var(--gray-200);
-    }
-
-    .week-day.today {
-      border-color: var(--chile-red);
-    }
-
-    .week-day-name {
-      font-size: 0.7rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      color: var(--gray-500);
-      margin-bottom: 0.25rem;
-    }
-
-    .week-day-number {
-      font-family: var(--font-display);
-      font-size: 1.5rem;
-      color: var(--gray-900);
-      line-height: 1;
-      margin-bottom: 0.5rem;
-    }
-
-    .week-day.today .week-day-number {
-      color: var(--chile-red);
-    }
-
-    .week-day-count {
-      font-size: 0.7rem;
-      font-weight: 500;
-      color: var(--gray-400);
-      margin-top: auto;
-    }
-
-    .week-day-count.has-bookings {
-      color: var(--chile-blue);
-      font-weight: 600;
-    }
-
-    .week-day-blocked-badge {
-      margin-top: auto;
-      font-size: 0.65rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      color: var(--white);
-      background: var(--gray-400);
-      padding: 0.2rem 0.5rem;
-      border-radius: 3px;
-    }
-
-    /* ─── SLOTS PANEL ────────────────────────────────── */
-    .slots-panel {
-      display: grid;
-      grid-template-columns: 1fr 340px;
-      gap: 1.5rem;
-    }
-
-    @media (max-width: 900px) {
-      .slots-panel { grid-template-columns: 1fr; }
-    }
-
-    .panel-card {
+    .config-overlay.hidden { display: none; }
+    .config-card {
       background: var(--white);
       border-radius: var(--radius-lg);
-      box-shadow: var(--shadow-sm);
-      border: 1px solid var(--gray-100);
-      overflow: hidden;
+      padding: 2.5rem;
+      width: 100%;
+      max-width: 440px;
+      box-shadow: var(--shadow-xl);
     }
-
-    .panel-header {
-      padding: 1.25rem 1.5rem;
-      border-bottom: 1px solid var(--gray-100);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .panel-title {
+    .config-title {
       font-family: var(--font-display);
-      font-size: 1.125rem;
-      color: var(--gray-900);
+      font-size: 1.5rem;
+      color: var(--chile-blue);
+      margin-bottom: 0.5rem;
     }
-
-    .panel-subtitle {
-      font-size: 0.8rem;
-      color: var(--gray-500);
-      font-weight: 400;
-    }
-
-    .panel-body { padding: 1.25rem 1.5rem; }
-
-    /* ─── SLOT LIST ──────────────────────────────────── */
-    .slot-list { display: flex; flex-direction: column; gap: 0.5rem; }
-
-    .slot-item {
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-      padding: 0.875rem 1rem;
-      border-radius: var(--radius-sm);
-      border: 1px solid var(--gray-100);
-      transition: all var(--transition);
-    }
-
-    .slot-item:hover {
-      background: var(--gray-50);
-      border-color: var(--gray-200);
-    }
-
-    .slot-item.booked {
-      background: var(--chile-blue);
-      border-color: var(--chile-blue);
-      color: var(--white);
-    }
-
-    .slot-item.booked:hover {
-      background: var(--chile-blue-dark);
-    }
-
-    .slot-time {
-      font-family: var(--font-mono);
-      font-size: 0.85rem;
-      font-weight: 500;
-      min-width: 100px;
-    }
-
-    .slot-item.booked .slot-time {
-      color: rgba(255,255,255,0.85);
-    }
-
-    .slot-patient {
-      font-weight: 500;
+    .config-subtitle {
       font-size: 0.875rem;
-    }
-
-    .slot-service {
-      font-size: 0.75rem;
       color: var(--gray-500);
+      margin-bottom: 1.5rem;
     }
-
-    .slot-item.booked .slot-service {
-      color: rgba(255,255,255,0.7);
-    }
-
-    .slot-status {
-      margin-left: auto;
-      font-size: 0.7rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      padding: 0.2rem 0.6rem;
-      border-radius: 99px;
-    }
-
-    .slot-status.available {
-      background: var(--success-bg);
-      color: var(--success);
-    }
-
-    .slot-status.booked-badge {
-      background: rgba(255,255,255,0.2);
-      color: var(--white);
-    }
-
-    /* ─── BLOCK DATE PANEL ───────────────────────────── */
-    .block-form { display: flex; flex-direction: column; gap: 1rem; }
-
+    .config-form { display: flex; flex-direction: column; gap: 1rem; }
     .form-group { display: flex; flex-direction: column; gap: 0.375rem; }
-
-    .form-label {
-      font-size: 0.8rem;
-      font-weight: 600;
-      color: var(--gray-700);
-    }
-
-    .form-input, .form-select, .form-textarea {
+    .form-label { font-size: 0.8rem; font-weight: 600; color: var(--gray-700); }
+    .form-input {
       padding: 0.625rem 0.875rem;
       border: 1px solid var(--gray-200);
       border-radius: var(--radius-sm);
@@ -497,15 +85,7 @@
       background: var(--white);
       transition: all var(--transition);
     }
-
-    .form-input:focus, .form-select:focus, .form-textarea:focus {
-      outline: none;
-      border-color: var(--chile-blue);
-      box-shadow: 0 0 0 3px rgba(0,57,166,0.1);
-    }
-
-    .form-textarea { resize: vertical; min-height: 80px; }
-
+    .form-input:focus { outline: none; border-color: var(--chile-blue); box-shadow: 0 0 0 3px rgba(0,57,166,0.1); }
     .btn {
       padding: 0.625rem 1.25rem;
       border-radius: var(--radius-sm);
@@ -515,163 +95,203 @@
       cursor: pointer;
       border: none;
       transition: all var(--transition);
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.5rem;
+      display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
     }
-
-    .btn-primary {
-      background: var(--chile-blue);
-      color: var(--white);
-    }
-
-    .btn-primary:hover {
-      background: var(--chile-blue-dark);
-      box-shadow: var(--shadow-md);
-    }
-
-    .btn-danger {
-      background: var(--chile-red);
-      color: var(--white);
-    }
-
-    .btn-danger:hover {
-      background: var(--chile-red-dark);
-    }
-
-    .btn-outline {
-      background: var(--white);
-      color: var(--gray-700);
-      border: 1px solid var(--gray-200);
-    }
-
-    .btn-outline:hover {
-      background: var(--gray-50);
-      border-color: var(--gray-300);
-    }
-
+    .btn-primary { background: var(--chile-blue); color: var(--white); }
+    .btn-primary:hover { background: var(--chile-blue-dark); box-shadow: var(--shadow-md); }
+    .btn-danger { background: var(--chile-red); color: var(--white); }
+    .btn-danger:hover { background: var(--chile-red-dark); }
+    .btn-outline { background: var(--white); color: var(--gray-700); border: 1px solid var(--gray-200); }
+    .btn-outline:hover { background: var(--gray-50); border-color: var(--gray-300); }
     .btn-full { width: 100%; }
+    .config-error { color: var(--chile-red); font-size: 0.8rem; font-weight: 500; display: none; }
+    .config-error.visible { display: block; }
+
+    /* ─── HEADER ─────────────────────────────────────── */
+    .header {
+      background: linear-gradient(135deg, var(--chile-blue) 0%, var(--chile-blue-dark) 100%);
+      color: var(--white);
+      padding: 0 2rem;
+      position: sticky; top: 0; z-index: 100;
+      box-shadow: 0 2px 12px rgba(0,57,166,0.25);
+    }
+    .header-inner { max-width: 1400px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; height: 64px; }
+    .header-brand { display: flex; align-items: center; gap: 0.75rem; }
+    .header-logo {
+      width: 36px; height: 36px; background: var(--white); border-radius: 8px;
+      display: flex; align-items: center; justify-content: center; font-size: 1.1rem;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+    .header-title { font-family: var(--font-display); font-size: 1.25rem; font-weight: 400; letter-spacing: -0.01em; }
+    .header-user { display: flex; align-items: center; gap: 0.75rem; font-size: 0.875rem; font-weight: 500; }
+    .header-avatar {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: rgba(255,255,255,0.15); border: 2px solid rgba(255,255,255,0.3);
+      display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 0.8rem;
+    }
+    .btn-logout {
+      background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+      color: var(--white); padding: 0.375rem 0.75rem; border-radius: var(--radius-sm);
+      font-size: 0.75rem; font-weight: 600; cursor: pointer; font-family: var(--font-body);
+      transition: all var(--transition);
+    }
+    .btn-logout:hover { background: rgba(255,255,255,0.2); }
+
+    /* ─── NAV TABS ───────────────────────────────────── */
+    .nav-tabs { background: var(--white); border-bottom: 1px solid var(--gray-200); padding: 0 2rem; }
+    .nav-tabs-inner { max-width: 1400px; margin: 0 auto; display: flex; gap: 0; }
+    .nav-tab {
+      padding: 0.875rem 1.25rem; font-size: 0.875rem; font-weight: 500; color: var(--gray-500);
+      border: none; background: none; cursor: pointer; border-bottom: 2px solid transparent;
+      transition: all var(--transition); font-family: var(--font-body);
+    }
+    .nav-tab:hover { color: var(--gray-700); }
+    .nav-tab.active { color: var(--chile-blue); border-bottom-color: var(--chile-blue); font-weight: 600; }
+
+    /* ─── MAIN ───────────────────────────────────────── */
+    .main { max-width: 1400px; margin: 0 auto; padding: 1.5rem 2rem 3rem; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* ─── STATS ──────────────────────────────────────── */
+    .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+    .stat-card {
+      background: var(--white); border-radius: var(--radius-md); padding: 1.25rem 1.5rem;
+      box-shadow: var(--shadow-sm); border: 1px solid var(--gray-100); transition: all var(--transition);
+    }
+    .stat-card:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
+    .stat-label { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gray-500); margin-bottom: 0.375rem; }
+    .stat-value { font-family: var(--font-display); font-size: 1.75rem; color: var(--gray-900); line-height: 1.2; }
+    .stat-value.accent { color: var(--chile-blue); }
+    .stat-value.success { color: var(--success); }
+
+    /* ─── CALENDAR ───────────────────────────────────── */
+    .calendar-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+    .calendar-nav { display: flex; align-items: center; gap: 1rem; }
+    .calendar-month { font-family: var(--font-display); font-size: 1.5rem; color: var(--gray-900); }
+    .btn-icon {
+      width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--gray-200);
+      background: var(--white); cursor: pointer; display: flex; align-items: center; justify-content: center;
+      transition: all var(--transition); color: var(--gray-600); font-size: 1rem;
+    }
+    .btn-icon:hover { background: var(--gray-50); border-color: var(--gray-300); color: var(--gray-800); }
+    .btn-today {
+      padding: 0.5rem 1rem; border-radius: var(--radius-sm); border: 1px solid var(--chile-blue);
+      background: var(--white); color: var(--chile-blue); font-weight: 600; font-size: 0.8rem;
+      cursor: pointer; font-family: var(--font-body); transition: all var(--transition);
+    }
+    .btn-today:hover { background: var(--chile-blue); color: var(--white); }
+
+    /* ─── WEEK GRID ──────────────────────────────────── */
+    .week-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 0.5rem; margin-bottom: 1.5rem; }
+    .week-day {
+      background: var(--white); border-radius: var(--radius-md); padding: 1rem;
+      border: 1px solid var(--gray-100); cursor: pointer; transition: all var(--transition); min-height: 120px;
+      display: flex; flex-direction: column;
+    }
+    .week-day:hover { border-color: var(--chile-blue-light); box-shadow: var(--shadow-md); }
+    .week-day.selected { border-color: var(--chile-blue); box-shadow: 0 0 0 2px rgba(0,57,166,0.15); }
+    .week-day.blocked { background: var(--gray-50); border-color: var(--gray-200); }
+    .week-day.today { border-color: var(--chile-red); }
+    .week-day.loading { opacity: 0.5; pointer-events: none; }
+    .week-day-name { font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--gray-500); margin-bottom: 0.25rem; }
+    .week-day-number { font-family: var(--font-display); font-size: 1.5rem; color: var(--gray-900); line-height: 1; margin-bottom: 0.5rem; }
+    .week-day.today .week-day-number { color: var(--chile-red); }
+    .week-day-count { font-size: 0.7rem; font-weight: 500; color: var(--gray-400); margin-top: auto; }
+    .week-day-count.has-bookings { color: var(--chile-blue); font-weight: 600; }
+    .week-day-blocked-badge {
+      margin-top: auto; font-size: 0.65rem; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.04em; color: var(--white); background: var(--gray-400);
+      padding: 0.2rem 0.5rem; border-radius: 3px;
+    }
+
+    /* ─── SLOTS PANEL ────────────────────────────────── */
+    .slots-panel { display: grid; grid-template-columns: 1fr 340px; gap: 1.5rem; }
+    @media (max-width: 900px) { .slots-panel { grid-template-columns: 1fr; } }
+    .panel-card {
+      background: var(--white); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm);
+      border: 1px solid var(--gray-100); overflow: hidden;
+    }
+    .panel-header { padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--gray-100); display: flex; align-items: center; justify-content: space-between; }
+    .panel-title { font-family: var(--font-display); font-size: 1.125rem; color: var(--gray-900); }
+    .panel-subtitle { font-size: 0.8rem; color: var(--gray-500); font-weight: 400; }
+    .panel-body { padding: 1.25rem 1.5rem; }
+
+    /* ─── SLOT LIST ──────────────────────────────────── */
+    .slot-list { display: flex; flex-direction: column; gap: 0.5rem; }
+    .slot-item {
+      display: flex; align-items: center; gap: 1rem; padding: 0.875rem 1rem;
+      border-radius: var(--radius-sm); border: 1px solid var(--gray-100); transition: all var(--transition);
+    }
+    .slot-item:hover { background: var(--gray-50); border-color: var(--gray-200); }
+    .slot-item.booked { background: var(--chile-blue); border-color: var(--chile-blue); color: var(--white); }
+    .slot-item.booked:hover { background: var(--chile-blue-dark); }
+    .slot-time { font-family: var(--font-mono); font-size: 0.85rem; font-weight: 500; min-width: 100px; }
+    .slot-item.booked .slot-time { color: rgba(255,255,255,0.85); }
+    .slot-patient { font-weight: 500; font-size: 0.875rem; }
+    .slot-service { font-size: 0.75rem; color: var(--gray-500); }
+    .slot-item.booked .slot-service { color: rgba(255,255,255,0.7); }
+    .slot-status {
+      margin-left: auto; font-size: 0.7rem; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.04em; padding: 0.2rem 0.6rem; border-radius: 99px;
+    }
+    .slot-status.available { background: var(--success-bg); color: var(--success); }
+    .slot-status.booked-badge { background: rgba(255,255,255,0.2); color: var(--white); }
+
+    /* ─── BLOCK FORM ─────────────────────────────────── */
+    .block-form { display: flex; flex-direction: column; gap: 1rem; }
+    .form-select, .form-textarea {
+      padding: 0.625rem 0.875rem; border: 1px solid var(--gray-200); border-radius: var(--radius-sm);
+      font-family: var(--font-body); font-size: 0.875rem; color: var(--gray-800);
+      background: var(--white); transition: all var(--transition);
+    }
+    .form-select:focus, .form-textarea:focus { outline: none; border-color: var(--chile-blue); box-shadow: 0 0 0 3px rgba(0,57,166,0.1); }
+    .form-textarea { resize: vertical; min-height: 80px; }
 
     /* ─── SCHEDULE EDITOR ────────────────────────────── */
-    .schedule-grid {
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-    }
-
+    .schedule-grid { display: flex; flex-direction: column; gap: 0.5rem; }
     .schedule-row {
-      display: grid;
-      grid-template-columns: 100px 1fr 1fr 40px;
-      gap: 0.75rem;
-      align-items: center;
-      padding: 0.75rem 1rem;
-      border-radius: var(--radius-sm);
-      background: var(--gray-50);
+      display: grid; grid-template-columns: 100px 1fr 1fr 40px; gap: 0.75rem; align-items: center;
+      padding: 0.75rem 1rem; border-radius: var(--radius-sm); background: var(--gray-50);
     }
-
-    .schedule-row.disabled {
-      opacity: 0.5;
-    }
-
-    .schedule-day {
-      font-weight: 600;
-      font-size: 0.85rem;
-      color: var(--gray-700);
-    }
-
+    .schedule-row.disabled { opacity: 0.5; }
+    .schedule-day { font-weight: 600; font-size: 0.85rem; color: var(--gray-700); }
     .schedule-toggle {
-      width: 40px;
-      height: 24px;
-      border-radius: 12px;
-      border: none;
-      cursor: pointer;
-      position: relative;
-      transition: all var(--transition);
+      width: 40px; height: 24px; border-radius: 12px; border: none; cursor: pointer;
+      position: relative; transition: all var(--transition);
     }
-
     .schedule-toggle.on { background: var(--chile-blue); }
     .schedule-toggle.off { background: var(--gray-300); }
-
     .schedule-toggle::after {
-      content: '';
-      position: absolute;
-      width: 18px;
-      height: 18px;
-      border-radius: 50%;
-      background: var(--white);
-      top: 3px;
-      left: 3px;
-      transition: all var(--transition);
+      content: ''; position: absolute; width: 18px; height: 18px; border-radius: 50%;
+      background: var(--white); top: 3px; left: 3px; transition: all var(--transition);
       box-shadow: 0 1px 3px rgba(0,0,0,0.15);
     }
-
     .schedule-toggle.on::after { left: 19px; }
 
     /* ─── TOAST ──────────────────────────────────────── */
-    .toast-container {
-      position: fixed;
-      bottom: 1.5rem;
-      right: 1.5rem;
-      z-index: 1000;
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-    }
-
+    .toast-container { position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 1000; display: flex; flex-direction: column; gap: 0.5rem; }
     .toast {
-      padding: 0.875rem 1.25rem;
-      border-radius: var(--radius-md);
-      font-size: 0.875rem;
-      font-weight: 500;
-      box-shadow: var(--shadow-lg);
-      animation: slideIn 0.3s ease;
-      max-width: 360px;
+      padding: 0.875rem 1.25rem; border-radius: var(--radius-md); font-size: 0.875rem; font-weight: 500;
+      box-shadow: var(--shadow-lg); animation: slideIn 0.3s ease; max-width: 360px;
     }
+    .toast.success { background: var(--success); color: var(--white); }
+    .toast.error { background: var(--chile-red); color: var(--white); }
+    .toast.info { background: var(--chile-blue); color: var(--white); }
+    @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 
-    .toast.success {
-      background: var(--success);
-      color: var(--white);
+    /* ─── EMPTY / LOADING ────────────────────────────── */
+    .empty-state { text-align: center; padding: 3rem 1.5rem; color: var(--gray-400); }
+    .empty-state-icon { font-size: 2.5rem; margin-bottom: 0.75rem; }
+    .empty-state-text { font-size: 0.9rem; font-weight: 500; }
+    .loading-spinner {
+      display: inline-block; width: 20px; height: 20px; border: 2px solid var(--gray-300);
+      border-top-color: var(--chile-blue); border-radius: 50%; animation: spin 0.6s linear infinite;
     }
+    @keyframes spin { to { transform: rotate(360deg); } }
 
-    .toast.error {
-      background: var(--chile-red);
-      color: var(--white);
-    }
-
-    .toast.info {
-      background: var(--chile-blue);
-      color: var(--white);
-    }
-
-    @keyframes slideIn {
-      from { transform: translateX(100%); opacity: 0; }
-      to { transform: translateX(0); opacity: 1; }
-    }
-
-    /* ─── EMPTY STATE ────────────────────────────────── */
-    .empty-state {
-      text-align: center;
-      padding: 3rem 1.5rem;
-      color: var(--gray-400);
-    }
-
-    .empty-state-icon {
-      font-size: 2.5rem;
-      margin-bottom: 0.75rem;
-    }
-
-    .empty-state-text {
-      font-size: 0.9rem;
-      font-weight: 500;
-    }
-
-    /* ─── RESPONSIVE ─────────────────────────────────── */
     @media (max-width: 768px) {
-      .week-grid {
-        grid-template-columns: repeat(7, 1fr);
-        gap: 0.25rem;
-      }
+      .week-grid { grid-template-columns: repeat(7, 1fr); gap: 0.25rem; }
       .week-day { min-height: 80px; padding: 0.5rem; }
       .week-day-number { font-size: 1.125rem; }
       .week-day-name { font-size: 0.6rem; }
@@ -684,6 +304,30 @@
 </head>
 <body>
 
+  <!-- CONFIG OVERLAY -->
+  <div class="config-overlay" id="configOverlay">
+    <div class="config-card">
+      <div class="config-title">Configurar Conexión</div>
+      <div class="config-subtitle">Ingresa las credenciales de tu instancia Windmill</div>
+      <form class="config-form" id="configForm">
+        <div class="form-group">
+          <label class="form-label">Windmill Base URL</label>
+          <input type="url" class="form-input" id="cfgBaseUrl" placeholder="https://windmill.stax.ink" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Workspace</label>
+          <input type="text" class="form-input" id="cfgWorkspace" placeholder="tu-workspace" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">API Token</label>
+          <input type="password" class="form-input" id="cfgToken" placeholder="wm_..." required>
+        </div>
+        <div class="config-error" id="configError">Error de conexión. Verifica las credenciales.</div>
+        <button type="submit" class="btn btn-primary btn-full">Conectar</button>
+      </form>
+    </div>
+  </div>
+
   <!-- HEADER -->
   <header class="header">
     <div class="header-inner">
@@ -692,8 +336,9 @@
         <span class="header-title">Booking Titanium</span>
       </div>
       <div class="header-user">
-        <span id="providerName">Dr. Provider</span>
-        <div class="header-avatar" id="providerAvatar">DP</div>
+        <span id="providerName">—</span>
+        <div class="header-avatar" id="providerAvatar">—</div>
+        <button class="btn-logout" id="btnLogout">Salir</button>
       </div>
     </div>
   </header>
@@ -709,10 +354,9 @@
 
   <!-- MAIN -->
   <main class="main">
-
     <!-- TAB: AGENDA -->
     <div class="tab-content active" id="tab-agenda">
-      <div class="stats-row" id="statsRow">
+      <div class="stats-row">
         <div class="stat-card">
           <div class="stat-label">Citas Hoy</div>
           <div class="stat-value accent" id="statToday">—</div>
@@ -742,7 +386,7 @@
 
       <div class="week-grid" id="weekGrid"></div>
 
-      <div class="slots-panel" id="slotsPanel">
+      <div class="slots-panel">
         <div class="panel-card">
           <div class="panel-header">
             <div>
@@ -826,17 +470,11 @@
         </div>
       </div>
     </div>
-
   </main>
 
-  <!-- TOAST CONTAINER -->
   <div class="toast-container" id="toastContainer"></div>
 
   <script>
-    // ═══════════════════════════════════════════════════════
-    // PROVIDER DASHBOARD — Vanilla JS
-    // ═══════════════════════════════════════════════════════
-
     const DAYS_ES = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
     const DAYS_SHORT = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
     const MONTHS_ES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
@@ -846,12 +484,61 @@
       currentWeekStart: getMonday(new Date()),
       selectedDate: null,
       provider: null,
-      services: [],
-      bookings: [],
-      schedules: [],
-      overrides: [],
+      serviceId: null,
       availability: {},
+      weekBookings: {},
+      overrides: [],
+      schedules: [],
+      loading: false,
     };
+
+    // ─── CONFIG ─────────────────────────────────────────
+    function getConfig() {
+      return {
+        baseUrl: localStorage.getItem('wm_base_url') || '',
+        workspace: localStorage.getItem('wm_workspace') || '',
+        token: localStorage.getItem('wm_token') || '',
+      };
+    }
+
+    function saveConfig(cfg) {
+      localStorage.setItem('wm_base_url', cfg.baseUrl);
+      localStorage.setItem('wm_workspace', cfg.workspace);
+      localStorage.setItem('wm_token', cfg.token);
+    }
+
+    function clearConfig() {
+      localStorage.removeItem('wm_base_url');
+      localStorage.removeItem('wm_workspace');
+      localStorage.removeItem('wm_token');
+    }
+
+    // ─── API (REAL ONLY — NO MOCKS) ─────────────────────
+    async function apiCall(action, params) {
+      const cfg = getConfig();
+      if (!cfg.baseUrl || !cfg.workspace || !cfg.token) {
+        throw new Error('CONFIG_REQUIRED');
+      }
+
+      const response = await fetch(`${cfg.baseUrl}/api/w/${cfg.workspace}/jobs/run/wait/f/provider_dashboard/main`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${cfg.token}`,
+        },
+        body: JSON.stringify({ action, ...params }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.error_message || 'Unknown error');
+      }
+      return result.data;
+    }
 
     // ─── HELPERS ────────────────────────────────────────
     function getMonday(d) {
@@ -863,9 +550,7 @@
       return date;
     }
 
-    function formatDate(d) {
-      return d.toISOString().split('T')[0];
-    }
+    function formatDate(d) { return d.toISOString().split('T')[0]; }
 
     function formatTime(isoStr) {
       if (!isoStr) return '';
@@ -874,16 +559,12 @@
     }
 
     function isToday(d) {
-      const today = new Date();
-      return d.getFullYear() === today.getFullYear() &&
-             d.getMonth() === today.getMonth() &&
-             d.getDate() === today.getDate();
+      const t = new Date();
+      return d.getFullYear() === t.getFullYear() && d.getMonth() === t.getMonth() && d.getDate() === t.getDate();
     }
 
     function isSameDay(a, b) {
-      return a.getFullYear() === b.getFullYear() &&
-             a.getMonth() === b.getMonth() &&
-             a.getDate() === b.getDate();
+      return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
     }
 
     // ─── TOAST ──────────────────────────────────────────
@@ -901,120 +582,6 @@
       }, 3500);
     }
 
-    // ─── API CALLS ──────────────────────────────────────
-    async function apiCall(script, params) {
-      try {
-        const token = localStorage.getItem('wm_token') || '';
-        const workspace = localStorage.getItem('wm_workspace') || '';
-        const baseUrl = localStorage.getItem('wm_base_url') || '';
-
-        if (!baseUrl) {
-          console.warn('Windmill not configured — using mock data');
-          return getMockData(script, params);
-        }
-
-        const response = await fetch(`${baseUrl}/api/w/${workspace}/jobs/run/wait/f/${script}/main`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          body: JSON.stringify(params),
-        });
-
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        return await response.json();
-      } catch (err) {
-        console.warn(`API call to ${script} failed, using mock:`, err.message);
-        return getMockData(script, params);
-      }
-    }
-
-    // ─── MOCK DATA (for development) ────────────────────
-    function getMockData(script, params) {
-      const now = new Date();
-
-      if (script === 'provider_agenda') {
-        return {
-          success: true,
-          data: {
-            provider_id: 'demo-provider',
-            provider_name: 'Dr. Martínez',
-            days: generateMockWeek(),
-          },
-        };
-      }
-
-      if (script === 'availability_check') {
-        return {
-          success: true,
-          data: {
-            provider_id: params.provider_id,
-            provider_name: 'Dr. Martínez',
-            date: params.date,
-            timezone: 'America/Santiago',
-            slots: generateMockSlots(params.date),
-            total_available: 8,
-            total_booked: 4,
-            is_blocked: false,
-          },
-        };
-      }
-
-      return { success: true, data: {} };
-    }
-
-    function generateMockWeek() {
-      const days = [];
-      const monday = getMonday(new Date());
-      for (let i = 0; i < 7; i++) {
-        const d = new Date(monday);
-        d.setDate(d.getDate() + i);
-        const isWeekday = i < 5;
-        const bookingCount = isWeekday ? Math.floor(Math.random() * 6) : 0;
-        days.push({
-          date: formatDate(d),
-          day_of_week: d.getDay(),
-          schedule_start: isWeekday ? '09:00' : null,
-          schedule_end: isWeekday ? '17:00' : null,
-          is_blocked: false,
-          block_reason: null,
-          bookings: Array.from({ length: bookingCount }, (_, j) => ({
-            booking_id: `bk-${i}-${j}`,
-            start_time: new Date(d.getFullYear(), d.getMonth(), d.getDate(), 9 + j * 2, 0).toISOString(),
-            end_time: new Date(d.getFullYear(), d.getMonth(), d.getDate(), 9 + j * 2 + 1, 0).toISOString(),
-            status: 'confirmed',
-            patient_name: ['Ana López', 'Carlos Ruiz', 'María Soto', 'Pedro Díaz', 'Laura Vega', 'Jorge Mora'][j % 6],
-            service_name: 'Consulta General',
-          })),
-          total_bookings: bookingCount,
-        });
-      }
-      return days;
-    }
-
-    function generateMockSlots(dateStr) {
-      const slots = [];
-      const d = new Date(dateStr + 'T00:00:00');
-      const bookedIndices = [1, 3, 5, 7];
-
-      for (let h = 9; h < 17; h++) {
-        for (let m = 0; m < 60; m += 30) {
-          const slotIdx = (h - 9) * 2 + (m / 30);
-          const start = new Date(d.getFullYear(), d.getMonth(), d.getDate(), h, m);
-          const end = new Date(d.getFullYear(), d.getMonth(), d.getDate(), h, m + 30);
-          const isBooked = bookedIndices.includes(slotIdx);
-
-          slots.push({
-            start: start.toISOString(),
-            end: end.toISOString(),
-            available: !isBooked,
-          });
-        }
-      }
-      return slots;
-    }
-
     // ─── RENDER: WEEK GRID ─────────────────────────────
     function renderWeekGrid() {
       const grid = document.getElementById('weekGrid');
@@ -1022,7 +589,6 @@
       const sunday = new Date(monday);
       sunday.setDate(sunday.getDate() + 6);
 
-      // Update month title
       if (monday.getMonth() === sunday.getMonth()) {
         document.getElementById('calendarMonth').textContent = `${MONTHS_ES[monday.getMonth()]} ${monday.getFullYear()}`;
       } else {
@@ -1034,24 +600,23 @@
       for (let i = 0; i < 7; i++) {
         const d = new Date(monday);
         d.setDate(d.getDate() + i);
-
-        const dayData = state.availability[formatDate(d)];
+        const dateStr = formatDate(d);
+        const dayData = state.availability[dateStr];
         const isBlocked = dayData?.is_blocked;
         const bookingCount = dayData?.total_booked ?? 0;
         const today = isToday(d);
         const selected = state.selectedDate && isSameDay(d, state.selectedDate);
 
         const el = document.createElement('div');
-        el.className = `week-day${isBlocked ? ' blocked' : ''}${today ? ' today' : ''}${selected ? ' selected' : ''}`;
+        el.className = `week-day${isBlocked ? ' blocked' : ''}${today ? ' today' : ''}${selected ? ' selected' : ''}${state.loading ? ' loading' : ''}`;
         el.innerHTML = `
           <div class="week-day-name">${DAYS_SHORT[d.getDay()]}</div>
           <div class="week-day-number">${d.getDate()}</div>
           ${isBlocked
-            ? `<div class="week-day-blocked-badge">Bloqueado</div>`
+            ? `<div class="week-day-blocked-badge">${dayData.block_reason || 'Bloqueado'}</div>`
             : `<div class="week-day-count ${bookingCount > 0 ? 'has-bookings' : ''}">${bookingCount} cita${bookingCount !== 1 ? 's' : ''}</div>`
           }
         `;
-
         el.addEventListener('click', () => selectDate(d));
         grid.appendChild(el);
       }
@@ -1062,72 +627,77 @@
       const dateStr = formatDate(date);
       state.selectedDate = date;
 
-      document.getElementById('selectedDateTitle').textContent =
-        `${DAYS_ES[date.getDay()]} ${date.getDate()} de ${MONTHS_ES[date.getMonth()]}`;
+      document.getElementById('selectedDateTitle').textContent = `${DAYS_ES[date.getDay()]} ${date.getDate()} de ${MONTHS_ES[date.getMonth()]}`;
       document.getElementById('selectedDateSubtitle').textContent = dateStr;
-
-      // Set block date input
       document.getElementById('blockDate').value = dateStr;
 
-      // Fetch availability
-      const providerId = state.provider?.provider_id || 'demo-provider';
-      const serviceId = state.services[0]?.service_id || '';
-
-      const result = await apiCall('availability_check', {
-        provider_id: providerId,
-        date: dateStr,
-        service_id: serviceId,
-      });
-
-      const data = result?.data;
       const slotList = document.getElementById('slotList');
+      slotList.innerHTML = '<div class="empty-state"><div class="loading-spinner"></div><div class="empty-state-text" style="margin-top:0.5rem">Cargando...</div></div>';
 
-      if (!data || data.is_blocked) {
-        slotList.innerHTML = `
-          <div class="empty-state">
-            <div class="empty-state-icon">🚫</div>
-            <div class="empty-state-text">${data?.block_reason || 'Día no disponible'}</div>
-          </div>
-        `;
-        return;
-      }
+      try {
+        const data = await apiCall('get_day_slots', {
+          provider_id: state.provider.provider_id,
+          date: dateStr,
+          service_id: state.serviceId,
+        });
 
-      if (!data.slots || data.slots.length === 0) {
-        slotList.innerHTML = `
-          <div class="empty-state">
-            <div class="empty-state-icon">📭</div>
-            <div class="empty-state-text">No hay horarios configurados para este día</div>
-          </div>
-        `;
-        return;
-      }
-
-      slotList.innerHTML = '';
-
-      for (const slot of data.slots) {
-        const el = document.createElement('div');
-        el.className = `slot-item${!slot.available ? ' booked' : ''}`;
-
-        if (slot.available) {
-          el.innerHTML = `
-            <span class="slot-time">${formatTime(slot.start)}</span>
-            <span class="slot-service">Disponible</span>
-            <span class="slot-status available">Libre</span>
-          `;
-        } else {
-          el.innerHTML = `
-            <span class="slot-time">${formatTime(slot.start)}</span>
-            <span class="slot-patient">Paciente</span>
-            <span class="slot-service">Confirmada</span>
-            <span class="slot-status booked-badge">Ocupado</span>
-          `;
+        if (data.is_blocked) {
+          slotList.innerHTML = `<div class="empty-state"><div class="empty-state-icon">🚫</div><div class="empty-state-text">${data.block_reason || 'Día no disponible'}</div></div>`;
+          return;
         }
 
-        slotList.appendChild(el);
-      }
+        if (!data.slots || data.slots.length === 0) {
+          slotList.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📭</div><div class="empty-state-text">No hay horarios configurados para este día</div></div>`;
+          return;
+        }
 
-      // Update stats
-      document.getElementById('statAvailable').textContent = data.total_available;
+        slotList.innerHTML = '';
+
+        // Build a map of booked slots to patient info
+        const bookedMap = {};
+        if (data.bookings) {
+          for (const b of data.bookings) {
+            bookedMap[b.start_time] = b;
+          }
+        }
+
+        for (const slot of data.slots) {
+          const booked = bookedMap[slot.start];
+          const el = document.createElement('div');
+          el.className = `slot-item${booked ? ' booked' : ''}`;
+
+          if (booked) {
+            el.innerHTML = `
+              <span class="slot-time">${formatTime(slot.start)}</span>
+              <span class="slot-patient">${booked.patient_name}</span>
+              <span class="slot-service">${booked.service_name}</span>
+              <span class="slot-status booked-badge">Ocupado</span>
+            `;
+          } else {
+            el.innerHTML = `
+              <span class="slot-time">${formatTime(slot.start)}</span>
+              <span class="slot-service">Disponible</span>
+              <span class="slot-status available">Libre</span>
+            `;
+          }
+          slotList.appendChild(el);
+        }
+
+        // Update availability cache
+        state.availability[dateStr] = {
+          total_available: data.total_available,
+          total_booked: data.total_booked,
+          is_blocked: data.is_blocked,
+          block_reason: data.block_reason,
+          slots: data.slots,
+        };
+        state.weekBookings[dateStr] = data.bookings || [];
+
+        updateStats();
+      } catch (err) {
+        slotList.innerHTML = `<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-text">${err.message}</div></div>`;
+        showToast(err.message, 'error');
+      }
     }
 
     // ─── RENDER: STATS ─────────────────────────────────
@@ -1138,7 +708,6 @@
       document.getElementById('statToday').textContent = todayData?.total_booked ?? '—';
       document.getElementById('statAvailable').textContent = todayData?.total_available ?? '—';
 
-      // Week total
       let weekTotal = 0;
       for (let i = 0; i < 7; i++) {
         const d = new Date(state.currentWeekStart);
@@ -1148,9 +717,12 @@
       }
       document.getElementById('statWeek').textContent = weekTotal;
 
-      // Next appointment
       const todaySlots = todayData?.slots ?? [];
-      const nextSlot = todaySlots.find(s => !s.available && new Date(s.start) > new Date());
+      const now = new Date();
+      const nextSlot = todaySlots.find(s => {
+        const booked = state.weekBookings[todayStr]?.find(b => b.start_time === s.start);
+        return booked && new Date(s.start) > now;
+      });
       document.getElementById('statNext').textContent = nextSlot ? formatTime(nextSlot.start) : 'Sin citas';
     }
 
@@ -1160,13 +732,8 @@
       grid.innerHTML = '';
 
       const days = [
-        { key: 1, name: 'Lunes' },
-        { key: 2, name: 'Martes' },
-        { key: 3, name: 'Miércoles' },
-        { key: 4, name: 'Jueves' },
-        { key: 5, name: 'Viernes' },
-        { key: 6, name: 'Sábado' },
-        { key: 0, name: 'Domingo' },
+        { key: 1, name: 'Lunes' }, { key: 2, name: 'Martes' }, { key: 3, name: 'Miércoles' },
+        { key: 4, name: 'Jueves' }, { key: 5, name: 'Viernes' }, { key: 6, name: 'Sábado' }, { key: 0, name: 'Domingo' },
       ];
 
       for (const day of days) {
@@ -1183,17 +750,13 @@
           <input type="time" class="form-input" value="${endTime}" ${!isActive ? 'disabled' : ''} data-day="${day.key}" data-field="end">
           <button class="schedule-toggle ${isActive ? 'on' : 'off'}" data-day="${day.key}"></button>
         `;
-
         grid.appendChild(row);
       }
 
-      // Toggle handlers
       grid.querySelectorAll('.schedule-toggle').forEach(btn => {
         btn.addEventListener('click', () => {
-          const day = parseInt(btn.dataset.day);
           const isOn = btn.classList.toggle('on');
           btn.classList.toggle('off');
-
           const row = btn.closest('.schedule-row');
           row.classList.toggle('disabled');
           row.querySelectorAll('input').forEach(inp => inp.disabled = !isOn);
@@ -1207,12 +770,7 @@
       const blocks = state.overrides.filter(o => !o.is_available);
 
       if (blocks.length === 0) {
-        list.innerHTML = `
-          <div class="empty-state">
-            <div class="empty-state-icon">✅</div>
-            <div class="empty-state-text">No hay fechas bloqueadas</div>
-          </div>
-        `;
+        list.innerHTML = `<div class="empty-state"><div class="empty-state-icon">✅</div><div class="empty-state-text">No hay fechas bloqueadas</div></div>`;
         return;
       }
 
@@ -1237,116 +795,194 @@
     }
 
     async function loadWeekData() {
-      const providerId = state.provider?.provider_id || 'demo-provider';
-      const serviceId = state.services[0]?.service_id || '';
+      state.loading = true;
+      renderWeekGrid();
 
       const monday = state.currentWeekStart;
+      const sunday = new Date(monday);
+      sunday.setDate(sunday.getDate() + 6);
 
-      for (let i = 0; i < 7; i++) {
-        const d = new Date(monday);
-        d.setDate(d.getDate() + i);
-        const dateStr = formatDate(d);
-
-        const result = await apiCall('availability_check', {
-          provider_id: providerId,
-          date: dateStr,
-          service_id: serviceId,
+      try {
+        const data = await apiCall('get_week', {
+          provider_id: state.provider.provider_id,
+          date_from: formatDate(monday),
+          date_to: formatDate(sunday),
+          service_id: state.serviceId,
         });
 
-        if (result?.data) {
-          state.availability[dateStr] = result.data;
+        if (data.days) {
+          for (const day of data.days) {
+            state.availability[day.date] = {
+              total_booked: day.total_bookings,
+              total_available: day.total_available,
+              is_blocked: day.is_blocked,
+              block_reason: day.block_reason,
+              slots: [],
+            };
+            state.weekBookings[day.date] = day.bookings || [];
+          }
         }
-      }
 
-      renderWeekGrid();
-      updateStats();
+        renderWeekGrid();
+        updateStats();
 
-      if (state.selectedDate) {
-        renderSlots(state.selectedDate);
+        if (state.selectedDate) {
+          renderSlots(state.selectedDate);
+        }
+      } catch (err) {
+        showToast(err.message, 'error');
+      } finally {
+        state.loading = false;
+        renderWeekGrid();
       }
     }
 
     async function blockDate() {
       const date = document.getElementById('blockDate').value;
       const reason = document.getElementById('blockReason').value;
-      const notes = document.getElementById('blockNotes').value;
 
-      if (!date) {
-        showToast('Selecciona una fecha', 'error');
-        return;
+      if (!date) { showToast('Selecciona una fecha', 'error'); return; }
+
+      try {
+        const data = await apiCall('block_date', {
+          provider_id: state.provider.provider_id,
+          override_date: date,
+          reason: reason,
+        });
+
+        if (data.has_existing_bookings) {
+          showToast(`⚠️ Hay ${data.booking_count} cita(s) existente(s) en esa fecha`, 'error');
+        } else {
+          showToast(`Fecha bloqueada: ${date} — ${reason}`, 'success');
+        }
+
+        await loadWeekData();
+      } catch (err) {
+        showToast(err.message, 'error');
       }
+    }
 
-      showToast(`Fecha bloqueada: ${date} — ${reason}`, 'success');
+    async function unblockDate(date) {
+      try {
+        await apiCall('unblock_date', {
+          provider_id: state.provider.provider_id,
+          override_date: date,
+        });
+        showToast('Fecha desbloqueada', 'success');
+        await loadWeekData();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    }
 
-      // Reload week data
-      await loadWeekData();
+    async function saveSchedule() {
+      const schedules = [];
+      document.querySelectorAll('.schedule-row').forEach(row => {
+        const day = parseInt(row.querySelector('.schedule-toggle').dataset.day);
+        const isActive = row.querySelector('.schedule-toggle').classList.contains('on');
+        const startTime = row.querySelector('input[data-field="start"]').value;
+        const endTime = row.querySelector('input[data-field="end"]').value;
+        schedules.push({ day_of_week: day, start_time: startTime, end_time: endTime, is_active: isActive });
+      });
+
+      try {
+        await apiCall('save_schedule', {
+          provider_id: state.provider.provider_id,
+          schedules,
+        });
+        showToast('Horario guardado correctamente', 'success');
+        state.schedules = schedules;
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
     }
 
     // ─── INIT ───────────────────────────────────────────
     async function init() {
-      // Load provider data
-      const result = await apiCall('provider_agenda', {
-        provider_id: 'demo-provider',
-        date_from: formatDate(new Date()),
-        date_to: formatDate(new Date(Date.now() + 7 * 86400000)),
-        include_patient_details: true,
-      });
-
-      if (result?.data) {
-        state.provider = {
-          provider_id: result.data.provider_id,
-          name: result.data.provider_name,
-        };
-
-        // Extract schedules and overrides from week data
-        if (result.data.days) {
-          for (const day of result.data.days) {
-            const dateStr = day.date;
-            state.availability[dateStr] = {
-              total_booked: day.total_bookings,
-              total_available: 0,
-              is_blocked: day.is_blocked,
-              block_reason: day.block_reason,
-              slots: [],
-            };
-
-            if (day.bookings) {
-              state.availability[dateStr].total_booked = day.bookings.length;
-              state.availability[dateStr].slots = day.bookings.map(b => ({
-                start: b.start_time,
-                end: b.end_time,
-                available: false,
-              }));
-            }
-          }
-        }
+      const cfg = getConfig();
+      if (!cfg.baseUrl || !cfg.workspace || !cfg.token) {
+        document.getElementById('configOverlay').classList.remove('hidden');
+        return;
       }
 
-      // Set provider name
-      document.getElementById('providerName').textContent = state.provider?.name || 'Dr. Provider';
-      const initials = (state.provider?.name || 'DP').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
-      document.getElementById('providerAvatar').textContent = initials;
+      try {
+        // Load provider
+        const providerData = await apiCall('get_provider', {});
+        state.provider = {
+          provider_id: providerData.provider_id,
+          name: providerData.name,
+        };
 
-      // Set default schedules
-      state.schedules = [
-        { day_of_week: 1, start_time: '09:00', end_time: '17:00', is_active: true },
-        { day_of_week: 2, start_time: '09:00', end_time: '17:00', is_active: true },
-        { day_of_week: 3, start_time: '09:00', end_time: '17:00', is_active: true },
-        { day_of_week: 4, start_time: '09:00', end_time: '17:00', is_active: true },
-        { day_of_week: 5, start_time: '09:00', end_time: '17:00', is_active: true },
-      ];
+        // Get first service for this provider
+        const svcData = await apiCall('list_services', { provider_id: state.provider.provider_id });
+        if (svcData?.services?.length > 0) {
+          state.serviceId = svcData.services[0].service_id;
+        }
 
-      // Select today
-      state.selectedDate = new Date();
+        // Load overrides
+        const ovData = await apiCall('list_overrides', { provider_id: state.provider.provider_id });
+        if (ovData?.overrides) {
+          state.overrides = ovData.overrides;
+        }
 
-      renderWeekGrid();
-      renderSlots(state.selectedDate);
-      updateStats();
-      renderScheduleEditor();
-      renderBlockedList();
+        // Load schedules
+        const scData = await apiCall('list_schedules', { provider_id: state.provider.provider_id });
+        if (scData?.schedules) {
+          state.schedules = scData.schedules;
+        }
+
+        // Update UI
+        document.getElementById('providerName').textContent = state.provider.name;
+        const initials = state.provider.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+        document.getElementById('providerAvatar').textContent = initials;
+
+        state.selectedDate = new Date();
+        renderWeekGrid();
+        renderSlots(state.selectedDate);
+        updateStats();
+        renderScheduleEditor();
+        renderBlockedList();
+
+      } catch (err) {
+        if (err.message === 'CONFIG_REQUIRED' || err.message.includes('401') || err.message.includes('403')) {
+          clearConfig();
+          document.getElementById('configOverlay').classList.remove('hidden');
+        } else {
+          showToast(err.message, 'error');
+        }
+      }
     }
 
     // ─── EVENT LISTENERS ────────────────────────────────
+    document.getElementById('configForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const errorEl = document.getElementById('configError');
+      errorEl.classList.remove('visible');
+
+      const cfg = {
+        baseUrl: document.getElementById('cfgBaseUrl').value.replace(/\/+$/, ''),
+        workspace: document.getElementById('cfgWorkspace').value,
+        token: document.getElementById('cfgToken').value,
+      };
+
+      saveConfig(cfg);
+
+      try {
+        await apiCall('get_provider', {});
+        document.getElementById('configOverlay').classList.add('hidden');
+        await init();
+      } catch (err) {
+        clearConfig();
+        errorEl.textContent = `Error: ${err.message}`;
+        errorEl.classList.add('visible');
+      }
+    });
+
+    document.getElementById('btnLogout').addEventListener('click', () => {
+      clearConfig();
+      location.reload();
+    });
+
     document.getElementById('prevWeek').addEventListener('click', () => {
       state.currentWeekStart.setDate(state.currentWeekStart.getDate() - 7);
       loadWeekData();
@@ -1365,8 +1001,8 @@
     });
 
     document.getElementById('btnBlock').addEventListener('click', blockDate);
+    document.getElementById('btnSaveSchedule').addEventListener('click', saveSchedule);
 
-    // Tab switching
     document.querySelectorAll('.nav-tab').forEach(tab => {
       tab.addEventListener('click', () => {
         document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
@@ -1376,10 +1012,8 @@
       });
     });
 
-    // Save schedule
-    document.getElementById('btnSaveSchedule').addEventListener('click', () => {
-      showToast('Horario guardado correctamente', 'success');
-    });
+    // Make unblockDate global
+    window.unblockDate = unblockDate;
 
     // Start
     init();
