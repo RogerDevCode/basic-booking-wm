@@ -8,7 +8,15 @@
 import { z } from 'zod';
 import postgres from 'postgres';
 import type { UUID } from '../internal/db-types';
-import { validateBookingRow } from '../internal/db-types';
+import { toUUID } from '../internal/db-types';
+
+interface CreatedBookingRow {
+  booking_id: string;
+  status: string;
+  start_time: string;
+  end_time: string;
+  idempotent: boolean;
+}
 
 // ─── Input Validation ───────────────────────────────────────────────────────
 const InputSchema = z.object({
@@ -254,7 +262,15 @@ export async function main(
           ]
         );
 
-        const firstRow: Record<string, unknown> | undefined = rows[0] as Record<string, unknown> | undefined;
+interface CreatedBookingRow {
+  booking_id: string;
+  status: string;
+  start_time: string;
+  end_time: string;
+  idempotent: boolean;
+}
+
+        const firstRow: CreatedBookingRow | undefined = rows[0] as CreatedBookingRow | undefined;
         if (firstRow === undefined) {
           throw new Error('INSERT returned no rows');
         }
@@ -302,23 +318,18 @@ export async function main(
       WHERE idempotency_key = ${input.idempotency_key}
       LIMIT 1
     `;
-    const resultRow: Record<string, unknown> | undefined = resultRows[0];
+    const resultRow: CreatedBookingRow | undefined = resultRows[0] as CreatedBookingRow | undefined;
     if (resultRow === undefined) {
       return { success: false, data: null, error_message: 'Booking not found after insert' };
-    }
-
-    const validated = validateBookingRow(resultRow);
-    if (validated === null) {
-      return { success: false, data: null, error_message: 'Invalid booking data returned from DB' };
     }
 
     return {
       success: true,
       data: {
-        booking_id: validated.booking_id,
-        status: validated.status,
-        start_time: validated.start_time,
-        end_time: validated.end_time,
+        booking_id: toUUID(resultRow.booking_id),
+        status: resultRow.status,
+        start_time: resultRow.start_time,
+        end_time: resultRow.end_time,
         provider_name: provider.name,
         service_name: service.name,
         patient_name: patient.name,

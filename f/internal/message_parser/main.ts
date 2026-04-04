@@ -15,7 +15,7 @@ const MessageParserInputSchema = z.object({
   }).optional(),
 }).readonly();
 
-type _MessageParserInput = Readonly<z.infer<typeof MessageParserInputSchema>>;
+// type _MessageParserInput reserved for future use
 
 export interface MessageParserData {
   readonly chat_id: number;
