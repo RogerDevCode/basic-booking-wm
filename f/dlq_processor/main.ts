@@ -22,7 +22,7 @@ interface DLQEntry {
   readonly failure_reason: string;
   readonly last_error_message: string;
   readonly last_error_stack: string | null;
-  readonly original_payload: Record<string, unknown>;
+  readonly original_payload: Readonly<Record<string, unknown>>;
   readonly idempotency_key: string;
   readonly status: 'pending' | 'resolved' | 'discarded';
   readonly created_at: string;
@@ -32,31 +32,72 @@ interface DLQEntry {
   readonly resolution_notes: string | null;
 }
 
-function parseDLQRow(row: Record<string, unknown>): DLQEntry {
+interface DLQRow {
+  readonly dlq_id: number;
+  readonly booking_id: string | null;
+  readonly provider_id: string | null;
+  readonly service_id: string | null;
+  readonly failure_reason: string;
+  readonly last_error_message: string;
+  readonly last_error_stack: string | null;
+  readonly original_payload: Readonly<Record<string, unknown>> | null;
+  readonly idempotency_key: string;
+  readonly status: string;
+  readonly created_at: string;
+  readonly updated_at: string;
+  readonly resolved_at: string | null;
+  readonly resolved_by: string | null;
+  readonly resolution_notes: string | null;
+}
+
+function parseDLQRow(row: DLQRow): DLQEntry {
   return {
-    dlq_id: Number(row['dlq_id']),
-    booking_id: typeof row['booking_id'] === 'string' ? row['booking_id'] : null,
-    provider_id: typeof row['provider_id'] === 'string' ? row['provider_id'] : null,
-    service_id: typeof row['service_id'] === 'string' ? row['service_id'] : null,
-    failure_reason: String(row['failure_reason']),
-    last_error_message: String(row['last_error_message']),
-    last_error_stack: typeof row['last_error_stack'] === 'string' ? row['last_error_stack'] : null,
-    original_payload: typeof row['original_payload'] === 'object' && row['original_payload'] !== null
-      ? row['original_payload'] as Record<string, unknown>
-      : {},
-    idempotency_key: String(row['idempotency_key']),
-    status: String(row['status']) as 'pending' | 'resolved' | 'discarded',
-    created_at: String(row['created_at']),
-    updated_at: String(row['updated_at']),
-    resolved_at: typeof row['resolved_at'] === 'string' ? row['resolved_at'] : null,
-    resolved_by: typeof row['resolved_by'] === 'string' ? row['resolved_by'] : null,
-    resolution_notes: typeof row['resolution_notes'] === 'string' ? row['resolution_notes'] : null,
+    dlq_id: row.dlq_id,
+    booking_id: row.booking_id,
+    provider_id: row.provider_id,
+    service_id: row.service_id,
+    failure_reason: row.failure_reason,
+    last_error_message: row.last_error_message,
+    last_error_stack: row.last_error_stack,
+    original_payload: row.original_payload !== null ? row.original_payload : {},
+    idempotency_key: row.idempotency_key,
+    status: row.status as 'pending' | 'resolved' | 'discarded',
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+    resolved_at: row.resolved_at,
+    resolved_by: row.resolved_by,
+    resolution_notes: row.resolution_notes,
+  };
+}
+
+interface DLQStatusRow {
+  readonly status: string;
+  readonly count: bigint | number;
+}
+
+interface DLQIdRow {
+  readonly dlq_id: number;
+}
+
+interface DLQInput {
+  readonly status_filter?: string | undefined;
+  readonly resolution_notes?: string | undefined;
+  readonly resolved_by?: string | undefined;
+}
+
+function parseRawInput(raw: unknown): DLQInput {
+  if (typeof raw !== 'object' || raw === null) return {};
+  const obj = raw as Record<string, unknown>;
+  return {
+    status_filter: typeof obj['status_filter'] === 'string' ? obj['status_filter'] : undefined,
+    resolution_notes: typeof obj['resolution_notes'] === 'string' ? obj['resolution_notes'] : undefined,
+    resolved_by: typeof obj['resolved_by'] === 'string' ? obj['resolved_by'] : undefined,
   };
 }
 
 export async function main(rawInput: unknown): Promise<{
   success: boolean;
-  data: Record<string, unknown> | null;
+  data: Readonly<Record<string, unknown>> | null;
   error_message: string | null;
 }> {
   const parsed = InputSchema.safeParse(rawInput);
@@ -65,6 +106,7 @@ export async function main(rawInput: unknown): Promise<{
   }
 
   const { action, dlq_id } = parsed.data;
+  const extraInput = parseRawInput(rawInput);
 
   const dbUrl = process.env['DATABASE_URL'];
   if (dbUrl === undefined || dbUrl === '') {
@@ -76,9 +118,8 @@ export async function main(rawInput: unknown): Promise<{
   try {
     switch (action) {
       case 'list': {
-        const statusFilter = (rawInput as Record<string, unknown>)['status_filter'] as string | undefined;
-        const status = statusFilter !== undefined && ['pending', 'resolved', 'discarded'].includes(statusFilter) ? statusFilter : 'pending';
-        const rows = await sql`
+        const status = extraInput.status_filter !== undefined && ['pending', 'resolved', 'discarded'].includes(extraInput.status_filter) ? extraInput.status_filter : 'pending';
+        const rows = await sql<DLQRow[]>`
           SELECT dlq_id, booking_id, provider_id, service_id,
                  failure_reason, last_error_message, last_error_stack,
                  original_payload, idempotency_key, status,
@@ -90,14 +131,14 @@ export async function main(rawInput: unknown): Promise<{
         `;
         const entries: DLQEntry[] = [];
         for (const r of rows) {
-          entries.push(parseDLQRow(r as Record<string, unknown>));
+          entries.push(parseDLQRow(r));
         }
         return { success: true, data: { entries, total: entries.length }, error_message: null };
       }
 
       case 'retry': {
         if (dlq_id === undefined) {
-          const rows = await sql`
+          const rows = await sql<DLQIdRow[]>`
             SELECT dlq_id FROM booking_dlq
             WHERE status = 'pending'
             ORDER BY created_at ASC
@@ -105,8 +146,7 @@ export async function main(rawInput: unknown): Promise<{
           `;
           const retried: number[] = [];
           for (const r of rows) {
-            const entry = r as Record<string, unknown>;
-            const id = Number(entry['dlq_id']);
+            const id = r.dlq_id;
             await sql`
               UPDATE booking_dlq
               SET status = 'pending', updated_at = NOW()
@@ -117,12 +157,12 @@ export async function main(rawInput: unknown): Promise<{
           return { success: true, data: { retried, count: retried.length }, error_message: null };
         }
 
-        const rows = await sql`
+        const rows = await sql<DLQIdRow[]>`
           SELECT dlq_id FROM booking_dlq
           WHERE dlq_id = ${dlq_id} AND status = 'pending'
           LIMIT 1
         `;
-        const row: Record<string, unknown> | undefined = rows[0] as Record<string, unknown> | undefined;
+        const row = rows[0];
         if (row === undefined) {
           return { success: false, data: null, error_message: "DLQ entry " + String(dlq_id) + " not found or not pending" };
         }
@@ -139,15 +179,13 @@ export async function main(rawInput: unknown): Promise<{
         if (dlq_id === undefined) {
           return { success: false, data: null, error_message: 'dlq_id is required for resolve' };
         }
-        const notes = (rawInput as Record<string, unknown>)['resolution_notes'] as string | undefined;
-        const resolvedBy = (rawInput as Record<string, unknown>)['resolved_by'] as string | undefined;
 
         await sql`
           UPDATE booking_dlq
           SET status = 'resolved',
               resolved_at = NOW(),
-              resolved_by = ${resolvedBy ?? null},
-              resolution_notes = ${notes ?? null},
+              resolved_by = ${extraInput.resolved_by ?? null},
+              resolution_notes = ${extraInput.resolution_notes ?? null},
               updated_at = NOW()
           WHERE dlq_id = ${dlq_id}
         `;
@@ -158,13 +196,12 @@ export async function main(rawInput: unknown): Promise<{
         if (dlq_id === undefined) {
           return { success: false, data: null, error_message: 'dlq_id is required for discard' };
         }
-        const notes = (rawInput as Record<string, unknown>)['resolution_notes'] as string | undefined;
 
         await sql`
           UPDATE booking_dlq
           SET status = 'discarded',
               resolved_at = NOW(),
-              resolution_notes = ${notes ?? 'Discarded manually'},
+              resolution_notes = ${extraInput.resolution_notes ?? 'Discarded manually'},
               updated_at = NOW()
           WHERE dlq_id = ${dlq_id}
         `;
@@ -172,15 +209,14 @@ export async function main(rawInput: unknown): Promise<{
       }
 
       case 'status': {
-        const rows = await sql`
+        const rows = await sql<DLQStatusRow[]>`
           SELECT status, COUNT(*) as count
           FROM booking_dlq
           GROUP BY status
         `;
         const stats: Record<string, number> = {};
         for (const r of rows) {
-          const row = r as Record<string, unknown>;
-          stats[String(row['status'])] = Number(row['count']);
+          stats[r.status] = Number(r.count);
         }
         return { success: true, data: stats, error_message: null };
       }
