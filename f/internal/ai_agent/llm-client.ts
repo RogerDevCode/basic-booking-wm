@@ -1,6 +1,6 @@
 // ============================================================================
-// LLM CLIENT — Groq (primary) + OpenAI (fallback) (v3.1)
-// Temperature 0.0, max_tokens 512, timeout 15s, 2 retries
+// LLM CLIENT — OpenAI GPT-4o-mini (primary) + Groq Llama 3.3 (fallback) (v3.2)
+// Temperature 0.0, max_tokens 512, timeout 15s, 2 retries, JSON mode
 // Pattern: Precision Architecture, No 'any', Errors as Values
 // ============================================================================
 
@@ -182,6 +182,17 @@ export async function callLLM(
     { role: 'user', content: userMessage },
   ];
 
+  // 1. OpenAI GPT-4o-mini (primary — better intent detection, structured JSON)
+  const openaiKey = getOpenAIKey();
+  if (openaiKey != null) {
+    const [err, res] = await callWithRetry(OPENAI_API_URL, openaiKey, OPENAI_MODEL, messages, 'openai');
+    if (err == null && res != null) {
+      void cacheSet(userMessage, res.content, 'unknown');
+      return res;
+    }
+  }
+
+  // 2. Groq Llama 3.3 70B (fallback — fast, free tier)
   const groqKey = getGroqKey();
   if (groqKey != null) {
     const [err, res] = await callWithRetry(GROQ_API_URL, groqKey, GROQ_MODEL, messages, 'groq');
@@ -191,7 +202,7 @@ export async function callLLM(
     }
   }
 
-  // Second Groq key as fallback
+  // 3. Groq second key (last resort)
   const groqKey2 = getGroqKey2();
   if (groqKey2 != null) {
     const [err, res] = await callWithRetry(GROQ_API_URL, groqKey2, GROQ_MODEL, messages, 'groq');
@@ -201,15 +212,5 @@ export async function callLLM(
     }
   }
 
-  const openaiKey = getOpenAIKey();
-  if (openaiKey != null) {
-    const [err, res] = await callWithRetry(OPENAI_API_URL, openaiKey, OPENAI_MODEL, messages, 'openai');
-    if (err == null && res != null) {
-      void cacheSet(userMessage, res.content, 'unknown');
-      return res;
-    }
-    throw err ?? new Error("OpenAI failed without error object");
-  }
-
-  throw new Error('No LLM provider configured (set GROQ_API_KEY or OPENAI_API_KEY)');
+  throw new Error('No LLM provider configured (set OPENAI_API_KEY or GROQ_API_KEY)');
 }
