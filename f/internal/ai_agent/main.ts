@@ -505,12 +505,10 @@ export async function main(rawInput: unknown): Promise<{ readonly success: boole
         confidence = rules.confidence;
       }
     } else {
-      // Test mode: use TF-IDF result if confidence is good, otherwise fall back to rules
-      if (confidence < 0.4) {
-        const rules = detectIntentRules(text);
-        intent = rules.intent;
-        confidence = rules.confidence;
-      }
+      // Test mode: use rule-based fallback directly
+      const rules = detectIntentRules(text);
+      intent = rules.intent;
+      confidence = rules.confidence;
     }
   }
 
