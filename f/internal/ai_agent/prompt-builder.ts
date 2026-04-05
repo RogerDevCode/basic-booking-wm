@@ -151,7 +151,9 @@ EXTRAE solo estas entidades si están presentes en el mensaje:
 </ENTITY_SPEC>`;
 
 // ============================================================================
-// SECTION 6: FEW-SHOT EXAMPLES (25 — Chilean real language, audited)
+// SECTION 6: FEW-SHOT EXAMPLES (~45 — Mix formal/informal, Chilean context)
+// Based on patterns from MASSIVE (Amazon), MTOP (Meta), and real Chilean usage.
+// Distribution: ~60% formal, ~40% informal/chileno.
 // Strategy: Static examples (Option A). Future: Semantic sampling (Option B).
 // See: docs/future-semantic-sampling.md
 // ============================================================================
@@ -160,11 +162,23 @@ const FEW_SHOT_EXAMPLES = `<FEW_SHOT_EXAMPLES>
 User: "Hola"
 → {"intent":"${INTENT.GREETING}","confidence":0.95,"entities":{},"needs_more":true,"follow_up":"¿En qué puedo ayudarte?"}
 
-User: "ola dotor"
+User: "Buenos días"
+→ {"intent":"${INTENT.GREETING}","confidence":0.95,"entities":{},"needs_more":true,"follow_up":"¿En qué puedo ayudarte?"}
+
+User: "Hola, buenas tardes"
 → {"intent":"${INTENT.GREETING}","confidence":0.90,"entities":{},"needs_more":true,"follow_up":"¿En qué puedo ayudarte?"}
+
+User: "ola"
+→ {"intent":"${INTENT.GREETING}","confidence":0.85,"entities":{},"needs_more":true,"follow_up":"¿En qué puedo ayudarte?"}
 
 User: "Quiero agendar una cita para mañana"
 → {"intent":"${INTENT.CREATE_APPOINTMENT}","confidence":0.95,"entities":{"date":"mañana"},"needs_more":false,"follow_up":null}
+
+User: "Necesito reservar una hora con el doctor"
+→ {"intent":"${INTENT.CREATE_APPOINTMENT}","confidence":0.90,"entities":{},"needs_more":true,"follow_up":"¿Para qué día y hora necesitas tu cita?"}
+
+User: "Me gustaría pedir una cita para la próxima semana"
+→ {"intent":"${INTENT.CREATE_APPOINTMENT}","confidence":0.90,"entities":{"date":"próxima semana"},"needs_more":true,"follow_up":"¿Qué día de la próxima semana te funciona?"}
 
 User: "kiero una ora pal bieres"
 → {"intent":"${INTENT.CREATE_APPOINTMENT}","confidence":0.90,"entities":{"date":"viernes"},"needs_more":false,"follow_up":null}
@@ -172,26 +186,56 @@ User: "kiero una ora pal bieres"
 User: "necesito resevar un truno"
 → {"intent":"${INTENT.CREATE_APPOINTMENT}","confidence":0.85,"entities":{},"needs_more":true,"follow_up":"¿Para qué día y hora necesitas tu cita?"}
 
+User: "Hola, quiero agendar para mañana a las 10"
+→ {"intent":"${INTENT.CREATE_APPOINTMENT}","confidence":0.95,"entities":{"date":"mañana","time":"10:00"},"needs_more":false,"follow_up":null}
+
+User: "tiene hora disponible para el lunes?"
+→ {"intent":"${INTENT.CHECK_AVAILABILITY}","confidence":0.90,"entities":{"date":"lunes"},"needs_more":false,"follow_up":null}
+
+User: "¿Tienen disponibilidad esta semana?"
+→ {"intent":"${INTENT.CHECK_AVAILABILITY}","confidence":0.90,"entities":{"date":"esta semana"},"needs_more":false,"follow_up":null}
+
 User: "tiene libre el lune?"
 → {"intent":"${INTENT.CHECK_AVAILABILITY}","confidence":0.85,"entities":{"date":"lunes"},"needs_more":false,"follow_up":null}
 
 User: "tine ora hoy a las 10?"
 → {"intent":"${INTENT.CHECK_AVAILABILITY}","confidence":0.85,"entities":{"date":"hoy","time":"10:00"},"needs_more":false,"follow_up":null}
 
+User: "Necesito cancelar mi cita del jueves"
+→ {"intent":"${INTENT.CANCEL_APPOINTMENT}","confidence":0.95,"entities":{"date":"jueves"},"needs_more":false,"follow_up":null}
+
+User: "No podré asistir a mi cita, favor anular"
+→ {"intent":"${INTENT.CANCEL_APPOINTMENT}","confidence":0.90,"entities":{},"needs_more":false,"follow_up":null}
+
 User: "no podre ir manana, kanselame"
 → {"intent":"${INTENT.CANCEL_APPOINTMENT}","confidence":0.90,"entities":{"date":"mañana"},"needs_more":false,"follow_up":null}
 
-User: "borrame la hora del martes po"
+User: "borrame la hora del martes por favor"
 → {"intent":"${INTENT.CANCEL_APPOINTMENT}","confidence":0.85,"entities":{"date":"martes"},"needs_more":false,"follow_up":null}
+
+User: "Ya no necesito la cita, gracias"
+→ {"intent":"${INTENT.CANCEL_APPOINTMENT}","confidence":0.85,"entities":{},"needs_more":false,"follow_up":null}
+
+User: "Necesito cambiar mi cita del viernes para el martes"
+→ {"intent":"${INTENT.RESCHEDULE}","confidence":0.95,"entities":{"date":"martes"},"needs_more":false,"follow_up":null}
+
+User: "Puedo reprogramar mi hora para la tarde?"
+→ {"intent":"${INTENT.RESCHEDULE}","confidence":0.90,"entities":{},"needs_more":true,"follow_up":"¿Para qué día y hora de la tarde te gustaría?"}
 
 User: "kiero kambiar la del bieres pal jueves"
 → {"intent":"${INTENT.RESCHEDULE}","confidence":0.90,"entities":{"date":"jueves"},"needs_more":false,"follow_up":null}
 
-User: "Me duele mucho la muela, necesito atención ya"
+User: "Me duele mucho la muela, necesito atención urgente"
+→ {"intent":"${INTENT.URGENT_CARE}","confidence":0.95,"entities":{},"needs_more":false,"follow_up":null}
+
+User: "Tengo un dolor muy fuerte en el pecho"
 → {"intent":"${INTENT.URGENT_CARE}","confidence":0.95,"entities":{},"needs_more":false,"follow_up":null}
 
 User: "tengo un dolor insoportable de guata"
 → {"intent":"${INTENT.URGENT_CARE}","confidence":0.90,"entities":{},"needs_more":false,"follow_up":null}
+
+User: "Me estoy sangrando mucho, qué hago"
+→ {"intent":"${INTENT.URGENT_CARE}","confidence":0.95,"entities":{},"needs_more":false,"follow_up":null}
 
 User: "necesito cita urgente pa mañana"
 → {"intent":"${INTENT.CREATE_APPOINTMENT}","confidence":0.70,"entities":{"date":"mañana"},"needs_more":false,"follow_up":null}
@@ -199,10 +243,25 @@ User: "necesito cita urgente pa mañana"
 User: "¿A qué hora cierran los sábados?"
 → {"intent":"${INTENT.GENERAL_QUESTION}","confidence":0.90,"entities":{},"needs_more":false,"follow_up":null}
 
+User: "¿Aceptan Fonasa?"
+→ {"intent":"${INTENT.GENERAL_QUESTION}","confidence":0.90,"entities":{},"needs_more":false,"follow_up":null}
+
+User: "¿Cuánto cuesta la consulta?"
+→ {"intent":"${INTENT.GENERAL_QUESTION}","confidence":0.90,"entities":{},"needs_more":false,"follow_up":null}
+
+User: "¿Dónde está ubicado el consultorio?"
+→ {"intent":"${INTENT.GENERAL_QUESTION}","confidence":0.90,"entities":{},"needs_more":false,"follow_up":null}
+
 User: "Chau, gracias"
 → {"intent":"${INTENT.FAREWELL}","confidence":0.95,"entities":{},"needs_more":false,"follow_up":null}
 
-User: "Gracias po"
+User: "Adiós, que tenga buen día"
+→ {"intent":"${INTENT.FAREWELL}","confidence":0.95,"entities":{},"needs_more":false,"follow_up":null}
+
+User: "Gracias por la ayuda"
+→ {"intent":"${INTENT.THANK_YOU}","confidence":0.95,"entities":{},"needs_more":false,"follow_up":null}
+
+User: "Muchas gracias, muy amable"
 → {"intent":"${INTENT.THANK_YOU}","confidence":0.95,"entities":{},"needs_more":false,"follow_up":null}
 
 User: "¿Qué tiempo hace hoy?"
@@ -211,26 +270,38 @@ User: "¿Qué tiempo hace hoy?"
 User: "asdkjhaskjd"
 → {"intent":"${INTENT.UNKNOWN}","confidence":0.05,"entities":{},"needs_more":true,"follow_up":"No logré entender. ¿Quieres agendar, cancelar o reprogramar una cita?"}
 
-User: "Activa mis recordatorios"
+User: "Activa mis recordatorios de citas"
 → {"intent":"${INTENT.ACTIVATE_REMINDERS}","confidence":0.95,"entities":{},"needs_more":false,"follow_up":null}
 
+User: "Quiero recibir avisos de mis citas por Telegram"
+→ {"intent":"${INTENT.ACTIVATE_REMINDERS}","confidence":0.90,"entities":{"channel":"telegram"},"needs_more":false,"follow_up":null}
+
 User: "No quiero que me envíen recordatorios"
+→ {"intent":"${INTENT.DEACTIVATE_REMINDERS}","confidence":0.90,"entities":{},"needs_more":false,"follow_up":null}
+
+User: "Desactiva las notificaciones de citas"
 → {"intent":"${INTENT.DEACTIVATE_REMINDERS}","confidence":0.90,"entities":{},"needs_more":false,"follow_up":null}
 
 User: "tengo alguna cita agendada?"
 → {"intent":"${INTENT.GET_MY_BOOKINGS}","confidence":0.90,"entities":{},"needs_more":false,"follow_up":null}
 
-User: "cuando es mi ora?"
-→ {"intent":"${INTENT.GET_MY_BOOKINGS}","confidence":0.85,"entities":{},"needs_more":false,"follow_up":null}
+User: "¿Cuándo es mi próxima cita?"
+→ {"intent":"${INTENT.GET_MY_BOOKINGS}","confidence":0.90,"entities":{},"needs_more":false,"follow_up":null}
+
+User: "Confírmame la cita que tengo esta semana"
+→ {"intent":"${INTENT.GET_MY_BOOKINGS}","confidence":0.85,"entities":{"date":"esta semana"},"needs_more":false,"follow_up":null}
 
 User: "Menú principal"
 → {"intent":"${INTENT.SHOW_MAIN_MENU}","confidence":0.95,"entities":{},"needs_more":false,"follow_up":null}
 
+User: "¿Qué opciones hay?"
+→ {"intent":"${INTENT.SHOW_MAIN_MENU}","confidence":0.85,"entities":{},"needs_more":false,"follow_up":null}
+
 User: "Siguiente"
 → {"intent":"${INTENT.WIZARD_STEP}","confidence":0.90,"entities":{},"needs_more":false,"follow_up":null}
 
-User: "Hola, quiero agendar para mañana a las 10"
-→ {"intent":"${INTENT.CREATE_APPOINTMENT}","confidence":0.95,"entities":{"date":"mañana","time":"10:00"},"needs_more":false,"follow_up":null}
+User: "Confirmar"
+→ {"intent":"${INTENT.WIZARD_STEP}","confidence":0.90,"entities":{},"needs_more":false,"follow_up":null}
 
 </FEW_SHOT_EXAMPLES>`;
 
