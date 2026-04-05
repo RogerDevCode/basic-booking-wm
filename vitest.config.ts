@@ -18,7 +18,11 @@ export default defineConfig({
     include: ["f/**/*.test.ts", "tests/**/*.test.ts"],
     exclude: ["node_modules", "dist"],
     // Pass env vars explicitly to workers
-    env: existsSync(envPath) ? dotenv.parse(readFileSync(envPath, "utf-8")) : {},
+    env: {
+      ...(existsSync(envPath) ? dotenv.parse(readFileSync(envPath, "utf-8")) : {}),
+      AI_AGENT_LLM_MODE: "test",
+      GROQ_LLM_TIMEOUT_MS: "2000",
+    },
   },
   esbuild: {
     target: "es2022",

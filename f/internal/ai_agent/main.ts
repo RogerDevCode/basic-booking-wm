@@ -444,15 +444,28 @@ export async function main(rawInput: unknown): Promise<{ readonly success: boole
     provider = "fast-path";
     cot_reasoning = "Social fast-path matched";
   } else {
-    // LLM Path
-    const [llmErr, llmRes] = await runLLMInquiry(text);
-    if (llmErr == null && llmRes != null) {
-      intent = llmRes.intent;
-      confidence = llmRes.confidence;
-      provider = llmRes.provider;
-      cot_reasoning = llmRes.cot_reasoning;
+    // Check if LLM should be skipped (test mode or no credits)
+    const skipLLM = (() => {
+      try { if (typeof process !== 'undefined' && process.env['AI_AGENT_LLM_MODE'] === 'test') return true; } catch { /* ignore */ }
+      return false;
+    })();
+
+    if (!skipLLM) {
+      // LLM Path
+      const [llmErr, llmRes] = await runLLMInquiry(text);
+      if (llmErr == null && llmRes != null) {
+        intent = llmRes.intent;
+        confidence = llmRes.confidence;
+        provider = llmRes.provider;
+        cot_reasoning = llmRes.cot_reasoning;
+      } else {
+        if (llmErr != null) console.log('[LLM ERROR]', llmErr.message);
+        const rules = detectIntentRules(text);
+        intent = rules.intent;
+        confidence = rules.confidence;
+      }
     } else {
-      if (llmErr != null) console.log('[LLM ERROR]', llmErr.message);
+      // Test mode: use rule-based fallback directly
       const rules = detectIntentRules(text);
       intent = rules.intent;
       confidence = rules.confidence;

@@ -1,30 +1,71 @@
 // ============================================================================
-// LLM CLIENT — Provider Switch (v4.1)
+// LLM CLIENT — Configurable Provider Chain (v5.0)
 // Temperature 0.0, max_tokens 512, timeout 15s, 2 retries
 // Structured Outputs (json_schema strict) for OpenAI, json_object for Groq
 // Pattern: Precision Architecture, No 'any', Errors as Values
 //
-// PROVIDER SWITCH — Change PRIMARY_PROVIDER to swap order
-//   'groq'  → Groq first, OpenAI fallback (current — saves OpenAI credits)
-//   'openai' → OpenAI first, Groq fallback (production default)
+// CONFIGURABLE PROVIDER CHAIN — Set via LLM_PROVIDER_ORDER env var
+//   Default: "groq,groq2,openai" → gpt-oss-20b → llama-3.3-70b → gpt-4o-mini
+//   Examples:
+//     "groq"                    → Only Groq (fastest, cheapest)
+//     "groq,openai"             → Groq first, OpenAI fallback
+//     "openai,groq"             → OpenAI first, Groq fallback
+//     "groq,groq2,openai"       → Groq1 → Groq2 → OpenAI (default)
 // ============================================================================
 
 declare const wmill: { readonly env: Readonly<Record<string, string>> };
 
-const PRIMARY_PROVIDER: 'groq' | 'openai' = 'groq';
+// ============================================================================
+// CONFIG — Read from env vars (wmill-safe) with sensible defaults
+// ============================================================================
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 
-const GROQ_MODEL = 'llama-3.3-70b-versatile';
-const OPENAI_MODEL = 'gpt-4o-mini';
+const DEFAULT_GROQ_MODEL = 'openai/gpt-oss-20b';
+const DEFAULT_GROQ_MODEL_2 = 'llama-3.3-70b-versatile';
+const DEFAULT_OPENAI_MODEL = 'gpt-4o-mini';
+const DEFAULT_PROVIDER_ORDER = 'groq,groq2,openai';
+
+function getEnv(key: string, fallback: string): string {
+  try { if (typeof wmill !== 'undefined' && wmill.env[key] != null) return wmill.env[key]; } catch { /* wmill not available */ }
+  if (typeof process !== 'undefined' && process.env[key] != null) {
+    const val = process.env[key];
+    if (val != null) return val;
+  }
+  return fallback;
+}
+
+function getEnvOptional(key: string): string | null {
+  try { if (typeof wmill !== 'undefined' && wmill.env[key] != null) return wmill.env[key]; } catch { /* wmill not available */ }
+  if (typeof process !== 'undefined' && process.env[key] != null) {
+    const val = process.env[key];
+    if (val != null && val !== '') return val;
+  }
+  return null;
+}
+
+const CONFIG = {
+  groqModel: getEnv('GROQ_MODEL', DEFAULT_GROQ_MODEL),
+  groqModel2: getEnv('GROQ_MODEL_2', DEFAULT_GROQ_MODEL_2),
+  openaiModel: getEnv('OPENAI_MODEL', DEFAULT_OPENAI_MODEL),
+  providerOrder: getEnv('LLM_PROVIDER_ORDER', DEFAULT_PROVIDER_ORDER),
+  timeoutMs: (() => {
+    const envVal = getEnvOptional('GROQ_LLM_TIMEOUT_MS');
+    if (envVal != null) { const n = Number(envVal); if (!Number.isNaN(n)) return n; }
+    return 15000;
+  })(),
+} as const;
+
+// ============================================================================
+// IMPORTS
+// ============================================================================
 
 import { cacheGet, cacheSet } from '../cache';
 import { INTENT } from './constants';
 
 const MAX_RETRIES = 2;
 const BACKOFF_MS = 500;
-const TIMEOUT_MS = 15000;
 
 // ============================================================================
 // OPENAI STRUCTURED OUTPUTS — JSON Schema (strict mode)
@@ -94,29 +135,9 @@ interface ProviderInternalResult {
 // API KEY RETRIEVAL (wmill-safe)
 // ============================================================================
 
-function getGroqKey(): string | null {
-  try { if (typeof wmill !== 'undefined' && wmill.env['GROQ_API_KEY'] != null) return wmill.env['GROQ_API_KEY']; } catch { /* wmill not available */ }
-  if (typeof process !== 'undefined' && process.env['GROQ_API_KEY'] != null) {
-    return process.env['GROQ_API_KEY'] ?? null;
-  }
-  return null;
-}
-
-function getGroqKey2(): string | null {
-  try { if (typeof wmill !== 'undefined' && wmill.env['GROQ_API_KEY_2'] != null) return wmill.env['GROQ_API_KEY_2']; } catch { /* wmill not available */ }
-  if (typeof process !== 'undefined' && process.env['GROQ_API_KEY_2'] != null) {
-    return process.env['GROQ_API_KEY_2'] ?? null;
-  }
-  return null;
-}
-
-function getOpenAIKey(): string | null {
-  try { if (typeof wmill !== 'undefined' && wmill.env['OPENAI_API_KEY'] != null) return wmill.env['OPENAI_API_KEY']; } catch { /* wmill not available */ }
-  if (typeof process !== 'undefined' && process.env['OPENAI_API_KEY'] != null) {
-    return process.env['OPENAI_API_KEY'] ?? null;
-  }
-  return null;
-}
+function getGroqKey(): string | null { return getEnvOptional('GROQ_API_KEY'); }
+function getGroqKey2(): string | null { return getEnvOptional('GROQ_API_KEY_2'); }
+function getOpenAIKey(): string | null { return getEnvOptional('OPENAI_API_KEY'); }
 
 // ============================================================================
 // HTTP UTILS
@@ -170,7 +191,7 @@ async function callProvider(
       max_tokens: 512,
       response_format: responseFormat,
     }),
-  }, TIMEOUT_MS);
+  }, CONFIG.timeoutMs);
 
   if (err != null || response == null) {
     return [err ?? new Error("Fetch failed without error object"), null];
@@ -287,24 +308,44 @@ export async function callLLM(
     { role: 'user', content: userMessage },
   ];
 
-  // Provider chain based on PRIMARY_PROVIDER setting
-  const providers: Array<{
+  // ─── Build provider chain from LLM_PROVIDER_ORDER env var ──────────────
+  // Supported tokens: groq, groq2, openai
+  // Example: "groq,groq2,openai" → Groq primary → Groq secondary → OpenAI
+  const providerOrder = CONFIG.providerOrder.split(',').map(s => s.trim().toLowerCase());
+
+  const providerMap: Record<string, {
     readonly name: 'openai' | 'groq';
     readonly url: string;
     readonly key: string | null;
     readonly model: string;
     readonly structured: boolean;
-  }> = PRIMARY_PROVIDER === 'groq'
-    ? [
-        { name: 'groq' as const, url: GROQ_API_URL, key: getGroqKey(), model: GROQ_MODEL, structured: false },
-        { name: 'groq' as const, url: GROQ_API_URL, key: getGroqKey2(), model: GROQ_MODEL, structured: false },
-        { name: 'openai' as const, url: OPENAI_API_URL, key: getOpenAIKey(), model: OPENAI_MODEL, structured: true },
-      ]
-    : [
-        { name: 'openai' as const, url: OPENAI_API_URL, key: getOpenAIKey(), model: OPENAI_MODEL, structured: true },
-        { name: 'groq' as const, url: GROQ_API_URL, key: getGroqKey(), model: GROQ_MODEL, structured: false },
-        { name: 'groq' as const, url: GROQ_API_URL, key: getGroqKey2(), model: GROQ_MODEL, structured: false },
-      ];
+  }> = {
+    groq: {
+      name: 'groq' as const,
+      url: GROQ_API_URL,
+      key: getGroqKey(),
+      model: CONFIG.groqModel,
+      structured: false,
+    },
+    groq2: {
+      name: 'groq' as const,
+      url: GROQ_API_URL,
+      key: getGroqKey2(),
+      model: CONFIG.groqModel2,
+      structured: false,
+    },
+    openai: {
+      name: 'openai' as const,
+      url: OPENAI_API_URL,
+      key: getOpenAIKey(),
+      model: CONFIG.openaiModel,
+      structured: true,
+    },
+  };
+
+  const providers = providerOrder
+    .map(token => providerMap[token])
+    .filter((p): p is NonNullable<typeof p> => p != null);
 
   for (const p of providers) {
     if (p.key == null) continue;
