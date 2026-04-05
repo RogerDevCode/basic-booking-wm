@@ -471,7 +471,10 @@ export async function main(rawInput: unknown): Promise<{ readonly success: boole
   } else {
     // TF-IDF semantic classification (fallback when social doesn't match)
     const tfidfResult = classifyIntent(text);
-    if (tfidfResult.confidence >= 0.3) {
+
+    // Only use TF-IDF if confidence is strong AND input has enough content
+    const hasEnoughContent = text.trim().split(/\s+/).length >= 2;
+    if (tfidfResult.confidence >= 0.4 && hasEnoughContent) {
       const tfidfIntent = tfidfResult.intent as IntentType;
       if (isIntentType(tfidfIntent)) {
         intent = tfidfIntent;
@@ -502,10 +505,12 @@ export async function main(rawInput: unknown): Promise<{ readonly success: boole
         confidence = rules.confidence;
       }
     } else {
-      // Test mode: use rule-based fallback directly
-      const rules = detectIntentRules(text);
-      intent = rules.intent;
-      confidence = rules.confidence;
+      // Test mode: use TF-IDF result if confidence is good, otherwise fall back to rules
+      if (confidence < 0.4) {
+        const rules = detectIntentRules(text);
+        intent = rules.intent;
+        confidence = rules.confidence;
+      }
     }
   }
 

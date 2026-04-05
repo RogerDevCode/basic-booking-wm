@@ -74,7 +74,7 @@ export const INTENT_KEYWORDS: Record<string, { readonly keywords: readonly strin
     weight: 3,
   },
   [INTENT.GET_MY_BOOKINGS]: {
-    keywords: ['confirmame la cita', 'mis citas', 'mi cita', 'confirmación', 'no me llegó', 'no fui a mi cita', 'ya completé', 'certificado', 'pendiente', 'atendido', 'me cobraron', 'reprogramada automáticamente'],
+    keywords: ['confirmame la cita', 'mis citas', 'mi cita', 'confirmación', 'no me llegó', 'no fui a mi cita', 'ya completé', 'certificado', 'pendiente', 'atendido', 'me cobraron', 'reprogramada automáticamente', 'tengo alguna cita', 'tengo cita', 'mi hora', 'tengo turno', 'cuando es mi hora', 'ver mis citas', 'revisar mis citas'],
     weight: 4,
   },
   [INTENT.FAREWELL]: {
@@ -82,7 +82,7 @@ export const INTENT_KEYWORDS: Record<string, { readonly keywords: readonly strin
     weight: 4,
   },
   [INTENT.GENERAL_QUESTION]: {
-    keywords: ['déjame pensarlo', 'espera', 'pregunta', 'saber si', 'me puedes decir'],
+    keywords: ['déjame pensarlo', 'espera', 'pregunta', 'saber si', 'me puedes decir', 'aceptan', 'seguro', 'isapre', 'fonasa', 'convenio', 'precio', 'costo', 'valor', 'donde', 'ubicado', 'hora', 'cierran', 'abren', 'documentos'],
     weight: 3,
   },
   [INTENT.ACTIVATE_REMINDERS]: {
@@ -94,7 +94,7 @@ export const INTENT_KEYWORDS: Record<string, { readonly keywords: readonly strin
     weight: 4,
   },
   [INTENT.REMINDER_PREFERENCES]: {
-    keywords: ['preferencia de recordatorio', 'configurar recordatorio', 'preferencias de notificación', 'cómo configuro recordatorios', 'ajustes de recordatorio', 'personalizar recordatorio', 'preferencias de recordatorio', 'configurar notificacion', 'cambiar mis preferencias de aviso', 'ajustes de aviso', 'configurar aviso'],
+    keywords: ['preferencia de recordatorio', 'configurar recordatorio', 'preferencias de notificación', 'cómo configuro recordatorios', 'ajustes de recordatorio', 'personalizar recordatorio', 'preferencias de recordatorio', 'configurar notificacion', 'cambiar mis preferencias de aviso', 'ajustes de aviso', 'configurar aviso', 'como configuro', 'como activo', 'donde cambio'],
     weight: 4,
   },
   [INTENT.SHOW_MAIN_MENU]: {
@@ -102,7 +102,7 @@ export const INTENT_KEYWORDS: Record<string, { readonly keywords: readonly strin
     weight: 4,
   },
   [INTENT.WIZARD_STEP]: {
-    keywords: ['siguiente', 'continuar', 'adelante', 'confirmar cita', 'si confirmar', 'elegir otro', 'otro horario', 'otro dia', 'volver', 'atras', 'cancelar wizard'],
+    keywords: ['siguiente', 'continuar', 'adelante', 'confirmar cita', 'si confirmar', 'elegir otro', 'otro horario', 'otro dia', 'volver', 'atras', 'cancelar wizard', 'siguiente paso', 'confirmo', 'si quiero'],
     weight: 4,
   },
 };

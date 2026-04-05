@@ -18,6 +18,11 @@ const CORPUS: Record<string, readonly string[]> = {
     'kiero una ora pal viernes a las diez',
     'reservar turno con especialista',
     'agendar consulta medica urgente',
+    'necesito cita urgente',
+    'pedir hora para control',
+    'kiero una ora',
+    'weon kiero orita al tiro una sita po',
+    'hola quiero agendar para manana a las 10',
   ],
   [INTENT.CANCEL_APPOINTMENT]: [
     'quiero cancelar mi cita del martes',
@@ -25,6 +30,8 @@ const CORPUS: Record<string, readonly string[]> = {
     'anular turno programado para manana',
     'eliminar cita agendada',
     'borrar mi reserva del jueves',
+    'no podre ir kanselame',
+    'cancelar la hora que tengo',
   ],
   [INTENT.RESCHEDULE]: [
     'necesito cambiar mi cita del viernes al jueves',
@@ -39,6 +46,8 @@ const CORPUS: Record<string, readonly string[]> = {
     'hay hueco para hoy a las tres',
     'tiene ora disponible esta semana',
     'puedo agendar para manana',
+    'tiene libre el lune',
+    'hay hora para esta semana',
   ],
   [INTENT.GET_MY_BOOKINGS]: [
     'tengo alguna cita agendada',
@@ -46,6 +55,8 @@ const CORPUS: Record<string, readonly string[]> = {
     'mis citas proximas',
     'confirmame el turno que reserve',
     'quiero saber si tengo hora',
+    'tengo cita para manana',
+    'revisar mis reservas',
   ],
   [INTENT.GREETING]: [
     'hola buenos dias',
@@ -53,6 +64,7 @@ const CORPUS: Record<string, readonly string[]> = {
     'ola como esta',
     'saludos necesito ayuda',
     'buenas noches',
+    'ola',
   ],
   [INTENT.FAREWELL]: [
     'chau gracias',
@@ -74,6 +86,8 @@ const CORPUS: Record<string, readonly string[]> = {
     'tengo un dolor insoportable no puedo esperar',
     'urgencia necesito hora inmediata',
     'dolor en el pecho necesito ver al doctor ahora',
+    'me duele mucho necesito atencion ya',
+    'dolor fuerte no puedo esperar',
   ],
   [INTENT.GENERAL_QUESTION]: [
     'a que hora cierran los sabados',
@@ -81,6 +95,8 @@ const CORPUS: Record<string, readonly string[]> = {
     'donde esta ubicado el consultorio',
     'cuanto cuesta la consulta general',
     'que documentos necesito traer',
+    'trabajan con isapre o fonasa',
+    'aceptan convenios',
   ],
   [INTENT.ACTIVATE_REMINDERS]: [
     'activa mis recordatorios de citas',
@@ -99,6 +115,8 @@ const CORPUS: Record<string, readonly string[]> = {
     'prefiero avisos por email no telegram',
     'cambiar preferencia de notificacion',
     'ajustes de recordatorio',
+    'como activo los avisos',
+    'donde cambio mis preferencias',
   ],
   [INTENT.SHOW_MAIN_MENU]: [
     'menu principal',
@@ -106,6 +124,7 @@ const CORPUS: Record<string, readonly string[]> = {
     'volver al inicio',
     'que puedo hacer',
     'ayuda menu',
+    'menu',
   ],
   [INTENT.WIZARD_STEP]: [
     'siguiente paso',
@@ -113,6 +132,7 @@ const CORPUS: Record<string, readonly string[]> = {
     'adelante confirmar',
     'si quiero esa hora',
     'confirmar cita',
+    'siguiente',
   ],
 };
 
@@ -129,6 +149,7 @@ const STOP_WORDS = new Set([
   'y', 'o', 'pero', 'si', 'como', 'donde', 'cuando',
   'muy', 'mas', 'menos', 'bien', 'asi',
   'necesito', 'quiero', 'puedo', 'debo',
+  'una', 'un',
 ]);
 
 // ============================================================================
@@ -138,10 +159,12 @@ const STOP_WORDS = new Set([
 
 const TYPO_MAP: Record<string, string> = {
   kiero: 'quiero', ora: 'hora', lune: 'lunes', vierne: 'viernes',
-  kansela: 'cancela', reprograma: 'reprograma', kambiar: 'cambiar',
-  sita: 'cita', truno: 'turno', konsulta: 'consulta', agendar: 'agendar',
-  manana: 'mañana', atencion: 'atencion', configuro: 'configurar',
-  agendada: 'agendada', reservada: 'reservada',
+  kansela: 'cancela', kanselame: 'cancelame', reprograma: 'reprograma',
+  kambiar: 'cambiar', sita: 'cita', truno: 'turno', konsulta: 'consulta',
+  agendar: 'agendar', manana: 'mañana', atencion: 'atencion',
+  configuro: 'configurar', agendada: 'agendada', reservada: 'reservada',
+  bieres: 'viernes', pal: 'para el', orita: 'ahora', po: '',
+  weon: '', libre: 'disponible',
 };
 
 function normalize(text: string): string[] {
