@@ -224,6 +224,7 @@ function suggestResponseType(intent: IntentType, context: AvailabilityContext, e
   if (intent === INTENT.ACTIVATE_REMINDERS) return 'activate_reminders_response';
   if (intent === INTENT.DEACTIVATE_REMINDERS) return 'deactivate_reminders_response';
   if (intent === INTENT.REMINDER_PREFERENCES) return 'reminder_preferences_response';
+  if (intent === INTENT.GET_MY_BOOKINGS) return 'my_bookings_response';
   return 'standard_response';
 }
 
@@ -328,6 +329,14 @@ function generateAIResponse(
       aiResponse: "Puedes configurar cómo y cuándo recibir recordatorios.",
       needsMoreInfo: true,
       followUpQuestion: "¿Por qué canal prefieres recibir los avisos: Telegram, email o SMS?"
+    };
+  }
+
+  if (responseType === 'my_bookings_response') {
+    return {
+      aiResponse: "Voy a consultar tus citas agendadas.",
+      needsMoreInfo: false,
+      followUpQuestion: null
     };
   }
 
@@ -480,7 +489,7 @@ export async function main(rawInput: unknown): Promise<{ readonly success: boole
   const verifiedResult = verifyUrgency(result, text);
 
   // Tracing
-  await trace({
+  trace({
     chat_id,
     intent: verifiedResult.intent as IntentType,
     confidence: verifiedResult.confidence,

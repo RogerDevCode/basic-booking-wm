@@ -117,7 +117,7 @@ export const NORMALIZATION_MAP: Record<string, string> = {
   'reserbar': 'reservar', 'reserba': 'reserva',
   'kanselar': 'cancelar', 'kansela': 'cancela', 'cancelsr': 'cancelar', 'canelar': 'cancelar',
   'kambiar': 'cambiar', 'kambia': 'cambia',
-  'disponiblidad': 'disponibilidad', 'disponsible': 'disponible', 'disponibilidaz': 'disponibilidad',
+  'disponiblidad': 'disponibilidad', 'disponible': 'disponible', 'disponibilidaz': 'disponibilidad',
   'konsulta': 'consulta', 'konsulto': 'consulto', 'cosulta': 'consulta',
   'ora': 'hora', 'oras': 'horas',
   'lugr': 'lugar', 'lugare': 'lugar',
@@ -130,7 +130,17 @@ export const NORMALIZATION_MAP: Record<string, string> = {
   'nececito': 'necesito', 'hor': 'hora',
   'grasias': 'gracias', 'ola': 'hola', 'holaa': 'hola',
   'chao': 'chau', 'adios': 'adiós',
-  'qiero': 'quiero',
+  'qiero': 'quiero', 'kiero': 'quiero',
+  'wena': 'buena', 'bacan': 'bacán',
+  'agendame': 'agendar', 'kancelo': 'cancelo', 'kambio': 'cambio',
+  'orita': 'ahora',
+  'lune': 'lunes', 'miercole': 'miércoles', 'jueve': 'jueves',
+  'vierne': 'viernes', 'bieres': 'viernes',
+  'saba': 'sábado', 'domin': 'domingo',
+  'mediodia': 'mediodía', 'madrugada': 'madrugada',
+  'antier': 'anteayer',
+  'chequeo': 'consulta general', 'revision': 'consulta general',
+  'examen': 'laboratorio', 'lab': 'laboratorio',
 };
 
 // ============================================================================

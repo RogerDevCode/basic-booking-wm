@@ -1,6 +1,7 @@
 // ============================================================================
-// LLM CLIENT — OpenAI GPT-4o-mini (primary) + Groq Llama 3.3 (fallback) (v3.2)
-// Temperature 0.0, max_tokens 512, timeout 15s, 2 retries, JSON mode
+// LLM CLIENT — OpenAI GPT-4o-mini (primary) + Groq Llama 3.3 (fallback) (v4.0)
+// Temperature 0.0, max_tokens 512, timeout 15s, 2 retries
+// Structured Outputs (json_schema strict) for OpenAI, json_object for Groq
 // Pattern: Precision Architecture, No 'any', Errors as Values
 // ============================================================================
 
@@ -13,10 +14,55 @@ const GROQ_MODEL = 'llama-3.3-70b-versatile';
 const OPENAI_MODEL = 'gpt-4o-mini';
 
 import { cacheGet, cacheSet } from '../cache';
+import { INTENT } from './constants';
 
 const MAX_RETRIES = 2;
 const BACKOFF_MS = 500;
 const TIMEOUT_MS = 15000;
+
+// ============================================================================
+// OPENAI STRUCTURED OUTPUTS — JSON Schema (strict mode)
+// Research: OpenAI docs guarantee 100% schema compliance with CFG engine
+// ============================================================================
+
+const INTENT_CLASSIFICATION_SCHEMA = {
+  type: 'object' as const,
+  properties: {
+    intent: {
+      type: 'string' as const,
+      enum: Object.values(INTENT),
+    },
+    confidence: {
+      type: 'number' as const,
+      minimum: 0,
+      maximum: 1,
+    },
+    entities: {
+      type: 'object' as const,
+      properties: {
+        date: { type: ['string', 'null'] as const },
+        time: { type: ['string', 'null'] as const },
+        booking_id: { type: ['string', 'null'] as const },
+        patient_name: { type: ['string', 'null'] as const },
+        service_type: { type: ['string', 'null'] as const },
+      },
+      required: ['date', 'time', 'booking_id', 'patient_name', 'service_type'],
+      additionalProperties: false,
+    },
+    needs_more: {
+      type: 'boolean' as const,
+    },
+    follow_up: {
+      type: ['string', 'null'] as const,
+    },
+  },
+  required: ['intent', 'confidence', 'entities', 'needs_more', 'follow_up'],
+  additionalProperties: false,
+} as const;
+
+// ============================================================================
+// TYPES
+// ============================================================================
 
 interface ChatMessage {
   readonly role: 'system' | 'user' | 'assistant';
@@ -37,6 +83,10 @@ interface ProviderInternalResult {
   readonly tokens_in: number;
   readonly tokens_out: number;
 }
+
+// ============================================================================
+// API KEY RETRIEVAL (wmill-safe)
+// ============================================================================
 
 function getGroqKey(): string | null {
   try { if (typeof wmill !== 'undefined' && wmill.env['GROQ_API_KEY'] != null) return wmill.env['GROQ_API_KEY']; } catch { /* wmill not available */ }
@@ -62,6 +112,10 @@ function getOpenAIKey(): string | null {
   return null;
 }
 
+// ============================================================================
+// HTTP UTILS
+// ============================================================================
+
 async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: number): Promise<[Error | null, Response | null]> {
   const controller = new AbortController();
   const id = setTimeout(() => { controller.abort(); }, timeoutMs);
@@ -75,12 +129,28 @@ async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: nu
   }
 }
 
+// ============================================================================
+// PROVIDER CALLS
+// ============================================================================
+
 async function callProvider(
   url: string,
   apiKey: string,
   model: string,
   messages: readonly ChatMessage[],
+  useStructuredOutput: boolean,
 ): Promise<[Error | null, ProviderInternalResult | null]> {
+  const responseFormat = useStructuredOutput
+    ? {
+        type: 'json_schema' as const,
+        json_schema: {
+          name: 'intent_classification',
+          strict: true,
+          schema: INTENT_CLASSIFICATION_SCHEMA,
+        },
+      }
+    : { type: 'json_object' as const };
+
   const [err, response] = await fetchWithTimeout(url, {
     method: 'POST',
     headers: {
@@ -92,7 +162,7 @@ async function callProvider(
       messages,
       temperature: 0.0,
       max_tokens: 512,
-      response_format: { type: 'json_object' },
+      response_format: responseFormat,
     }),
   }, TIMEOUT_MS);
 
@@ -128,12 +198,13 @@ async function callWithRetry(
   model: string,
   messages: readonly ChatMessage[],
   provider: 'groq' | 'openai',
+  useStructuredOutput: boolean,
 ): Promise<[Error | null, LLMResponse | null]> {
   let lastError: Error | null = null;
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     const start = Date.now();
-    const [err, result] = await callProvider(url, apiKey, model, messages);
+    const [err, result] = await callProvider(url, apiKey, model, messages, useStructuredOutput);
     
     if (err == null && result != null) {
       return [null, {
@@ -153,6 +224,40 @@ async function callWithRetry(
 
   return [new Error(`${provider} failed after ${String(MAX_RETRIES + 1)} attempts: ${lastError?.message ?? 'Unknown'}`), null];
 }
+
+// ============================================================================
+// SCHEMA VALIDATION (post-parse defense-in-depth)
+// ============================================================================
+
+function validateIntentSchema(parsed: Record<string, unknown>): [Error | null, boolean] {
+  // Validate intent
+  const intent = parsed['intent'];
+  if (typeof intent !== 'string') {
+    return [new Error('validation_failed: intent must be a string'), false];
+  }
+  const validIntents = Object.values(INTENT);
+  if (!validIntents.includes(intent as typeof INTENT[keyof typeof INTENT])) {
+    return [new Error(`validation_failed: invalid intent "${intent}"`), false];
+  }
+
+  // Validate confidence
+  const confidence = parsed['confidence'];
+  if (typeof confidence !== 'number' || confidence < 0 || confidence > 1) {
+    return [new Error('validation_failed: confidence must be a number between 0 and 1'), false];
+  }
+
+  // Validate entities
+  const entities = parsed['entities'];
+  if (entities == null || typeof entities !== 'object' || Array.isArray(entities)) {
+    return [new Error('validation_failed: entities must be an object'), false];
+  }
+
+  return [null, true];
+}
+
+// ============================================================================
+// MAIN ENTRY POINT
+// ============================================================================
 
 export async function callLLM(
   systemPrompt: string,
@@ -176,20 +281,31 @@ export async function callLLM(
     { role: 'user', content: userMessage },
   ];
 
-  // 1. OpenAI GPT-4o-mini (primary — better intent detection, structured JSON)
+  // 1. OpenAI GPT-4o-mini (primary — structured outputs with json_schema strict)
   const openaiKey = getOpenAIKey();
   if (openaiKey != null) {
-    const [err, res] = await callWithRetry(OPENAI_API_URL, openaiKey, OPENAI_MODEL, messages, 'openai');
+    const [err, res] = await callWithRetry(OPENAI_API_URL, openaiKey, OPENAI_MODEL, messages, 'openai', true);
     if (err == null && res != null) {
+      // Validate schema compliance (defense-in-depth)
+      try {
+        const cleaned = res.content.replace(/^```json\n?|\n?```$/g, '').trim();
+        const parsed = JSON.parse(cleaned) as Record<string, unknown>;
+        const [validationErr] = validateIntentSchema(parsed);
+        if (validationErr != null) {
+          console.log('[STRUCTURED OUTPUT VALIDATION WARNING]', validationErr.message);
+        }
+      } catch {
+        console.log('[STRUCTURED OUTPUT PARSE WARNING] Response is not valid JSON despite strict mode');
+      }
       void cacheSet(userMessage, res.content, 'unknown');
       return res;
     }
   }
 
-  // 2. Groq Llama 3.3 70B (fallback — fast, free tier)
+  // 2. Groq Llama 3.3 70B (fallback — json_object mode, no strict schema)
   const groqKey = getGroqKey();
   if (groqKey != null) {
-    const [err, res] = await callWithRetry(GROQ_API_URL, groqKey, GROQ_MODEL, messages, 'groq');
+    const [err, res] = await callWithRetry(GROQ_API_URL, groqKey, GROQ_MODEL, messages, 'groq', false);
     if (err == null && res != null) {
       void cacheSet(userMessage, res.content, 'unknown');
       return res;
@@ -199,7 +315,7 @@ export async function callLLM(
   // 3. Groq second key (last resort)
   const groqKey2 = getGroqKey2();
   if (groqKey2 != null) {
-    const [err, res] = await callWithRetry(GROQ_API_URL, groqKey2, GROQ_MODEL, messages, 'groq');
+    const [err, res] = await callWithRetry(GROQ_API_URL, groqKey2, GROQ_MODEL, messages, 'groq', false);
     if (err == null && res != null) {
       void cacheSet(userMessage, res.content, 'unknown');
       return res;
