@@ -28,6 +28,7 @@ import {
   verifyUrgency,
 } from './guardrails';
 import { trace } from './tracing';
+import { classifyIntent } from './tfidf-classifier';
 import {
   AIAgentInputSchema,
   type AIAgentInput,
@@ -36,6 +37,11 @@ import {
   type IntentResult,
   type IntentType,
 } from './types';
+
+// Type guard for intent validation
+function isIntentType(value: string): value is IntentType {
+  return Object.values(INTENT).includes(value as IntentType);
+}
 
 // ============================================================================
 // ENTITY EXTRACTION
@@ -463,6 +469,18 @@ export async function main(rawInput: unknown): Promise<{ readonly success: boole
     provider = "fast-path";
     cot_reasoning = "Social fast-path matched";
   } else {
+    // TF-IDF semantic classification (fallback when social doesn't match)
+    const tfidfResult = classifyIntent(text);
+    if (tfidfResult.confidence >= 0.3) {
+      const tfidfIntent = tfidfResult.intent as IntentType;
+      if (isIntentType(tfidfIntent)) {
+        intent = tfidfIntent;
+        confidence = Math.max(tfidfResult.confidence, 0.5);
+        provider = "fallback";
+        cot_reasoning = `TF-IDF semantic match (${tfidfResult.scores[0]?.intent ?? 'unknown'})`;
+      }
+    }
+
     // Check if LLM should be skipped (test mode or no credits)
     const skipLLM = (() => {
       try { if (typeof process !== 'undefined' && process.env['AI_AGENT_LLM_MODE'] === 'test') return true; } catch { /* ignore */ }
