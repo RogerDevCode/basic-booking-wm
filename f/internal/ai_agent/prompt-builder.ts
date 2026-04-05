@@ -7,6 +7,7 @@
 // ============================================================================
 
 import { INTENT } from './constants';
+import { selectFewShotExamples, formatFewShotExamples } from './semantic-sampler';
 
 const ALL_INTENTS = Object.values(INTENT).join(', ');
 
@@ -147,9 +148,10 @@ EXTRAE solo estas entidades si están presentes en el mensaje:
 </ENTITY_SPEC>`;
 
 // ============================================================================
-// SECTION 6: FEW-SHOT EXAMPLES (25 — Chilean real language, audited)
+// SECTION 6: FEW-SHOT EXAMPLES (static default — 25 Chilean examples)
+// Used when semantic sampling is not available or userMessage is not provided
 // ============================================================================
-const FEW_SHOT_EXAMPLES = `<FEW_SHOT_EXAMPLES>
+const FEW_SHOT_EXAMPLES_STATIC = `<FEW_SHOT_EXAMPLES>
 
 User: "Hola"
 → {"intent":"${INTENT.GREETING}","confidence":0.95,"entities":{},"needs_more":true,"follow_up":"¿En qué puedo ayudarte?"}
@@ -264,7 +266,18 @@ const RECAP = `RECUERDA: DEBES devolver ÚNICAMENTE un objeto JSON válido. Cero
 // PROMPT BUILDER
 // ============================================================================
 
-export function buildSystemPrompt(): string {
+function buildFewShotSection(userMessage?: string): string {
+  if (userMessage != null && userMessage.length > 0) {
+    const examples = selectFewShotExamples(userMessage, 3);
+    if (examples.length > 0) {
+      const formatted = formatFewShotExamples(examples);
+      return `<FEW_SHOT_EXAMPLES>\n\n${formatted}\n\n</FEW_SHOT_EXAMPLES>`;
+    }
+  }
+  return FEW_SHOT_EXAMPLES_STATIC;
+}
+
+export function buildSystemPrompt(userMessage?: string): string {
   return `${OBJECTIVE_PERSONA}
 
 ${ERROR_TOLERANCE}
@@ -275,7 +288,7 @@ ${DISAMBIGUATION_RULES}
 
 ${ENTITY_SPEC}
 
-${FEW_SHOT_EXAMPLES}
+${buildFewShotSection(userMessage)}
 
 ${OUTPUT_SCHEMA}
 
