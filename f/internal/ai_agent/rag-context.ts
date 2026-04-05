@@ -1,12 +1,15 @@
 // ============================================================================
-// RAG CONTEXT BUILDER — Knowledge Base Integration for AI Agent
-// Queries knowledge_base table and formats relevant FAQs for LLM context injection
+// RAG CONTEXT BUILDER — Multi-Provider Knowledge Base Integration
+// Queries knowledge_base with provider isolation:
+//   - provider_id = NULL → public FAQ (shared by all providers)
+//   - provider_id = X    → private FAQ (only for that provider)
 // ============================================================================
 
 import postgres from 'postgres';
 
 export interface FAQEntry {
   readonly kb_id: string;
+  readonly provider_id: string | null;
   readonly category: string;
   readonly title: string;
   readonly content: string;
@@ -24,7 +27,7 @@ const STOP_WORDS = new Set([
   'muy', 'mas', 'menos', 'bien', 'asi',
   'puedo', 'pueden', 'aceptan', 'realizan', 'hacen', 'ofrecen',
   'necesito', 'quiero', 'debo', 'deben',
-  ' alguna', 'algun', 'ningun', 'ninguna',
+  'alguna', 'algun', 'ningun', 'ninguna',
 ]);
 
 // Spanish typo/variant normalization
@@ -106,47 +109,73 @@ function scoreFAQ(entry: { title: string; content: string; category: string }, t
   return score;
 }
 
+export interface RAGContextResult {
+  readonly context: string;
+  readonly count: number;
+  readonly hasProviderSpecific: boolean;
+}
+
 export async function buildRAGContext(
   query: string,
+  providerId?: string | null,
   topK: number = 3
-): Promise<string> {
+): Promise<RAGContextResult> {
   const dbUrl = process.env['DATABASE_URL'];
   if (dbUrl == null || dbUrl === '') {
-    return '';
+    return { context: '', count: 0, hasProviderSpecific: false };
   }
 
   const sql = postgres(dbUrl, { ssl: 'require' });
 
   try {
-    // Fetch all active FAQs
-    const rows = await sql`
-      SELECT kb_id, category, title, content
-      FROM knowledge_base
-      WHERE is_active = true
-      ORDER BY category, title
-    `;
-
-    if (rows.length === 0) {
-      return '';
-    }
-
     const terms = normalizeQuery(query);
     if (terms.length === 0) {
-      return '';
+      return { context: '', count: 0, hasProviderSpecific: false };
+    }
+
+    // Fetch FAQs: always include public (provider_id IS NULL),
+    // and include provider-specific if providerId is provided
+    let rows;
+    if (providerId != null) {
+      rows = await sql`
+        SELECT kb_id, provider_id, category, title, content
+        FROM knowledge_base
+        WHERE is_active = true
+          AND (provider_id IS NULL OR provider_id = ${providerId}::uuid)
+        ORDER BY category, title
+      `;
+    } else {
+      // No provider context — only return public FAQs
+      rows = await sql`
+        SELECT kb_id, provider_id, category, title, content
+        FROM knowledge_base
+        WHERE is_active = true
+          AND provider_id IS NULL
+        ORDER BY category, title
+      `;
+    }
+
+    if (rows.length === 0) {
+      return { context: '', count: 0, hasProviderSpecific: false };
     }
 
     // Score each FAQ entry
     const scored: ScoredEntry[] = [];
+    let hasProviderSpecific = false;
+
     for (const row of rows) {
       const title = typeof row['title'] === 'string' ? row['title'] : '';
       const content = typeof row['content'] === 'string' ? row['content'] : '';
       const category = typeof row['category'] === 'string' ? row['category'] : '';
+      const rowProviderId = row['provider_id'] != null ? String(row['provider_id']) : null;
 
       const s = scoreFAQ({ title, content, category }, terms);
       if (s > 0) {
+        if (rowProviderId != null) hasProviderSpecific = true;
         scored.push({
           entry: {
             kb_id: String(row['kb_id']),
+            provider_id: rowProviderId,
             category,
             title,
             content,
@@ -162,20 +191,21 @@ export async function buildRAGContext(
     const topEntries = scored.slice(0, topK);
 
     if (topEntries.length === 0) {
-      return '';
+      return { context: '', count: 0, hasProviderSpecific: false };
     }
 
     // Format as RAG context for LLM
     const contextParts: string[] = [
-      '\n=== CONOCIMIENTO DE LA BASE DE DATOS (RAG) ===',
-      'La siguiente información proviene de la base de conocimiento del consultorio:',
+      '\n=== CONOCIMIENTO DEL CONSULTORIO (RAG) ===',
+      'La siguiente información proviene de la base de conocimiento:',
       '',
     ];
 
     for (let i = 0; i < topEntries.length; i++) {
       const e = topEntries[i]?.entry;
       if (e == null) continue;
-      contextParts.push(`[${String(i + 1)}] ${e.title}`);
+      const scope = e.provider_id != null ? '[Proveedor específico]' : '[Información general]';
+      contextParts.push(`${scope} [${String(i + 1)}] ${e.title}`);
       contextParts.push(`Categoría: ${e.category}`);
       contextParts.push(`Respuesta: ${e.content}`);
       contextParts.push('');
@@ -184,10 +214,14 @@ export async function buildRAGContext(
     contextParts.push('Usa esta información para responder la pregunta del usuario de manera precisa y basada en los datos reales del consultorio.');
     contextParts.push('===================================');
 
-    return contextParts.join('\n');
+    return {
+      context: contextParts.join('\n'),
+      count: topEntries.length,
+      hasProviderSpecific,
+    };
   } catch {
-    // If RAG fails, return empty string — LLM will use general knowledge
-    return '';
+    // If RAG fails, return empty — LLM uses general knowledge
+    return { context: '', count: 0, hasProviderSpecific: false };
   } finally {
     await sql.end();
   }

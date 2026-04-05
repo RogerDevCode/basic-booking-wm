@@ -15,6 +15,7 @@ import { INTENT } from "./constants";
 export const AIAgentInputSchema = z.object({
   chat_id: z.string().min(1).describe("Identificador único del chat/paciente"),
   text: z.string().trim().min(1).max(500).describe("Mensaje del usuario"),
+  provider_id: z.string().uuid().optional().describe("ID del proveedor/contexto del consultorio"),
   user_profile: z.object({
     is_first_time: z.boolean().describe("Si es la primera interacción"),
     booking_count: z.number().int().min(0).describe("Número de citas previas"),

@@ -448,7 +448,7 @@ export async function main(rawInput: unknown): Promise<{ readonly success: boole
   }
 
   const input = inputResult.data;
-  const { text, chat_id } = input;
+  const { text, chat_id, provider_id } = input;
 
   // Step 1: Input guardrails
   const inputGuard = validateInput(text);
@@ -495,9 +495,11 @@ export async function main(rawInput: unknown): Promise<{ readonly success: boole
       // RAG: Build context from knowledge base for general questions
       let ragContext: string | undefined;
       if (intent === INTENT.GENERAL_QUESTION || intent === INTENT.UNKNOWN) {
-        ragContext = await buildRAGContext(text, 3);
-        if (ragContext !== '') {
-          cot_reasoning = `RAG context found (${ragContext.split('\n').filter(l => l.startsWith('[')).length} FAQs)`;
+        const ragResult = await buildRAGContext(text, provider_id ?? null, 3);
+        ragContext = ragResult.context;
+        if (ragResult.count > 0) {
+          const scope = ragResult.hasProviderSpecific ? 'provider-specific + public' : 'public only';
+          cot_reasoning = `RAG: ${String(ragResult.count)} FAQs found (${scope})`;
         }
       }
 
