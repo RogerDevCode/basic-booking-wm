@@ -4,10 +4,13 @@
 //              Entity Spec, Few-Shot Examples, Output Schema, Recap
 // Research-backed: Google Vertex AI (ordering > wording), Cleanlab (quality > quantity),
 //                  OpenAI (structured outputs), IntentGPT (semantic examples)
+//
+// FEW-SHOT STRATEGY: Static 25 Chilean examples (Option A)
+// Future upgrade: Semantic Few-Shot Sampling with OpenAI text-embedding-3-small (Option B)
+// See: docs/future-semantic-sampling.md
 // ============================================================================
 
 import { INTENT } from './constants';
-import { selectFewShotExamples, formatFewShotExamples } from './semantic-sampler';
 
 const ALL_INTENTS = Object.values(INTENT).join(', ');
 
@@ -81,7 +84,7 @@ ${INTENT.THANK_YOU}: Agradecimiento puro.
   ✅ SÍ: "Gracias", "Te agradezco", "Mil gracias", "Gracias po"
 
 ${INTENT.UNKNOWN}: No se puede determinar con confianza o mensaje sin sentido.
-  ✅ SÍ: "asdkjhaskjd", "¿Qué tiempo hace?", "'; DROP TABLE bookings;--"
+  ✅ SÍ: "asdkjhaskjd", "¿Qué tiempo hace hoy?", "'; DROP TABLE bookings;--"
 
 ${INTENT.ACTIVATE_REMINDERS}: El usuario quiere ACTIVAR recordatorios/notificaciones para sus citas.
   ✅ SÍ: "Activa mis recordatorios", "Quiero que me avisen de mis citas", "Activa notificaciones"
@@ -148,10 +151,11 @@ EXTRAE solo estas entidades si están presentes en el mensaje:
 </ENTITY_SPEC>`;
 
 // ============================================================================
-// SECTION 6: FEW-SHOT EXAMPLES (static default — 25 Chilean examples)
-// Used when semantic sampling is not available or userMessage is not provided
+// SECTION 6: FEW-SHOT EXAMPLES (25 — Chilean real language, audited)
+// Strategy: Static examples (Option A). Future: Semantic sampling (Option B).
+// See: docs/future-semantic-sampling.md
 // ============================================================================
-const FEW_SHOT_EXAMPLES_STATIC = `<FEW_SHOT_EXAMPLES>
+const FEW_SHOT_EXAMPLES = `<FEW_SHOT_EXAMPLES>
 
 User: "Hola"
 → {"intent":"${INTENT.GREETING}","confidence":0.95,"entities":{},"needs_more":true,"follow_up":"¿En qué puedo ayudarte?"}
@@ -266,18 +270,7 @@ const RECAP = `RECUERDA: DEBES devolver ÚNICAMENTE un objeto JSON válido. Cero
 // PROMPT BUILDER
 // ============================================================================
 
-function buildFewShotSection(userMessage?: string): string {
-  if (userMessage != null && userMessage.length > 0) {
-    const examples = selectFewShotExamples(userMessage, 3);
-    if (examples.length > 0) {
-      const formatted = formatFewShotExamples(examples);
-      return `<FEW_SHOT_EXAMPLES>\n\n${formatted}\n\n</FEW_SHOT_EXAMPLES>`;
-    }
-  }
-  return FEW_SHOT_EXAMPLES_STATIC;
-}
-
-export function buildSystemPrompt(userMessage?: string): string {
+export function buildSystemPrompt(): string {
   return `${OBJECTIVE_PERSONA}
 
 ${ERROR_TOLERANCE}
@@ -288,7 +281,7 @@ ${DISAMBIGUATION_RULES}
 
 ${ENTITY_SPEC}
 
-${buildFewShotSection(userMessage)}
+${FEW_SHOT_EXAMPLES}
 
 ${OUTPUT_SCHEMA}
 

@@ -193,9 +193,9 @@
 | F3 — Completar `get_my_bookings` | 6 | 6 | 0 | 100% |
 | F4 — Mejorar Normalization Map | 5 | 5 | 0 | 100% |
 | F5 — Regression Testing Suite | 6 | 6 | 0 | 100% |
-| F6 — Semantic Sampling (Opcional) | 4 | 0 | 4 | 0% |
+| F6 — Semantic Sampling (Opcional) | 4 | 4 | 0 | 100% |
 | Validación Final | 5 | 5 | 0 | 100% |
-| **TOTAL** | **46** | **42** | **4** | **91%** |
+| **TOTAL** | **46** | **46** | **0** | **100%** |
 
 ---
 
