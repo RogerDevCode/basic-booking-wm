@@ -1,11 +1,17 @@
 // ============================================================================
-// LLM CLIENT — OpenAI GPT-4o-mini (primary) + Groq Llama 3.3 (fallback) (v4.0)
+// LLM CLIENT — Provider Switch (v4.1)
 // Temperature 0.0, max_tokens 512, timeout 15s, 2 retries
 // Structured Outputs (json_schema strict) for OpenAI, json_object for Groq
 // Pattern: Precision Architecture, No 'any', Errors as Values
+//
+// PROVIDER SWITCH — Change PRIMARY_PROVIDER to swap order
+//   'groq'  → Groq first, OpenAI fallback (current — saves OpenAI credits)
+//   'openai' → OpenAI first, Groq fallback (production default)
 // ============================================================================
 
 declare const wmill: { readonly env: Readonly<Record<string, string>> };
+
+const PRIMARY_PROVIDER: 'groq' | 'openai' = 'groq';
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
@@ -281,42 +287,42 @@ export async function callLLM(
     { role: 'user', content: userMessage },
   ];
 
-  // 1. OpenAI GPT-4o-mini (primary — structured outputs with json_schema strict)
-  const openaiKey = getOpenAIKey();
-  if (openaiKey != null) {
-    const [err, res] = await callWithRetry(OPENAI_API_URL, openaiKey, OPENAI_MODEL, messages, 'openai', true);
+  // Provider chain based on PRIMARY_PROVIDER setting
+  const providers: Array<{
+    readonly name: 'openai' | 'groq';
+    readonly url: string;
+    readonly key: string | null;
+    readonly model: string;
+    readonly structured: boolean;
+  }> = PRIMARY_PROVIDER === 'groq'
+    ? [
+        { name: 'groq' as const, url: GROQ_API_URL, key: getGroqKey(), model: GROQ_MODEL, structured: false },
+        { name: 'groq' as const, url: GROQ_API_URL, key: getGroqKey2(), model: GROQ_MODEL, structured: false },
+        { name: 'openai' as const, url: OPENAI_API_URL, key: getOpenAIKey(), model: OPENAI_MODEL, structured: true },
+      ]
+    : [
+        { name: 'openai' as const, url: OPENAI_API_URL, key: getOpenAIKey(), model: OPENAI_MODEL, structured: true },
+        { name: 'groq' as const, url: GROQ_API_URL, key: getGroqKey(), model: GROQ_MODEL, structured: false },
+        { name: 'groq' as const, url: GROQ_API_URL, key: getGroqKey2(), model: GROQ_MODEL, structured: false },
+      ];
+
+  for (const p of providers) {
+    if (p.key == null) continue;
+    const [err, res] = await callWithRetry(p.url, p.key, p.model, messages, p.name, p.structured);
     if (err == null && res != null) {
-      // Validate schema compliance (defense-in-depth)
-      try {
-        const cleaned = res.content.replace(/^```json\n?|\n?```$/g, '').trim();
-        const parsed = JSON.parse(cleaned) as Record<string, unknown>;
-        const [validationErr] = validateIntentSchema(parsed);
-        if (validationErr != null) {
-          console.log('[STRUCTURED OUTPUT VALIDATION WARNING]', validationErr.message);
+      // Validate schema compliance for structured outputs (defense-in-depth)
+      if (p.structured) {
+        try {
+          const cleaned = res.content.replace(/^```json\n?|\n?```$/g, '').trim();
+          const parsed = JSON.parse(cleaned) as Record<string, unknown>;
+          const [validationErr] = validateIntentSchema(parsed);
+          if (validationErr != null) {
+            console.log('[STRUCTURED OUTPUT VALIDATION WARNING]', validationErr.message);
+          }
+        } catch {
+          console.log('[STRUCTURED OUTPUT PARSE WARNING] Response is not valid JSON despite strict mode');
         }
-      } catch {
-        console.log('[STRUCTURED OUTPUT PARSE WARNING] Response is not valid JSON despite strict mode');
       }
-      void cacheSet(userMessage, res.content, 'unknown');
-      return res;
-    }
-  }
-
-  // 2. Groq Llama 3.3 70B (fallback — json_object mode, no strict schema)
-  const groqKey = getGroqKey();
-  if (groqKey != null) {
-    const [err, res] = await callWithRetry(GROQ_API_URL, groqKey, GROQ_MODEL, messages, 'groq', false);
-    if (err == null && res != null) {
-      void cacheSet(userMessage, res.content, 'unknown');
-      return res;
-    }
-  }
-
-  // 3. Groq second key (last resort)
-  const groqKey2 = getGroqKey2();
-  if (groqKey2 != null) {
-    const [err, res] = await callWithRetry(GROQ_API_URL, groqKey2, GROQ_MODEL, messages, 'groq', false);
-    if (err == null && res != null) {
       void cacheSet(userMessage, res.content, 'unknown');
       return res;
     }
