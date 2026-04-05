@@ -341,7 +341,7 @@ const RECAP = `RECUERDA: DEBES devolver ÚNICAMENTE un objeto JSON válido. Cero
 // PROMPT BUILDER
 // ============================================================================
 
-export function buildSystemPrompt(): string {
+export function buildSystemPrompt(ragContext?: string): string {
   return `${OBJECTIVE_PERSONA}
 
 ${ERROR_TOLERANCE}
@@ -356,7 +356,7 @@ ${FEW_SHOT_EXAMPLES}
 
 ${OUTPUT_SCHEMA}
 
-${RECAP}`;
+${ragContext != null && ragContext !== '' ? ragContext + '\n\n' : ''}${RECAP}`;
 }
 
 export function buildUserMessage(text: string): string {

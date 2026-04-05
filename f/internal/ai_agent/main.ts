@@ -29,6 +29,7 @@ import {
 } from './guardrails';
 import { trace } from './tracing';
 import { classifyIntent } from './tfidf-classifier';
+import { buildRAGContext } from './rag-context';
 import {
   AIAgentInputSchema,
   type AIAgentInput,
@@ -491,8 +492,19 @@ export async function main(rawInput: unknown): Promise<{ readonly success: boole
     })();
 
     if (!skipLLM) {
+      // RAG: Build context from knowledge base for general questions
+      let ragContext: string | undefined;
+      if (intent === INTENT.GENERAL_QUESTION || intent === INTENT.UNKNOWN) {
+        ragContext = await buildRAGContext(text, 3);
+        if (ragContext !== '') {
+          cot_reasoning = `RAG context found (${ragContext.split('\n').filter(l => l.startsWith('[')).length} FAQs)`;
+        }
+      }
+
       // LLM Path
-      const [llmErr, llmRes] = await runLLMInquiry(text);
+      const systemPrompt = buildSystemPrompt(ragContext);
+      const userMsg = buildUserMessage(text);
+      const [llmErr, llmRes] = await runLLMInquiryWithPrompt(systemPrompt, userMsg);
       if (llmErr == null && llmRes != null) {
         intent = llmRes.intent;
         confidence = llmRes.confidence;
@@ -587,23 +599,21 @@ interface LLMInquiryResult {
   readonly cot_reasoning: string;
 }
 
-async function runLLMInquiry(text: string): Promise<[Error | null, LLMInquiryResult | null]> {
+async function runLLMInquiryWithPrompt(systemPrompt: string, userMsg: string): Promise<[Error | null, LLMInquiryResult | null]> {
   try {
-    const prompt = buildSystemPrompt();
-    const userMsg = buildUserMessage(text);
-    const response = await callLLM(prompt, userMsg);
-    
+    const response = await callLLM(systemPrompt, userMsg);
+
     const cleaned = sanitizeJSONResponse(response.content);
     const parsed = JSON.parse(cleaned) as Record<string, unknown>;
-    
+
     const intent = parsed["intent"] as IntentType;
     const confidence = typeof parsed["confidence"] === "number" ? parsed["confidence"] : 0.5;
 
-    return [null, { 
-      intent, 
-      confidence, 
-      provider: response.provider, 
-      cot_reasoning: "LLM successful classification" 
+    return [null, {
+      intent,
+      confidence,
+      provider: response.provider,
+      cot_reasoning: "LLM with RAG context"
     }];
   } catch (e) {
     return [e instanceof Error ? e : new Error(String(e)), null];
