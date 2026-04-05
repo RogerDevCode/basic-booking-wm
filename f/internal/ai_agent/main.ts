@@ -354,10 +354,18 @@ function generateAIResponse(
 function detectIntentRules(text: string): { readonly intent: IntentType; readonly confidence: number } {
   const lower = text.toLowerCase();
   
-  // Urgency first — override other matches
-  if (URGENCY_WORDS.some(w => lower.includes(w))) return { intent: INTENT.URGENT_CARE, confidence: 0.9 };
-  if (lower.includes('urjente') || lower.includes('urgnete') || lower.includes('urjencia') || lower.includes('urgente')) return { intent: INTENT.URGENT_CARE, confidence: 0.85 };
-  if (lower.includes('nececito atencion') || lower.includes('necesito atencion')) return { intent: INTENT.URGENT_CARE, confidence: 0.8 };
+  // Urgency first — but only when it's MEDICAL urgency, not general context
+  // "emergencia familiar" ≠ medical urgency
+  // "dolor en el pecho" = medical urgency
+  const medicalUrgencyPatterns = [
+    'dolor', 'sangrando', 'no puedo esperar', 'urgente', 'emergencia', 'urgencia',
+    'urjente', 'urgnete', 'urjencia', 'urgente',
+    'nececito atencion', 'necesito atencion',
+  ];
+  const hasMedicalUrgency = medicalUrgencyPatterns.some(w => lower.includes(w));
+  // Exclude non-medical contexts
+  const hasNonMedicalContext = lower.includes('emergencia familiar') || lower.includes('emergencia laboral');
+  if (hasMedicalUrgency && !hasNonMedicalContext) return { intent: INTENT.URGENT_CARE, confidence: 0.9 };
   
   // Reminder intents — check before general keywords (multi-word phrases first)
   const reminderLower = lower.trim();
@@ -375,9 +383,18 @@ function detectIntentRules(text: string): { readonly intent: IntentType; readonl
     return { intent: INTENT.REMINDER_PREFERENCES, confidence: 0.85 };
   }
 
-  // Reschedule check before create (cambiar/mover + cita = reschedule)
+  // Reschedule check — but only when NOT explicitly creating new appointment
+  // "Quiero agendar para otro día" → create (new appointment for another day)
+  // "Quiero cambiar mi cita" → reschedule (modify existing)
   const rescheduleKw = INTENT_KEYWORDS[INTENT.RESCHEDULE]?.keywords ?? [];
-  if (rescheduleKw.some(k => lower.includes(k))) {
+  // Core create keywords (not "cita" which appears everywhere)
+  const coreCreateKw = ['agendar', 'reservar', 'ajendar', 'sacar', 'pedir hora', 'necesito hora', 'consulta', 'visita', 'ver al doctor', 'konsulta', 'cosulta', 'resevar', 'truno', 'sita', 'agenda'];
+  const hasRescheduleKeyword = rescheduleKw.some(k => lower.includes(k));
+  const hasCreateKeyword = coreCreateKw.some(k => lower.includes(k));
+
+  // If user says "agendar"/"reservar", it's create (even with "otro día")
+  // Otherwise if reschedule keywords match, use reschedule
+  if (hasRescheduleKeyword && !hasCreateKeyword) {
     return { intent: INTENT.RESCHEDULE, confidence: 0.8 };
   }
 
@@ -396,6 +413,8 @@ function detectIntentRules(text: string): { readonly intent: IntentType; readonl
 
   for (const [intent, config] of Object.entries(INTENT_KEYWORDS)) {
     const typedIntent = intent as IntentType;
+    // Skip reschedule if user explicitly says "agendar"/"reservar"
+    if (typedIntent === INTENT.RESCHEDULE && hasCreateKeyword) continue;
     const keywords = config.keywords;
     const matchCount = keywords.filter((k: string) => lower.includes(k)).length;
     if (matchCount > 0) {
@@ -517,6 +536,20 @@ export async function main(rawInput: unknown): Promise<{ readonly success: boole
 
 function detectSocial(text: string): { readonly intent: IntentType; readonly confidence: number } | null {
   const lower = text.toLowerCase().trim();
+
+  // If the text contains actionable keywords, don't match as social
+  // This prevents "Buenos días, necesito reprogramar" from being classified as greeting
+  const hasActionableKeywords =
+    INTENT_KEYWORDS[INTENT.CANCEL_APPOINTMENT]?.keywords.some(k => lower.includes(k)) ||
+    INTENT_KEYWORDS[INTENT.RESCHEDULE]?.keywords.some(k => lower.includes(k)) ||
+    INTENT_KEYWORDS[INTENT.CHECK_AVAILABILITY]?.keywords.some(k => lower.includes(k)) ||
+    INTENT_KEYWORDS[INTENT.CREATE_APPOINTMENT]?.keywords.some(k => lower.includes(k)) ||
+    INTENT_KEYWORDS[INTENT.GET_MY_BOOKINGS]?.keywords.some(k => lower.includes(k)) ||
+    INTENT_KEYWORDS[INTENT.ACTIVATE_REMINDERS]?.keywords.some(k => lower.includes(k)) ||
+    INTENT_KEYWORDS[INTENT.DEACTIVATE_REMINDERS]?.keywords.some(k => lower.includes(k));
+
+  if (hasActionableKeywords && text.length > 30) return null;
+
   if (GREETINGS.some(g => lower === g)) return { intent: INTENT.GREETING, confidence: 0.95 };
   if (GREETING_PHRASES.some(p => lower.includes(p))) return { intent: INTENT.GREETING, confidence: 0.9 };
   if (FAREWELLS.some(f => lower === f)) return { intent: INTENT.FAREWELL, confidence: 0.95 };

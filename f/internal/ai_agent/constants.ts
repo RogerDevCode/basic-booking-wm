@@ -70,7 +70,7 @@ export const INTENT_KEYWORDS: Record<string, { readonly keywords: readonly strin
     weight: 3,
   },
   [INTENT.CREATE_APPOINTMENT]: {
-    keywords: ['reservar', 'agendar', 'cita', 'turno', 'sacar', 'pedir hora', 'necesito hora', 'consulta', 'visita', 'ver al doctor', 'ajendar', 'konsulta', 'cosulta', 'resevar', 'reserba', 'truno', 'sita', 'chequeo general', 'sacarme la muela', 'dolor de guata', 'la hora con el doctor', 'que me den la hora', 'pasado mañana', 'próximo bisiesto', 'medianoche', 'estaba agendando'],
+    keywords: ['reservar', 'agendar', 'cita', 'turno', 'sacar', 'pedir hora', 'necesito hora', 'consulta', 'visita', 'ver al doctor', 'ajendar', 'konsulta', 'cosulta', 'resevar', 'reserba', 'truno', 'sita', 'chequeo general', 'sacarme la muela', 'dolor de guata', 'la hora con el doctor', 'que me den la hora', 'pasado mañana', 'próximo bisiesto', 'medianoche', 'estaba agendando', 'agenda'],
     weight: 3,
   },
   [INTENT.GET_MY_BOOKINGS]: {
