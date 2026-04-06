@@ -939,8 +939,10 @@ declare namespace RT {
     port: number,
     user: string,
     dbname: string,
+    region: string,
     sslmode: string,
     password: string,
+    use_iam_auth: boolean,
     root_certificate_pem: string
   }
 

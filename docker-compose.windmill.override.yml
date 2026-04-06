@@ -1,0 +1,32 @@
+# Windmill override — use external Neon DB, disable bundled Postgres, disable extra services
+services:
+  db:
+    deploy:
+      replicas: 0
+
+  windmill_worker:
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          memory: 1024M
+
+  windmill_worker_native:
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          memory: 1024M
+
+  # Disable optional services we don't need
+  windmill_extra:
+    image: alpine:latest
+    command: ["tail", "-f", "/dev/null"]
+    deploy:
+      replicas: 0
+
+  windmill_indexer:
+    image: alpine:latest
+    command: ["tail", "-f", "/dev/null"]
+    deploy:
+      replicas: 0

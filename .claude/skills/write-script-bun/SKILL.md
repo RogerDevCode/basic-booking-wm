@@ -6,7 +6,7 @@ description: MUST use when writing Bun/TypeScript scripts.
 ## CLI Commands
 
 Place scripts in a folder. After writing, tell the user they can run:
-- `wmill script generate-metadata` - Generate .script.yaml and .lock files
+- `wmill generate-metadata` - Generate .script.yaml and .lock files
 - `wmill sync push` - Deploy to Windmill
 
 Do NOT run these commands yourself. Instead, inform the user that they should run them.
@@ -130,6 +130,8 @@ const result: S3Object = await wmill.writeS3File(
 # TypeScript SDK (windmill-client)
 
 Import: import * as wmill from 'windmill-client'
+
+workerHasInternalServer(): boolean
 
 /**
  * Initialize the Windmill client with authentication token and base URL
@@ -610,7 +612,7 @@ workflow<T>(fn: (...args: any[]) => Promise<T>): void
  * await step("notify", () => sendEmail(urls.approvalPage));
  * const { value, approver } = await waitForApproval({ timeout: 3600 });
  */
-waitForApproval(options?: { timeout?: number; form?: object; }): PromiseLike<{ value: any; approver: string; approved: boolean }>
+waitForApproval(options?: { timeout?: number; form?: object; selfApproval?: boolean; }): PromiseLike<{ value: any; approver: string; approved: boolean }>
 
 /**
  * Process items in parallel with optional concurrency control.

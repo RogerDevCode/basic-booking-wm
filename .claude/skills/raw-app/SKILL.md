@@ -30,7 +30,7 @@ my_app__raw_app/
 ├── backend/               # Backend runnables (server-side scripts)
 │   ├── <id>.<ext>         # Code file (e.g., get_user.ts)
 │   ├── <id>.yaml          # Optional: config for fields, or to reference existing scripts
-│   └── <id>.lock          # Lock file (run 'wmill app generate-locks' to create)
+│   └── <id>.lock          # Lock file (run 'wmill generate-metadata' to create/update)
 └── sql_to_apply/          # SQL migrations (dev only, not synced)
     └── *.sql              # SQL files to apply via dev server
 ```
@@ -86,7 +86,7 @@ export async function main(user_id: string) {
 
 After creating, tell the user they can generate lock files by running:
 ```bash
-wmill app generate-locks
+wmill generate-metadata
 ```
 
 ### Optional YAML Configuration
@@ -244,18 +244,9 @@ Tell the user they can run these commands (do NOT run them yourself):
 | `wmill app new` | Create a new raw app interactively |
 | `wmill app dev` | Start dev server with live reload |
 | `wmill app generate-agents` | Refresh AGENTS.md and DATATABLES.md |
-| `wmill app generate-locks` | Generate lock files for backend runnables |
-| `wmill sync push --extra-includes "f/<folder>/<app>.raw_app/**" --yes` | Deploy this specific raw app to Windmill (never do a blanket `wmill sync push`) |
+| `wmill generate-metadata` | Generate lock files for backend runnables |
+| `wmill sync push` | Deploy app to Windmill |
 | `wmill sync pull` | Pull latest from Windmill |
-
-## Svelte 5 Event Handling
-
-When building Svelte 5 raw apps, be aware of event delegation:
-
-- The Svelte runtime version in `node_modules/svelte` **must match** the compiler version used by `wmill sync push`. If you get `$.delegated is undefined` errors at runtime, run `npm install svelte@latest` in the raw app folder and re-push.
-- `onclick` on `<div>`, `<span>`, and other non-interactive elements uses Svelte's event delegation system. If the runtime doesn't support it, you'll get errors.
-- `onclick` on `<button>` elements is native and generally works fine.
-- For modal overlays or click-outside patterns, prefer using `<button>` elements styled as overlays, or ensure the Svelte runtime is up to date.
 
 ## Best Practices
 
@@ -264,4 +255,4 @@ When building Svelte 5 raw apps, be aware of event delegation:
 3. **Keep runnables focused** - one function per file
 4. **Use descriptive IDs** - `get_user.ts` not `a.ts`
 5. **Always whitelist tables** - add to `data.tables` before querying
-6. **Generate locks** - tell the user to run `wmill app generate-locks` after adding/modifying backend runnables
+6. **Generate locks** - tell the user to run `wmill generate-metadata` after adding/modifying backend runnables

@@ -1,0 +1,18 @@
+# Mirror override — replace all ghcr.io images with ghcr.dockerproxy.com
+# Usage: docker compose -f docker-compose.windmill.yml -f docker-compose.windmirror.yml -f docker-compose.windmill.override.yml --env-file .env.wm up -d
+
+services:
+  windmill_server:
+    image: ghcr.dockerproxy.com/windmill-labs/windmill:main
+
+  windmill_worker:
+    image: ghcr.dockerproxy.com/windmill-labs/windmill:main
+
+  windmill_worker_native:
+    image: ghcr.dockerproxy.com/windmill-labs/windmill:main
+
+  windmill_extra:
+    image: ghcr.dockerproxy.com/windmill-labs/windmill-extra:main
+
+  caddy:
+    image: ghcr.dockerproxy.com/windmill-labs/caddy-l4:latest
