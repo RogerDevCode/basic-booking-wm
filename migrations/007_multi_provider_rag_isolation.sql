@@ -1,7 +1,7 @@
 -- ============================================================================
 -- Migration 007: Multi-Provider RAG Isolation + RLS Policies
 -- Purpose: Ensure each provider only accesses their own knowledge base entries
---          and patient data. Public FAQs (provider_id IS NULL) are shared.
+--          and client data. Public FAQs (provider_id IS NULL) are shared.
 -- Date: 2026-04-05
 -- ============================================================================
 
@@ -39,25 +39,25 @@ CREATE POLICY kb_tenant_write ON knowledge_base
   );
 
 -- ============================================================================
--- STEP 3: RLS Policy for patients (patient isolation per provider)
+-- STEP 3: RLS Policy for clients (client isolation per provider)
 -- ============================================================================
 
--- Add provider_id to patients table if not exists
+-- Add provider_id to clients table if not exists
 DO $$
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM information_schema.columns
-    WHERE table_name = 'patients' AND column_name = 'provider_id'
+    WHERE table_name = 'clients' AND column_name = 'provider_id'
   ) THEN
-    ALTER TABLE patients ADD COLUMN provider_id UUID REFERENCES providers(provider_id);
+    ALTER TABLE clients ADD COLUMN provider_id UUID REFERENCES providers(provider_id);
   END IF;
 END $$;
 
-ALTER TABLE patients ENABLE ROW LEVEL SECURITY;
-ALTER TABLE patients FORCE ROW LEVEL SECURITY;
+ALTER TABLE clients ENABLE ROW LEVEL SECURITY;
+ALTER TABLE clients FORCE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS patient_tenant_isolation ON patients;
-CREATE POLICY patient_tenant_isolation ON patients
+DROP POLICY IF EXISTS client_tenant_isolation ON clients;
+CREATE POLICY client_tenant_isolation ON clients
   FOR ALL
   USING (
     provider_id IS NULL
@@ -96,7 +96,7 @@ CREATE POLICY conversation_tenant_isolation ON conversations
 
 CREATE INDEX IF NOT EXISTS idx_kb_provider ON knowledge_base(provider_id);
 CREATE INDEX IF NOT EXISTS idx_kb_public ON knowledge_base(provider_id) WHERE provider_id IS NULL;
-CREATE INDEX IF NOT EXISTS idx_patients_provider ON patients(provider_id);
+CREATE INDEX IF NOT EXISTS idx_clients_provider ON clients(provider_id);
 CREATE INDEX IF NOT EXISTS idx_conversations_provider ON conversations(provider_id);
 
 -- ============================================================================

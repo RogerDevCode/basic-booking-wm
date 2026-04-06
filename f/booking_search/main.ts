@@ -1,7 +1,7 @@
 // ============================================================================
 // BOOKING SEARCH — Search and filter bookings
 // ============================================================================
-// Search by: date range, provider, patient, status, service
+// Search by: date range, provider, client, status, service
 // Pagination: offset + limit
 // ============================================================================
 
@@ -10,7 +10,7 @@ import postgres from 'postgres';
 
 const InputSchema = z.object({
   provider_id: z.uuid().optional(),
-  patient_id: z.uuid().optional(),
+  client_id: z.uuid().optional(),
   status: z.enum(['pending', 'confirmed', 'in_service', 'completed', 'cancelled', 'no_show', 'rescheduled']).optional(),
   date_from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   date_to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
@@ -29,7 +29,7 @@ interface BookingSearchRow {
   readonly notification_sent: boolean;
   readonly created_at: string;
   readonly provider_name: string;
-  readonly patient_name: string;
+  readonly client_name: string;
   readonly service_name: string;
 }
 
@@ -69,9 +69,9 @@ export async function main(rawInput: unknown): Promise<{
       params.push(input.provider_id);
       paramIdx++;
     }
-    if (input.patient_id !== undefined) {
-      conditions.push('b.patient_id = $' + String(paramIdx) + '::uuid');
-      params.push(input.patient_id);
+    if (input.client_id !== undefined) {
+      conditions.push('b.client_id = $' + String(paramIdx) + '::uuid');
+      params.push(input.client_id);
       paramIdx++;
     }
     if (input.status !== undefined) {
@@ -109,10 +109,10 @@ export async function main(rawInput: unknown): Promise<{
     const bookingRows = await sql.unsafe(
       'SELECT b.booking_id, b.start_time, b.end_time, b.status, b.idempotency_key,' +
       ' b.gcal_sync_status, b.notification_sent, b.created_at,' +
-      ' p.name as provider_name, pt.name as patient_name, s.name as service_name' +
+      ' p.name as provider_name, pt.name as client_name, s.name as service_name' +
       ' FROM bookings b' +
       ' JOIN providers p ON p.provider_id = b.provider_id' +
-      ' JOIN patients pt ON pt.patient_id = b.patient_id' +
+      ' JOIN clients pt ON pt.client_id = b.client_id' +
       ' JOIN services s ON s.service_id = b.service_id' +
       ' ' + whereClause +
       ' ORDER BY b.start_time DESC' +

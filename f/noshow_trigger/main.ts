@@ -35,7 +35,7 @@ export async function main(rawInput: unknown): Promise<{
   try {
     // Find confirmed bookings that ended more than lookback_minutes ago
     const rows = await sql`
-      SELECT booking_id, provider_id, patient_id, status, start_time, end_time
+      SELECT booking_id, provider_id, client_id, status, start_time, end_time
       FROM bookings
       WHERE status = 'confirmed'
         AND end_time < (NOW() - (${input.lookback_minutes} || ' minutes')::interval)

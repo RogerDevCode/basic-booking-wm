@@ -73,7 +73,7 @@ interface ServiceRow {
 export interface AffectedBooking {
   readonly booking_id: string;
   readonly start_time: string;
-  readonly patient_name: string;
+  readonly client_name: string;
 }
 
 // ─── Result Type ────────────────────────────────────────────────────────────
@@ -238,9 +238,9 @@ export async function validateOverride(
 ): Promise<Result<OverrideValidation>> {
   try {
     const rows = await sql`
-      SELECT b.booking_id, b.start_time, p.name as patient_name
+      SELECT b.booking_id, b.start_time, p.name as client_name
       FROM bookings b
-      JOIN patients p ON p.patient_id = b.patient_id
+      JOIN clients p ON p.client_id = b.client_id
       WHERE b.provider_id = ${providerId}::uuid
         AND b.start_time >= ${dateStart}::date
         AND b.start_time < (${dateEnd}::date + INTERVAL '1 day')
@@ -250,7 +250,7 @@ export async function validateOverride(
     const affected = rows.map(r => ({
       booking_id: String(r['booking_id']),
       start_time: String(r['start_time']),
-      patient_name: String(r['patient_name']),
+      client_name: String(r['client_name']),
     }));
 
     return [null, {

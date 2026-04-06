@@ -7,7 +7,7 @@
 -- Changes:
 --   1. Convert providers.id from SERIAL INT to UUID
 --   2. Convert services.id from SERIAL INT to UUID
---   3. Add missing tables: patients, provider_schedules, schedule_overrides,
+--   3. Add missing tables: clients, provider_schedules, schedule_overrides,
 --      booking_audit, knowledge_base, conversations
 --   4. Add missing columns to bookings table
 --   5. Change status values from UPPERCASE to lowercase
@@ -104,7 +104,7 @@ ALTER TABLE services_new RENAME TO services;
 CREATE TABLE IF NOT EXISTS bookings_new (
     booking_id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     provider_id         UUID NOT NULL REFERENCES providers(provider_id),
-    patient_id          UUID NOT NULL, -- FK added after patients table creation
+    client_id          UUID NOT NULL, -- FK added after clients table creation
     service_id          UUID NOT NULL REFERENCES services(service_id),
     start_time          TIMESTAMPTZ NOT NULL,
     end_time            TIMESTAMPTZ NOT NULL,
@@ -113,14 +113,14 @@ CREATE TABLE IF NOT EXISTS bookings_new (
                                           'completed','cancelled','no_show','rescheduled')),
     idempotency_key     TEXT UNIQUE NOT NULL,
     cancellation_reason TEXT,
-    cancelled_by        TEXT CHECK (cancelled_by IN ('patient','provider','system', NULL)),
+    cancelled_by        TEXT CHECK (cancelled_by IN ('client','provider','system', NULL)),
     rescheduled_from    UUID REFERENCES bookings_new(booking_id),
     rescheduled_to      UUID REFERENCES bookings_new(booking_id),
     notes               TEXT,
 
     -- Google Calendar sync
     gcal_provider_event_id TEXT,
-    gcal_patient_event_id  TEXT,
+    gcal_client_event_id  TEXT,
     gcal_sync_status       TEXT DEFAULT 'pending'
                            CHECK (gcal_sync_status IN ('pending','synced','partial','failed')),
     gcal_retry_count       INT DEFAULT 0,
@@ -167,7 +167,7 @@ ALTER TABLE bookings_new RENAME TO bookings;
 -- 3d. Add indexes for bookings
 CREATE INDEX idx_bookings_provider_time ON bookings(provider_id, start_time, end_time)
     WHERE status NOT IN ('cancelled', 'no_show', 'rescheduled');
-CREATE INDEX idx_bookings_patient ON bookings(patient_id, start_time DESC);
+CREATE INDEX idx_bookings_client ON bookings(client_id, start_time DESC);
 CREATE INDEX idx_bookings_status ON bookings(status);
 CREATE INDEX idx_bookings_gcal_pending ON bookings(gcal_sync_status)
     WHERE gcal_sync_status IN ('pending', 'partial');
@@ -177,10 +177,10 @@ CREATE INDEX idx_bookings_reminders ON bookings(start_time)
 CREATE INDEX idx_bookings_idempotency ON bookings(idempotency_key);
 
 -- ============================================================================
--- STEP 4: Create patients table
+-- STEP 4: Create clients table
 -- ============================================================================
-CREATE TABLE IF NOT EXISTS patients (
-    patient_id        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+CREATE TABLE IF NOT EXISTS clients (
+    client_id        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name              TEXT NOT NULL,
     email             TEXT UNIQUE,
     phone             TEXT,
@@ -192,13 +192,13 @@ CREATE TABLE IF NOT EXISTS patients (
     updated_at        TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_patients_email ON patients(email);
-CREATE INDEX idx_patients_telegram ON patients(telegram_chat_id);
+CREATE INDEX idx_clients_email ON clients(email);
+CREATE INDEX idx_clients_telegram ON clients(telegram_chat_id);
 
--- 4b. Add FK constraint for patient_id in bookings
+-- 4b. Add FK constraint for client_id in bookings
 ALTER TABLE bookings
-    ADD CONSTRAINT fk_bookings_patient
-    FOREIGN KEY (patient_id) REFERENCES patients(patient_id);
+    ADD CONSTRAINT fk_bookings_client
+    FOREIGN KEY (client_id) REFERENCES clients(client_id);
 
 -- ============================================================================
 -- STEP 5: Create provider_schedules table
@@ -276,7 +276,7 @@ CREATE INDEX idx_kb_embedding ON knowledge_base USING ivfflat (embedding vector_
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS conversations (
     message_id    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    patient_id    UUID REFERENCES patients(patient_id),
+    client_id    UUID REFERENCES clients(client_id),
     channel       TEXT NOT NULL CHECK (channel IN ('telegram', 'web', 'api')),
     direction     TEXT NOT NULL CHECK (direction IN ('incoming', 'outgoing')),
     content       TEXT NOT NULL,
@@ -285,7 +285,7 @@ CREATE TABLE IF NOT EXISTS conversations (
     created_at    TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_conversations_patient ON conversations(patient_id, created_at DESC);
+CREATE INDEX idx_conversations_client ON conversations(client_id, created_at DESC);
 CREATE INDEX idx_conversations_channel ON conversations(channel, created_at DESC);
 
 -- ============================================================================
@@ -444,8 +444,8 @@ DROP TRIGGER IF EXISTS update_services_updated_at ON services;
 CREATE TRIGGER update_services_updated_at BEFORE UPDATE ON services
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-DROP TRIGGER IF EXISTS update_patients_updated_at ON patients;
-CREATE TRIGGER update_patients_updated_at BEFORE UPDATE ON patients
+DROP TRIGGER IF EXISTS update_clients_updated_at ON clients;
+CREATE TRIGGER update_clients_updated_at BEFORE UPDATE ON clients
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 DROP TRIGGER IF EXISTS update_bookings_updated_at ON bookings;

@@ -17,7 +17,7 @@ import { randomUUID } from 'crypto';
 
 const InputSchema = z.object({
   calendar_id: z.string().min(1),
-  calendar_type: z.enum(['provider', 'patient']).default('provider'),
+  calendar_type: z.enum(['provider', 'client']).default('provider'),
   old_channel_id: z.string().optional(),
   old_resource_id: z.string().optional(),
   webhook_base_url: z.url().optional(),

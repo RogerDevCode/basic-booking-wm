@@ -1,7 +1,7 @@
 // ============================================================================
 // WEB AUTH CHANGE ROLE — Admin-only: change user role
 // ============================================================================
-// Allows an admin to change a user's role between patient/provider/admin.
+// Allows an admin to change a user's role between client/provider/admin.
 // When changing to 'provider', creates a linked providers record if missing.
 // Validates admin permissions and role transitions.
 // ============================================================================
@@ -12,7 +12,7 @@ import postgres from 'postgres';
 const InputSchema = z.object({
   admin_user_id: z.uuid(),
   target_user_id: z.uuid(),
-  new_role: z.enum(['patient', 'provider', 'admin']),
+  new_role: z.enum(['client', 'provider', 'admin']),
 });
 
 interface ChangeRoleResult {

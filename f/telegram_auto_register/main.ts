@@ -80,7 +80,7 @@ export async function main(rawInput: unknown): Promise<[Error | null, TelegramUs
         full_name, telegram_chat_id, role, password_hash,
         is_active, timezone
       ) VALUES (
-        ${fullName}, ${chat_id}, 'patient', ${passwordHash},
+        ${fullName}, ${chat_id}, 'client', ${passwordHash},
         true, 'America/Santiago'
       )
       RETURNING user_id, full_name, telegram_chat_id, role

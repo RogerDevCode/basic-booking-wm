@@ -1,8 +1,8 @@
 // ============================================================================
-// PATIENT REGISTER — Create or update patient records
+// PATIENT REGISTER — Create or update client records
 // ============================================================================
-// Creates a new patient or updates existing one by email/phone/telegram_chat_id.
-// Idempotent: if patient exists, updates name/timezone instead of creating duplicate.
+// Creates a new client or updates existing one by email/phone/telegram_chat_id.
+// Idempotent: if client exists, updates name/timezone instead of creating duplicate.
 // ============================================================================
 
 import { z } from 'zod';
@@ -17,8 +17,8 @@ const InputSchema = z.object({
   idempotency_key: z.string().min(1).optional(),
 });
 
-interface PatientRow {
-  readonly patient_id: string;
+interface ClientRow {
+  readonly client_id: string;
   readonly name: string;
   readonly email: string | null;
   readonly phone: string | null;
@@ -26,8 +26,8 @@ interface PatientRow {
   readonly timezone: string;
 }
 
-interface PatientResult {
-  readonly patient_id: string;
+interface ClientResult {
+  readonly client_id: string;
   readonly name: string;
   readonly email: string | null;
   readonly phone: string | null;
@@ -38,7 +38,7 @@ interface PatientResult {
 
 export async function main(rawInput: unknown): Promise<{
   success: boolean;
-  data: PatientResult | null;
+  data: ClientResult | null;
   error_message: string | null;
 }> {
   const parsed = InputSchema.safeParse(rawInput);
@@ -60,50 +60,50 @@ export async function main(rawInput: unknown): Promise<{
   const sql = postgres(dbUrl, { ssl: 'require' });
 
   try {
-    // Try to find existing patient
-    let existingRow: PatientRow | undefined;
+    // Try to find existing client
+    let existingRow: ClientRow | undefined;
 
     if (email !== undefined) {
-      const rows = await sql<PatientRow[]>`
-        SELECT patient_id, name, email, phone, telegram_chat_id, timezone
-        FROM patients WHERE email = ${email} LIMIT 1
+      const rows = await sql<ClientRow[]>`
+        SELECT client_id, name, email, phone, telegram_chat_id, timezone
+        FROM clients WHERE email = ${email} LIMIT 1
       `;
       existingRow = rows[0];
     }
 
     if (existingRow === undefined && telegram_chat_id !== undefined) {
-      const rows = await sql<PatientRow[]>`
-        SELECT patient_id, name, email, phone, telegram_chat_id, timezone
-        FROM patients WHERE telegram_chat_id = ${telegram_chat_id} LIMIT 1
+      const rows = await sql<ClientRow[]>`
+        SELECT client_id, name, email, phone, telegram_chat_id, timezone
+        FROM clients WHERE telegram_chat_id = ${telegram_chat_id} LIMIT 1
       `;
       existingRow = rows[0];
     }
 
     if (existingRow === undefined && phone !== undefined) {
-      const rows = await sql<PatientRow[]>`
-        SELECT patient_id, name, email, phone, telegram_chat_id, timezone
-        FROM patients WHERE phone = ${phone} LIMIT 1
+      const rows = await sql<ClientRow[]>`
+        SELECT client_id, name, email, phone, telegram_chat_id, timezone
+        FROM clients WHERE phone = ${phone} LIMIT 1
       `;
       existingRow = rows[0];
     }
 
     if (existingRow !== undefined) {
-      // Update existing patient
+      // Update existing client
       await sql`
-        UPDATE patients
+        UPDATE clients
         SET name = ${name},
             timezone = ${timezone},
             email = COALESCE(${email ?? null}, email),
             phone = COALESCE(${phone ?? null}, phone),
             telegram_chat_id = COALESCE(${telegram_chat_id ?? null}, telegram_chat_id),
             updated_at = NOW()
-        WHERE patient_id = ${existingRow.patient_id}::uuid
+        WHERE client_id = ${existingRow.client_id}::uuid
       `;
 
       return {
         success: true,
         data: {
-          patient_id: existingRow.patient_id,
+          client_id: existingRow.client_id,
           name,
           email: existingRow.email,
           phone: existingRow.phone,
@@ -115,26 +115,26 @@ export async function main(rawInput: unknown): Promise<{
       };
     }
 
-    // Create new patient
-    const rows = await sql<PatientRow[]>`
-      INSERT INTO patients (name, email, phone, telegram_chat_id, timezone)
+    // Create new client
+    const rows = await sql<ClientRow[]>`
+      INSERT INTO clients (name, email, phone, telegram_chat_id, timezone)
       VALUES (${name}, ${email ?? null}, ${phone ?? null}, ${telegram_chat_id ?? null}, ${timezone})
       ON CONFLICT (email) DO UPDATE SET
         name = EXCLUDED.name,
-        telegram_chat_id = COALESCE(EXCLUDED.telegram_chat_id, patients.telegram_chat_id),
+        telegram_chat_id = COALESCE(EXCLUDED.telegram_chat_id, clients.telegram_chat_id),
         updated_at = NOW()
-      RETURNING patient_id, name, email, phone, telegram_chat_id, timezone
+      RETURNING client_id, name, email, phone, telegram_chat_id, timezone
     `;
 
     const newRow = rows[0];
     if (newRow === undefined) {
-      return { success: false, data: null, error_message: 'Failed to create patient' };
+      return { success: false, data: null, error_message: 'Failed to create client' };
     }
 
     return {
       success: true,
       data: {
-        patient_id: newRow.patient_id,
+        client_id: newRow.client_id,
         name: newRow.name,
         email: newRow.email,
         phone: newRow.phone,

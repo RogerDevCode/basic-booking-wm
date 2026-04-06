@@ -17,7 +17,7 @@ const InputSchema = z.object({
   chat_id: z.string().min(1),
   message_id: z.string().optional(),
   user_id: z.string().optional(),
-  patient_id: z.string().optional(),
+  client_id: z.string().optional(),
 });
 
 const ACTION_MAP: Record<string, string> = {
@@ -101,12 +101,12 @@ async function updateBookingStatus(
   sql: SqlClient,
   bookingId: string,
   newStatus: string,
-  patientId: string | undefined,
+  clientId: string | undefined,
   actor: string
 ): Promise<{ success: boolean; error: string | null }> {
   try {
     const [booking] = await sql`
-      SELECT booking_id, status, patient_id, start_time, end_time
+      SELECT booking_id, status, client_id, start_time, end_time
       FROM bookings
       WHERE booking_id = ${bookingId}::uuid
         AND status NOT IN ('cancelled', 'completed', 'no_show', 'rescheduled')
@@ -117,8 +117,8 @@ async function updateBookingStatus(
       return { success: false, error: 'Booking not found or already terminal' };
     }
 
-    if (patientId && booking['patient_id'] !== patientId) {
-      return { success: false, error: 'Unauthorized: patient mismatch' };
+    if (clientId && booking['client_id'] !== clientId) {
+      return { success: false, error: 'Unauthorized: client mismatch' };
     }
 
     await sql`
@@ -132,7 +132,7 @@ async function updateBookingStatus(
     await sql`
       INSERT INTO booking_audit (booking_id, from_status, to_status, changed_by, actor_id, reason)
       VALUES (${bookingId}::uuid, ${String(booking['status'] ?? 'unknown')}, ${newStatus}, ${actor},
-              ${patientId ?? null},
+              ${clientId ?? null},
               ${newStatus === 'cancelled' ? 'Cancelled via Telegram inline button' : 'Status updated via Telegram'})
     `;
 
@@ -145,7 +145,7 @@ async function updateBookingStatus(
 
 async function updateReminderPreferences(
   sql: SqlClient,
-  patientId: string,
+  clientId: string,
   activate: boolean
 ): Promise<{ success: boolean; error: string | null }> {
   try {
@@ -154,14 +154,14 @@ async function updateReminderPreferences(
       : '{"telegram_24h": false, "gmail_24h": false, "telegram_2h": false, "telegram_30min": false}';
 
     await sql`
-      UPDATE patients
+      UPDATE clients
       SET metadata = jsonb_set(
             COALESCE(metadata, '{}'::jsonb),
             '{reminder_preferences}',
             ${defaults}::jsonb
           ),
           updated_at = NOW()
-      WHERE patient_id = ${patientId}::uuid
+      WHERE client_id = ${clientId}::uuid
     `;
 
     return { success: true, error: null };
@@ -174,11 +174,11 @@ async function updateReminderPreferences(
 async function confirmBooking(
   sql: SqlClient,
   bookingId: string,
-  patientId: string | undefined
+  clientId: string | undefined
 ): Promise<{ success: boolean; error: string | null }> {
   try {
     const [booking] = await sql`
-      SELECT booking_id, status, patient_id
+      SELECT booking_id, status, client_id
       FROM bookings
       WHERE booking_id = ${bookingId}::uuid
         AND status = 'pending'
@@ -189,8 +189,8 @@ async function confirmBooking(
       return { success: false, error: 'Booking not found or not in pending status' };
     }
 
-    if (patientId && booking['patient_id'] !== patientId) {
-      return { success: false, error: 'Unauthorized: patient mismatch' };
+    if (clientId && booking['client_id'] !== clientId) {
+      return { success: false, error: 'Unauthorized: client mismatch' };
     }
 
     await sql`
@@ -202,8 +202,8 @@ async function confirmBooking(
 
     await sql`
       INSERT INTO booking_audit (booking_id, from_status, to_status, changed_by, actor_id, reason)
-      VALUES (${bookingId}::uuid, ${String(booking['status'] ?? 'unknown')}, 'confirmed', 'patient',
-              ${patientId ?? null}, 'Confirmed via Telegram inline button')
+      VALUES (${bookingId}::uuid, ${String(booking['status'] ?? 'unknown')}, 'confirmed', 'client',
+              ${clientId ?? null}, 'Confirmed via Telegram inline button')
     `;
 
     return { success: true, error: null };
@@ -220,7 +220,7 @@ export async function main(rawInput: unknown): Promise<{ success: boolean; data:
       return { success: false, data: null, error_message: `Invalid input: ${parsed.error.message}` };
     }
 
-    const { callback_query_id, callback_data, chat_id, patient_id } = parsed.data;
+    const { callback_query_id, callback_data, chat_id, client_id } = parsed.data;
 
     const botToken = process.env['TELEGRAM_BOT_TOKEN'];
     if (!botToken) {
@@ -247,7 +247,7 @@ export async function main(rawInput: unknown): Promise<{ success: boolean; data:
         }
 
         const sql = postgres(dbUrl, { ssl: 'require' });
-        const result = await updateBookingStatus(sql, booking_id, 'cancelled', patient_id, 'patient');
+        const result = await updateBookingStatus(sql, booking_id, 'cancelled', client_id, 'client');
         await sql.end();
 
         if (result.success) {
@@ -269,7 +269,7 @@ export async function main(rawInput: unknown): Promise<{ success: boolean; data:
         }
 
         const sql = postgres(dbUrl, { ssl: 'require' });
-        const result = await confirmBooking(sql, booking_id, patient_id);
+        const result = await confirmBooking(sql, booking_id, client_id);
         await sql.end();
 
         if (result.success) {
@@ -296,14 +296,14 @@ export async function main(rawInput: unknown): Promise<{ success: boolean; data:
           return { success: false, data: null, error_message: 'DATABASE_URL not configured' };
         }
 
-        const effectivePatientId = patient_id ?? process.env['PATIENT_ID'];
-        if (!effectivePatientId) {
+        const effectiveClientId = client_id ?? process.env['PATIENT_ID'];
+        if (!effectiveClientId) {
           await answerCallbackQuery(botToken, callback_query_id, '❌ Paciente no identificado');
           return { success: false, data: null, error_message: 'PATIENT_ID not available' };
         }
 
         const sql = postgres(dbUrl, { ssl: 'require' });
-        const result = await updateReminderPreferences(sql, effectivePatientId, true);
+        const result = await updateReminderPreferences(sql, effectiveClientId, true);
         await sql.end();
 
         if (result.success) {
@@ -323,14 +323,14 @@ export async function main(rawInput: unknown): Promise<{ success: boolean; data:
           return { success: false, data: null, error_message: 'DATABASE_URL not configured' };
         }
 
-        const effectivePatientId = patient_id ?? process.env['PATIENT_ID'];
-        if (!effectivePatientId) {
+        const effectiveClientId = client_id ?? process.env['PATIENT_ID'];
+        if (!effectiveClientId) {
           await answerCallbackQuery(botToken, callback_query_id, '❌ Paciente no identificado');
           return { success: false, data: null, error_message: 'PATIENT_ID not available' };
         }
 
         const sql = postgres(dbUrl, { ssl: 'require' });
-        const result = await updateReminderPreferences(sql, effectivePatientId, false);
+        const result = await updateReminderPreferences(sql, effectiveClientId, false);
         await sql.end();
 
         if (result.success) {

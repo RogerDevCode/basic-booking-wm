@@ -14,7 +14,7 @@ const InputSchema = z.object({
   full_name: z.string().min(1).max(200).optional(),
   email: z.email().optional(),
   phone: z.string().max(50).optional(),
-  role: z.enum(['patient', 'provider', 'admin']).optional(),
+  role: z.enum(['client', 'provider', 'admin']).optional(),
   is_active: z.boolean().optional(),
 });
 

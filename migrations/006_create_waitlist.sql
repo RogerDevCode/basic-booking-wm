@@ -1,19 +1,19 @@
 -- ============================================================================
 -- Migration: 006_create_waitlist.sql
--- Purpose: Waitlist table for patient queue management
+-- Purpose: Waitlist table for client queue management
 -- Severity: HIGH - Required for waitlist feature
 -- Date: 2026-04-03
 -- 
 -- Changes:
 --   1. Create waitlist table
---   2. Create indexes for patient, service, status, and position lookups
+--   2. Create indexes for client, service, status, and position lookups
 --   3. Add trigger for updated_at
 --   4. Add helper function for position calculation
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS waitlist (
     waitlist_id     UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    patient_id      UUID NOT NULL REFERENCES patients(patient_id),
+    client_id      UUID NOT NULL REFERENCES clients(client_id),
     service_id      UUID NOT NULL REFERENCES services(service_id),
     preferred_date  DATE,
     preferred_start_time TIME,
@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS waitlist (
 );
 
 -- Indexes
-CREATE INDEX IF NOT EXISTS idx_waitlist_patient ON waitlist(patient_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_waitlist_client ON waitlist(client_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_waitlist_service_status ON waitlist(service_id, status, position);
 CREATE INDEX IF NOT EXISTS idx_waitlist_waiting ON waitlist(service_id, position) WHERE status = 'waiting';
 CREATE INDEX IF NOT EXISTS idx_waitlist_notified ON waitlist(status, notified_at) WHERE status = 'notified';
@@ -58,10 +58,10 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Helper function: get next available slot from waitlist
-CREATE OR REPLACE FUNCTION get_next_waitlist_patient(p_service_id UUID)
+CREATE OR REPLACE FUNCTION get_next_waitlist_client(p_service_id UUID)
 RETURNS TABLE(
     waitlist_id UUID,
-    patient_id UUID,
+    client_id UUID,
     preferred_date DATE,
     preferred_start_time TIME,
     preferred_end_time TIME,
@@ -69,7 +69,7 @@ RETURNS TABLE(
 ) AS $$
 BEGIN
     RETURN QUERY
-    SELECT w.waitlist_id, w.patient_id, w.preferred_date,
+    SELECT w.waitlist_id, w.client_id, w.preferred_date,
            w.preferred_start_time, w.preferred_end_time, w.position
     FROM waitlist w
     WHERE w.service_id = p_service_id
@@ -96,7 +96,7 @@ BEGIN
     RAISE NOTICE 'Migration 006 completed successfully!';
     RAISE NOTICE '========================================';
     RAISE NOTICE 'Waitlist table created: %', v_table_exists;
-    RAISE NOTICE 'Indexes: patient, service_status, waiting, notified';
-    RAISE NOTICE 'Helper functions: recalculate_waitlist_positions, get_next_waitlist_patient';
+    RAISE NOTICE 'Indexes: client, service_status, waiting, notified';
+    RAISE NOTICE 'Helper functions: recalculate_waitlist_positions, get_next_waitlist_client';
     RAISE NOTICE '========================================';
 END $$;

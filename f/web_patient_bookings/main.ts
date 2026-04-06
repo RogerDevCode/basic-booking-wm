@@ -1,7 +1,7 @@
 // ============================================================================
-// WEB PATIENT BOOKINGS — Patient booking history and upcoming appointments
+// WEB PATIENT BOOKINGS — Client booking history and upcoming appointments
 // ============================================================================
-// Returns upcoming and past bookings for a patient.
+// Returns upcoming and past bookings for a client.
 // Supports filtering by status and date range.
 // ============================================================================
 
@@ -9,7 +9,7 @@ import { z } from 'zod';
 import postgres from 'postgres';
 
 const InputSchema = z.object({
-  patient_user_id: z.uuid(),
+  client_user_id: z.uuid(),
   status: z.enum(['all', 'pending', 'confirmed', 'in_service', 'completed', 'cancelled', 'no_show', 'rescheduled']).default('all'),
   limit: z.number().int().min(1).max(100).default(50),
   offset: z.number().int().min(0).default(0),
@@ -40,7 +40,7 @@ export async function main(rawInput: unknown): Promise<[Error | null, BookingsRe
     return [new Error('Validation error: ' + parsed.error.message), null];
   }
 
-  const { patient_user_id, status, limit, offset } = parsed.data;
+  const { client_user_id, status, limit, offset } = parsed.data;
 
   const dbUrl = process.env['DATABASE_URL'];
   if (dbUrl === undefined || dbUrl === '') {
@@ -51,28 +51,28 @@ export async function main(rawInput: unknown): Promise<[Error | null, BookingsRe
 
   try {
     const userRows = await sql`
-      SELECT p.patient_id FROM patients p
-      INNER JOIN users u ON u.user_id = p.patient_id
-      WHERE u.user_id = ${patient_user_id}::uuid
+      SELECT p.client_id FROM clients p
+      INNER JOIN users u ON u.user_id = p.client_id
+      WHERE u.user_id = ${client_user_id}::uuid
       LIMIT 1
     `;
 
     const userRow = userRows[0];
-    let patientId: string;
+    let clientId: string;
 
     if (userRow === undefined) {
-      const patientRows = await sql`
-        SELECT patient_id FROM patients
-        WHERE email = (SELECT email FROM users WHERE user_id = ${patient_user_id}::uuid LIMIT 1)
+      const clientRows = await sql`
+        SELECT client_id FROM clients
+        WHERE email = (SELECT email FROM users WHERE user_id = ${client_user_id}::uuid LIMIT 1)
         LIMIT 1
       `;
-      const pRow = patientRows[0];
+      const pRow = clientRows[0];
       if (pRow === undefined) {
-        return [new Error('Patient record not found for this user'), null];
+        return [new Error('Client record not found for this user'), null];
       }
-      patientId = String(pRow['patient_id']);
+      clientId = String(pRow['client_id']);
     } else {
-      patientId = String(userRow['patient_id']);
+      clientId = String(userRow['client_id']);
     }
 
     const cancellableStatuses = ['pending', 'confirmed'];
@@ -87,7 +87,7 @@ export async function main(rawInput: unknown): Promise<[Error | null, BookingsRe
       FROM bookings b
       INNER JOIN providers p ON b.provider_id = p.provider_id
       INNER JOIN services s ON b.service_id = s.service_id
-      WHERE b.patient_id = ${patientId}::uuid
+      WHERE b.client_id = ${clientId}::uuid
     `;
 
     if (status !== 'all') {
@@ -124,7 +124,7 @@ export async function main(rawInput: unknown): Promise<[Error | null, BookingsRe
 
     const countRows = await sql`
       SELECT COUNT(*) AS total FROM bookings
-      WHERE patient_id = ${patientId}::uuid
+      WHERE client_id = ${clientId}::uuid
     `;
 
     const total = countRows[0] !== undefined ? Number(countRows[0]['total']) : 0;

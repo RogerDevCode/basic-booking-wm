@@ -12,14 +12,14 @@ const InputSchema = z.object({
   action: z.enum(['create', 'read', 'update', 'list']),
   note_id: z.uuid().optional(),
   booking_id: z.uuid().optional(),
-  patient_id: z.uuid().optional(),
+  client_id: z.uuid().optional(),
   content: z.string().min(1).max(5000).optional(),
 });
 
 interface NoteResult {
   readonly note_id: string;
   readonly booking_id: string;
-  readonly patient_id: string;
+  readonly client_id: string;
   readonly provider_id: string;
   readonly content: string;
   readonly created_at: string;
@@ -70,7 +70,7 @@ export async function main(rawInput: unknown): Promise<[Error | null, NoteResult
         }
 
         const bookingRows = await sql`
-          SELECT patient_id FROM bookings WHERE booking_id = ${bookingId}::uuid LIMIT 1
+          SELECT client_id FROM bookings WHERE booking_id = ${bookingId}::uuid LIMIT 1
         `;
 
         const bRow = bookingRows[0];
@@ -79,9 +79,9 @@ export async function main(rawInput: unknown): Promise<[Error | null, NoteResult
         }
 
         const rows = await sql`
-          INSERT INTO clinical_notes (booking_id, patient_id, provider_id, content)
-          VALUES (${bookingId}::uuid, ${String(bRow['patient_id'])}::uuid, ${providerId}::uuid, ${content})
-          RETURNING note_id, booking_id, patient_id, provider_id, content, created_at, updated_at
+          INSERT INTO service_notes (booking_id, client_id, provider_id, content)
+          VALUES (${bookingId}::uuid, ${String(bRow['client_id'])}::uuid, ${providerId}::uuid, ${content})
+          RETURNING note_id, booking_id, client_id, provider_id, content, created_at, updated_at
         `;
 
         const newRow = rows[0];
@@ -92,7 +92,7 @@ export async function main(rawInput: unknown): Promise<[Error | null, NoteResult
         return [null, {
           note_id: String(newRow['note_id']),
           booking_id: String(newRow['booking_id']),
-          patient_id: String(newRow['patient_id']),
+          client_id: String(newRow['client_id']),
           provider_id: String(newRow['provider_id']),
           content: String(newRow['content']),
           created_at: String(newRow['created_at']),
@@ -107,8 +107,8 @@ export async function main(rawInput: unknown): Promise<[Error | null, NoteResult
         }
 
         const rows = await sql`
-          SELECT note_id, booking_id, patient_id, provider_id, content, created_at, updated_at
-          FROM clinical_notes
+          SELECT note_id, booking_id, client_id, provider_id, content, created_at, updated_at
+          FROM service_notes
           WHERE note_id = ${noteId}::uuid AND provider_id = ${providerId}::uuid
           LIMIT 1
         `;
@@ -121,7 +121,7 @@ export async function main(rawInput: unknown): Promise<[Error | null, NoteResult
         return [null, {
           note_id: String(row['note_id']),
           booking_id: String(row['booking_id']),
-          patient_id: String(row['patient_id']),
+          client_id: String(row['client_id']),
           provider_id: String(row['provider_id']),
           content: String(row['content']),
           created_at: String(row['created_at']),
@@ -137,9 +137,9 @@ export async function main(rawInput: unknown): Promise<[Error | null, NoteResult
         }
 
         const rows = await sql`
-          UPDATE clinical_notes SET content = ${content}, updated_at = NOW()
+          UPDATE service_notes SET content = ${content}, updated_at = NOW()
           WHERE note_id = ${noteId}::uuid AND provider_id = ${providerId}::uuid
-          RETURNING note_id, booking_id, patient_id, provider_id, content, created_at, updated_at
+          RETURNING note_id, booking_id, client_id, provider_id, content, created_at, updated_at
         `;
 
         const row = rows[0];
@@ -150,7 +150,7 @@ export async function main(rawInput: unknown): Promise<[Error | null, NoteResult
         return [null, {
           note_id: String(row['note_id']),
           booking_id: String(row['booking_id']),
-          patient_id: String(row['patient_id']),
+          client_id: String(row['client_id']),
           provider_id: String(row['provider_id']),
           content: String(row['content']),
           created_at: String(row['created_at']),
@@ -159,15 +159,15 @@ export async function main(rawInput: unknown): Promise<[Error | null, NoteResult
       }
 
       case 'list': {
-        const patientId = parsed.data.patient_id;
-        if (patientId === undefined) {
-          return [new Error('patient_id is required for list'), null];
+        const clientId = parsed.data.client_id;
+        if (clientId === undefined) {
+          return [new Error('client_id is required for list'), null];
         }
 
         const rows = await sql`
-          SELECT note_id, booking_id, patient_id, provider_id, content, created_at, updated_at
-          FROM clinical_notes
-          WHERE patient_id = ${patientId}::uuid AND provider_id = ${providerId}::uuid
+          SELECT note_id, booking_id, client_id, provider_id, content, created_at, updated_at
+          FROM service_notes
+          WHERE client_id = ${clientId}::uuid AND provider_id = ${providerId}::uuid
           ORDER BY created_at DESC
           LIMIT 50
         `;
@@ -177,7 +177,7 @@ export async function main(rawInput: unknown): Promise<[Error | null, NoteResult
           notes.push({
             note_id: String(r['note_id']),
             booking_id: String(r['booking_id']),
-            patient_id: String(r['patient_id']),
+            client_id: String(r['client_id']),
             provider_id: String(r['provider_id']),
             content: String(r['content']),
             created_at: String(r['created_at']),

@@ -11,7 +11,7 @@ const InputSchema = z.object({
   action: z.enum(['show', 'select_option', 'start']),
   chat_id: z.string(),
   user_input: z.string().optional(),
-  patient_id: z.string().optional(),
+  client_id: z.string().optional(),
 });
 
 const MAIN_MENU_KEYBOARD: string[][] = [
@@ -45,7 +45,7 @@ export function main(rawInput: unknown): { success: boolean; data: Record<string
       return { success: false, data: null, error_message: `Invalid input: ${parsed.error.message}` };
     }
 
-    const { action, chat_id, user_input, patient_id } = parsed.data;
+    const { action, chat_id, user_input, client_id } = parsed.data;
 
     let message = '';
     let reply_keyboard: string[][] | undefined;
@@ -118,7 +118,7 @@ export function main(rawInput: unknown): { success: boolean; data: Record<string
         reply_placeholder,
         route_to,
         chat_id,
-        patient_id,
+        client_id,
       },
       error_message: null,
     };

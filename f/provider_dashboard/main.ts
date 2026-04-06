@@ -82,12 +82,12 @@ export async function main(rawInput: unknown): Promise<{
             if (err != null) {
               days.push({ date: dateStr, error: err.message });
             } else if (avail != null) {
-              // Get bookings with patient info for this day
+              // Get bookings with client info for this day
               const bookings = await sql`
                 SELECT b.booking_id, b.start_time, b.end_time, b.status,
-                       p.name as patient_name, s.name as service_name
+                       p.name as client_name, s.name as service_name
                 FROM bookings b
-                JOIN patients p ON p.patient_id = b.patient_id
+                JOIN clients p ON p.client_id = b.client_id
                 JOIN services s ON s.service_id = b.service_id
                 WHERE b.provider_id = ${input.provider_id}::uuid
                   AND b.start_time >= ${dateStr}::date
@@ -108,7 +108,7 @@ export async function main(rawInput: unknown): Promise<{
                   start_time: String(b['start_time']),
                   end_time: String(b['end_time']),
                   status: String(b['status']),
-                  patient_name: String(b['patient_name']),
+                  client_name: String(b['client_name']),
                   service_name: String(b['service_name']),
                 })),
                 total_bookings: bookings.length,
@@ -136,12 +136,12 @@ export async function main(rawInput: unknown): Promise<{
         if (err != null) return { success: false, data: null, error_message: err.message };
         if (avail == null) return { success: false, data: null, error_message: 'No availability data' };
 
-        // Get bookings with patient info
+        // Get bookings with client info
         const bookings = await sql`
           SELECT b.booking_id, b.start_time, b.end_time, b.status,
-                 p.name as patient_name, p.email as patient_email, s.name as service_name
+                 p.name as client_name, p.email as client_email, s.name as service_name
           FROM bookings b
-          JOIN patients p ON p.patient_id = b.patient_id
+          JOIN clients p ON p.client_id = b.client_id
           JOIN services s ON s.service_id = b.service_id
           WHERE b.provider_id = ${input.provider_id}::uuid
             AND b.start_time >= ${input.date}::date
@@ -164,8 +164,8 @@ export async function main(rawInput: unknown): Promise<{
               start_time: String(b['start_time']),
               end_time: String(b['end_time']),
               status: String(b['status']),
-              patient_name: String(b['patient_name']),
-              patient_email: b['patient_email'] != null ? String(b['patient_email']) : null,
+              client_name: String(b['client_name']),
+              client_email: b['client_email'] != null ? String(b['client_email']) : null,
               service_name: String(b['service_name']),
             })),
           },

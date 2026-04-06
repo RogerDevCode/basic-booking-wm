@@ -1,7 +1,7 @@
 // ============================================================================
 // WEB PROVIDER DASHBOARD — Provider stats + agenda
 // ============================================================================
-// Returns today's agenda, stats, and patient list for a provider.
+// Returns today's agenda, stats, and client list for a provider.
 // ============================================================================
 
 import { z } from 'zod';
@@ -14,8 +14,8 @@ const InputSchema = z.object({
 
 interface AgendaItem {
   readonly booking_id: string;
-  readonly patient_name: string;
-  readonly patient_email: string | null;
+  readonly client_name: string;
+  readonly client_email: string | null;
   readonly service_name: string;
   readonly start_time: string;
   readonly end_time: string;
@@ -79,10 +79,10 @@ export async function main(rawInput: unknown): Promise<[Error | null, DashboardR
 
     const agendaRows = await sql`
       SELECT b.booking_id, b.start_time, b.end_time, b.status,
-             pat.name AS patient_name, pat.email AS patient_email,
+             pat.name AS client_name, pat.email AS client_email,
              s.name AS service_name
       FROM bookings b
-      INNER JOIN patients pat ON b.patient_id = pat.patient_id
+      INNER JOIN clients pat ON b.client_id = pat.client_id
       INNER JOIN services s ON b.service_id = s.service_id
       WHERE b.provider_id = ${providerId}::uuid
         AND b.start_time >= ${dayStart}
@@ -95,8 +95,8 @@ export async function main(rawInput: unknown): Promise<[Error | null, DashboardR
     for (const r of agendaRows) {
       agenda.push({
         booking_id: String(r['booking_id']),
-        patient_name: String(r['patient_name']),
-        patient_email: r['patient_email'] !== null ? String(r['patient_email']) : null,
+        client_name: String(r['client_name']),
+        client_email: r['client_email'] !== null ? String(r['client_email']) : null,
         service_name: String(r['service_name']),
         start_time: String(r['start_time']),
         end_time: String(r['end_time']),

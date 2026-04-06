@@ -20,13 +20,13 @@ interface CreatedBookingRow {
 
 // ─── Input Validation ───────────────────────────────────────────────────────
 const InputSchema = z.object({
-  patient_id: z.uuid(),
+  client_id: z.uuid(),
   provider_id: z.uuid(),
   service_id: z.uuid(),
   start_time: z.coerce.date(),
   idempotency_key: z.string().min(1),
   notes: z.string().optional(),
-  actor: z.enum(['patient', 'provider', 'system']).default('patient'),
+  actor: z.enum(['client', 'provider', 'system']).default('client'),
   channel: z.enum(['telegram', 'web', 'api']).default('api'),
 });
 
@@ -40,12 +40,12 @@ export interface BookingCreated {
   readonly end_time: string;
   readonly provider_name: string;
   readonly service_name: string;
-  readonly patient_name: string;
+  readonly client_name: string;
 }
 
 // ─── Typed Row Interfaces ───────────────────────────────────────────────────
-interface PatientLookup {
-  readonly patient_id: string;
+interface ClientLookup {
+  readonly client_id: string;
   readonly name: string;
 }
 
@@ -73,16 +73,16 @@ interface InsertedBooking {
 }
 
 // ─── Validation Functions (return [Error | null, Result | null]) ────────────
-async function lookupPatient(
+async function lookupClient(
   sql: postgres.Sql,
-  patientId: string,
-): Promise<[Error | null, PatientLookup | null]> {
-  const rows = await sql<PatientLookup[]>`
-    SELECT patient_id, name FROM patients WHERE patient_id = ${patientId}::uuid LIMIT 1
+  clientId: string,
+): Promise<[Error | null, ClientLookup | null]> {
+  const rows = await sql<ClientLookup[]>`
+    SELECT client_id, name FROM clients WHERE client_id = ${clientId}::uuid LIMIT 1
   `;
   const row = rows[0];
   if (row === undefined) {
-    return [new Error(`Patient ${patientId} not found`), null];
+    return [new Error(`Client ${clientId} not found`), null];
   }
   return [null, row];
 }
@@ -201,9 +201,9 @@ export async function main(
 
   try {
     // 3. Validate all references exist
-    const [patientErr, patient] = await lookupPatient(sql, input.patient_id);
-    if (patientErr !== null || patient === null) {
-      return { success: false, data: null, error_message: patientErr?.message ?? 'Patient not found' };
+    const [clientErr, client] = await lookupClient(sql, input.client_id);
+    if (clientErr !== null || client === null) {
+      return { success: false, data: null, error_message: clientErr?.message ?? 'Client not found' };
     }
 
     const [providerErr, provider] = await lookupProvider(sql, input.provider_id);
@@ -238,7 +238,7 @@ export async function main(
       booking = await sql.begin(async (tx) => {
         const rows: unknown[] = await tx.unsafe(
           `INSERT INTO bookings (
-            patient_id, provider_id, service_id,
+            client_id, provider_id, service_id,
             start_time, end_time, status, idempotency_key, notes,
             gcal_sync_status, notification_sent,
             reminder_24h_sent, reminder_2h_sent, reminder_30min_sent
@@ -252,7 +252,7 @@ export async function main(
           DO UPDATE SET updated_at = NOW(), status = EXCLUDED.status
           RETURNING booking_id, status, start_time, end_time`,
           [
-            input.patient_id,
+            input.client_id,
             input.provider_id,
             input.service_id,
             input.start_time.toISOString(),
@@ -291,7 +291,7 @@ interface CreatedBookingRow {
           [
             inserted.booking_id,
             input.actor,
-            input.patient_id,
+            input.client_id,
             'Booking created',
             JSON.stringify({ channel: input.channel }),
           ]
@@ -332,7 +332,7 @@ interface CreatedBookingRow {
         end_time: resultRow.end_time,
         provider_name: provider.name,
         service_name: service.name,
-        patient_name: patient.name,
+        client_name: client.name,
       },
       error_message: null,
     };

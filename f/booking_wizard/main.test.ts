@@ -42,7 +42,7 @@ describe('Booking Wizard', () => {
   test('start should return date selection', async () => {
     const result = await main({
       action: 'start',
-      wizard_state: { chat_id: '123', patient_id: 'p1', step: 0, selected_date: null, selected_time: null },
+      wizard_state: { chat_id: '123', client_id: 'p1', step: 0, selected_date: null, selected_time: null },
     });
     expect(result.success).toBe(true);
     const data = result.data as { wizard_state: { step: number }; reply_keyboard: unknown; message: string };
@@ -54,7 +54,7 @@ describe('Booking Wizard', () => {
   test('cancel should reset state', async () => {
     const result = await main({
       action: 'cancel',
-      wizard_state: { step: 2, patient_id: 'p1', chat_id: '123', selected_date: '2026-04-15', selected_time: '10:00' },
+      wizard_state: { step: 2, client_id: 'p1', chat_id: '123', selected_date: '2026-04-15', selected_time: '10:00' },
     });
     expect(result.success).toBe(true);
     const data = result.data as { wizard_state: { step: number; selected_date: null; selected_time: null }; message: string };
@@ -67,7 +67,7 @@ describe('Booking Wizard', () => {
   test('back from step 1 should show main menu', async () => {
     const result = await main({
       action: 'back',
-      wizard_state: { step: 1, patient_id: 'p1', chat_id: '123', selected_date: null, selected_time: null },
+      wizard_state: { step: 1, client_id: 'p1', chat_id: '123', selected_date: null, selected_time: null },
     });
     expect(result.success).toBe(true);
     const data = result.data as { wizard_state: { step: number }; message: string };
@@ -78,7 +78,7 @@ describe('Booking Wizard', () => {
   test('confirm without date/time should reset to date selection', async () => {
     const result = await main({
       action: 'confirm',
-      wizard_state: { step: 3, patient_id: 'p1', chat_id: '123', selected_date: null, selected_time: null },
+      wizard_state: { step: 3, client_id: 'p1', chat_id: '123', selected_date: null, selected_time: null },
     });
     expect(result.success).toBe(true);
     const data = result.data as { wizard_state: { step: number }; message: string };
@@ -91,7 +91,7 @@ describe('Booking Wizard', () => {
     const dayName = today.toLocaleDateString('es-AR', { weekday: 'short' });
     const result = await main({
       action: 'select_date',
-      wizard_state: { step: 1, patient_id: 'p1', chat_id: '123', selected_date: null, selected_time: null },
+      wizard_state: { step: 1, client_id: 'p1', chat_id: '123', selected_date: null, selected_time: null },
       user_input: dayName,
     });
     expect(result.success).toBe(true);
@@ -103,7 +103,7 @@ describe('Booking Wizard', () => {
   test('select_time with valid input should advance to confirmation', async () => {
     const result = await main({
       action: 'select_time',
-      wizard_state: { step: 2, patient_id: 'p1', chat_id: '123', selected_date: '2026-04-15', selected_time: null },
+      wizard_state: { step: 2, client_id: 'p1', chat_id: '123', selected_date: '2026-04-15', selected_time: null },
       user_input: '10:00',
       provider_id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
       service_id: 'b2c3d4e5-f6a7-8901-bcde-f12345678901',
@@ -118,7 +118,7 @@ describe('Booking Wizard', () => {
   test('complete flow with DB write should show success message', async () => {
     const result = await main({
       action: 'confirm',
-      wizard_state: { step: 3, patient_id: 'p1', chat_id: '123', selected_date: '2026-04-15', selected_time: '10:00' },
+      wizard_state: { step: 3, client_id: 'p1', chat_id: '123', selected_date: '2026-04-15', selected_time: '10:00' },
       provider_id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
       service_id: 'b2c3d4e5-f6a7-8901-bcde-f12345678901',
     });
@@ -133,7 +133,7 @@ describe('Booking Wizard', () => {
   test('confirm without provider_id should show error', async () => {
     const result = await main({
       action: 'confirm',
-      wizard_state: { step: 3, patient_id: 'p1', chat_id: '123', selected_date: '2026-04-15', selected_time: '10:00' },
+      wizard_state: { step: 3, client_id: 'p1', chat_id: '123', selected_date: '2026-04-15', selected_time: '10:00' },
     });
     expect(result.success).toBe(true);
     const data = result.data as { wizard_state: { step: number }; message: string };
@@ -145,7 +145,7 @@ describe('Booking Wizard', () => {
 
     const result = await main({
       action: 'confirm',
-      wizard_state: { step: 3, patient_id: 'p1', chat_id: '123', selected_date: '2026-04-15', selected_time: '10:00' },
+      wizard_state: { step: 3, client_id: 'p1', chat_id: '123', selected_date: '2026-04-15', selected_time: '10:00' },
       provider_id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
       service_id: 'b2c3d4e5-f6a7-8901-bcde-f12345678901',
     });
@@ -161,7 +161,7 @@ describe('Booking Wizard', () => {
 
     const result = await main({
       action: 'confirm',
-      wizard_state: { step: 3, patient_id: 'p1', chat_id: '123', selected_date: '2026-04-15', selected_time: '10:00' },
+      wizard_state: { step: 3, client_id: 'p1', chat_id: '123', selected_date: '2026-04-15', selected_time: '10:00' },
       provider_id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
       service_id: 'b2c3d4e5-f6a7-8901-bcde-f12345678901',
     });
@@ -177,7 +177,7 @@ describe('Booking Wizard', () => {
 
     const result = await main({
       action: 'confirm',
-      wizard_state: { step: 3, patient_id: 'p1', chat_id: '123', selected_date: '2026-04-15', selected_time: '10:00' },
+      wizard_state: { step: 3, client_id: 'p1', chat_id: '123', selected_date: '2026-04-15', selected_time: '10:00' },
       provider_id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
       service_id: 'b2c3d4e5-f6a7-8901-bcde-f12345678901',
     });
@@ -187,7 +187,7 @@ describe('Booking Wizard', () => {
   });
 
   test('full flow: start to select_date to select_time to confirm', async () => {
-    let state: Record<string, unknown> = { chat_id: '123', patient_id: 'p1', step: 0, selected_date: null, selected_time: null };
+    let state: Record<string, unknown> = { chat_id: '123', client_id: 'p1', step: 0, selected_date: null, selected_time: null };
 
     const startResult = await main({ action: 'start', wizard_state: state });
     expect(startResult.success).toBe(true);

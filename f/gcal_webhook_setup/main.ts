@@ -4,7 +4,7 @@
 // Creates a webhook channel so Google Calendar pushes change notifications
 // to Windmill when a calendar event is created, updated, or deleted.
 //
-// Run once per calendar (provider or patient) to set up the webhook.
+// Run once per calendar (provider or client) to set up the webhook.
 // Re-register before expiry using gcal_webhook_renew.
 //
 // Reference: https://developers.google.com/calendar/api/v3/reference/channels/watch
@@ -15,7 +15,7 @@ import { randomUUID } from 'crypto';
 
 const InputSchema = z.object({
   calendar_id: z.string().min(1),
-  calendar_type: z.enum(['provider', 'patient']).default('provider'),
+  calendar_type: z.enum(['provider', 'client']).default('provider'),
   webhook_base_url: z.url().optional(),
   ttl_seconds: z.number().int().min(3600).max(2592000).default(86400), // 1h–30d
 });

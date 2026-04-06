@@ -1,8 +1,8 @@
 // ============================================================================
-// WEB PATIENT PROFILE — Patient profile CRUD
+// WEB PATIENT PROFILE — Client profile CRUD
 // ============================================================================
-// Get or update patient profile data.
-// Links user to patient record if not already linked.
+// Get or update client profile data.
+// Links user to client record if not already linked.
 // ============================================================================
 
 import { z } from 'zod';
@@ -18,7 +18,7 @@ const InputSchema = z.object({
 });
 
 interface ProfileResult {
-  readonly patient_id: string;
+  readonly client_id: string;
   readonly name: string;
   readonly email: string | null;
   readonly phone: string | null;
@@ -54,18 +54,18 @@ export async function main(rawInput: unknown): Promise<[Error | null, ProfileRes
     }
 
     const userEmail = String(userRow['email']);
-    const patientRows = await sql`
-      SELECT patient_id, name, email, phone, telegram_chat_id, timezone, gcal_calendar_id
-      FROM patients
-      WHERE patient_id = ${user_id}::uuid OR email = ${userEmail}
+    const clientRows = await sql`
+      SELECT client_id, name, email, phone, telegram_chat_id, timezone, gcal_calendar_id
+      FROM clients
+      WHERE client_id = ${user_id}::uuid OR email = ${userEmail}
       LIMIT 1
     `;
 
-    let patientRow = patientRows[0];
+    let clientRow = clientRows[0];
 
-    if (patientRow === undefined) {
+    if (clientRow === undefined) {
       const createRows = await sql`
-        INSERT INTO patients (name, email, phone, telegram_chat_id, timezone)
+        INSERT INTO clients (name, email, phone, telegram_chat_id, timezone)
         VALUES (
           ${String(userRow['full_name'])},
           ${userEmail !== 'null' ? userEmail : null},
@@ -73,13 +73,13 @@ export async function main(rawInput: unknown): Promise<[Error | null, ProfileRes
           ${userRow['telegram_chat_id'] !== null ? String(userRow['telegram_chat_id']) : null},
           ${String(userRow['timezone'])}
         )
-        RETURNING patient_id, name, email, phone, telegram_chat_id, timezone, gcal_calendar_id
+        RETURNING client_id, name, email, phone, telegram_chat_id, timezone, gcal_calendar_id
       `;
-      patientRow = createRows[0];
+      clientRow = createRows[0];
     }
 
-    if (patientRow === undefined) {
-      return [new Error('Failed to get or create patient record'), null];
+    if (clientRow === undefined) {
+      return [new Error('Failed to get or create client record'), null];
     }
 
     if (action === 'update') {
@@ -105,26 +105,26 @@ export async function main(rawInput: unknown): Promise<[Error | null, ProfileRes
 
       if (updates.length > 0) {
         updates.push('updated_at = NOW()');
-        const patientId = String(patientRow['patient_id']);
-        const queryText = 'UPDATE patients SET ' + updates.join(', ') + ' WHERE patient_id = $' + String(values.length + 1) + '::uuid RETURNING patient_id, name, email, phone, telegram_chat_id, timezone, gcal_calendar_id';
-        values.push(patientId);
+        const clientId = String(clientRow['client_id']);
+        const queryText = 'UPDATE clients SET ' + updates.join(', ') + ' WHERE client_id = $' + String(values.length + 1) + '::uuid RETURNING client_id, name, email, phone, telegram_chat_id, timezone, gcal_calendar_id';
+        values.push(clientId);
 
         const updateResult = await sql.unsafe(queryText, values);
         const updatedRow = updateResult[0];
         if (updatedRow !== undefined) {
-          patientRow = updatedRow;
+          clientRow = updatedRow;
         }
       }
     }
 
     return [null, {
-      patient_id: String(patientRow['patient_id']),
-      name: String(patientRow['name']),
-      email: patientRow['email'] !== null ? String(patientRow['email']) : null,
-      phone: patientRow['phone'] !== null ? String(patientRow['phone']) : null,
-      telegram_chat_id: patientRow['telegram_chat_id'] !== null ? String(patientRow['telegram_chat_id']) : null,
-      timezone: String(patientRow['timezone']),
-      gcal_calendar_id: patientRow['gcal_calendar_id'] !== null ? String(patientRow['gcal_calendar_id']) : null,
+      client_id: String(clientRow['client_id']),
+      name: String(clientRow['name']),
+      email: clientRow['email'] !== null ? String(clientRow['email']) : null,
+      phone: clientRow['phone'] !== null ? String(clientRow['phone']) : null,
+      telegram_chat_id: clientRow['telegram_chat_id'] !== null ? String(clientRow['telegram_chat_id']) : null,
+      timezone: String(clientRow['timezone']),
+      gcal_calendar_id: clientRow['gcal_calendar_id'] !== null ? String(clientRow['gcal_calendar_id']) : null,
     }];
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);

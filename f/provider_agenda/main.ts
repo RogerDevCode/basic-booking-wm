@@ -3,7 +3,7 @@
 // ============================================================================
 // Returns a provider's agenda for a given date range, showing:
 // - Scheduled hours from provider_schedules
-// - Existing bookings with patient info
+// - Existing bookings with client info
 // - Schedule overrides (blocked/modified)
 // - Available vs booked slots
 // ============================================================================
@@ -15,7 +15,7 @@ const InputSchema = z.object({
   provider_id: z.uuid(),
   date_from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   date_to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  include_patient_details: z.boolean().default(false),
+  include_client_details: z.boolean().default(false),
 });
 
 interface ProviderRow {
@@ -35,17 +35,17 @@ interface OverrideRow {
   readonly reason: string | null;
 }
 
-interface BookingWithPatient {
+interface BookingWithClient {
   readonly booking_id: string;
   readonly start_time: string;
   readonly end_time: string;
   readonly status: string;
-  readonly patient_name: string;
-  readonly patient_email: string | null;
+  readonly client_name: string;
+  readonly client_email: string | null;
   readonly service_name: string;
 }
 
-interface BookingWithoutPatient {
+interface BookingWithoutClient {
   readonly booking_id: string;
   readonly start_time: string;
   readonly end_time: string;
@@ -53,7 +53,7 @@ interface BookingWithoutPatient {
   readonly service_name: string;
 }
 
-type BookingEntry = BookingWithPatient | BookingWithoutPatient;
+type BookingEntry = BookingWithClient | BookingWithoutClient;
 
 interface AgendaDay {
   readonly date: string;
@@ -132,13 +132,13 @@ export async function main(rawInput: unknown): Promise<{
 
       // Get bookings for this day
       let bookings: BookingEntry[];
-      if (input.include_patient_details) {
-        bookings = await sql<BookingWithPatient[]>`
+      if (input.include_client_details) {
+        bookings = await sql<BookingWithClient[]>`
           SELECT b.booking_id, b.start_time, b.end_time, b.status,
-                 p.name as patient_name, p.email as patient_email,
+                 p.name as client_name, p.email as client_email,
                  s.name as service_name
           FROM bookings b
-          JOIN patients p ON p.patient_id = b.patient_id
+          JOIN clients p ON p.client_id = b.client_id
           JOIN services s ON s.service_id = b.service_id
           WHERE b.provider_id = ${input.provider_id}::uuid
             AND b.start_time >= ${dateStr}::date
@@ -147,7 +147,7 @@ export async function main(rawInput: unknown): Promise<{
           ORDER BY b.start_time ASC
         `;
       } else {
-        bookings = await sql<BookingWithoutPatient[]>`
+        bookings = await sql<BookingWithoutClient[]>`
           SELECT b.booking_id, b.start_time, b.end_time, b.status, s.name as service_name
           FROM bookings b
           JOIN services s ON s.service_id = b.service_id

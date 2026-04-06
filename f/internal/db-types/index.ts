@@ -48,9 +48,9 @@ export interface ServiceRow {
   created_at: string;
 }
 
-// ─── Patient ────────────────────────────────────────────────────────────────
-export interface PatientRow {
-  patient_id: UUID;
+// ─── Client ────────────────────────────────────────────────────────────────
+export interface ClientRow {
+  client_id: UUID;
   name: string;
   email: string | null;
   phone: string | null;
@@ -77,19 +77,19 @@ export type GCalSyncStatus = 'pending' | 'synced' | 'partial' | 'failed';
 export interface BookingRow {
   booking_id: UUID;
   provider_id: UUID;
-  patient_id: UUID;
+  client_id: UUID;
   service_id: UUID;
   start_time: string;
   end_time: string;
   status: BookingStatus;
   idempotency_key: string;
   cancellation_reason: string | null;
-  cancelled_by: 'patient' | 'provider' | 'system' | null;
+  cancelled_by: 'client' | 'provider' | 'system' | null;
   rescheduled_from: UUID | null;
   rescheduled_to: UUID | null;
   notes: string | null;
   gcal_provider_event_id: string | null;
-  gcal_patient_event_id: string | null;
+  gcal_client_event_id: string | null;
   gcal_sync_status: GCalSyncStatus;
   gcal_retry_count: number;
   gcal_last_sync: string | null;
@@ -129,7 +129,7 @@ export interface BookingAuditRow {
   booking_id: UUID;
   from_status: BookingStatus | null;
   to_status: BookingStatus;
-  changed_by: 'patient' | 'provider' | 'system';
+  changed_by: 'client' | 'provider' | 'system';
   actor_id: UUID | null;
   reason: string | null;
   metadata: Record<string, unknown> | null;
@@ -139,19 +139,19 @@ export interface BookingAuditRow {
 // ─── Booking with joins (for display/notification) ──────────────────────────
 export interface BookingWithDetails {
   booking_id: UUID;
-  patient_id: UUID;
+  client_id: UUID;
   provider_id: UUID;
   service_id: UUID;
   start_time: string;
   end_time: string;
   status: BookingStatus;
   provider_name: string;
-  patient_name: string;
-  patient_email: string | null;
-  patient_telegram_chat_id: string | null;
+  client_name: string;
+  client_email: string | null;
+  client_telegram_chat_id: string | null;
   service_name: string;
   gcal_provider_event_id: string | null;
-  gcal_patient_event_id: string | null;
+  gcal_client_event_id: string | null;
   gcal_sync_status: GCalSyncStatus;
   gcal_retry_count: number;
   reminder_preferences: Record<string, unknown> | null;
@@ -196,26 +196,26 @@ export function isGCalSyncStatus(value: unknown): value is GCalSyncStatus {
 // Validates a row from the database has the expected shape
 export function validateBookingRow(row: Record<string, unknown>): BookingWithDetails | null {
   const bookingId = row['booking_id'];
-  const patientId = row['patient_id'];
+  const clientId = row['client_id'];
   const providerId = row['provider_id'];
   const serviceId = row['service_id'];
   const startTime = row['start_time'];
   const endTime = row['end_time'];
   const status = row['status'];
   const providerName = row['provider_name'];
-  const patientName = row['patient_name'];
+  const clientName = row['client_name'];
   const serviceName = row['service_name'];
 
   if (
     typeof bookingId !== 'string' ||
-    typeof patientId !== 'string' ||
+    typeof clientId !== 'string' ||
     typeof providerId !== 'string' ||
     typeof serviceId !== 'string' ||
     typeof startTime !== 'string' ||
     typeof endTime !== 'string' ||
     typeof status !== 'string' ||
     typeof providerName !== 'string' ||
-    typeof patientName !== 'string' ||
+    typeof clientName !== 'string' ||
     typeof serviceName !== 'string'
   ) {
     return null;
@@ -225,19 +225,19 @@ export function validateBookingRow(row: Record<string, unknown>): BookingWithDet
 
   return {
     booking_id: toUUID(bookingId),
-    patient_id: toUUID(patientId),
+    client_id: toUUID(clientId),
     provider_id: toUUID(providerId),
     service_id: toUUID(serviceId),
     start_time: startTime,
     end_time: endTime,
     status,
     provider_name: providerName,
-    patient_name: patientName,
-    patient_email: typeof row['patient_email'] === 'string' ? row['patient_email'] : null,
-    patient_telegram_chat_id: typeof row['patient_telegram_chat_id'] === 'string' ? row['patient_telegram_chat_id'] : null,
+    client_name: clientName,
+    client_email: typeof row['client_email'] === 'string' ? row['client_email'] : null,
+    client_telegram_chat_id: typeof row['client_telegram_chat_id'] === 'string' ? row['client_telegram_chat_id'] : null,
     service_name: serviceName,
     gcal_provider_event_id: typeof row['gcal_provider_event_id'] === 'string' ? row['gcal_provider_event_id'] : null,
-    gcal_patient_event_id: typeof row['gcal_patient_event_id'] === 'string' ? row['gcal_patient_event_id'] : null,
+    gcal_client_event_id: typeof row['gcal_client_event_id'] === 'string' ? row['gcal_client_event_id'] : null,
     gcal_sync_status: isGCalSyncStatus(row['gcal_sync_status']) ? row['gcal_sync_status'] : 'pending',
     gcal_retry_count: typeof row['gcal_retry_count'] === 'number' ? row['gcal_retry_count'] : 0,
     reminder_preferences: typeof row['reminder_preferences'] === 'object' && row['reminder_preferences'] !== null

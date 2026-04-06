@@ -76,7 +76,7 @@ export const GCAL_SYNC_STATUS = {
 
 // ─── Actor Constants ───────────────────────────────────────────────────────
 export const ACTOR = {
-  PATIENT: 'patient',
+  PATIENT: 'client',
   PROVIDER: 'provider',
   SYSTEM: 'system',
 } as const;

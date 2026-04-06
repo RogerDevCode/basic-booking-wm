@@ -15,8 +15,8 @@ CREATE TABLE IF NOT EXISTS users (
     user_id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     email           TEXT UNIQUE,
     password_hash   TEXT,
-    role            TEXT NOT NULL DEFAULT 'patient'
-                    CHECK (role IN ('patient', 'provider', 'admin')),
+    role            TEXT NOT NULL DEFAULT 'client'
+                    CHECK (role IN ('client', 'provider', 'admin')),
     full_name       TEXT NOT NULL,
     rut             TEXT UNIQUE,
     address         TEXT,

@@ -1,7 +1,7 @@
 // ============================================================================
 // WEB WAITLIST — Waitlist CRUD (join, leave, list, position)
 // ============================================================================
-// Manages patient waitlist entries for services.
+// Manages client waitlist entries for services.
 // Actions: join, leave, list, check_position
 // ============================================================================
 
@@ -11,7 +11,7 @@ import postgres from 'postgres';
 const InputSchema = z.object({
   action: z.enum(['join', 'leave', 'list', 'check_position']),
   user_id: z.uuid(),
-  patient_id: z.uuid().optional(),
+  client_id: z.uuid().optional(),
   service_id: z.uuid().optional(),
   waitlist_id: z.uuid().optional(),
   preferred_date: z.string().optional(),
@@ -52,8 +52,8 @@ export async function main(rawInput: unknown): Promise<[Error | null, WaitlistRe
 
   try {
     const userRows = await sql`
-      SELECT u.user_id, p.patient_id FROM users u
-      LEFT JOIN patients p ON p.patient_id = u.user_id OR p.email = u.email
+      SELECT u.user_id, p.client_id FROM users u
+      LEFT JOIN clients p ON p.client_id = u.user_id OR p.email = u.email
       WHERE u.user_id = ${user_id}::uuid LIMIT 1
     `;
 
@@ -62,13 +62,13 @@ export async function main(rawInput: unknown): Promise<[Error | null, WaitlistRe
       return [new Error('User not found'), null];
     }
 
-    let patientId = userRow['patient_id'] !== null ? String(userRow['patient_id']) : null;
-    if (patientId === null && parsed.data.patient_id !== undefined) {
-      patientId = parsed.data.patient_id;
+    let clientId = userRow['client_id'] !== null ? String(userRow['client_id']) : null;
+    if (clientId === null && parsed.data.client_id !== undefined) {
+      clientId = parsed.data.client_id;
     }
 
-    if (patientId === null) {
-      return [new Error('Patient record not found'), null];
+    if (clientId === null) {
+      return [new Error('Client record not found'), null];
     }
 
     switch (action) {
@@ -80,7 +80,7 @@ export async function main(rawInput: unknown): Promise<[Error | null, WaitlistRe
 
         const existingRows = await sql`
           SELECT waitlist_id, status FROM waitlist
-          WHERE patient_id = ${patientId}::uuid
+          WHERE client_id = ${clientId}::uuid
             AND service_id = ${serviceId}::uuid
             AND status IN ('waiting', 'notified')
           LIMIT 1
@@ -100,11 +100,11 @@ export async function main(rawInput: unknown): Promise<[Error | null, WaitlistRe
 
         const insertRows = await sql`
           INSERT INTO waitlist (
-            patient_id, service_id, preferred_date,
+            client_id, service_id, preferred_date,
             preferred_start_time, preferred_end_time,
             status, position
           ) VALUES (
-            ${patientId}::uuid, ${serviceId}::uuid,
+            ${clientId}::uuid, ${serviceId}::uuid,
             ${parsed.data.preferred_date ?? null},
             ${parsed.data.preferred_start_time ?? null},
             ${parsed.data.preferred_end_time ?? null},
@@ -134,7 +134,7 @@ export async function main(rawInput: unknown): Promise<[Error | null, WaitlistRe
         await sql`
           UPDATE waitlist SET status = 'cancelled', updated_at = NOW()
           WHERE waitlist_id = ${waitlistId}::uuid
-            AND patient_id = ${patientId}::uuid
+            AND client_id = ${clientId}::uuid
             AND status IN ('waiting', 'notified')
         `;
 
@@ -151,7 +151,7 @@ export async function main(rawInput: unknown): Promise<[Error | null, WaitlistRe
           SELECT waitlist_id, service_id, preferred_date,
                  preferred_start_time, status, position, created_at
           FROM waitlist
-          WHERE patient_id = ${patientId}::uuid
+          WHERE client_id = ${clientId}::uuid
             AND status IN ('waiting', 'notified')
           ORDER BY created_at DESC
         `;
@@ -181,7 +181,7 @@ export async function main(rawInput: unknown): Promise<[Error | null, WaitlistRe
         const rows = await sql`
           SELECT position, status FROM waitlist
           WHERE waitlist_id = ${waitlistId}::uuid
-            AND patient_id = ${patientId}::uuid
+            AND client_id = ${clientId}::uuid
           LIMIT 1
         `;
 

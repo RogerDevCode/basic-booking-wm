@@ -32,12 +32,12 @@ interface BookingRow {
   start_time: Date | string;
   end_time: Date | string;
   gcal_provider_event_id: string | null;
-  gcal_patient_event_id: string | null;
+  gcal_client_event_id: string | null;
   gcal_retry_count: number;
   provider_name: string;
   provider_calendar_id: string | null;
-  patient_name: string;
-  patient_calendar_id: string | null;
+  client_name: string;
+  client_calendar_id: string | null;
   service_name: string;
 }
 
@@ -127,10 +127,10 @@ async function retryWithBackoff<T>(
 async function syncBookingToGCal(
   booking: BookingRow,
   maxRetries: number
-): Promise<{ providerEventId: string | null; patientEventId: string | null; errors: string[] }> {
+): Promise<{ providerEventId: string | null; clientEventId: string | null; errors: string[] }> {
   const result = {
     providerEventId: booking.gcal_provider_event_id,
-    patientEventId: booking.gcal_patient_event_id,
+    clientEventId: booking.gcal_client_event_id,
     errors: [] as string[],
   };
 
@@ -163,23 +163,23 @@ async function syncBookingToGCal(
     }
   }
 
-  // Sync to patient calendar
-  if (booking.patient_calendar_id) {
-    const patientCalId = booking.patient_calendar_id;
-    const patientResult = await retryWithBackoff(
+  // Sync to client calendar
+  if (booking.client_calendar_id) {
+    const clientCalId = booking.client_calendar_id;
+    const clientResult = await retryWithBackoff(
       () => {
-        if (result.patientEventId) {
-          return callGCalAPI('PUT', patientCalId, `events/${result.patientEventId}`, eventBody);
+        if (result.clientEventId) {
+          return callGCalAPI('PUT', clientCalId, `events/${result.clientEventId}`, eventBody);
         }
-        return callGCalAPI('POST', patientCalId, 'events', eventBody);
+        return callGCalAPI('POST', clientCalId, 'events', eventBody);
       },
       maxRetries
     );
 
-    if (patientResult.ok && patientResult.data) {
-      result.patientEventId = patientResult.data.id ?? null;
+    if (clientResult.ok && clientResult.data) {
+      result.clientEventId = clientResult.data.id ?? null;
     } else {
-      result.errors.push(`Patient: ${patientResult.error ?? 'Unknown error'}`);
+      result.errors.push(`Client: ${clientResult.error ?? 'Unknown error'}`);
     }
   }
 
@@ -198,17 +198,17 @@ async function syncBookingToGCal(
         result.errors.push(`Provider delete: ${deleteResult.error ?? 'Unknown error'}`);
       }
     }
-    if (result.patientEventId && booking.patient_calendar_id) {
-      const patientCalId = booking.patient_calendar_id;
-      const eventId = result.patientEventId;
+    if (result.clientEventId && booking.client_calendar_id) {
+      const clientCalId = booking.client_calendar_id;
+      const eventId = result.clientEventId;
       const deleteResult = await retryWithBackoff(
-        () => callGCalAPI('DELETE', patientCalId, `events/${eventId}`),
+        () => callGCalAPI('DELETE', clientCalId, `events/${eventId}`),
         maxRetries
       );
       if (deleteResult.ok) {
-        result.patientEventId = null;
+        result.clientEventId = null;
       } else {
-        result.errors.push(`Patient delete: ${deleteResult.error ?? 'Unknown error'}`);
+        result.errors.push(`Client delete: ${deleteResult.error ?? 'Unknown error'}`);
       }
     }
   }
@@ -240,14 +240,14 @@ export async function main(rawInput: unknown): Promise<{
       // Fetch pending bookings
       const bookings = await sql<BookingRow[]>`
         SELECT b.booking_id, b.status, b.start_time, b.end_time,
-               b.gcal_provider_event_id, b.gcal_patient_event_id,
+               b.gcal_provider_event_id, b.gcal_client_event_id,
                b.gcal_retry_count,
                p.name as provider_name, p.gcal_calendar_id as provider_calendar_id,
-               pt.name as patient_name, pt.gcal_calendar_id as patient_calendar_id,
+               pt.name as client_name, pt.gcal_calendar_id as client_calendar_id,
                s.name as service_name
         FROM bookings b
         JOIN providers p ON p.provider_id = b.provider_id
-        JOIN patients pt ON pt.patient_id = b.patient_id
+        JOIN clients pt ON pt.client_id = b.client_id
         JOIN services s ON s.service_id = b.service_id
         WHERE b.gcal_sync_status IN ('pending', 'partial')
           AND b.gcal_retry_count < ${max_gcal_retries}
@@ -278,7 +278,7 @@ export async function main(rawInput: unknown): Promise<{
         if (syncResult.errors.length === 0) {
           syncStatus = 'synced';
           result.synced++;
-        } else if (syncResult.providerEventId || syncResult.patientEventId) {
+        } else if (syncResult.providerEventId || syncResult.clientEventId) {
           syncStatus = 'partial';
           result.partial++;
         } else {
@@ -293,7 +293,7 @@ export async function main(rawInput: unknown): Promise<{
         await sql`
           UPDATE bookings
           SET gcal_provider_event_id = ${syncResult.providerEventId},
-              gcal_patient_event_id = ${syncResult.patientEventId},
+              gcal_client_event_id = ${syncResult.clientEventId},
               gcal_sync_status = ${syncStatus},
               gcal_retry_count = gcal_retry_count + 1,
               gcal_last_sync = NOW()

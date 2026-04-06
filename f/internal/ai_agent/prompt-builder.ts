@@ -144,7 +144,7 @@ EXTRAE solo estas entidades si están presentes en el mensaje:
 - date: fechas relativas (hoy, mañana, lunes) o absolutas (2026-04-15, 15/04)
 - time: horas (10:00, 3pm, las 5 de la tarde, 15:30)
 - booking_id: códigos de reserva (ABC-123, #456, reserva 789)
-- patient_name: nombre del paciente si se menciona explícitamente
+- client_name: nombre del paciente si se menciona explícitamente
 - service_type: tipo de servicio (consulta, limpieza, cardiología)
 - channel: canal de notificación preferido (telegram, gmail, email, ambos)
 - reminder_window: ventana de recordatorio (24h, 2h, 30min)
@@ -317,7 +317,7 @@ RESPONDE ÚNICAMENTE con un JSON válido siguiendo este schema:
     "date": "string o null",
     "time": "string o null",
     "booking_id": "string o null",
-    "patient_name": "string o null",
+    "client_name": "string o null",
     "service_type": "string o null"
   },
   "needs_more": true,

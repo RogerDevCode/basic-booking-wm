@@ -90,10 +90,10 @@ const INTENT_CLASSIFICATION_SCHEMA = {
         date: { type: ['string', 'null'] as const },
         time: { type: ['string', 'null'] as const },
         booking_id: { type: ['string', 'null'] as const },
-        patient_name: { type: ['string', 'null'] as const },
+        client_name: { type: ['string', 'null'] as const },
         service_type: { type: ['string', 'null'] as const },
       },
-      required: ['date', 'time', 'booking_id', 'patient_name', 'service_type'],
+      required: ['date', 'time', 'booking_id', 'client_name', 'service_type'],
       additionalProperties: false,
     },
     needs_more: {

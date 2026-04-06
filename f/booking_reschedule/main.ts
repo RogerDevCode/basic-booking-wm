@@ -20,7 +20,7 @@ const InputSchema = z.object({
   booking_id: z.uuid(),
   new_start_time: z.coerce.date(),
   new_service_id: z.uuid().optional(),
-  actor: z.enum(['patient', 'provider', 'system']),
+  actor: z.enum(['client', 'provider', 'system']),
   actor_id: z.uuid().optional(),
   reason: z.string().max(500).optional(),
 });
@@ -39,7 +39,7 @@ interface RescheduleResult {
 interface OldBookingRow {
   booking_id: string;
   status: string;
-  patient_id: string;
+  client_id: string;
   provider_id: string;
   service_id: string;
   start_time: string;
@@ -116,7 +116,7 @@ export async function main(rawInput: unknown): Promise<{
     try {
       const newStartDateTime = new_start_time;
       const [oldBooking] = await sql<OldBookingRow[]>`
-        SELECT booking_id, status, patient_id, provider_id, service_id,
+        SELECT booking_id, status, client_id, provider_id, service_id,
                start_time, end_time, idempotency_key
         FROM bookings
         WHERE booking_id = ${booking_id}::uuid
@@ -135,8 +135,8 @@ export async function main(rawInput: unknown): Promise<{
         };
       }
 
-      if (actor === 'patient' && oldBooking.patient_id !== actor_id) {
-        return { success: false, data: null, error_message: 'Unauthorized: patient_id mismatch' };
+      if (actor === 'client' && oldBooking.client_id !== actor_id) {
+        return { success: false, data: null, error_message: 'Unauthorized: client_id mismatch' };
       }
       if (actor === 'provider' && oldBooking.provider_id !== actor_id) {
         return { success: false, data: null, error_message: 'Unauthorized: provider_id mismatch' };
@@ -168,12 +168,12 @@ export async function main(rawInput: unknown): Promise<{
         // 1. Create new booking
         const newRows = await q<InsertedBookingRow[]>`
           INSERT INTO bookings (
-            patient_id, provider_id, service_id,
+            client_id, provider_id, service_id,
             start_time, end_time, status, idempotency_key, rescheduled_from,
             gcal_sync_status, notification_sent,
             reminder_24h_sent, reminder_2h_sent, reminder_30min_sent
           ) VALUES (
-            ${oldBooking.patient_id}::uuid, ${oldBooking.provider_id}::uuid, ${serviceId}::uuid,
+            ${oldBooking.client_id}::uuid, ${oldBooking.provider_id}::uuid, ${serviceId}::uuid,
             ${newStartTime.toISOString()}::timestamptz, ${newEndTime.toISOString()}::timestamptz,
             'confirmed', ${newIdempotencyKey}, ${booking_id}::uuid,
             'pending', false, false, false, false

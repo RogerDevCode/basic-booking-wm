@@ -1,7 +1,7 @@
 // ============================================================================
 // REMINDER CONFIG — Preference Configuration UI
 // ============================================================================
-// Allows patients to configure reminder preferences:
+// Allows clients to configure reminder preferences:
 // - Channel toggles (Telegram, Gmail)
 // - Time window toggles (24h, 2h, 30min)
 // Uses reply_keyboard for selection and force_reply for custom input.
@@ -14,7 +14,7 @@ type SqlClient = postgres.Sql;
 
 const InputSchema = z.object({
   action: z.enum(['show', 'toggle_channel', 'toggle_window', 'deactivate_all', 'activate_all', 'back']),
-  patient_id: z.string().optional(),
+  client_id: z.string().optional(),
   channel: z.string().optional(),
   window: z.string().optional(),
 });
@@ -71,17 +71,17 @@ function setAll(_prefs: ReminderPrefs, value: boolean): ReminderPrefs {
   };
 }
 
-async function savePreferences(sql: SqlClient, patientId: string, prefs: ReminderPrefs): Promise<boolean> {
+async function savePreferences(sql: SqlClient, clientId: string, prefs: ReminderPrefs): Promise<boolean> {
   try {
     await sql`
-      UPDATE patients
+      UPDATE clients
       SET metadata = jsonb_set(
             COALESCE(metadata, '{}'::jsonb),
             '{reminder_preferences}',
             ${JSON.stringify(prefs)}::jsonb
           ),
           updated_at = NOW()
-      WHERE patient_id = ${patientId}::uuid
+      WHERE client_id = ${clientId}::uuid
     `;
     return true;
   } catch {
@@ -89,7 +89,7 @@ async function savePreferences(sql: SqlClient, patientId: string, prefs: Reminde
   }
 }
 
-interface PatientMetadataRow {
+interface ClientMetadataRow {
   readonly metadata: Readonly<Record<string, unknown>> | null;
 }
 
@@ -99,7 +99,7 @@ interface ReminderConfigResult {
   readonly preferences: ReminderPrefs;
 }
 
-async function loadPreferences(sql: SqlClient, patientId: string): Promise<ReminderPrefs> {
+async function loadPreferences(sql: SqlClient, clientId: string): Promise<ReminderPrefs> {
   const defaults: ReminderPrefs = {
     telegram_24h: true,
     gmail_24h: true,
@@ -108,8 +108,8 @@ async function loadPreferences(sql: SqlClient, patientId: string): Promise<Remin
   };
 
   try {
-    const rows = await sql<PatientMetadataRow[]>`
-      SELECT metadata FROM patients WHERE patient_id = ${patientId}::uuid LIMIT 1
+    const rows = await sql<ClientMetadataRow[]>`
+      SELECT metadata FROM clients WHERE client_id = ${clientId}::uuid LIMIT 1
     `;
     const firstRow = rows[0];
     if (!firstRow?.metadata) return defaults;
@@ -136,10 +136,10 @@ export async function main(rawInput: unknown): Promise<{ success: boolean; data:
       return { success: false, data: null, error_message: `Invalid input: ${parsed.error.message}` };
     }
 
-    const { action, patient_id, channel, window } = parsed.data;
+    const { action, client_id, channel, window } = parsed.data;
 
-    if (!patient_id) {
-      return { success: false, data: null, error_message: 'patient_id is required' };
+    if (!client_id) {
+      return { success: false, data: null, error_message: 'client_id is required' };
     }
 
     const dbUrl = process.env['DATABASE_URL'];
@@ -153,7 +153,7 @@ export async function main(rawInput: unknown): Promise<{ success: boolean; data:
     };
 
     if (sql) {
-      prefs = await loadPreferences(sql, patient_id);
+      prefs = await loadPreferences(sql, client_id);
     }
 
     let message = '';
@@ -171,7 +171,7 @@ export async function main(rawInput: unknown): Promise<{ success: boolean; data:
         } else if (channel === 'gmail') {
           prefs = { ...prefs, gmail_24h: !prefs.gmail_24h };
         }
-        if (sql) await savePreferences(sql, patient_id, prefs);
+        if (sql) await savePreferences(sql, client_id, prefs);
         ({ message, reply_keyboard } = buildConfigMessage(prefs));
         break;
       }
@@ -179,7 +179,7 @@ export async function main(rawInput: unknown): Promise<{ success: boolean; data:
       case 'toggle_window': {
         if (window) {
           prefs = toggleValue(prefs, `telegram_${window}`);
-          if (sql) await savePreferences(sql, patient_id, prefs);
+          if (sql) await savePreferences(sql, client_id, prefs);
         }
         ({ message, reply_keyboard } = buildWindowConfig(prefs));
         break;
@@ -187,14 +187,14 @@ export async function main(rawInput: unknown): Promise<{ success: boolean; data:
 
       case 'deactivate_all':
         prefs = setAll(prefs, false);
-        if (sql) await savePreferences(sql, patient_id, prefs);
+        if (sql) await savePreferences(sql, client_id, prefs);
         message = '🔕 *Recordatorios desactivados*\n\nNo recibirás avisos automáticos.\n\nPara reactivarlos, toca "Activar todo".';
         reply_keyboard = [['✅ Activar todo', '« Volver al menú']];
         break;
 
       case 'activate_all':
         prefs = setAll(prefs, true);
-        if (sql) await savePreferences(sql, patient_id, prefs);
+        if (sql) await savePreferences(sql, client_id, prefs);
         message = '🔔 *Recordatorios activados*\n\nRecibirás avisos en todos los canales y ventanas.';
         reply_keyboard = [['⚙️ Configurar', '« Volver al menú']];
         break;

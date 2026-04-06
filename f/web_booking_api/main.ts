@@ -44,9 +44,9 @@ export async function main(rawInput: unknown): Promise<[Error | null, BookingRes
 
   try {
     const userRows = await sql`
-      SELECT u.user_id, u.email, p.patient_id
+      SELECT u.user_id, u.email, p.client_id
       FROM users u
-      LEFT JOIN patients p ON p.patient_id = u.user_id OR p.email = u.email
+      LEFT JOIN clients p ON p.client_id = u.user_id OR p.email = u.email
       WHERE u.user_id = ${user_id}::uuid
       LIMIT 1
     `;
@@ -56,20 +56,20 @@ export async function main(rawInput: unknown): Promise<[Error | null, BookingRes
       return [new Error('User not found'), null];
     }
 
-    let patientId = userRow['patient_id'] !== null ? String(userRow['patient_id']) : null;
+    let clientId = userRow['client_id'] !== null ? String(userRow['client_id']) : null;
 
-    if (patientId === null && userRow['email'] !== null) {
-      const patientRows = await sql`
-        SELECT patient_id FROM patients WHERE email = ${String(userRow['email'])} LIMIT 1
+    if (clientId === null && userRow['email'] !== null) {
+      const clientRows = await sql`
+        SELECT client_id FROM clients WHERE email = ${String(userRow['email'])} LIMIT 1
       `;
-      const pRow = patientRows[0];
+      const pRow = clientRows[0];
       if (pRow !== undefined) {
-        patientId = String(pRow['patient_id']);
+        clientId = String(pRow['client_id']);
       }
     }
 
-    if (patientId === null) {
-      return [new Error('Patient record not found. Please complete your profile first.'), null];
+    if (clientId === null) {
+      return [new Error('Client record not found. Please complete your profile first.'), null];
     }
 
     switch (action) {
@@ -93,10 +93,10 @@ export async function main(rawInput: unknown): Promise<[Error | null, BookingRes
 
         const insertRows = await sql`
           INSERT INTO bookings (
-            provider_id, patient_id, service_id, start_time, end_time,
+            provider_id, client_id, service_id, start_time, end_time,
             status, idempotency_key, gcal_sync_status
           ) VALUES (
-            ${provider_id}::uuid, ${patientId}::uuid, ${service_id}::uuid,
+            ${provider_id}::uuid, ${clientId}::uuid, ${service_id}::uuid,
             ${start_time}, ${endTime.toISOString()},
             'pending', ${idempotencyKey}, 'pending'
           )
@@ -121,7 +121,7 @@ export async function main(rawInput: unknown): Promise<[Error | null, BookingRes
         }
 
         const bookingRows = await sql`
-          SELECT booking_id, status, patient_id FROM bookings
+          SELECT booking_id, status, client_id FROM bookings
           WHERE booking_id = ${booking_id}::uuid LIMIT 1
         `;
 
@@ -130,7 +130,7 @@ export async function main(rawInput: unknown): Promise<[Error | null, BookingRes
           return [new Error('Booking not found'), null];
         }
 
-        if (String(bRow['patient_id']) !== patientId) {
+        if (String(bRow['client_id']) !== clientId) {
           return [new Error('You can only cancel your own bookings'), null];
         }
 
@@ -143,7 +143,7 @@ export async function main(rawInput: unknown): Promise<[Error | null, BookingRes
           UPDATE bookings SET
             status = 'cancelled',
             cancellation_reason = ${cancellation_reason ?? null},
-            cancelled_by = 'patient',
+            cancelled_by = 'client',
             updated_at = NOW()
           WHERE booking_id = ${booking_id}::uuid
           RETURNING booking_id, status
@@ -167,7 +167,7 @@ export async function main(rawInput: unknown): Promise<[Error | null, BookingRes
         }
 
         const bookingRows = await sql`
-          SELECT booking_id, status, patient_id, provider_id, service_id FROM bookings
+          SELECT booking_id, status, client_id, provider_id, service_id FROM bookings
           WHERE booking_id = ${booking_id}::uuid LIMIT 1
         `;
 
@@ -176,7 +176,7 @@ export async function main(rawInput: unknown): Promise<[Error | null, BookingRes
           return [new Error('Booking not found'), null];
         }
 
-        if (String(bRow['patient_id']) !== patientId) {
+        if (String(bRow['client_id']) !== clientId) {
           return [new Error('You can only reschedule your own bookings'), null];
         }
 
@@ -200,10 +200,10 @@ export async function main(rawInput: unknown): Promise<[Error | null, BookingRes
 
         const insertRows = await sql`
           INSERT INTO bookings (
-            provider_id, patient_id, service_id, start_time, end_time,
+            provider_id, client_id, service_id, start_time, end_time,
             status, idempotency_key, rescheduled_from, gcal_sync_status
           ) VALUES (
-            ${String(bRow['provider_id'])}::uuid, ${patientId}::uuid, ${String(bRow['service_id'])}::uuid,
+            ${String(bRow['provider_id'])}::uuid, ${clientId}::uuid, ${String(bRow['service_id'])}::uuid,
             ${start_time}, ${endTime.toISOString()},
             'pending', ${idempotencyKey}, ${booking_id}::uuid, 'pending'
           )

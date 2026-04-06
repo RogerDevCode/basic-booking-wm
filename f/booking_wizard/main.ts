@@ -8,7 +8,7 @@ import postgres from 'postgres';
 
 const WizardStateSchema = z.object({
   step: z.number().int().min(0),
-  patient_id: z.string().min(1),
+  client_id: z.string().min(1),
   chat_id: z.string().min(1),
   selected_date: z.string().nullable(),
   selected_time: z.string().nullable(),
@@ -174,7 +174,7 @@ function parseTimeFromInput(input: string): string | null {
 
 async function createBookingInDB(
   sql: postgres.Sql,
-  patientId: string,
+  clientId: string,
   providerId: string,
   serviceId: string,
   dateStr: string,
@@ -183,7 +183,7 @@ async function createBookingInDB(
 ): Promise<[Error | null, string | null]> {
   try {
     const localTimestampStr = `${dateStr}T${timeStr}:00`;
-    const idempotencyKey = `wizard-${patientId}-${providerId}-${serviceId}-${dateStr}-${timeStr}`;
+    const idempotencyKey = `wizard-${clientId}-${providerId}-${serviceId}-${dateStr}-${timeStr}`;
 
     const bookingId = await sql.begin(async (tx) => {
       const q = tx as unknown as postgres.Sql;
@@ -197,11 +197,11 @@ async function createBookingInDB(
       interface BookingIdRow { readonly booking_id: string }
       const [booking] = await q<readonly BookingIdRow[]>`
         INSERT INTO bookings (
-          patient_id, provider_id, service_id, start_time, end_time,
+          client_id, provider_id, service_id, start_time, end_time,
           status, idempotency_key, gcal_sync_status, notification_sent,
           reminder_24h_sent, reminder_2h_sent, reminder_30min_sent
         ) VALUES (
-          ${patientId}::uuid, ${providerId}::uuid, ${serviceId}::uuid,
+          ${clientId}::uuid, ${providerId}::uuid, ${serviceId}::uuid,
           (${localTimestampStr}::timestamp AT TIME ZONE ${timezone}),
           (${localTimestampStr}::timestamp AT TIME ZONE ${timezone} + (${durationMin} * INTERVAL '1 minute')),
           'confirmed', ${idempotencyKey}, 'pending', false, false, false, false
@@ -217,8 +217,8 @@ async function createBookingInDB(
         INSERT INTO booking_audit (
           booking_id, from_status, to_status, changed_by, actor_id, reason, metadata
         ) VALUES (
-          ${booking.booking_id}::uuid, null, 'confirmed', 'patient',
-          ${patientId}::uuid, 'Booking created via wizard', '{"channel": "telegram"}'::jsonb
+          ${booking.booking_id}::uuid, null, 'confirmed', 'client',
+          ${clientId}::uuid, 'Booking created via wizard', '{"channel": "telegram"}'::jsonb
         )
       `;
 
@@ -245,9 +245,9 @@ export async function main(rawInput: unknown): Promise<{ readonly success: boole
     let state: WizardState;
     if (wizard_state != null && Object.keys(wizard_state).length > 0) {
       const stateResult = WizardStateSchema.safeParse(wizard_state);
-      state = stateResult.success ? stateResult.data : { step: 0, patient_id: '', chat_id: '', selected_date: null, selected_time: null };
+      state = stateResult.success ? stateResult.data : { step: 0, client_id: '', chat_id: '', selected_date: null, selected_time: null };
     } else {
-      state = { step: 0, patient_id: '', chat_id: '', selected_date: null, selected_time: null };
+      state = { step: 0, client_id: '', chat_id: '', selected_date: null, selected_time: null };
     }
 
     const dbUrl = process.env['DATABASE_URL'];
@@ -276,7 +276,7 @@ export async function main(rawInput: unknown): Promise<{ readonly success: boole
 
     switch (action) {
       case 'start':
-        state = { ...state, step: 1, chat_id: typeof wizard_state?.['chat_id'] === 'string' ? wizard_state['chat_id'] : '', patient_id: typeof wizard_state?.['patient_id'] === 'string' ? wizard_state['patient_id'] : '' };
+        state = { ...state, step: 1, chat_id: typeof wizard_state?.['chat_id'] === 'string' ? wizard_state['chat_id'] : '', client_id: typeof wizard_state?.['client_id'] === 'string' ? wizard_state['client_id'] : '' };
         ({ message, reply_keyboard, new_state: state } = buildDateSelection(state, 0));
         break;
 
@@ -365,7 +365,7 @@ export async function main(rawInput: unknown): Promise<{ readonly success: boole
             break;
           }
 
-          const [err, bookingId] = await createBookingInDB(sql, state.patient_id, provider_id, service_id, state.selected_date, state.selected_time, timezone);
+          const [err, bookingId] = await createBookingInDB(sql, state.client_id, provider_id, service_id, state.selected_date, state.selected_time, timezone);
           if (err != null) {
             message = `❌ Error al agendar: ${err.message}. Intenta con otro horario.`;
             reply_keyboard = [['📅 Agendar otra', '📋 Mis citas']];

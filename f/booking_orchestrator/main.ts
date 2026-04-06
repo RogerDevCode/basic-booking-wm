@@ -17,7 +17,7 @@ import postgres from 'postgres';
 const InputSchema = z.object({
   intent: z.enum(['create_booking', 'cancel_booking', 'reschedule', 'list_available', 'get_my_bookings']),
   entities: z.record(z.string(), z.unknown()).default({}),
-  patient_id: z.uuid().optional(),
+  client_id: z.uuid().optional(),
   provider_id: z.uuid().optional(),
   service_id: z.uuid().optional(),
   booking_id: z.uuid().optional(),
@@ -38,13 +38,13 @@ interface OrchestratorResult {
 async function handleCreateBooking(
   input: z.infer<typeof InputSchema>
 ): Promise<OrchestratorResult> {
-  const patientId = input.patient_id ?? (input.entities['patient_id'] as string | undefined);
+  const clientId = input.client_id ?? (input.entities['client_id'] as string | undefined);
   const providerId = input.provider_id ?? (input.entities['provider_id'] as string | undefined);
   const serviceId = input.service_id ?? (input.entities['service_id'] as string | undefined);
   const date = input.date ?? (input.entities['date'] as string | undefined);
   const time = input.time ?? (input.entities['time'] as string | undefined);
 
-  if (!patientId || !providerId || !serviceId || !date || !time) {
+  if (!clientId || !providerId || !serviceId || !date || !time) {
     return {
       action: 'create_booking',
       success: false,
@@ -55,16 +55,16 @@ async function handleCreateBooking(
   }
 
   const startTime = new Date(`${date}T${time}:00`);
-  const idempotencyKey = `orch-${patientId}-${providerId}-${date}-${time}-${String(Date.now())}`;
+  const idempotencyKey = `orch-${clientId}-${providerId}-${date}-${time}-${String(Date.now())}`;
 
   const createInput = {
-    patient_id: patientId,
+    client_id: clientId,
     provider_id: providerId,
     service_id: serviceId,
     start_time: startTime.toISOString(),
     idempotency_key: idempotencyKey,
     notes: input.notes,
-    actor: 'patient' as const,
+    actor: 'client' as const,
     channel: input.channel,
   };
 
@@ -93,7 +93,7 @@ async function handleCancelBooking(
   input: z.infer<typeof InputSchema>
 ): Promise<OrchestratorResult> {
   const bookingId = input.booking_id ?? (input.entities['booking_id'] as string | undefined);
-  const patientId = input.patient_id ?? (input.entities['patient_id'] as string | undefined);
+  const clientId = input.client_id ?? (input.entities['client_id'] as string | undefined);
 
   if (!bookingId) {
     return {
@@ -107,8 +107,8 @@ async function handleCancelBooking(
 
   const cancelInput = {
     booking_id: bookingId,
-    actor: 'patient' as const,
-    actor_id: patientId,
+    actor: 'client' as const,
+    actor_id: clientId,
     reason: (input.entities['reason'] as string | undefined) ?? input.notes,
   };
 
@@ -136,7 +136,7 @@ async function handleReschedule(
   input: z.infer<typeof InputSchema>
 ): Promise<OrchestratorResult> {
   const bookingId = input.booking_id ?? (input.entities['booking_id'] as string | undefined);
-  const patientId = input.patient_id ?? (input.entities['patient_id'] as string | undefined);
+  const clientId = input.client_id ?? (input.entities['client_id'] as string | undefined);
   const date = input.date ?? (input.entities['date'] as string | undefined);
   const time = input.time ?? (input.entities['time'] as string | undefined);
 
@@ -155,8 +155,8 @@ async function handleReschedule(
   const rescheduleInput = {
     booking_id: bookingId,
     new_start_time: newStartTime.toISOString(),
-    actor: 'patient' as const,
-    actor_id: patientId,
+    actor: 'client' as const,
+    actor_id: clientId,
     reason: (input.entities['reason'] as string | undefined) ?? input.notes,
   };
 
@@ -255,9 +255,9 @@ async function handleListAvailable(
 async function handleGetMyBookings(
   input: z.infer<typeof InputSchema>
 ): Promise<OrchestratorResult> {
-  const patientId = input.patient_id ?? (input.entities['patient_id'] as string | undefined);
+  const clientId = input.client_id ?? (input.entities['client_id'] as string | undefined);
 
-  if (!patientId) {
+  if (!clientId) {
     return {
       action: 'get_my_bookings',
       success: false,
@@ -280,7 +280,7 @@ async function handleGetMyBookings(
       FROM bookings b
       JOIN providers p ON p.provider_id = b.provider_id
       JOIN services s ON s.service_id = b.service_id
-      WHERE b.patient_id = ${patientId}::uuid
+      WHERE b.client_id = ${clientId}::uuid
         AND b.status NOT IN ('cancelled', 'no_show', 'rescheduled')
       ORDER BY b.start_time ASC
       LIMIT 20

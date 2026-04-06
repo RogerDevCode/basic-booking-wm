@@ -13,7 +13,7 @@ import type { UUID } from '../internal/db-types';
 // ─── Input Validation ───────────────────────────────────────────────────────
 const InputSchema = z.object({
   booking_id: z.uuid(),
-  actor: z.enum(['patient', 'provider', 'system']),
+  actor: z.enum(['client', 'provider', 'system']),
   actor_id: z.uuid().optional(),
   reason: z.string().max(500).optional(),
 });
@@ -33,10 +33,10 @@ export interface CancelResult {
 interface BookingLookup {
   readonly booking_id: string;
   readonly status: string;
-  readonly patient_id: string;
+  readonly client_id: string;
   readonly provider_id: string;
   readonly gcal_provider_event_id: string | null;
-  readonly gcal_patient_event_id: string | null;
+  readonly gcal_client_event_id: string | null;
 }
 
 interface UpdatedBooking {
@@ -70,8 +70,8 @@ export async function main(
   try {
     // 1. Find booking
     const bookingRows = await sql<BookingLookup[]>`
-      SELECT booking_id, status, patient_id, provider_id,
-             gcal_provider_event_id, gcal_patient_event_id
+      SELECT booking_id, status, client_id, provider_id,
+             gcal_provider_event_id, gcal_client_event_id
       FROM bookings
       WHERE booking_id = ${input.booking_id}::uuid
       LIMIT 1
@@ -93,8 +93,8 @@ export async function main(
     }
 
     // 3. Validate actor permission
-    if (input.actor === 'patient' && booking.patient_id !== input.actor_id) {
-      return { success: false, data: null, error_message: 'Unauthorized: patient_id mismatch' };
+    if (input.actor === 'client' && booking.client_id !== input.actor_id) {
+      return { success: false, data: null, error_message: 'Unauthorized: client_id mismatch' };
     }
     if (input.actor === 'provider' && booking.provider_id !== input.actor_id) {
       return { success: false, data: null, error_message: 'Unauthorized: provider_id mismatch' };
@@ -133,7 +133,7 @@ export async function main(
             input.reason ?? 'Cancelled via API',
             JSON.stringify({
               gcal_provider_event_id: booking.gcal_provider_event_id,
-              gcal_patient_event_id: booking.gcal_patient_event_id,
+              gcal_client_event_id: booking.gcal_client_event_id,
             }),
           ]
         );
@@ -154,7 +154,7 @@ export async function main(
     }
 
     // 5. Mark GCal events for cleanup
-    if (booking.gcal_provider_event_id !== null || booking.gcal_patient_event_id !== null) {
+    if (booking.gcal_provider_event_id !== null || booking.gcal_client_event_id !== null) {
       await sql`
         UPDATE bookings
         SET gcal_sync_status = 'pending', gcal_retry_count = 0

@@ -64,12 +64,12 @@ describe('GCal Reconcile Cron', () => {
       start_time: new Date(),
       end_time: new Date(),
       gcal_provider_event_id: null,
-      gcal_patient_event_id: null,
+      gcal_client_event_id: null,
       gcal_retry_count: 0,
       provider_name: 'Dr. Test',
       provider_calendar_id: 'cal1',
-      patient_name: 'Patient Test',
-      patient_calendar_id: null,
+      client_name: 'Client Test',
+      client_calendar_id: null,
       service_name: 'Consulta',
     }));
 

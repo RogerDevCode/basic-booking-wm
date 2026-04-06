@@ -10,7 +10,7 @@ import { z } from 'zod';
 import postgres from 'postgres';
 
 const InputSchema = z.object({
-  patient_id: z.uuid().optional(),
+  client_id: z.uuid().optional(),
   channel: z.enum(['telegram', 'web', 'api']),
   direction: z.enum(['incoming', 'outgoing']),
   content: z.string().min(1).max(2000),
@@ -28,7 +28,7 @@ export async function main(rawInput: unknown): Promise<{
     return { success: false, data: null, error_message: "Validation error: " + parsed.error.message };
   }
 
-  const { patient_id, channel, direction, content, intent, metadata } = parsed.data;
+  const { client_id, channel, direction, content, intent, metadata } = parsed.data;
 
   const dbUrl = process.env['DATABASE_URL'];
   if (dbUrl === undefined || dbUrl === '') {
@@ -39,9 +39,9 @@ export async function main(rawInput: unknown): Promise<{
 
   try {
     const rows = await sql`
-      INSERT INTO conversations (patient_id, channel, direction, content, intent, metadata)
+      INSERT INTO conversations (client_id, channel, direction, content, intent, metadata)
       VALUES (
-        ${patient_id ?? null}::uuid,
+        ${client_id ?? null}::uuid,
         ${channel},
         ${direction},
         ${content},

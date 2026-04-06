@@ -31,11 +31,11 @@ export interface GoogleCalendarEvent {
  * Used by both gcal_sync (realtime) and gcal_reconcile (cron retry).
  *
  * @param booking - Booking data with provider and service info
- * @param calendarType - 'provider' or 'patient' (reserved for future per-type customization)
+ * @param calendarType - 'provider' or 'client' (reserved for future per-type customization)
  */
 export function buildGCalEvent(
   booking: BookingEventData,
-  calendarType: 'provider' | 'patient' = 'provider'
+  calendarType: 'provider' | 'client' = 'provider'
 ): GoogleCalendarEvent {
   // calendarType reserved for future per-audience event customization
   void calendarType;

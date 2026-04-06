@@ -3,7 +3,7 @@
 // ============================================================================
 // Registers a new user with full profile data.
 // Validates Chilean RUT (módulo 11), email uniqueness, password strength.
-// Default role: 'patient'.
+// Default role: 'client'.
 // ============================================================================
 
 import { z } from 'zod';
@@ -114,7 +114,7 @@ export async function main(rawInput: unknown): Promise<[Error | null, RegisterRe
         role, is_active, timezone
       ) VALUES (
         ${full_name}, ${rut}, ${email}, ${address}, ${phone}, ${passwordHash},
-        'patient', true, ${timezone}
+        'client', true, ${timezone}
       )
       RETURNING user_id, email, full_name, role
     `;

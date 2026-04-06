@@ -1,10 +1,10 @@
 // ============================================================================
-// GCal SYNC — Sync booking to Google Calendar (provider + patient)
+// GCal SYNC — Sync booking to Google Calendar (provider + client)
 // ============================================================================
-// Syncs a booking to both provider and patient Google Calendars:
+// Syncs a booking to both provider and client Google Calendars:
 // 1. Fetches booking details from DB
 // 2. Creates/updates GCal event for provider calendar
-// 3. Creates/updates GCal event for patient calendar
+// 3. Creates/updates GCal event for client calendar
 // 4. Stores GCal event IDs in booking row
 // 5. Updates gcal_sync_status
 //
@@ -25,7 +25,7 @@ const InputSchema = z.object({
 interface GCalSyncResult {
   booking_id: string;
   provider_event_id: string | null;
-  patient_event_id: string | null;
+  client_event_id: string | null;
   sync_status: 'synced' | 'partial' | 'pending';
   retry_count: number;
   errors: string[];
@@ -38,11 +38,11 @@ interface BookingRow {
   start_time: string;
   end_time: string;
   gcal_provider_event_id: string | null;
-  gcal_patient_event_id: string | null;
+  gcal_client_event_id: string | null;
   provider_name: string;
   provider_calendar_id: string | null;
-  patient_name: string;
-  patient_calendar_id: string | null;
+  client_name: string;
+  client_calendar_id: string | null;
   service_name: string;
 }
 
@@ -142,13 +142,13 @@ export async function main(rawInput: unknown): Promise<{
       // Step 1: Fetch booking details (fully typed)
       const [booking] = await sql<BookingRow[]>`
         SELECT b.booking_id, b.status, b.start_time, b.end_time,
-               b.gcal_provider_event_id, b.gcal_patient_event_id,
+               b.gcal_provider_event_id, b.gcal_client_event_id,
                p.name as provider_name, p.gcal_calendar_id as provider_calendar_id,
-               pt.name as patient_name, pt.gcal_calendar_id as patient_calendar_id,
+               pt.name as client_name, pt.gcal_calendar_id as client_calendar_id,
                s.name as service_name
         FROM bookings b
         JOIN providers p ON p.provider_id = b.provider_id
-        JOIN patients pt ON pt.patient_id = b.patient_id
+        JOIN clients pt ON pt.client_id = b.client_id
         JOIN services s ON s.service_id = b.service_id
         WHERE b.booking_id = ${booking_id}::uuid
         LIMIT 1
@@ -161,7 +161,7 @@ export async function main(rawInput: unknown): Promise<{
       const result: GCalSyncResult = {
         booking_id,
         provider_event_id: booking.gcal_provider_event_id,
-        patient_event_id: booking.gcal_patient_event_id,
+        client_event_id: booking.gcal_client_event_id,
         sync_status: 'pending',
         retry_count: 0,
         errors: [],
@@ -180,15 +180,15 @@ export async function main(rawInput: unknown): Promise<{
             result.errors.push(`Provider event delete failed: ${deleteResult.error ?? 'Unknown error'}`);
           }
         }
-        if (booking.gcal_patient_event_id && booking.patient_calendar_id) {
-          const calId = booking.patient_calendar_id;
-          const eventId = booking.gcal_patient_event_id;
+        if (booking.gcal_client_event_id && booking.client_calendar_id) {
+          const calId = booking.client_calendar_id;
+          const eventId = booking.gcal_client_event_id;
           const deleteResult = await retryWithBackoff(
             () => callGCalAPI('DELETE', `events/${eventId}`, calId),
             max_retries
           );
           if (!deleteResult.ok) {
-            result.errors.push(`Patient event delete failed: ${deleteResult.error ?? 'Unknown error'}`);
+            result.errors.push(`Client event delete failed: ${deleteResult.error ?? 'Unknown error'}`);
           }
         }
 
@@ -199,7 +199,7 @@ export async function main(rawInput: unknown): Promise<{
           SET gcal_sync_status = ${result.sync_status},
               gcal_last_sync = NOW(),
               gcal_provider_event_id = null,
-              gcal_patient_event_id = null
+              gcal_client_event_id = null
           WHERE booking_id = ${booking_id}::uuid
         `;
 
@@ -236,30 +236,30 @@ export async function main(rawInput: unknown): Promise<{
         }
       }
 
-      // Step 4: Create/update patient event
-      if (booking.patient_calendar_id) {
-        const calId = booking.patient_calendar_id;
-        const patientResult = await retryWithBackoff(
+      // Step 4: Create/update client event
+      if (booking.client_calendar_id) {
+        const calId = booking.client_calendar_id;
+        const clientResult = await retryWithBackoff(
           () => {
-            if (booking.gcal_patient_event_id) {
-              return callGCalAPI('PUT', `events/${booking.gcal_patient_event_id}`, calId, eventBody);
+            if (booking.gcal_client_event_id) {
+              return callGCalAPI('PUT', `events/${booking.gcal_client_event_id}`, calId, eventBody);
             }
             return callGCalAPI('POST', 'events', calId, eventBody);
           },
           max_retries
         );
 
-        if (patientResult.ok && patientResult.data) {
-          result.patient_event_id = (patientResult.data as GCalEventResponse).id;
+        if (clientResult.ok && clientResult.data) {
+          result.client_event_id = (clientResult.data as GCalEventResponse).id;
         } else {
-          result.errors.push(`Patient event failed: ${patientResult.error ?? 'Unknown error'}`);
+          result.errors.push(`Client event failed: ${clientResult.error ?? 'Unknown error'}`);
         }
       }
 
       // Step 5: Determine sync status
       if (result.errors.length === 0) {
         result.sync_status = 'synced';
-      } else if (result.provider_event_id || result.patient_event_id) {
+      } else if (result.provider_event_id || result.client_event_id) {
         result.sync_status = 'partial';
       } else {
         result.sync_status = 'pending';
@@ -269,7 +269,7 @@ export async function main(rawInput: unknown): Promise<{
       await sql`
         UPDATE bookings
         SET gcal_provider_event_id = ${result.provider_event_id},
-            gcal_patient_event_id = ${result.patient_event_id},
+            gcal_client_event_id = ${result.client_event_id},
             gcal_sync_status = ${result.sync_status},
             gcal_last_sync = NOW(),
             gcal_retry_count = ${result.errors.length > 0 ? 1 : 0}

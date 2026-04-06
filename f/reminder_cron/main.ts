@@ -3,7 +3,7 @@
 // ============================================================================
 // Runs every 30 minutes via Windmill Schedule.
 // Queries confirmed bookings within reminder windows and sends notifications.
-// Respects patient reminder_preferences (channel + window toggles).
+// Respects client reminder_preferences (channel + window toggles).
 //
 // FIX: Replaced all sql.unsafe() calls with 3 explicitly typed functions.
 // Each window has its own query with a hardcoded column name — no interpolation.
@@ -31,7 +31,7 @@ interface ReminderPrefs {
 
 interface BookingRecord {
   booking_id: string;
-  patient_id: string;
+  client_id: string;
   provider_id: string;
   start_time: Date;
   end_time: Date;
@@ -39,9 +39,9 @@ interface BookingRecord {
   reminder_24h_sent: boolean;
   reminder_2h_sent: boolean;
   reminder_30min_sent: boolean;
-  patient_telegram_chat_id: string | null;
-  patient_email: string | null;
-  patient_name: string | null;
+  client_telegram_chat_id: string | null;
+  client_email: string | null;
+  client_name: string | null;
   provider_name: string | null;
   service_name: string | null;
   reminder_preferences: ReminderPrefs | null;
@@ -65,7 +65,7 @@ function formatTime(date: Date, tz: string): string {
   });
 }
 
-function getPatientPreference(
+function getClientPreference(
   prefs: ReminderPrefs | null,
   channel: string,
   window: string
@@ -87,7 +87,7 @@ function buildBookingDetails(
     provider_name: booking.provider_name ?? 'Tu doctor',
     service: booking.service_name ?? 'Consulta',
     booking_id: booking.booking_id.slice(0, 8).toUpperCase(),
-    patient_name: booking.patient_name ?? 'Paciente',
+    client_name: booking.client_name ?? 'Paciente',
   };
 }
 
@@ -243,17 +243,17 @@ async function getBookingsFor24h(
 ): Promise<BookingRecord[]> {
   return sql<BookingRecord[]>`
     SELECT
-      b.booking_id, b.patient_id, b.provider_id,
+      b.booking_id, b.client_id, b.provider_id,
       b.start_time, b.end_time, b.status,
       b.reminder_24h_sent, b.reminder_2h_sent, b.reminder_30min_sent,
-      p.telegram_chat_id AS patient_telegram_chat_id,
-      p.email AS patient_email,
-      p.name AS patient_name,
+      p.telegram_chat_id AS client_telegram_chat_id,
+      p.email AS client_email,
+      p.name AS client_name,
       p.metadata AS reminder_preferences,
       pr.name AS provider_name,
       s.name AS service_name
     FROM bookings b
-    JOIN patients p ON p.patient_id = b.patient_id
+    JOIN clients p ON p.client_id = b.client_id
     LEFT JOIN providers pr ON pr.provider_id = b.provider_id
     LEFT JOIN services s ON s.service_id = b.service_id
     WHERE b.status = 'confirmed'
@@ -272,17 +272,17 @@ async function getBookingsFor2h(
 ): Promise<BookingRecord[]> {
   return sql<BookingRecord[]>`
     SELECT
-      b.booking_id, b.patient_id, b.provider_id,
+      b.booking_id, b.client_id, b.provider_id,
       b.start_time, b.end_time, b.status,
       b.reminder_24h_sent, b.reminder_2h_sent, b.reminder_30min_sent,
-      p.telegram_chat_id AS patient_telegram_chat_id,
-      p.email AS patient_email,
-      p.name AS patient_name,
+      p.telegram_chat_id AS client_telegram_chat_id,
+      p.email AS client_email,
+      p.name AS client_name,
       p.metadata AS reminder_preferences,
       pr.name AS provider_name,
       s.name AS service_name
     FROM bookings b
-    JOIN patients p ON p.patient_id = b.patient_id
+    JOIN clients p ON p.client_id = b.client_id
     LEFT JOIN providers pr ON pr.provider_id = b.provider_id
     LEFT JOIN services s ON s.service_id = b.service_id
     WHERE b.status = 'confirmed'
@@ -301,17 +301,17 @@ async function getBookingsFor30min(
 ): Promise<BookingRecord[]> {
   return sql<BookingRecord[]>`
     SELECT
-      b.booking_id, b.patient_id, b.provider_id,
+      b.booking_id, b.client_id, b.provider_id,
       b.start_time, b.end_time, b.status,
       b.reminder_24h_sent, b.reminder_2h_sent, b.reminder_30min_sent,
-      p.telegram_chat_id AS patient_telegram_chat_id,
-      p.email AS patient_email,
-      p.name AS patient_name,
+      p.telegram_chat_id AS client_telegram_chat_id,
+      p.email AS client_email,
+      p.name AS client_name,
       p.metadata AS reminder_preferences,
       pr.name AS provider_name,
       s.name AS service_name
     FROM bookings b
-    JOIN patients p ON p.patient_id = b.patient_id
+    JOIN clients p ON p.client_id = b.client_id
     LEFT JOIN providers pr ON pr.provider_id = b.provider_id
     LEFT JOIN services s ON s.service_id = b.service_id
     WHERE b.status = 'confirmed'
@@ -396,9 +396,9 @@ export async function main(rawInput: unknown): Promise<{ success: boolean; data:
 
         const messageType = `reminder_${window}`;
 
-        if (booking.patient_telegram_chat_id && getPatientPreference(prefs, 'telegram', window)) {
+        if (booking.client_telegram_chat_id && getClientPreference(prefs, 'telegram', window)) {
           const tgResult = await sendTelegramReminder(
-            booking.patient_telegram_chat_id,
+            booking.client_telegram_chat_id,
             messageType,
             details,
             buttons
@@ -408,9 +408,9 @@ export async function main(rawInput: unknown): Promise<{ success: boolean; data:
           }
         }
 
-        if (booking.patient_email && getPatientPreference(prefs, 'gmail', window)) {
+        if (booking.client_email && getClientPreference(prefs, 'gmail', window)) {
           const gmResult = await sendGmailReminder(
-            booking.patient_email,
+            booking.client_email,
             messageType,
             details,
             booking.booking_id
