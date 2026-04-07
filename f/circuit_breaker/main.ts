@@ -9,6 +9,8 @@
 
 import { z } from 'zod';
 import postgres from 'postgres';
+import { withTenantContext } from '../internal/tenant-context';
+import { createDbClient } from '../internal/db/client';
 
 const InputSchema = z.object({
   action: z.enum(['check', 'record_success', 'record_failure', 'reset', 'status']),
@@ -45,8 +47,8 @@ interface CircuitBreakerRow {
   readonly last_error_message: string | null;
 }
 
-async function getState(sql: postgres.Sql, serviceId: string): Promise<CircuitState | null> {
-  const rows = await sql<CircuitBreakerRow[]>`
+async function getState(tx: postgres.TransactionSql, serviceId: string): Promise<CircuitState | null> {
+  const rows = await tx<CircuitBreakerRow[]>`
     SELECT service_id, state, failure_count, success_count,
            failure_threshold, success_threshold, timeout_seconds,
            opened_at, half_open_at, last_failure_at, last_success_at,
@@ -74,8 +76,8 @@ async function getState(sql: postgres.Sql, serviceId: string): Promise<CircuitSt
   };
 }
 
-async function initService(sql: postgres.Sql, serviceId: string): Promise<void> {
-  await sql`
+async function initService(tx: postgres.TransactionSql, serviceId: string): Promise<void> {
+  await tx`
     INSERT INTO circuit_breaker_state (service_id, state, failure_count, success_count)
     VALUES (${serviceId}, 'closed', 0, 0)
     ON CONFLICT (service_id) DO NOTHING
@@ -92,123 +94,131 @@ interface CircuitBreakerResult {
   readonly error_message?: string;
 }
 
-export async function main(rawInput: unknown): Promise<{
-  success: boolean;
-  data: CircuitBreakerResult | CircuitState | null;
-  error_message: string | null;
-}> {
+export async function main(rawInput: unknown): Promise<[Error | null, CircuitBreakerResult | CircuitState | null]> {
   const parsed = InputSchema.safeParse(rawInput);
   if (!parsed.success) {
-    return { success: false, data: null, error_message: `Validation error: ${parsed.error.message}` };
+    return [new Error(`Validation error: ${parsed.error.message}`), null];
   }
 
   const { action, service_id } = parsed.data;
 
   const dbUrl = process.env['DATABASE_URL'];
   if (dbUrl === undefined || dbUrl === '') {
-    return { success: false, data: null, error_message: 'CONFIGURATION_ERROR: DATABASE_URL is required' };
+    return [new Error('CONFIGURATION_ERROR: DATABASE_URL is required'), null];
   }
 
-  const sql = postgres(dbUrl, { ssl: 'require' });
+  const sql = createDbClient({ url: dbUrl });
+
+  // No UUID in input, use fallback tenant ID
+  const tenantId = '00000000-0000-0000-0000-000000000000';
 
   try {
-    await initService(sql, service_id);
+    const [txErr, txData] = await withTenantContext(sql, tenantId, async (tx) => {
+      await initService(tx, service_id);
 
-    switch (action) {
-      case 'check': {
-        const state = await getState(sql, service_id);
-        if (state === null) {
-          return { success: true, data: { allowed: true, state: 'closed' }, error_message: null };
+      switch (action) {
+        case 'check': {
+          const state = await getState(tx, service_id);
+          if (state === null) {
+            return [null, { allowed: true, state: 'closed' }];
+          }
+
+          // Check if open circuit should transition to half-open
+          if (state.state === 'open' && state.opened_at !== null) {
+            const openedAt = new Date(state.opened_at);
+            const now = new Date();
+            const elapsed = (now.getTime() - openedAt.getTime()) / 1000;
+            if (elapsed >= state.timeout_seconds) {
+              await tx`
+                UPDATE circuit_breaker_state
+                SET state = 'half-open', half_open_at = NOW(), failure_count = 0
+                WHERE service_id = ${service_id}
+              `;
+              return [null, { allowed: true, state: 'half-open' }];
+            }
+            return [null, { allowed: false, state: 'open', retry_after: state.timeout_seconds - elapsed }];
+          }
+
+          return [null, { allowed: state.state !== 'open', state: state.state }];
         }
 
-        // Check if open circuit should transition to half-open
-        if (state.state === 'open' && state.opened_at !== null) {
-          const openedAt = new Date(state.opened_at);
-          const now = new Date();
-          const elapsed = (now.getTime() - openedAt.getTime()) / 1000;
-          if (elapsed >= state.timeout_seconds) {
-            await sql`
+        case 'record_success': {
+          await tx`
+            UPDATE circuit_breaker_state
+            SET success_count = success_count + 1,
+                failure_count = 0,
+                last_success_at = NOW(),
+                updated_at = NOW()
+            WHERE service_id = ${service_id}
+          `;
+
+          const state = await getState(tx, service_id);
+          if (state !== null && state.state === 'half-open' && state.success_count >= state.success_threshold) {
+            await tx`
               UPDATE circuit_breaker_state
-              SET state = 'half-open', half_open_at = NOW(), failure_count = 0
+              SET state = 'closed', success_count = 0, failure_count = 0,
+                  opened_at = null, half_open_at = null, updated_at = NOW()
               WHERE service_id = ${service_id}
             `;
-            return { success: true, data: { allowed: true, state: 'half-open' }, error_message: null };
           }
-          return { success: true, data: { allowed: false, state: 'open', retry_after: state.timeout_seconds - elapsed }, error_message: null };
+
+          return [null, { state: 'success recorded' }];
         }
 
-        return { success: true, data: { allowed: state.state !== 'open', state: state.state }, error_message: null };
-      }
+        case 'record_failure': {
+          const parsedExtra = InputSchema.extend({ error_message: z.string().optional() }).safeParse(rawInput);
+          const errorMessage = parsedExtra.success ? parsedExtra.data.error_message : undefined;
 
-      case 'record_success': {
-        await sql`
-          UPDATE circuit_breaker_state
-          SET success_count = success_count + 1,
-              failure_count = 0,
-              last_success_at = NOW(),
-              updated_at = NOW()
-          WHERE service_id = ${service_id}
-        `;
-
-        const state = await getState(sql, service_id);
-        if (state !== null && state.state === 'half-open' && state.success_count >= state.success_threshold) {
-          await sql`
+          await tx`
             UPDATE circuit_breaker_state
-            SET state = 'closed', success_count = 0, failure_count = 0,
-                opened_at = null, half_open_at = null, updated_at = NOW()
+            SET failure_count = failure_count + 1,
+                success_count = 0,
+                last_failure_at = NOW(),
+                last_error_message = ${errorMessage ?? null},
+                updated_at = NOW()
             WHERE service_id = ${service_id}
           `;
+
+          const state = await getState(tx, service_id);
+          if (state !== null && state.failure_count >= state.failure_threshold && state.state !== 'open') {
+            await tx`
+              UPDATE circuit_breaker_state
+              SET state = 'open', opened_at = NOW(), updated_at = NOW()
+              WHERE service_id = ${service_id}
+            `;
+            return [null, { state: 'opened', message: `Circuit opened for ${service_id} after ${String(state.failure_count)} failures` }];
+          }
+
+          return [null, { state: 'failure recorded', failure_count: state?.failure_count ?? 0 }];
         }
 
-        return { success: true, data: { state: 'success recorded' }, error_message: null };
-      }
-
-      case 'record_failure': {
-        const parsedExtra = InputSchema.extend({ error_message: z.string().optional() }).safeParse(rawInput);
-        const errorMessage = parsedExtra.success ? parsedExtra.data.error_message : undefined;
-
-        await sql`
-          UPDATE circuit_breaker_state
-          SET failure_count = failure_count + 1,
-              success_count = 0,
-              last_failure_at = NOW(),
-              last_error_message = ${errorMessage ?? null},
-              updated_at = NOW()
-          WHERE service_id = ${service_id}
-        `;
-
-        const state = await getState(sql, service_id);
-        if (state !== null && state.failure_count >= state.failure_threshold && state.state !== 'open') {
-          await sql`
+        case 'reset': {
+          await tx`
             UPDATE circuit_breaker_state
-            SET state = 'open', opened_at = NOW(), updated_at = NOW()
+            SET state = 'closed', failure_count = 0, success_count = 0,
+                opened_at = null, half_open_at = null, last_error_message = null,
+                updated_at = NOW()
             WHERE service_id = ${service_id}
           `;
-          return { success: true, data: { state: 'opened', message: `Circuit opened for ${service_id} after ${String(state.failure_count)} failures` }, error_message: null };
+          return [null, { state: 'reset' }];
         }
 
-        return { success: true, data: { state: 'failure recorded', failure_count: state?.failure_count ?? 0 }, error_message: null };
+        case 'status': {
+          const state = await getState(tx, service_id);
+          return [null, state];
+        }
       }
+      return [new Error('Unknown action'), null];
+    });
 
-      case 'reset': {
-        await sql`
-          UPDATE circuit_breaker_state
-          SET state = 'closed', failure_count = 0, success_count = 0,
-              opened_at = null, half_open_at = null, last_error_message = null,
-              updated_at = NOW()
-          WHERE service_id = ${service_id}
-        `;
-        return { success: true, data: { state: 'reset' }, error_message: null };
-      }
-
-      case 'status': {
-        const state = await getState(sql, service_id);
-        return { success: true, data: state, error_message: null };
-      }
+    if (txErr) {
+      return [new Error(txErr.message), null];
     }
+
+    return [null, txData];
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
-    return { success: false, data: null, error_message: `Internal error: ${message}` };
+    return [new Error(`Internal error: ${message}`), null];
   } finally {
     await sql.end();
   }

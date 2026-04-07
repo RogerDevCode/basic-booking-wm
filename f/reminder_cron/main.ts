@@ -11,6 +11,8 @@
 
 import { z } from 'zod';
 import postgres from 'postgres';
+import { withTenantContext } from '../internal/tenant-context';
+import { createDbClient } from '../internal/db/client';
 
 const InputSchema = z.object({
   dry_run: z.boolean().optional().default(false),
@@ -150,7 +152,7 @@ async function sendTelegramReminder(
       return { sent: false, error: `HTTP ${String(response.status)}` };
     }
 
-    const result = await response.json() as ScriptResponse;
+    const result = (await response.json()) as ScriptResponse;
     return { sent: result.success === true, error: result.error_message ?? null };
   } catch (e) {
     return { sent: false, error: e instanceof Error ? e.message : String(e) };
@@ -188,7 +190,7 @@ async function sendGmailReminder(
       return { sent: false, error: `HTTP ${String(response.status)}` };
     }
 
-    const result = await response.json() as ScriptResponse;
+    const result = (await response.json()) as ScriptResponse;
     return { sent: result.success === true, error: result.error_message ?? null };
   } catch (e) {
     return { sent: false, error: e instanceof Error ? e.message : String(e) };
@@ -201,34 +203,34 @@ async function sendGmailReminder(
 // Best practice: named functions are also easier to test individually.
 // ============================================================================
 
-async function markReminder24hSent(sql: postgres.Sql, bookingId: string): Promise<void> {
-  await sql`
+async function markReminder24hSent(tx: postgres.TransactionSql, bookingId: string): Promise<void> {
+  await tx`
     UPDATE bookings
     SET reminder_24h_sent = true, updated_at = NOW()
     WHERE booking_id = ${bookingId}::uuid
   `;
 }
 
-async function markReminder2hSent(sql: postgres.Sql, bookingId: string): Promise<void> {
-  await sql`
+async function markReminder2hSent(tx: postgres.TransactionSql, bookingId: string): Promise<void> {
+  await tx`
     UPDATE bookings
     SET reminder_2h_sent = true, updated_at = NOW()
     WHERE booking_id = ${bookingId}::uuid
   `;
 }
 
-async function markReminder30minSent(sql: postgres.Sql, bookingId: string): Promise<void> {
-  await sql`
+async function markReminder30minSent(tx: postgres.TransactionSql, bookingId: string): Promise<void> {
+  await tx`
     UPDATE bookings
     SET reminder_30min_sent = true, updated_at = NOW()
     WHERE booking_id = ${bookingId}::uuid
   `;
 }
 
-async function markReminderSent(sql: postgres.Sql, bookingId: string, window: ReminderWindow): Promise<void> {
-  if (window === '24h') return markReminder24hSent(sql, bookingId);
-  if (window === '2h') return markReminder2hSent(sql, bookingId);
-  return markReminder30minSent(sql, bookingId);
+async function markReminderSent(tx: postgres.TransactionSql, bookingId: string, window: ReminderWindow): Promise<void> {
+  if (window === '24h') return markReminder24hSent(tx, bookingId);
+  if (window === '2h') return markReminder2hSent(tx, bookingId);
+  return markReminder30minSent(tx, bookingId);
 }
 
 // ============================================================================
@@ -237,11 +239,11 @@ async function markReminderSent(sql: postgres.Sql, bookingId: string, window: Re
 // ============================================================================
 
 async function getBookingsFor24h(
-  sql: postgres.Sql,
+  tx: postgres.TransactionSql,
   start: Date,
   end: Date
 ): Promise<BookingRecord[]> {
-  return sql<BookingRecord[]>`
+  return tx<BookingRecord[]>`
     SELECT
       b.booking_id, b.client_id, b.provider_id,
       b.start_time, b.end_time, b.status,
@@ -266,11 +268,11 @@ async function getBookingsFor24h(
 }
 
 async function getBookingsFor2h(
-  sql: postgres.Sql,
+  tx: postgres.TransactionSql,
   start: Date,
   end: Date
 ): Promise<BookingRecord[]> {
-  return sql<BookingRecord[]>`
+  return tx<BookingRecord[]>`
     SELECT
       b.booking_id, b.client_id, b.provider_id,
       b.start_time, b.end_time, b.status,
@@ -295,11 +297,11 @@ async function getBookingsFor2h(
 }
 
 async function getBookingsFor30min(
-  sql: postgres.Sql,
+  tx: postgres.TransactionSql,
   start: Date,
   end: Date
 ): Promise<BookingRecord[]> {
-  return sql<BookingRecord[]>`
+  return tx<BookingRecord[]>`
     SELECT
       b.booking_id, b.client_id, b.provider_id,
       b.start_time, b.end_time, b.status,
@@ -324,14 +326,14 @@ async function getBookingsFor30min(
 }
 
 async function getBookingsForWindow(
-  sql: postgres.Sql,
+  tx: postgres.TransactionSql,
   window: ReminderWindow,
   start: Date,
   end: Date
 ): Promise<BookingRecord[]> {
-  if (window === '24h') return getBookingsFor24h(sql, start, end);
-  if (window === '2h') return getBookingsFor2h(sql, start, end);
-  return getBookingsFor30min(sql, start, end);
+  if (window === '24h') return getBookingsFor24h(tx, start, end);
+  if (window === '2h') return getBookingsFor2h(tx, start, end);
+  return getBookingsFor30min(tx, start, end);
 }
 
 interface CronResult {
@@ -343,21 +345,21 @@ interface CronResult {
   readonly processed_bookings: string[];
 }
 
-export async function main(rawInput: unknown): Promise<{ success: boolean; data: CronResult | null; error_message: string | null }> {
+export async function main(rawInput: unknown): Promise<[Error | null, CronResult | null]> {
   try {
     const parsed = InputSchema.safeParse(rawInput);
     if (!parsed.success) {
-      return { success: false, data: null, error_message: `Invalid input: ${parsed.error.message}` };
+      return [new Error(`Invalid input: ${parsed.error.message}`), null];
     }
 
     const { dry_run, timezone } = parsed.data;
 
     const dbUrl = process.env['DATABASE_URL'];
     if (!dbUrl) {
-      return { success: false, data: null, error_message: 'DATABASE_URL not configured' };
+      return [new Error('DATABASE_URL not configured'), null];
     }
 
-    const sql = postgres(dbUrl, { ssl: 'require' });
+    const sql = createDbClient({ url: dbUrl });
 
     const now = new Date();
     const window24hStart = new Date(now.getTime() + 23 * 60 * 60 * 1000);
@@ -373,15 +375,42 @@ export async function main(rawInput: unknown): Promise<{ success: boolean; data:
       reminders_30min_sent: 0,
       errors: 0,
       dry_run,
-      processed_bookings: [] as string[],
+      processed_bookings: [],
     };
 
+    // First, fetch all providers using the fallback bypass ID
+    const [providersErr, providers] = await withTenantContext<{ provider_id: string }[]>(
+      sql,
+      '00000000-0000-0000-0000-000000000000',
+      async (tx) => {
+        const rows = await tx<{ provider_id: string }[]>`SELECT provider_id FROM providers`;
+        return [null, rows];
+      }
+    );
+
+    if (providersErr || !providers) {
+      await sql.end();
+      return [new Error(`Failed to fetch providers: ${providersErr?.message ?? 'Unknown'}`), null];
+    }
+
     const processWindow = async (
+      tenantId: string,
       window: ReminderWindow,
       start: Date,
       end: Date,
     ): Promise<void> => {
-      const bookings = await getBookingsForWindow(sql, window, start, end);
+      const [err, bookings] = await withTenantContext<BookingRecord[]>(
+        sql,
+        tenantId,
+        async (tx) => {
+          const b = await getBookingsForWindow(tx, window, start, end);
+          return [null, b];
+        }
+      );
+
+      if (err || !bookings) {
+        return; // Skip this window for this provider if error
+      }
 
       for (const booking of bookings) {
         result.processed_bookings.push(booking.booking_id);
@@ -420,27 +449,38 @@ export async function main(rawInput: unknown): Promise<{ success: boolean; data:
           }
         }
 
-        await markReminderSent(sql, booking.booking_id, window);
+        const [updateErr] = await withTenantContext<boolean>(
+          sql,
+          tenantId,
+          async (tx) => {
+            await markReminderSent(tx, booking.booking_id, window);
+            return [null, true];
+          }
+        );
 
-        if (window === '24h') result.reminders_24h_sent++;
-        else if (window === '2h') result.reminders_2h_sent++;
-        else result.reminders_30min_sent++;
+        if (updateErr) {
+          result.errors++;
+        } else {
+          if (window === '24h') result.reminders_24h_sent++;
+          else if (window === '2h') result.reminders_2h_sent++;
+          else result.reminders_30min_sent++;
+        }
       }
     };
 
-    await processWindow('24h', window24hStart, window24hEnd);
-    await processWindow('2h', window2hStart, window2hEnd);
-    await processWindow('30min', window30minStart, window30minEnd);
+    // Iterate through all providers and process each window
+    for (const provider of providers) {
+      const tenantId = provider.provider_id;
+      await processWindow(tenantId, '24h', window24hStart, window24hEnd);
+      await processWindow(tenantId, '2h', window2hStart, window2hEnd);
+      await processWindow(tenantId, '30min', window30minStart, window30minEnd);
+    }
 
     await sql.end();
 
-    return {
-      success: true,
-      data: result,
-      error_message: null,
-    };
+    return [null, result];
   } catch (e) {
     const error = e instanceof Error ? e : new Error(String(e));
-    return { success: false, data: null, error_message: error.message };
+    return [new Error(error.message), null];
   }
 }

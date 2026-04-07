@@ -9,8 +9,10 @@
 
 import { z } from 'zod';
 import postgres from 'postgres';
+import { withTenantContext } from '../internal/tenant-context';
+import { createDbClient } from '../internal/db/client';
 
-type SqlClient = postgres.Sql;
+type SqlClient = postgres.Sql | postgres.TransactionSql;
 
 const InputSchema = z.object({
   action: z.enum(['show', 'toggle_channel', 'toggle_window', 'deactivate_all', 'activate_all', 'back']),
@@ -129,95 +131,89 @@ async function loadPreferences(sql: SqlClient, clientId: string): Promise<Remind
   }
 }
 
-export async function main(rawInput: unknown): Promise<{ success: boolean; data: ReminderConfigResult | null; error_message: string | null }> {
+export async function main(rawInput: unknown): Promise<[Error | null, ReminderConfigResult | null]> {
   try {
     const parsed = InputSchema.safeParse(rawInput);
     if (!parsed.success) {
-      return { success: false, data: null, error_message: `Invalid input: ${parsed.error.message}` };
+      return [new Error(`Invalid input: ${parsed.error.message}`), null];
     }
 
     const { action, client_id, channel, window } = parsed.data;
 
     if (!client_id) {
-      return { success: false, data: null, error_message: 'client_id is required' };
+      return [new Error('client_id is required'), null];
     }
 
     const dbUrl = process.env['DATABASE_URL'];
-    const sql = dbUrl ? postgres(dbUrl, { ssl: 'require' }) : null;
+    const sql = dbUrl ? createDbClient({ url: dbUrl }) : null;
 
-    let prefs: ReminderPrefs = {
-      telegram_24h: true,
-      gmail_24h: true,
-      telegram_2h: true,
-      telegram_30min: true,
-    };
-
-    if (sql) {
-      prefs = await loadPreferences(sql, client_id);
+    if (!sql) {
+      return [new Error('No DB configured'), null];
     }
 
-    let message = '';
-    let reply_keyboard: string[][] | undefined;
+    const tenantId = client_id || '00000000-0000-0000-0000-000000000000';
 
-    switch (action) {
-      case 'show':
-        ({ message, reply_keyboard } = buildConfigMessage(prefs));
-        break;
+    const [txErr, txData] = await withTenantContext(sql, tenantId, async (tx) => {
+      let prefs: ReminderPrefs = await loadPreferences(tx, client_id);
+      let message = '';
+      let reply_keyboard: string[][] | undefined;
 
-      case 'toggle_channel': {
-        if (channel === 'telegram') {
-          const allOn = prefs.telegram_24h && prefs.telegram_2h && prefs.telegram_30min;
-          prefs = { ...prefs, telegram_24h: !allOn, telegram_2h: !allOn, telegram_30min: !allOn };
-        } else if (channel === 'gmail') {
-          prefs = { ...prefs, gmail_24h: !prefs.gmail_24h };
+      switch (action) {
+        case 'show':
+          ({ message, reply_keyboard } = buildConfigMessage(prefs));
+          break;
+
+        case 'toggle_channel': {
+          if (channel === 'telegram') {
+            const allOn = prefs.telegram_24h && prefs.telegram_2h && prefs.telegram_30min;
+            prefs = { ...prefs, telegram_24h: !allOn, telegram_2h: !allOn, telegram_30min: !allOn };
+          } else if (channel === 'gmail') {
+            prefs = { ...prefs, gmail_24h: !prefs.gmail_24h };
+          }
+          await savePreferences(tx, client_id, prefs);
+          ({ message, reply_keyboard } = buildConfigMessage(prefs));
+          break;
         }
-        if (sql) await savePreferences(sql, client_id, prefs);
-        ({ message, reply_keyboard } = buildConfigMessage(prefs));
-        break;
+
+        case 'toggle_window': {
+          if (window) {
+            prefs = toggleValue(prefs, `telegram_${window}`);
+            await savePreferences(tx, client_id, prefs);
+          }
+          ({ message, reply_keyboard } = buildWindowConfig(prefs));
+          break;
+        }
+
+        case 'deactivate_all':
+          prefs = setAll(prefs, false);
+          await savePreferences(tx, client_id, prefs);
+          message = '🔕 *Recordatorios desactivados*\n\nNo recibirás avisos automáticos.\n\nPara reactivarlos, toca "Activar todo".';
+          reply_keyboard = [['✅ Activar todo', '« Volver al menú']];
+          break;
+
+        case 'activate_all':
+          prefs = setAll(prefs, true);
+          await savePreferences(tx, client_id, prefs);
+          message = '🔔 *Recordatorios activados*\n\nRecibirás avisos en todos los canales y ventanas.';
+          reply_keyboard = [['⚙️ Configurar', '« Volver al menú']];
+          break;
+
+        case 'back':
+          message = '📋 Menú principal. ¿En qué puedo ayudarte?';
+          reply_keyboard = [['📅 Agendar cita', '📋 Mis citas'], ['🔔 Recordatorios', '❓ Información']];
+          break;
       }
 
-      case 'toggle_window': {
-        if (window) {
-          prefs = toggleValue(prefs, `telegram_${window}`);
-          if (sql) await savePreferences(sql, client_id, prefs);
-        }
-        ({ message, reply_keyboard } = buildWindowConfig(prefs));
-        break;
-      }
+      return [null, { message, reply_keyboard, preferences: prefs }];
+    });
 
-      case 'deactivate_all':
-        prefs = setAll(prefs, false);
-        if (sql) await savePreferences(sql, client_id, prefs);
-        message = '🔕 *Recordatorios desactivados*\n\nNo recibirás avisos automáticos.\n\nPara reactivarlos, toca "Activar todo".';
-        reply_keyboard = [['✅ Activar todo', '« Volver al menú']];
-        break;
+    await sql.end();
 
-      case 'activate_all':
-        prefs = setAll(prefs, true);
-        if (sql) await savePreferences(sql, client_id, prefs);
-        message = '🔔 *Recordatorios activados*\n\nRecibirás avisos en todos los canales y ventanas.';
-        reply_keyboard = [['⚙️ Configurar', '« Volver al menú']];
-        break;
+    if (txErr) return [new Error(txErr.message), null];
 
-      case 'back':
-        message = '📋 Menú principal. ¿En qué puedo ayudarte?';
-        reply_keyboard = [['📅 Agendar cita', '📋 Mis citas'], ['🔔 Recordatorios', '❓ Información']];
-        break;
-    }
-
-    if (sql) await sql.end();
-
-    return {
-      success: true,
-      data: {
-        message,
-        reply_keyboard,
-        preferences: prefs,
-      },
-      error_message: null,
-    };
+    return [null, txData as ReminderConfigResult];
   } catch (e) {
     const error = e instanceof Error ? e : new Error(String(e));
-    return { success: false, data: null, error_message: error.message };
+    return [new Error(error.message), null];
   }
 }
