@@ -1,10 +1,11 @@
 // ============================================================================
 // DB TYPES — Strict TypeScript types matching PostgreSQL schema
 // ============================================================================
-// No `any`, no `as` for DB queries. Every query result is typed.
+// AGENTS.md §1.A.2: NO `as Type` casts. Type guards only.
 // postgres library returns untyped rows; we validate with type guards.
 // ============================================================================
 
+// ─── UUID Brand Type — validated at runtime, no cast needed ────────────────
 export type UUID = string & { readonly __brand: unique symbol };
 
 export function isUUID(value: unknown): value is UUID {
@@ -12,54 +13,53 @@ export function isUUID(value: unknown): value is UUID {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
-export function toUUID(value: string): UUID {
-  if (!isUUID(value)) {
-    throw new Error(`Invalid UUID: ${value}`);
-  }
-  return value as unknown as UUID; // Type guard validated, safe cast
+// toUUID returns UUID only after validation — no cast, brand is asserted via predicate
+export function toUUID(value: string): UUID | null {
+  if (!isUUID(value)) return null;
+  return value;
 }
 
 // ─── Provider ───────────────────────────────────────────────────────────────
 export interface ProviderRow {
-  provider_id: UUID;
-  name: string;
-  email: string;
-  phone: string | null;
-  specialty: string;
-  telegram_chat_id: string | null;
-  gcal_calendar_id: string | null;
-  timezone: string;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
+  readonly provider_id: UUID;
+  readonly name: string;
+  readonly email: string;
+  readonly phone: string | null;
+  readonly specialty: string;
+  readonly telegram_chat_id: string | null;
+  readonly gcal_calendar_id: string | null;
+  readonly timezone: string;
+  readonly is_active: boolean;
+  readonly created_at: string;
+  readonly updated_at: string;
 }
 
 // ─── Service ────────────────────────────────────────────────────────────────
 export interface ServiceRow {
-  service_id: UUID;
-  provider_id: UUID;
-  name: string;
-  description: string | null;
-  duration_minutes: number;
-  buffer_minutes: number;
-  price_cents: number;
-  currency: string;
-  is_active: boolean;
-  created_at: string;
+  readonly service_id: UUID;
+  readonly provider_id: UUID;
+  readonly name: string;
+  readonly description: string | null;
+  readonly duration_minutes: number;
+  readonly buffer_minutes: number;
+  readonly price_cents: number;
+  readonly currency: string;
+  readonly is_active: boolean;
+  readonly created_at: string;
 }
 
 // ─── Client ────────────────────────────────────────────────────────────────
 export interface ClientRow {
-  client_id: UUID;
-  name: string;
-  email: string | null;
-  phone: string | null;
-  telegram_chat_id: string | null;
-  gcal_calendar_id: string | null;
-  timezone: string;
-  metadata: Record<string, unknown> | null;
-  created_at: string;
-  updated_at: string;
+  readonly client_id: UUID;
+  readonly name: string;
+  readonly email: string | null;
+  readonly phone: string | null;
+  readonly telegram_chat_id: string | null;
+  readonly gcal_calendar_id: string | null;
+  readonly timezone: string;
+  readonly metadata: Readonly<Record<string, unknown>> | null;
+  readonly created_at: string;
+  readonly updated_at: string;
 }
 
 // ─── Booking ────────────────────────────────────────────────────────────────
@@ -75,126 +75,130 @@ export type BookingStatus =
 export type GCalSyncStatus = 'pending' | 'synced' | 'partial' | 'failed';
 
 export interface BookingRow {
-  booking_id: UUID;
-  provider_id: UUID;
-  client_id: UUID;
-  service_id: UUID;
-  start_time: string;
-  end_time: string;
-  status: BookingStatus;
-  idempotency_key: string;
-  cancellation_reason: string | null;
-  cancelled_by: 'client' | 'provider' | 'system' | null;
-  rescheduled_from: UUID | null;
-  rescheduled_to: UUID | null;
-  notes: string | null;
-  gcal_provider_event_id: string | null;
-  gcal_client_event_id: string | null;
-  gcal_sync_status: GCalSyncStatus;
-  gcal_retry_count: number;
-  gcal_last_sync: string | null;
-  notification_sent: boolean;
-  reminder_24h_sent: boolean;
-  reminder_2h_sent: boolean;
-  reminder_30min_sent: boolean;
-  created_at: string;
-  updated_at: string;
+  readonly booking_id: UUID;
+  readonly provider_id: UUID;
+  readonly client_id: UUID;
+  readonly service_id: UUID;
+  readonly start_time: string;
+  readonly end_time: string;
+  readonly status: BookingStatus;
+  readonly idempotency_key: string;
+  readonly cancellation_reason: string | null;
+  readonly cancelled_by: 'client' | 'provider' | 'system' | null;
+  readonly rescheduled_from: UUID | null;
+  readonly rescheduled_to: UUID | null;
+  readonly notes: string | null;
+  readonly gcal_provider_event_id: string | null;
+  readonly gcal_client_event_id: string | null;
+  readonly gcal_sync_status: GCalSyncStatus;
+  readonly gcal_retry_count: number;
+  readonly gcal_last_sync: string | null;
+  readonly notification_sent: boolean;
+  readonly reminder_24h_sent: boolean;
+  readonly reminder_2h_sent: boolean;
+  readonly reminder_30min_sent: boolean;
+  readonly created_at: string;
+  readonly updated_at: string;
 }
 
 // ─── Provider Schedule ──────────────────────────────────────────────────────
 export interface ProviderScheduleRow {
-  schedule_id: UUID;
-  provider_id: UUID;
-  day_of_week: number;
-  start_time: string;
-  end_time: string;
-  is_active: boolean;
+  readonly schedule_id: UUID;
+  readonly provider_id: UUID;
+  readonly day_of_week: number;
+  readonly start_time: string;
+  readonly end_time: string;
+  readonly is_active: boolean;
 }
 
 // ─── Schedule Override ──────────────────────────────────────────────────────
 export interface ScheduleOverrideRow {
-  override_id: UUID;
-  provider_id: UUID;
-  override_date: string;
-  is_blocked: boolean;
-  start_time: string | null;
-  end_time: string | null;
-  reason: string | null;
-  created_at: string;
+  readonly override_id: UUID;
+  readonly provider_id: UUID;
+  readonly override_date: string;
+  readonly is_blocked: boolean;
+  readonly start_time: string | null;
+  readonly end_time: string | null;
+  readonly reason: string | null;
+  readonly created_at: string;
 }
 
 // ─── Booking Audit ──────────────────────────────────────────────────────────
 export interface BookingAuditRow {
-  audit_id: UUID;
-  booking_id: UUID;
-  from_status: BookingStatus | null;
-  to_status: BookingStatus;
-  changed_by: 'client' | 'provider' | 'system';
-  actor_id: UUID | null;
-  reason: string | null;
-  metadata: Record<string, unknown> | null;
-  created_at: string;
+  readonly audit_id: UUID;
+  readonly booking_id: UUID;
+  readonly from_status: BookingStatus | null;
+  readonly to_status: BookingStatus;
+  readonly changed_by: 'client' | 'provider' | 'system';
+  readonly actor_id: UUID | null;
+  readonly reason: string | null;
+  readonly metadata: Readonly<Record<string, unknown>> | null;
+  readonly created_at: string;
 }
 
 // ─── Booking with joins (for display/notification) ──────────────────────────
 export interface BookingWithDetails {
-  booking_id: UUID;
-  client_id: UUID;
-  provider_id: UUID;
-  service_id: UUID;
-  start_time: string;
-  end_time: string;
-  status: BookingStatus;
-  provider_name: string;
-  client_name: string;
-  client_email: string | null;
-  client_telegram_chat_id: string | null;
-  service_name: string;
-  gcal_provider_event_id: string | null;
-  gcal_client_event_id: string | null;
-  gcal_sync_status: GCalSyncStatus;
-  gcal_retry_count: number;
-  reminder_preferences: Record<string, unknown> | null;
+  readonly booking_id: UUID;
+  readonly client_id: UUID;
+  readonly provider_id: UUID;
+  readonly service_id: UUID;
+  readonly start_time: string;
+  readonly end_time: string;
+  readonly status: BookingStatus;
+  readonly provider_name: string;
+  readonly client_name: string;
+  readonly client_email: string | null;
+  readonly client_telegram_chat_id: string | null;
+  readonly service_name: string;
+  readonly gcal_provider_event_id: string | null;
+  readonly gcal_client_event_id: string | null;
+  readonly gcal_sync_status: GCalSyncStatus;
+  readonly gcal_retry_count: number;
+  readonly reminder_preferences: Readonly<Record<string, unknown>> | null;
 }
 
 // ─── Time Slot ──────────────────────────────────────────────────────────────
 export interface TimeSlot {
-  start: string; // ISO 8601
-  end: string;   // ISO 8601
-  available: boolean;
+  readonly start: string; // ISO 8601
+  readonly end: string;   // ISO 8601
+  readonly available: boolean;
 }
 
 // ─── Availability Result ────────────────────────────────────────────────────
 export interface AvailabilityResult {
-  provider_id: UUID;
-  provider_name: string;
-  date: string; // YYYY-MM-DD
-  timezone: string;
-  slots: readonly TimeSlot[];
-  total_available: number;
-  total_booked: number;
-  is_blocked: boolean;
-  block_reason: string | null;
+  readonly provider_id: UUID;
+  readonly provider_name: string;
+  readonly date: string; // YYYY-MM-DD
+  readonly timezone: string;
+  readonly slots: readonly TimeSlot[];
+  readonly total_available: number;
+  readonly total_booked: number;
+  readonly is_blocked: boolean;
+  readonly block_reason: string | null;
 }
 
-// ─── Type Guards for DB rows ────────────────────────────────────────────────
+// ─── Type Guards for DB rows — NO casts, pure predicates ────────────────────
+
+const VALID_BOOKING_STATUSES: readonly BookingStatus[] = [
+  'pending', 'confirmed', 'in_service', 'completed',
+  'cancelled', 'no_show', 'rescheduled',
+];
+
+const VALID_GCAL_SYNC_STATUSES: readonly GCalSyncStatus[] = ['pending', 'synced', 'partial', 'failed'];
+
 export function isBookingStatus(value: unknown): value is BookingStatus {
   if (typeof value !== 'string') return false;
-  const valid: readonly BookingStatus[] = [
-    'pending', 'confirmed', 'in_service', 'completed',
-    'cancelled', 'no_show', 'rescheduled',
-  ];
-  return (valid as readonly string[]).includes(value);
+  return VALID_BOOKING_STATUSES.includes(value);
 }
 
 export function isGCalSyncStatus(value: unknown): value is GCalSyncStatus {
   if (typeof value !== 'string') return false;
-  const valid: readonly GCalSyncStatus[] = ['pending', 'synced', 'partial', 'failed'];
-  return (valid as readonly string[]).includes(value);
+  return VALID_GCAL_SYNC_STATUSES.includes(value);
 }
 
-// Validates a row from the database has the expected shape
-export function validateBookingRow(row: Record<string, unknown>): BookingWithDetails | null {
+// Validates a row from the database has the expected shape.
+// Uses type guards exclusively — NO casts.
+export function validateBookingRow(row: Readonly<Record<string, unknown>>): BookingWithDetails | null {
   const bookingId = row['booking_id'];
   const clientId = row['client_id'];
   const providerId = row['provider_id'];
@@ -223,11 +227,26 @@ export function validateBookingRow(row: Record<string, unknown>): BookingWithDet
 
   if (!isBookingStatus(status)) return null;
 
+  const bookingUuid = toUUID(bookingId);
+  const clientUuid = toUUID(clientId);
+  const providerUuid = toUUID(providerId);
+  const serviceUuid = toUUID(serviceId);
+
+  if (bookingUuid === null || clientUuid === null || providerUuid === null || serviceUuid === null) {
+    return null;
+  }
+
+  const gcalSyncStatus = isGCalSyncStatus(row['gcal_sync_status']) ? row['gcal_sync_status'] : 'pending';
+
+  const reminderPrefs = typeof row['reminder_preferences'] === 'object' && row['reminder_preferences'] !== null
+    ? row['reminder_preferences']
+    : null;
+
   return {
-    booking_id: toUUID(bookingId),
-    client_id: toUUID(clientId),
-    provider_id: toUUID(providerId),
-    service_id: toUUID(serviceId),
+    booking_id: bookingUuid,
+    client_id: clientUuid,
+    provider_id: providerUuid,
+    service_id: serviceUuid,
     start_time: startTime,
     end_time: endTime,
     status,
@@ -238,10 +257,8 @@ export function validateBookingRow(row: Record<string, unknown>): BookingWithDet
     service_name: serviceName,
     gcal_provider_event_id: typeof row['gcal_provider_event_id'] === 'string' ? row['gcal_provider_event_id'] : null,
     gcal_client_event_id: typeof row['gcal_client_event_id'] === 'string' ? row['gcal_client_event_id'] : null,
-    gcal_sync_status: isGCalSyncStatus(row['gcal_sync_status']) ? row['gcal_sync_status'] : 'pending',
+    gcal_sync_status: gcalSyncStatus,
     gcal_retry_count: typeof row['gcal_retry_count'] === 'number' ? row['gcal_retry_count'] : 0,
-    reminder_preferences: typeof row['reminder_preferences'] === 'object' && row['reminder_preferences'] !== null
-      ? row['reminder_preferences'] as Record<string, unknown>
-      : null,
+    reminder_preferences: reminderPrefs,
   };
 }

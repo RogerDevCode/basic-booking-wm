@@ -205,8 +205,10 @@ export async function getAvailabilityRange(
   const current = new Date(dateFrom + 'T00:00:00Z');
   const end = new Date(dateTo + 'T23:59:59Z');
 
-  while (current <= end) {
-    const dateStr = current.toISOString().split('T')[0];
+  // AGENTS.md §1.A.4: NO Date mutation. Create new Date each iteration.
+  let iterDate = new Date(current.getTime());
+  while (iterDate <= end) {
+    const dateStr = iterDate.toISOString().split('T')[0];
     if (dateStr != null) {
       const [err, result] = await getAvailability(sql, {
         provider_id: providerId,
@@ -216,7 +218,8 @@ export async function getAvailabilityRange(
       if (err != null) return [err, null];
       if (result != null) results.push(result);
     }
-    current.setDate(current.getDate() + 1);
+    // Create new Date — no mutation
+    iterDate = new Date(iterDate.getTime() + 86400000); // +1 day in ms
   }
 
   return [null, results];

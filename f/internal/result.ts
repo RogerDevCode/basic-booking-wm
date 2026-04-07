@@ -1,16 +1,8 @@
 // ============================================================================
-// MINIMAL RESULT TYPE — For Windmill scripts
-// Replaces deleted internal/types/domain.ts
+// RESULT TYPE — Strict tuple format per AGENTS.md §4
+// ============================================================================
+// AGENTS.md §4 mandates: type Result<T> = [Error | null, T | null]
+// NO tagged unions ({ ok: true; value: T }) — tuples only.
 // ============================================================================
 
-export type Result<T> =
-  | { ok: true; value: T }
-  | { ok: false; error: Error };
-
-export function ok<T>(value: T): Result<T> {
-  return { ok: true, value };
-}
-
-export function err<T>(error: Error): Result<T> {
-  return { ok: false, error };
-}
+export type Result<T> = [Error | null, T | null];

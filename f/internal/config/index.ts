@@ -3,12 +3,18 @@
 // ============================================================================
 // All magic numbers, timeouts, defaults, and limits live here.
 // No hardcoded values anywhere else in the codebase.
+//
+// AGENTS.md §1.A.3: NO throw for control flow.
+// AGENTS.md §5.3: Retry policy = 500ms * 2^attempt (not 1000ms * 3^attempt).
 // ============================================================================
 
-// ─── Retry Configuration ───────────────────────────────────────────────────
+import { Result } from './result';
+
+// ─── Retry Configuration — AGENTS.md §5.3 compliant ───────────────────────
+// Base: 500ms, multiplier: 2 → 500ms, 1000ms, 2000ms, 4000ms, ...
 export const MAX_RETRIES = 3;
-export const RETRY_BACKOFF_BASE_MS = 1000;
-export const RETRY_BACKOFF_MULTIPLIER = 3; // 1s, 3s, 9s
+export const RETRY_BACKOFF_BASE_MS = 500;
+export const RETRY_BACKOFF_MULTIPLIER = 2;
 export const MAX_GCAL_RETRIES = 10; // Reconciliation cron max attempts
 
 // ─── Timeout Configuration ─────────────────────────────────────────────────
@@ -100,34 +106,42 @@ export const INTENT = {
   UNKNOWN: 'unknown',
 } as const;
 
-// ─── Fail-Fast Configuration Validation ────────────────────────────────────
-export function requireEnv(name: string): string {
+// ─── Fail-Fast Configuration Validation — AGENTS.md §1.A.3 compliant ──────
+// NO throw. Returns Result<string> so caller handles missing env explicitly.
+
+export function requireEnv(name: string): Result<string> {
   const value = process.env[name];
   if (!value || value.trim() === '') {
-    throw new Error(`CONFIGURATION_ERROR: Required environment variable ${name} is not set. This is a fatal configuration error.`);
+    return [
+      new Error(`CONFIGURATION_ERROR: Required environment variable ${name} is not set. This is a fatal configuration error.`),
+      null,
+    ];
   }
-  return value;
+  return [null, value];
 }
 
-export function requireDatabaseUrl(): string {
+export function requireDatabaseUrl(): Result<string> {
   return requireEnv('DATABASE_URL');
 }
 
-export function requireTelegramBotToken(): string {
+export function requireTelegramBotToken(): Result<string> {
   return requireEnv('TELEGRAM_BOT_TOKEN');
 }
 
-export function requireGCalAccessToken(): string {
+export function requireGCalAccessToken(): Result<string> {
   return requireEnv('GCAL_ACCESS_TOKEN');
 }
 
-export function requireGmailCredentials(): { user: string; pass: string } {
+export function requireGmailCredentials(): Result<{ readonly user: string; readonly pass: string }> {
   const user = process.env['GMAIL_USER'];
   const pass = process.env['GMAIL_PASSWORD'];
   if (!user || !pass) {
-    throw new Error('CONFIGURATION_ERROR: GMAIL_USER and GMAIL_PASSWORD are required. Dev fallback credentials are not permitted in production.');
+    return [
+      new Error('CONFIGURATION_ERROR: GMAIL_USER and GMAIL_PASSWORD are required. Dev fallback credentials are not permitted in production.'),
+      null,
+    ];
   }
-  return { user, pass };
+  return [null, { user, pass }];
 }
 
 export function getOptionalEnv(name: string, defaultValue?: string): string | undefined {

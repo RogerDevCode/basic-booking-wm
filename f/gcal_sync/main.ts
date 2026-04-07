@@ -1,9 +1,23 @@
+/*
+ * PRE-FLIGHT CHECKLIST
+ * Mission         : Sync booking to Google Calendar (provider + client)
+ * DB Tables Used  : bookings, providers, clients, services
+ * Concurrency Risk: NO — single booking read, no locks needed
+ * GCal Calls      : YES — retryWithBackoff (3 attempts, 500ms*2^attempt)
+ * Idempotency Key : N/A — read-only + update by booking_id
+ * RLS Tenant ID   : YES — withTenantContext wraps DB ops
+ * Zod Schemas     : YES — InputSchema validates all inputs
+ */
+
 // ============================================================================
 // GCal SYNC — Sync booking to Google Calendar (provider + client)
 // ============================================================================
+// AGENTS.md §8 Anti-pattern fix: GCal API calls occur OUTSIDE DB transaction.
+// Pattern: (1) SELECT booking in tx → (2) commit → (3) call GCal API →
+//          (4) UPDATE booking in new tx
 // Uses shared retryWithBackoff from internal/retry (DRY).
 // Go-style: no throw, no any, no as. Tuple return.
-// Retry: 3 attempts with exponential backoff [1s, 3s, 9s]
+// Retry: 3 attempts with exponential backoff [500ms, 1s, 2s]
 // On failure: marks as 'pending' for reconciliation cron
 // ============================================================================
 
@@ -12,6 +26,7 @@ import postgres from 'postgres';
 import { buildGCalEvent } from '../internal/gcal_utils/buildGCalEvent';
 import { retryWithBackoff } from '../internal/retry';
 import { createDbClient } from '../internal/db/client';
+import { withTenantContext } from '../internal/tenant-context';
 
 const InputSchema = z.object({
   booking_id: z.uuid(),
@@ -28,7 +43,6 @@ export interface GCalSyncResult {
   readonly errors: readonly string[];
 }
 
-// --- Typed Row Interface for the booking join query ---
 interface BookingRow {
   readonly booking_id: string;
   readonly status: string;
@@ -43,13 +57,11 @@ interface BookingRow {
   readonly service_name: string;
 }
 
-// --- GCal API Response Type Guard ---
-function isGCalEventResponse(data: Record<string, unknown>): data is GCalEventResponse {
+function isGCalEventResponse(data: Readonly<Record<string, unknown>>): data is GCalEventResponse {
   return typeof data['id'] === 'string' && data['id'].length > 0;
 }
 
-// --- Type Guard for Record<string, unknown> ---
-function isRecord(data: unknown): data is Record<string, unknown> {
+function isRecord(data: unknown): data is Readonly<Record<string, unknown>> {
   return typeof data === 'object' && data !== null && !Array.isArray(data);
 }
 
@@ -57,8 +69,12 @@ const GCAL_BASE = 'https://www.googleapis.com/calendar/v3';
 
 interface GCalAPIResult {
   readonly ok: boolean;
-  readonly data?: Record<string, unknown>;
+  readonly data?: Readonly<Record<string, unknown>>;
   readonly error?: string;
+}
+
+interface GCalEventResponse {
+  readonly id?: string;
 }
 
 async function callGCalAPI(
@@ -104,7 +120,6 @@ async function callGCalAPI(
   }
 }
 
-// Wrapper to adapt callGCalAPI to retryWithBackoff's expected signature
 async function retryGCalOperation(
   operation: () => Promise<GCalAPIResult>,
   maxRetries: number,
@@ -145,54 +160,63 @@ export async function main(
   }
 
   const sql = createDbClient({ url: dbUrl });
+  const tenantId = input.tenant_id ?? '00000000-0000-0000-0000-000000000000';
 
   try {
-    // Step 1: Fetch booking details
-    const bookingRows = await sql.values<[
-      string, string, string, string,
-      string | null, string | null,
-      string, string | null,
-      string, string | null,
-      string,
-    ][]>`
-      SELECT b.booking_id, b.status, b.start_time, b.end_time,
-             b.gcal_provider_event_id, b.gcal_client_event_id,
-             p.name as provider_name, p.gcal_calendar_id as provider_calendar_id,
-             pt.name as client_name, pt.gcal_calendar_id as client_calendar_id,
-             s.name as service_name
-      FROM bookings b
-      JOIN providers p ON p.provider_id = b.provider_id
-      JOIN clients pt ON pt.client_id = b.client_id
-      JOIN services s ON s.service_id = b.service_id
-      WHERE b.booking_id = ${input.booking_id}::uuid
-      LIMIT 1
-    `;
+    // STEP 1: Fetch booking details INSIDE transaction (short-lived)
+    const [fetchErr, booking] = await withTenantContext(sql, tenantId, async (tx) => {
+      const bookingRows = await tx.values<[
+        string, string, string, string,
+        string | null, string | null,
+        string, string | null,
+        string, string | null,
+        string,
+      ]>`
+        SELECT b.booking_id, b.status, b.start_time, b.end_time,
+               b.gcal_provider_event_id, b.gcal_client_event_id,
+               p.name as provider_name, p.gcal_calendar_id as provider_calendar_id,
+               pt.name as client_name, pt.gcal_calendar_id as client_calendar_id,
+               s.name as service_name
+        FROM bookings b
+        JOIN providers p ON p.provider_id = b.provider_id
+        JOIN clients pt ON pt.client_id = b.client_id
+        JOIN services s ON s.service_id = b.service_id
+        WHERE b.booking_id = ${input.booking_id}::uuid
+        LIMIT 1
+      `;
 
-    const bookingRow = bookingRows[0];
-    if (bookingRow === undefined) {
-      return [new Error(`Booking ${input.booking_id} not found`), null];
-    }
+      const bookingRow = bookingRows[0];
+      if (bookingRow === undefined) {
+        return [new Error(`Booking ${input.booking_id} not found`), null];
+      }
 
-    const booking: BookingRow = {
-      booking_id: bookingRow[0],
-      status: bookingRow[1],
-      start_time: bookingRow[2],
-      end_time: bookingRow[3],
-      gcal_provider_event_id: bookingRow[4],
-      gcal_client_event_id: bookingRow[5],
-      provider_name: bookingRow[6],
-      provider_calendar_id: bookingRow[7],
-      client_name: bookingRow[8],
-      client_calendar_id: bookingRow[9],
-      service_name: bookingRow[10],
-    };
+      const b: BookingRow = {
+        booking_id: bookingRow[0],
+        status: bookingRow[1],
+        start_time: bookingRow[2],
+        end_time: bookingRow[3],
+        gcal_provider_event_id: bookingRow[4],
+        gcal_client_event_id: bookingRow[5],
+        provider_name: bookingRow[6],
+        provider_calendar_id: bookingRow[7],
+        client_name: bookingRow[8],
+        client_calendar_id: bookingRow[9],
+        service_name: bookingRow[10],
+      };
 
+      return [null, b];
+    });
+
+    if (fetchErr !== null) return [fetchErr, null];
+    if (booking === null) return [new Error('Booking not found'), null];
+
+    // STEP 2: GCal API calls OUTSIDE transaction (no DB lock held)
     const errors: string[] = [];
     let providerEventId: string | null = booking.gcal_provider_event_id;
     let clientEventId: string | null = booking.gcal_client_event_id;
 
-    // Step 2: Handle delete action
     if (input.action === 'delete') {
+      // Delete provider event
       if (booking.gcal_provider_event_id !== null && booking.provider_calendar_id !== null) {
         const calId = booking.provider_calendar_id;
         const eventId = booking.gcal_provider_event_id;
@@ -207,6 +231,8 @@ export async function main(
           providerEventId = null;
         }
       }
+
+      // Delete client event
       if (booking.gcal_client_event_id !== null && booking.client_calendar_id !== null) {
         const calId = booking.client_calendar_id;
         const eventId = booking.gcal_client_event_id;
@@ -221,83 +247,69 @@ export async function main(
           clientEventId = null;
         }
       }
+    } else {
+      // Create/update provider event
+      if (booking.provider_calendar_id !== null) {
+        const calId = booking.provider_calendar_id;
+        const eventBody = buildGCalEvent({
+          booking_id: booking.booking_id,
+          status: booking.status,
+          start_time: booking.start_time,
+          end_time: booking.end_time,
+          provider_name: booking.provider_name,
+          service_name: booking.service_name,
+        });
 
-      const syncStatus: 'synced' | 'partial' | 'pending' = errors.length === 0 ? 'synced' : 'partial';
+        const providerResult = await retryGCalOperation(
+          () => {
+            if (booking.gcal_provider_event_id !== null) {
+              return callGCalAPI('PUT', `events/${booking.gcal_provider_event_id}`, calId, eventBody);
+            }
+            return callGCalAPI('POST', 'events', calId, eventBody);
+          },
+          input.max_retries,
+          'gcal_provider_sync',
+        );
 
-      await sql`
-        UPDATE bookings
-        SET gcal_sync_status = ${syncStatus},
-            gcal_last_sync = NOW(),
-            gcal_provider_event_id = ${providerEventId},
-            gcal_client_event_id = ${clientEventId}
-        WHERE booking_id = ${input.booking_id}::uuid
-      `;
+        if (providerResult.ok && providerResult.data !== undefined && isGCalEventResponse(providerResult.data)) {
+          providerEventId = providerResult.data.id ?? null;
+        } else {
+          errors.push(`Provider event failed: ${providerResult.error ?? 'Unknown error'}`);
+        }
+      }
 
-      const result: GCalSyncResult = {
-        booking_id: input.booking_id,
-        provider_event_id: providerEventId,
-        client_event_id: clientEventId,
-        sync_status: syncStatus,
-        retry_count: 0,
-        errors: errors,
-      };
+      // Create/update client event
+      if (booking.client_calendar_id !== null) {
+        const calId = booking.client_calendar_id;
+        const eventBody = buildGCalEvent({
+          booking_id: booking.booking_id,
+          status: booking.status,
+          start_time: booking.start_time,
+          end_time: booking.end_time,
+          provider_name: booking.provider_name,
+          service_name: booking.service_name,
+        });
 
-      return [null, result];
-    }
+        const clientResult = await retryGCalOperation(
+          () => {
+            if (booking.gcal_client_event_id !== null) {
+              return callGCalAPI('PUT', `events/${booking.gcal_client_event_id}`, calId, eventBody);
+            }
+            return callGCalAPI('POST', 'events', calId, eventBody);
+          },
+          input.max_retries,
+          'gcal_client_sync',
+        );
 
-    // Build event body from shared util
-    const eventBody = buildGCalEvent({
-      booking_id: booking.booking_id,
-      status: booking.status,
-      start_time: booking.start_time,
-      end_time: booking.end_time,
-      provider_name: booking.provider_name,
-      service_name: booking.service_name,
-    });
-
-    // Step 3: Create/update provider event
-    if (booking.provider_calendar_id !== null) {
-      const calId = booking.provider_calendar_id;
-      const providerResult = await retryGCalOperation(
-        () => {
-          if (booking.gcal_provider_event_id !== null) {
-            return callGCalAPI('PUT', `events/${booking.gcal_provider_event_id}`, calId, eventBody);
-          }
-          return callGCalAPI('POST', 'events', calId, eventBody);
-        },
-        input.max_retries,
-        'gcal_provider_sync',
-      );
-
-      if (providerResult.ok && providerResult.data !== undefined && isGCalEventResponse(providerResult.data)) {
-        providerEventId = providerResult.data.id;
-      } else {
-        errors.push(`Provider event failed: ${providerResult.error ?? 'Unknown error'}`);
+        if (clientResult.ok && clientResult.data !== undefined && isGCalEventResponse(clientResult.data)) {
+          clientEventId = clientResult.data.id ?? null;
+        } else {
+          errors.push(`Client event failed: ${clientResult.error ?? 'Unknown error'}`);
+        }
       }
     }
 
-    // Step 4: Create/update client event
-    if (booking.client_calendar_id !== null) {
-      const calId = booking.client_calendar_id;
-      const clientResult = await retryGCalOperation(
-        () => {
-          if (booking.gcal_client_event_id !== null) {
-            return callGCalAPI('PUT', `events/${booking.gcal_client_event_id}`, calId, eventBody);
-          }
-          return callGCalAPI('POST', 'events', calId, eventBody);
-        },
-        input.max_retries,
-        'gcal_client_sync',
-      );
-
-      if (clientResult.ok && clientResult.data !== undefined && isGCalEventResponse(clientResult.data)) {
-        clientEventId = clientResult.data.id;
-      } else {
-        errors.push(`Client event failed: ${clientResult.error ?? 'Unknown error'}`);
-      }
-    }
-
-    // Step 5: Determine sync status
+    // STEP 3: Determine sync status
     let syncStatus: 'synced' | 'partial' | 'pending' = 'pending';
     if (errors.length === 0) {
       syncStatus = 'synced';
@@ -305,16 +317,21 @@ export async function main(
       syncStatus = 'partial';
     }
 
-    // Step 6: Update booking with GCal event IDs
-    await sql`
-      UPDATE bookings
-      SET gcal_provider_event_id = ${providerEventId},
-          gcal_client_event_id = ${clientEventId},
-          gcal_sync_status = ${syncStatus},
-          gcal_last_sync = NOW(),
-          gcal_retry_count = ${errors.length > 0 ? 1 : 0}
-      WHERE booking_id = ${input.booking_id}::uuid
-    `;
+    // STEP 4: Update booking with GCal event IDs (short-lived transaction)
+    const [updateErr] = await withTenantContext(sql, tenantId, async (tx) => {
+      await tx`
+        UPDATE bookings
+        SET gcal_provider_event_id = ${providerEventId},
+            gcal_client_event_id = ${clientEventId},
+            gcal_sync_status = ${syncStatus},
+            gcal_last_sync = NOW(),
+            gcal_retry_count = ${errors.length > 0 ? 1 : 0}
+        WHERE booking_id = ${input.booking_id}::uuid
+      `;
+      return [null, true];
+    });
+
+    if (updateErr !== null) return [updateErr, null];
 
     const result: GCalSyncResult = {
       booking_id: input.booking_id,
