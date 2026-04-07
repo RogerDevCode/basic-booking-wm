@@ -3,10 +3,13 @@
 // ============================================================================
 // Creates a new client or updates existing one by email/phone/telegram_chat_id.
 // Idempotent: if client exists, updates name/timezone instead of creating duplicate.
+// Go-style: no throw, no any, no as. Tuple return.
 // ============================================================================
 
 import { z } from 'zod';
 import postgres from 'postgres';
+import { withTenantContext } from '../internal/tenant-context';
+import { createDbClient } from '../internal/db/client';
 
 const InputSchema = z.object({
   name: z.string().min(1).max(200),
@@ -15,16 +18,9 @@ const InputSchema = z.object({
   telegram_chat_id: z.string().optional(),
   timezone: z.string().default('America/Argentina/Buenos_Aires'),
   idempotency_key: z.string().min(1).optional(),
+  provider_id: z.uuid().optional(),
+  client_id: z.uuid().optional(),
 });
-
-interface ClientRow {
-  readonly client_id: string;
-  readonly name: string;
-  readonly email: string | null;
-  readonly phone: string | null;
-  readonly telegram_chat_id: string | null;
-  readonly timezone: string;
-}
 
 interface ClientResult {
   readonly client_id: string;
@@ -36,117 +32,121 @@ interface ClientResult {
   readonly created: boolean;
 }
 
-export async function main(rawInput: unknown): Promise<{
-  success: boolean;
-  data: ClientResult | null;
-  error_message: string | null;
-}> {
+export async function main(rawInput: unknown): Promise<[Error | null, ClientResult | null]> {
   const parsed = InputSchema.safeParse(rawInput);
   if (!parsed.success) {
-    return { success: false, data: null, error_message: "Validation error: " + parsed.error.message };
+    return [new Error('Validation error: ' + parsed.error.message), null];
   }
 
-  const { name, email, phone, telegram_chat_id, timezone } = parsed.data;
+  const input: Readonly<z.infer<typeof InputSchema>> = parsed.data;
 
-  if (email === undefined && phone === undefined && telegram_chat_id === undefined) {
-    return { success: false, data: null, error_message: 'At least one of email, phone, or telegram_chat_id is required' };
+  const tenantId = input.provider_id || input.client_id || '00000000-0000-0000-0000-000000000000';
+
+  if (input.email === undefined && input.phone === undefined && input.telegram_chat_id === undefined) {
+    return [new Error('At least one of email, phone, or telegram_chat_id is required'), null];
   }
 
   const dbUrl = process.env['DATABASE_URL'];
   if (dbUrl === undefined || dbUrl === '') {
-    return { success: false, data: null, error_message: 'CONFIGURATION_ERROR: DATABASE_URL is required' };
+    return [new Error('CONFIGURATION_ERROR: DATABASE_URL is required'), null];
   }
 
-  const sql = postgres(dbUrl, { ssl: 'require' });
+  const sql = createDbClient({ url: dbUrl });
 
   try {
-    // Try to find existing client
-    let existingRow: ClientRow | undefined;
+    const [txErr, txData] = await withTenantContext(sql, tenantId, async (tx) => {
+      let existingRow: { client_id: string; name: string; email: string | null; phone: string | null; telegram_chat_id: string | null; timezone: string } | undefined;
 
-    if (email !== undefined) {
-      const rows = await sql<ClientRow[]>`
-        SELECT client_id, name, email, phone, telegram_chat_id, timezone
-        FROM clients WHERE email = ${email} LIMIT 1
-      `;
-      existingRow = rows[0];
-    }
+      if (input.email !== undefined) {
+        const rows = await tx.values<[string, string, string | null, string | null, string | null, string][]>`
+          SELECT client_id, name, email, phone, telegram_chat_id, timezone
+          FROM clients WHERE email = ${input.email} LIMIT 1
+        `;
+        const row = rows[0];
+        if (row !== undefined) {
+          existingRow = { client_id: row[0], name: row[1], email: row[2], phone: row[3], telegram_chat_id: row[4], timezone: row[5] };
+        }
+      }
 
-    if (existingRow === undefined && telegram_chat_id !== undefined) {
-      const rows = await sql<ClientRow[]>`
-        SELECT client_id, name, email, phone, telegram_chat_id, timezone
-        FROM clients WHERE telegram_chat_id = ${telegram_chat_id} LIMIT 1
-      `;
-      existingRow = rows[0];
-    }
+      if (existingRow === undefined && input.telegram_chat_id !== undefined) {
+        const rows = await tx.values<[string, string, string | null, string | null, string | null, string][]>`
+          SELECT client_id, name, email, phone, telegram_chat_id, timezone
+          FROM clients WHERE telegram_chat_id = ${input.telegram_chat_id} LIMIT 1
+        `;
+        const row = rows[0];
+        if (row !== undefined) {
+          existingRow = { client_id: row[0], name: row[1], email: row[2], phone: row[3], telegram_chat_id: row[4], timezone: row[5] };
+        }
+      }
 
-    if (existingRow === undefined && phone !== undefined) {
-      const rows = await sql<ClientRow[]>`
-        SELECT client_id, name, email, phone, telegram_chat_id, timezone
-        FROM clients WHERE phone = ${phone} LIMIT 1
-      `;
-      existingRow = rows[0];
-    }
+      if (existingRow === undefined && input.phone !== undefined) {
+        const rows = await tx.values<[string, string, string | null, string | null, string | null, string][]>`
+          SELECT client_id, name, email, phone, telegram_chat_id, timezone
+          FROM clients WHERE phone = ${input.phone} LIMIT 1
+        `;
+        const row = rows[0];
+        if (row !== undefined) {
+          existingRow = { client_id: row[0], name: row[1], email: row[2], phone: row[3], telegram_chat_id: row[4], timezone: row[5] };
+        }
+      }
 
-    if (existingRow !== undefined) {
-      // Update existing client
-      await sql`
-        UPDATE clients
-        SET name = ${name},
-            timezone = ${timezone},
-            email = COALESCE(${email ?? null}, email),
-            phone = COALESCE(${phone ?? null}, phone),
-            telegram_chat_id = COALESCE(${telegram_chat_id ?? null}, telegram_chat_id),
-            updated_at = NOW()
-        WHERE client_id = ${existingRow.client_id}::uuid
-      `;
+      if (existingRow !== undefined) {
+        await tx`
+          UPDATE clients
+          SET name = ${input.name},
+              timezone = ${input.timezone},
+              email = COALESCE(${input.email ?? null}, email),
+              phone = COALESCE(${input.phone ?? null}, phone),
+              telegram_chat_id = COALESCE(${input.telegram_chat_id ?? null}, telegram_chat_id),
+              updated_at = NOW()
+          WHERE client_id = ${existingRow.client_id}::uuid
+        `;
 
-      return {
-        success: true,
-        data: {
+        const result: ClientResult = {
           client_id: existingRow.client_id,
-          name,
+          name: input.name,
           email: existingRow.email,
           phone: existingRow.phone,
           telegram_chat_id: existingRow.telegram_chat_id,
-          timezone,
+          timezone: input.timezone,
           created: false,
-        },
-        error_message: null,
-      };
-    }
+        };
+        return [null, result];
+      }
 
-    // Create new client
-    const rows = await sql<ClientRow[]>`
-      INSERT INTO clients (name, email, phone, telegram_chat_id, timezone)
-      VALUES (${name}, ${email ?? null}, ${phone ?? null}, ${telegram_chat_id ?? null}, ${timezone})
-      ON CONFLICT (email) DO UPDATE SET
-        name = EXCLUDED.name,
-        telegram_chat_id = COALESCE(EXCLUDED.telegram_chat_id, clients.telegram_chat_id),
-        updated_at = NOW()
-      RETURNING client_id, name, email, phone, telegram_chat_id, timezone
-    `;
+      const rows = await tx.values<[string, string, string | null, string | null, string | null, string][]>`
+        INSERT INTO clients (name, email, phone, telegram_chat_id, timezone)
+        VALUES (${input.name}, ${input.email ?? null}, ${input.phone ?? null}, ${input.telegram_chat_id ?? null}, ${input.timezone})
+        ON CONFLICT (email) DO UPDATE SET
+          name = EXCLUDED.name,
+          telegram_chat_id = COALESCE(EXCLUDED.telegram_chat_id, clients.telegram_chat_id),
+          updated_at = NOW()
+        RETURNING client_id, name, email, phone, telegram_chat_id, timezone
+      `;
 
-    const newRow = rows[0];
-    if (newRow === undefined) {
-      return { success: false, data: null, error_message: 'Failed to create client' };
-    }
+      const newRow = rows[0];
+      if (newRow === undefined) {
+        return [new Error('Failed to create client'), null];
+      }
 
-    return {
-      success: true,
-      data: {
-        client_id: newRow.client_id,
-        name: newRow.name,
-        email: newRow.email,
-        phone: newRow.phone,
-        telegram_chat_id: newRow.telegram_chat_id,
-        timezone: newRow.timezone,
+      const result: ClientResult = {
+        client_id: newRow[0],
+        name: newRow[1],
+        email: newRow[2],
+        phone: newRow[3],
+        telegram_chat_id: newRow[4],
+        timezone: newRow[5],
         created: true,
-      },
-      error_message: null,
-    };
+      };
+      return [null, result];
+    });
+
+    if (txErr !== null) return [txErr, null];
+    if (txData === null) return [new Error('Operation failed'), null];
+    return [null, txData];
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
-    return { success: false, data: null, error_message: "Internal error: " + message };
+    return [new Error('Internal error: ' + message), null];
   } finally {
     await sql.end();
   }
