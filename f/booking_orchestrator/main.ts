@@ -8,8 +8,10 @@
 import { z } from 'zod';
 import postgres from 'postgres';
 import { createDbClient } from '../internal/db/client';
+import { withTenantContext } from '../internal/tenant-context';
 
 const InputSchema = z.object({
+  tenant_id: z.uuid(),
   intent: z.enum(['create_booking', 'cancel_booking', 'reschedule', 'list_available', 'get_my_bookings']),
   entities: z.record(z.string(), z.string()).default({}),
   client_id: z.uuid().optional(),
@@ -324,8 +326,8 @@ async function handleGetMyBookings(
 
   const sql = createDbClient({ url: dbUrl });
 
-  try {
-    const bookings = await sql`
+  const [dbErr, bookings] = await withTenantContext<readonly unknown[]>(sql, input.tenant_id, async (tx) => {
+    return await tx`
       SELECT b.booking_id, b.status, b.start_time, b.end_time,
              p.name as provider_name, s.name as service_name
       FROM bookings b
@@ -336,44 +338,45 @@ async function handleGetMyBookings(
       ORDER BY b.start_time ASC
       LIMIT 20
     `;
+  });
+  if (dbErr !== null) return [dbErr, null];
+  if (bookings === null) return [new Error('Unexpected null bookings'), null];
 
-    if (bookings.length === 0) {
-      const result: OrchestratorResult = {
-        action: 'get_my_bookings',
-        success: true,
-        data: [],
-        message: '📋 No tienes citas programadas.',
-        follow_up: '¿Quieres agendar una cita?',
-      };
-      return [null, result];
-    }
-
-    interface BookingRow {
-      readonly start_time: string;
-      readonly provider_name: string;
-      readonly service_name: string;
-      readonly status: string;
-    }
-
-    const bookingList = bookings
-      .map((b: BookingRow) => {
-        const d = new Date(b.start_time);
-        const dateStr = d.toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric', month: 'short' });
-        const timeStr = d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
-        return `• ${dateStr} ${timeStr} - ${b.provider_name} (${b.service_name}) [${b.status}]`;
-      })
-      .join('\n');
-
+  if (bookings.length === 0) {
     const result: OrchestratorResult = {
       action: 'get_my_bookings',
       success: true,
-      data: bookings,
-      message: `📋 Tus próximas citas:\n${bookingList}`,
+      data: [],
+      message: '📋 No tienes citas programadas.',
+      follow_up: '¿Quieres agendar una cita?',
     };
     return [null, result];
-  } finally {
-    await sql.end();
   }
+
+  interface BookingRow {
+    readonly start_time: string;
+    readonly provider_name: string;
+    readonly service_name: string;
+    readonly status: string;
+  }
+
+  const bookingList = bookings
+    .map((b: unknown) => {
+      const bb = b as BookingRow;
+      const d = new Date(bb.start_time);
+      const dateStr = d.toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric', month: 'short' });
+      const timeStr = d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+      return `• ${dateStr} ${timeStr} - ${bb.provider_name} (${bb.service_name}) [${bb.status}]`;
+    })
+    .join('\n');
+
+  const result: OrchestratorResult = {
+    action: 'get_my_bookings',
+    success: true,
+    data: bookings,
+    message: `📋 Tus próximas citas:\n${bookingList}`,
+  };
+  return [null, result];
 }
 
 // ─── Main Entry Point ───────────────────────────────────────────────────────
