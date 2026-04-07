@@ -9,6 +9,8 @@
 import { z } from 'zod';
 import postgres from 'postgres';
 import crypto from 'crypto';
+import { withTenantContext } from '../internal/tenant-context';
+import { createDbClient } from '../internal/db/client';
 
 const InputSchema = z.object({
   chat_id: z.string().min(1),
@@ -48,57 +50,68 @@ export async function main(rawInput: unknown): Promise<[Error | null, TelegramUs
     ? `${first_name} ${last_name}`
     : first_name;
 
-  const sql = postgres(dbUrl, { ssl: 'require' });
+  const sql = createDbClient({ url: dbUrl });
+
+  // No specific UUID provided in payload for tenant context
+  const tenantId = '00000000-0000-0000-0000-000000000000';
 
   try {
-    const existingRows = await sql`
-      SELECT user_id, full_name, telegram_chat_id, role,
-             CASE WHEN rut IS NOT NULL AND email IS NOT NULL AND password_hash IS NOT NULL
-                  THEN true ELSE false END AS profile_complete
-      FROM users
-      WHERE telegram_chat_id = ${chat_id}
-      LIMIT 1
-    `;
+    const [txErr, txData] = await withTenantContext(sql, tenantId, async (tx) => {
+      const existingRows = await tx`
+        SELECT user_id, full_name, telegram_chat_id, role,
+               CASE WHEN rut IS NOT NULL AND email IS NOT NULL AND password_hash IS NOT NULL
+                    THEN true ELSE false END AS profile_complete
+        FROM users
+        WHERE telegram_chat_id = ${chat_id}
+        LIMIT 1
+      `;
 
-    const existingRow = existingRows[0];
-    if (existingRow !== undefined) {
+      const existingRow = existingRows[0];
+      if (existingRow !== undefined) {
+        return [null, {
+          user_id: String(existingRow['user_id']),
+          full_name: String(existingRow['full_name']),
+          telegram_chat_id: String(existingRow['telegram_chat_id']),
+          role: String(existingRow['role']),
+          is_new: false,
+          profile_complete: Boolean(existingRow['profile_complete']),
+        }];
+      }
+
+      const tempPassword = crypto.randomBytes(32).toString('hex');
+      const passwordHash = hashPasswordSync(tempPassword);
+
+      const insertRows = await tx`
+        INSERT INTO users (
+          full_name, telegram_chat_id, role, password_hash,
+          is_active, timezone
+        ) VALUES (
+          ${fullName}, ${chat_id}, 'client', ${passwordHash},
+          true, 'America/Santiago'
+        )
+        RETURNING user_id, full_name, telegram_chat_id, role
+      `;
+
+      const newRow = insertRows[0];
+      if (newRow === undefined) {
+        return [new Error('Failed to create user record'), null];
+      }
+
       return [null, {
-        user_id: String(existingRow['user_id']),
-        full_name: String(existingRow['full_name']),
-        telegram_chat_id: String(existingRow['telegram_chat_id']),
-        role: String(existingRow['role']),
-        is_new: false,
-        profile_complete: Boolean(existingRow['profile_complete']),
+        user_id: String(newRow['user_id']),
+        full_name: String(newRow['full_name']),
+        telegram_chat_id: String(newRow['telegram_chat_id']),
+        role: String(newRow['role']),
+        is_new: true,
+        profile_complete: false,
       }];
+    });
+
+    if (txErr) {
+      return [txErr, null];
     }
-
-    const tempPassword = crypto.randomBytes(32).toString('hex');
-    const passwordHash = hashPasswordSync(tempPassword);
-
-    const insertRows = await sql`
-      INSERT INTO users (
-        full_name, telegram_chat_id, role, password_hash,
-        is_active, timezone
-      ) VALUES (
-        ${fullName}, ${chat_id}, 'client', ${passwordHash},
-        true, 'America/Santiago'
-      )
-      RETURNING user_id, full_name, telegram_chat_id, role
-    `;
-
-    const newRow = insertRows[0];
-    if (newRow === undefined) {
-      return [new Error('Failed to create user record'), null];
-    }
-
-    return [null, {
-      user_id: String(newRow['user_id']),
-      full_name: String(newRow['full_name']),
-      telegram_chat_id: String(newRow['telegram_chat_id']),
-      role: String(newRow['role']),
-      is_new: true,
-      profile_complete: false,
-    }];
+    
+    return [null, txData];
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     return [new Error('Internal error: ' + message), null];

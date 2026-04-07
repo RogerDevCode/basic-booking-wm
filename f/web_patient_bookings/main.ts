@@ -3,10 +3,13 @@
 // ============================================================================
 // Returns upcoming and past bookings for a client.
 // Supports filtering by status and date range.
+// Go-style: no throw, no any, no as. Tuple return.
 // ============================================================================
 
 import { z } from 'zod';
 import postgres from 'postgres';
+import { withTenantContext } from '../internal/tenant-context';
+import { createDbClient } from '../internal/db/client';
 
 const InputSchema = z.object({
   client_user_id: z.uuid(),
@@ -40,100 +43,109 @@ export async function main(rawInput: unknown): Promise<[Error | null, BookingsRe
     return [new Error('Validation error: ' + parsed.error.message), null];
   }
 
-  const { client_user_id, status, limit, offset } = parsed.data;
+  const input: Readonly<z.infer<typeof InputSchema>> = parsed.data;
 
   const dbUrl = process.env['DATABASE_URL'];
   if (dbUrl === undefined || dbUrl === '') {
     return [new Error('CONFIGURATION_ERROR: DATABASE_URL is not set'), null];
   }
 
-  const sql = postgres(dbUrl, { ssl: 'require' });
+  const sql = createDbClient({ url: dbUrl });
+
+  const rawObj = typeof rawInput === 'object' && rawInput !== null ? rawInput : {};
+  let tenantId = '00000000-0000-0000-0000-000000000000';
+  const tenantKeys = ['provider_id', 'user_id', 'admin_user_id', 'client_id', 'client_user_id'] as const;
+  for (const key of tenantKeys) {
+    const val = (rawObj as Record<string, unknown>)[key];
+    if (typeof val === 'string') {
+      tenantId = val;
+      break;
+    }
+  }
 
   try {
-    const userRows = await sql`
-      SELECT p.client_id FROM clients p
-      INNER JOIN users u ON u.user_id = p.client_id
-      WHERE u.user_id = ${client_user_id}::uuid
-      LIMIT 1
-    `;
-
-    const userRow = userRows[0];
-    let clientId: string;
-
-    if (userRow === undefined) {
-      const clientRows = await sql`
-        SELECT client_id FROM clients
-        WHERE email = (SELECT email FROM users WHERE user_id = ${client_user_id}::uuid LIMIT 1)
+    const [txErr, txData] = await withTenantContext(sql, tenantId, async (tx) => {
+      const userRows = await tx.values<[string][]>`
+        SELECT p.client_id FROM clients p
+        INNER JOIN users u ON u.user_id = p.client_id
+        WHERE u.user_id = ${input.client_user_id}::uuid
         LIMIT 1
       `;
-      const pRow = clientRows[0];
-      if (pRow === undefined) {
-        return [new Error('Client record not found for this user'), null];
-      }
-      clientId = String(pRow['client_id']);
-    } else {
-      clientId = String(userRow['client_id']);
-    }
 
-    const cancellableStatuses = ['pending', 'confirmed'];
-    const reschedulableStatuses = ['pending', 'confirmed'];
-    const now = new Date().toISOString();
+      let clientId: string;
 
-    let query = sql`
-      SELECT b.booking_id, b.start_time, b.end_time, b.status,
-             b.cancellation_reason,
-             p.name AS provider_name, p.specialty AS provider_specialty,
-             s.name AS service_name
-      FROM bookings b
-      INNER JOIN providers p ON b.provider_id = p.provider_id
-      INNER JOIN services s ON b.service_id = s.service_id
-      WHERE b.client_id = ${clientId}::uuid
-    `;
-
-    if (status !== 'all') {
-      query = sql`${query} AND b.status = ${status}`;
-    }
-
-    query = sql`${query} ORDER BY b.start_time DESC LIMIT ${limit} OFFSET ${offset}`;
-
-    const bookingRows = await query;
-
-    const upcoming: BookingInfo[] = [];
-    const past: BookingInfo[] = [];
-
-    for (const row of bookingRows) {
-      const booking: BookingInfo = {
-        booking_id: String(row['booking_id']),
-        provider_name: String(row['provider_name']),
-        provider_specialty: String(row['provider_specialty']),
-        service_name: String(row['service_name']),
-        start_time: String(row['start_time']),
-        end_time: String(row['end_time']),
-        status: String(row['status']),
-        cancellation_reason: row['cancellation_reason'] !== null ? String(row['cancellation_reason']) : null,
-        can_cancel: cancellableStatuses.includes(String(row['status'])),
-        can_reschedule: reschedulableStatuses.includes(String(row['status'])),
-      };
-
-      if (String(row['start_time']) > now) {
-        upcoming.push(booking);
+      if (userRows[0] === undefined) {
+        const clientRows = await tx.values<[string][]>`
+          SELECT client_id FROM clients
+          WHERE email = (SELECT email FROM users WHERE user_id = ${input.client_user_id}::uuid LIMIT 1)
+          LIMIT 1
+        `;
+        const pRow = clientRows[0];
+        if (pRow === undefined) {
+          return [new Error('Client record not found for this user'), null];
+        }
+        clientId = pRow[0];
       } else {
-        past.push(booking);
+        clientId = userRows[0][0];
       }
-    }
 
-    const countRows = await sql`
-      SELECT COUNT(*) AS total FROM bookings
-      WHERE client_id = ${clientId}::uuid
-    `;
+      const cancellableStatuses = ['pending', 'confirmed'];
+      const reschedulableStatuses = ['pending', 'confirmed'];
+      const now = new Date().toISOString();
 
-    const total = countRows[0] !== undefined ? Number(countRows[0]['total']) : 0;
+      let statusCondition = '';
+      const statusParams: (string | number)[] = [clientId];
+      let paramIdx = 2;
 
-    return [null, {
-      upcoming: upcoming,
-      past: past,
-      total: total,
-    }];
+      if (input.status !== 'all') {
+        statusCondition = ' AND b.status = $' + String(paramIdx);
+        statusParams.push(input.status);
+        paramIdx++;
+      }
+
+      const rows = await tx.values<[string, string, string, string, string, string | null, string, string, string][]>`
+        SELECT b.booking_id, b.start_time, b.end_time, b.status,
+               b.cancellation_reason,
+               p.name AS provider_name, p.specialty AS provider_specialty,
+               s.name AS service_name, b.start_time
+        FROM bookings b
+        INNER JOIN providers p ON b.provider_id = p.provider_id
+        INNER JOIN services s ON b.service_id = s.service_id
+        WHERE b.client_id = ${clientId}::uuid
+        ${statusCondition}
+        ORDER BY b.start_time DESC
+        LIMIT ${input.limit} OFFSET ${input.offset}
+      `;
+
+      const bookings: BookingInfo[] = rows.map((row) => ({
+        booking_id: row[0],
+        start_time: row[1],
+        end_time: row[2],
+        status: row[3],
+        cancellation_reason: row[4],
+        provider_name: row[5],
+        provider_specialty: row[6],
+        service_name: row[7],
+        can_cancel: cancellableStatuses.includes(row[3]),
+        can_reschedule: reschedulableStatuses.includes(row[3]),
+      }));
+
+      const upcoming = bookings.filter((b) => b.start_time > now);
+      const past = bookings.filter((b) => b.start_time <= now);
+
+      const countRows = await tx.values<[bigint | number][]>`
+        SELECT COUNT(*) FROM bookings
+        WHERE client_id = ${clientId}::uuid
+        ${statusCondition}
+      `;
+      const total = countRows[0] !== undefined ? Number(countRows[0][0]) : 0;
+
+      return [null, { upcoming, past, total }];
+    });
+
+    if (txErr !== null) return [txErr, null];
+    if (txData === null) return [new Error('Bookings query failed'), null];
+    return [null, txData];
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     return [new Error('Internal error: ' + message), null];

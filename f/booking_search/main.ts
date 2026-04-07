@@ -3,10 +3,12 @@
 // ============================================================================
 // Search by: date range, provider, client, status, service
 // Pagination: offset + limit
+// Go-style: no throw, no any, no as. Tuple return.
 // ============================================================================
 
 import { z } from 'zod';
 import postgres from 'postgres';
+import { createDbClient } from '../internal/db/client';
 
 const InputSchema = z.object({
   provider_id: z.uuid().optional(),
@@ -34,29 +36,25 @@ interface BookingSearchRow {
 }
 
 interface BookingSearchResult {
-  readonly bookings: BookingSearchRow[];
+  readonly bookings: readonly BookingSearchRow[];
   readonly total: number;
   readonly offset: number;
   readonly limit: number;
 }
 
-export async function main(rawInput: unknown): Promise<{
-  success: boolean;
-  data: BookingSearchResult | null;
-  error_message: string | null;
-}> {
+export async function main(rawInput: unknown): Promise<[Error | null, BookingSearchResult | null]> {
   const parsed = InputSchema.safeParse(rawInput);
   if (!parsed.success) {
-    return { success: false, data: null, error_message: 'Validation error: ' + parsed.error.message };
+    return [new Error('Validation error: ' + parsed.error.message), null];
   }
 
-  const input = parsed.data;
+  const input: Readonly<z.infer<typeof InputSchema>> = parsed.data;
   const dbUrl = process.env['DATABASE_URL'];
   if (dbUrl === undefined || dbUrl === '') {
-    return { success: false, data: null, error_message: 'CONFIGURATION_ERROR: DATABASE_URL is required' };
+    return [new Error('CONFIGURATION_ERROR: DATABASE_URL is required'), null];
   }
 
-  const sql = postgres(dbUrl, { ssl: 'require' });
+  const sql = createDbClient({ url: dbUrl });
 
   try {
     // Build WHERE clauses dynamically based on provided filters
@@ -98,15 +96,18 @@ export async function main(rawInput: unknown): Promise<{
     const whereClause = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
 
     // Count total
-    const countRows = await sql.unsafe(
+    const countRows = await sql.values<[bigint | number][]>(
       'SELECT COUNT(*) as total FROM bookings b ' + whereClause,
       params
     );
-    const countRow = countRows[0] as { total: string | number } | undefined;
-    const total = countRow !== undefined ? Number(countRow.total) : 0;
+    const countRow = countRows[0];
+    const total = countRow !== undefined ? Number(countRow[0]) : 0;
 
     // Fetch bookings
-    const bookingRows = await sql.unsafe(
+    const bookingRows = await sql.values<[
+      string, string, string, string, string, string, boolean, string,
+      string, string, string,
+    ][]>(
       'SELECT b.booking_id, b.start_time, b.end_time, b.status, b.idempotency_key,' +
       ' b.gcal_sync_status, b.notification_sent, b.created_at,' +
       ' p.name as provider_name, pt.name as client_name, s.name as service_name' +
@@ -118,21 +119,33 @@ export async function main(rawInput: unknown): Promise<{
       ' ORDER BY b.start_time DESC' +
       ' LIMIT $' + String(paramIdx) + ' OFFSET $' + String(paramIdx + 1),
       params.concat([input.limit, input.offset])
-    ) as BookingSearchRow[];
+    );
 
-    return {
-      success: true,
-      data: {
-        bookings: bookingRows,
-        total: total,
-        offset: input.offset,
-        limit: input.limit,
-      },
-      error_message: null,
+    const bookings: BookingSearchRow[] = bookingRows.map((row) => ({
+      booking_id: row[0],
+      start_time: row[1],
+      end_time: row[2],
+      status: row[3],
+      idempotency_key: row[4],
+      gcal_sync_status: row[5],
+      notification_sent: row[6],
+      created_at: row[7],
+      provider_name: row[8],
+      client_name: row[9],
+      service_name: row[10],
+    }));
+
+    const result: BookingSearchResult = {
+      bookings,
+      total,
+      offset: input.offset,
+      limit: input.limit,
     };
+
+    return [null, result];
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
-    return { success: false, data: null, error_message: 'Internal error: ' + message };
+    return [new Error('Internal error: ' + message), null];
   } finally {
     await sql.end();
   }

@@ -49,9 +49,9 @@ interface InlineButton {
 
 type ReplyMarkup =
   | { readonly remove_keyboard: true }
-  | { readonly keyboard: Readonly<{ readonly text: string }[][]>; readonly resize_keyboard: true; readonly one_time_keyboard: boolean }
+  | { readonly keyboard: readonly { readonly text: string }[][]; readonly resize_keyboard: true; readonly one_time_keyboard: boolean }
   | { readonly force_reply: true; readonly input_field_placeholder: string }
-  | { readonly inline_keyboard: Readonly<InlineButton[][]> }
+  | { readonly inline_keyboard: readonly InlineButton[][] }
   | undefined;
 
 interface TelegramApiResponse {
@@ -227,7 +227,7 @@ async function sendWithRetry(
         signal: AbortSignal.timeout(10000),
       });
 
-      const data = await response.json() as TelegramApiResponse;
+      const data = (await response.json()) as TelegramApiResponse;
 
       if (response.ok && data.result != null) {
         return {
@@ -264,18 +264,18 @@ async function sendWithRetry(
   return { sent: false, message_id: null, error: `Failed after ${String(maxRetries)} retries: ${lastError ?? 'Unknown error'}` };
 }
 
-export async function main(rawInput: unknown): Promise<{ success: boolean; data: TelegramSendData | null; error_message: string | null }> {
+export async function main(rawInput: unknown): Promise<[Error | null, TelegramSendData | null]> {
   try {
     const parsed = InputSchema.safeParse(rawInput);
     if (!parsed.success) {
-      return { success: false, data: null, error_message: `Invalid input: ${parsed.error.message}` };
+      return [new Error(`Invalid input: ${parsed.error.message), null]` };
     }
 
     const { chat_id, message_type, booking_details, inline_buttons, reply_keyboard, force_reply, reply_placeholder, remove_keyboard, parse_mode } = parsed.data;
 
     const botToken = process.env['TELEGRAM_BOT_TOKEN'];
     if (!botToken) {
-      return { success: false, data: null, error_message: 'TELEGRAM_BOT_TOKEN not configured' };
+      return [new Error('TELEGRAM_BOT_TOKEN not configured'), null];
     }
 
     const message = buildMessage(message_type, booking_details, parse_mode);
@@ -289,18 +289,17 @@ export async function main(rawInput: unknown): Promise<{ success: boolean; data:
 
     const result = await sendWithRetry(botToken, chat_id, message, replyMarkup, parse_mode);
 
-    return {
-      success: result.sent,
-      data: {
+    if (!result.sent) {
+      return [new Error(result.error ?? 'Failed to send message'), null];
+    }
+    return [null, {
         sent: result.sent,
         message_id: result.message_id,
         chat_id,
         message_type,
-      },
-      error_message: result.error,
-    };
+      }];
   } catch (e) {
     const error = e instanceof Error ? e : new Error(String(e));
-    return { success: false, data: null, error_message: error.message };
+    return [new Error(error.message), null];
   }
 }

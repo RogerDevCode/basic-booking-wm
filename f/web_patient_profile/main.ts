@@ -7,6 +7,8 @@
 
 import { z } from 'zod';
 import postgres from 'postgres';
+import { withTenantContext } from '../internal/tenant-context';
+import { createDbClient } from '../internal/db/client';
 
 const InputSchema = z.object({
   user_id: z.uuid(),
@@ -40,92 +42,98 @@ export async function main(rawInput: unknown): Promise<[Error | null, ProfileRes
     return [new Error('CONFIGURATION_ERROR: DATABASE_URL is not set'), null];
   }
 
-  const sql = postgres(dbUrl, { ssl: 'require' });
+  const sql = createDbClient({ url: dbUrl });
+  const tenantId = user_id || '00000000-0000-0000-0000-000000000000';
 
   try {
-    const userRows = await sql`
-      SELECT user_id, email, full_name, phone, telegram_chat_id, timezone
-      FROM users WHERE user_id = ${user_id}::uuid LIMIT 1
-    `;
-
-    const userRow = userRows[0];
-    if (userRow === undefined) {
-      return [new Error('User not found'), null];
-    }
-
-    const userEmail = String(userRow['email']);
-    const clientRows = await sql`
-      SELECT client_id, name, email, phone, telegram_chat_id, timezone, gcal_calendar_id
-      FROM clients
-      WHERE client_id = ${user_id}::uuid OR email = ${userEmail}
-      LIMIT 1
-    `;
-
-    let clientRow = clientRows[0];
-
-    if (clientRow === undefined) {
-      const createRows = await sql`
-        INSERT INTO clients (name, email, phone, telegram_chat_id, timezone)
-        VALUES (
-          ${String(userRow['full_name'])},
-          ${userEmail !== 'null' ? userEmail : null},
-          ${userRow['phone'] !== null ? String(userRow['phone']) : null},
-          ${userRow['telegram_chat_id'] !== null ? String(userRow['telegram_chat_id']) : null},
-          ${String(userRow['timezone'])}
-        )
-        RETURNING client_id, name, email, phone, telegram_chat_id, timezone, gcal_calendar_id
+    const [txErr, txData] = await withTenantContext(sql, tenantId, async (tx) => {
+      const userRows = await tx`
+        SELECT user_id, email, full_name, phone, telegram_chat_id, timezone
+        FROM users WHERE user_id = ${user_id}::uuid LIMIT 1
       `;
-      clientRow = createRows[0];
-    }
 
-    if (clientRow === undefined) {
-      return [new Error('Failed to get or create client record'), null];
-    }
-
-    if (action === 'update') {
-      const updates: string[] = [];
-      const values: string[] = [];
-
-      if (parsed.data.name !== undefined) {
-        updates.push('name = $' + String(values.length + 1));
-        values.push(parsed.data.name);
-      }
-      if (parsed.data.email !== undefined) {
-        updates.push('email = $' + String(values.length + 1));
-        values.push(parsed.data.email);
-      }
-      if (parsed.data.phone !== undefined) {
-        updates.push('phone = $' + String(values.length + 1));
-        values.push(parsed.data.phone);
-      }
-      if (parsed.data.timezone !== undefined) {
-        updates.push('timezone = $' + String(values.length + 1));
-        values.push(parsed.data.timezone);
+      const userRow = userRows[0];
+      if (userRow === undefined) {
+        return [new Error('User not found'), null];
       }
 
-      if (updates.length > 0) {
-        updates.push('updated_at = NOW()');
-        const clientId = String(clientRow['client_id']);
-        const queryText = 'UPDATE clients SET ' + updates.join(', ') + ' WHERE client_id = $' + String(values.length + 1) + '::uuid RETURNING client_id, name, email, phone, telegram_chat_id, timezone, gcal_calendar_id';
-        values.push(clientId);
+      const userEmail = String(userRow['email']);
+      const clientRows = await tx`
+        SELECT client_id, name, email, phone, telegram_chat_id, timezone, gcal_calendar_id
+        FROM clients
+        WHERE client_id = ${user_id}::uuid OR email = ${userEmail}
+        LIMIT 1
+      `;
 
-        const updateResult = await sql.unsafe(queryText, values);
-        const updatedRow = updateResult[0];
-        if (updatedRow !== undefined) {
-          clientRow = updatedRow;
+      let clientRow = clientRows[0];
+
+      if (clientRow === undefined) {
+        const createRows = await tx`
+          INSERT INTO clients (name, email, phone, telegram_chat_id, timezone)
+          VALUES (
+            ${String(userRow['full_name'])},
+            ${userEmail !== 'null' ? userEmail : null},
+            ${userRow['phone'] !== null ? String(userRow['phone']) : null},
+            ${userRow['telegram_chat_id'] !== null ? String(userRow['telegram_chat_id']) : null},
+            ${String(userRow['timezone'])}
+          )
+          RETURNING client_id, name, email, phone, telegram_chat_id, timezone, gcal_calendar_id
+        `;
+        clientRow = createRows[0];
+      }
+
+      if (clientRow === undefined) {
+        return [new Error('Failed to get or create client record'), null];
+      }
+
+      if (action === 'update') {
+        const updates: string[] = [];
+        const values: string[] = [];
+
+        if (parsed.data.name !== undefined) {
+          updates.push('name = $' + String(values.length + 1));
+          values.push(parsed.data.name);
+        }
+        if (parsed.data.email !== undefined) {
+          updates.push('email = $' + String(values.length + 1));
+          values.push(parsed.data.email);
+        }
+        if (parsed.data.phone !== undefined) {
+          updates.push('phone = $' + String(values.length + 1));
+          values.push(parsed.data.phone);
+        }
+        if (parsed.data.timezone !== undefined) {
+          updates.push('timezone = $' + String(values.length + 1));
+          values.push(parsed.data.timezone);
+        }
+
+        if (updates.length > 0) {
+          updates.push('updated_at = NOW()');
+          const clientId = String(clientRow['client_id']);
+          const queryText = 'UPDATE clients SET ' + updates.join(', ') + ' WHERE client_id = $' + String(values.length + 1) + '::uuid RETURNING client_id, name, email, phone, telegram_chat_id, timezone, gcal_calendar_id';
+          values.push(clientId);
+
+          const updateResult = await tx.unsafe(queryText, values);
+          const updatedRow = updateResult[0];
+          if (updatedRow !== undefined) {
+            clientRow = updatedRow;
+          }
         }
       }
-    }
 
-    return [null, {
-      client_id: String(clientRow['client_id']),
-      name: String(clientRow['name']),
-      email: clientRow['email'] !== null ? String(clientRow['email']) : null,
-      phone: clientRow['phone'] !== null ? String(clientRow['phone']) : null,
-      telegram_chat_id: clientRow['telegram_chat_id'] !== null ? String(clientRow['telegram_chat_id']) : null,
-      timezone: String(clientRow['timezone']),
-      gcal_calendar_id: clientRow['gcal_calendar_id'] !== null ? String(clientRow['gcal_calendar_id']) : null,
-    }];
+      return [null, {
+        client_id: String(clientRow['client_id']),
+        name: String(clientRow['name']),
+        email: clientRow['email'] !== null ? String(clientRow['email']) : null,
+        phone: clientRow['phone'] !== null ? String(clientRow['phone']) : null,
+        telegram_chat_id: clientRow['telegram_chat_id'] !== null ? String(clientRow['telegram_chat_id']) : null,
+        timezone: String(clientRow['timezone']),
+        gcal_calendar_id: clientRow['gcal_calendar_id'] !== null ? String(clientRow['gcal_calendar_id']) : null,
+      }];
+    });
+
+    if (txErr) return [txErr, null];
+    return [null, txData];
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     return [new Error('Internal error: ' + message), null];

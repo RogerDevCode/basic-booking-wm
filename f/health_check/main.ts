@@ -7,6 +7,8 @@
 
 import { z } from 'zod';
 import postgres from 'postgres';
+import { withTenantContext } from '../internal/tenant-context';
+import { createDbClient } from '../internal/db/client';
 
 const InputSchema = z.object({
   component: z.enum(['all', 'database', 'gcal', 'telegram', 'gmail']).default('all'),
@@ -22,8 +24,15 @@ interface ComponentStatus {
 async function checkDatabase(dbUrl: string): Promise<ComponentStatus> {
   const start = Date.now();
   try {
-    const sql = postgres(dbUrl, { ssl: 'require' });
-    await sql`SELECT 1`;
+    const sql = createDbClient({ url: dbUrl });
+    const tenantId = '00000000-0000-0000-0000-000000000000';
+    const [txErr] = await withTenantContext(sql, tenantId, async (tx) => {
+      await tx`SELECT 1`;
+      return [null, true];
+    });
+    
+    if (txErr) throw txErr;
+
     const latency = Date.now() - start;
     await sql.end();
     return { component: 'database', status: 'healthy', latency_ms: latency, message: 'OK' };
@@ -77,14 +86,10 @@ async function checkTelegram(botToken: string): Promise<ComponentStatus> {
   }
 }
 
-export async function main(rawInput: unknown): Promise<{
-  success: boolean;
-  data: { overall: 'healthy' | 'degraded' | 'unhealthy'; timestamp: string; components: ComponentStatus[] } | null;
-  error_message: string | null;
-}> {
+export async function main(rawInput: unknown): Promise<[Error | null, { overall: 'healthy' | 'degraded' | 'unhealthy'; timestamp: string; components: ComponentStatus[] } | null]> {
   const parsed = InputSchema.safeParse(rawInput);
   if (!parsed.success) {
-    return { success: false, data: null, error_message: 'Validation error: ' + parsed.error.message };
+    return [new Error('Validation error: ' + parsed.error.message), null];
   }
 
   const input = parsed.data;
@@ -114,13 +119,9 @@ export async function main(rawInput: unknown): Promise<{
   const hasDegraded = components.some(function(c: ComponentStatus): boolean { return c.status === 'degraded'; });
   const overall: 'healthy' | 'degraded' | 'unhealthy' = hasUnhealthy ? 'unhealthy' : hasDegraded ? 'degraded' : 'healthy';
 
-  return {
-    success: true,
-    data: {
+  return [null, {
       overall: overall,
       timestamp: new Date().toISOString(),
       components: components,
-    },
-    error_message: null,
-  };
+    }];
 }
