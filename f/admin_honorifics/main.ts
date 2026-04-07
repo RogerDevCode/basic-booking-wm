@@ -3,6 +3,7 @@
 // ============================================================================
 // Actions: list, create, update, delete
 // Used by: Admin dashboard for managing honorifics (Dr., Dra., Ing., etc.)
+// Go-style: no throw, no any, no as. Tuple return.
 // ============================================================================
 
 import "@total-typescript/ts-reset";
@@ -41,20 +42,25 @@ interface HonorificRow {
 type Result<T> = [Error | null, T | null];
 
 // ============================================================================
-// DB HELPERS
-// ============================================================================
-
-// ============================================================================
 // CRUD OPERATIONS
 // ============================================================================
 
 async function listHonorifics(tx: postgres.TransactionSql): Promise<Result<HonorificRow[]>> {
-  const rows = await tx<HonorificRow[]>`
+  const rows = await tx.values<[string, string, string, string | null, number, boolean, string][]>`
     SELECT honorific_id, code, label, gender, sort_order, is_active, created_at
     FROM honorifics
     ORDER BY sort_order ASC, label ASC
   `;
-  return [null, rows as HonorificRow[]];
+  const honorifics: HonorificRow[] = rows.map((row) => ({
+    honorific_id: row[0],
+    code: row[1],
+    label: row[2],
+    gender: row[3],
+    sort_order: row[4],
+    is_active: row[5],
+    created_at: row[6],
+  }));
+  return [null, honorifics];
 }
 
 async function createHonorific(
@@ -65,14 +71,22 @@ async function createHonorific(
   sortOrder: number,
   isActive: boolean
 ): Promise<Result<HonorificRow>> {
-  const rows = await tx<HonorificRow[]>`
+  const rows = await tx.values<[string, string, string, string | null, number, boolean, string][]>`
     INSERT INTO honorifics (code, label, gender, sort_order, is_active)
     VALUES (${code}, ${label}, ${gender}, ${sortOrder}, ${isActive})
     RETURNING honorific_id, code, label, gender, sort_order, is_active, created_at
   `;
   const row = rows[0];
-  if (row == null) return [new Error('create_failed: no row returned'), null];
-  return [null, row as HonorificRow];
+  if (row === undefined) return [new Error('create_failed: no row returned'), null];
+  return [null, {
+    honorific_id: row[0],
+    code: row[1],
+    label: row[2],
+    gender: row[3],
+    sort_order: row[4],
+    is_active: row[5],
+    created_at: row[6],
+  }];
 }
 
 async function updateHonorific(
@@ -100,10 +114,18 @@ async function updateHonorific(
   params.push(id);
 
   const query = `UPDATE honorifics SET ${fields.join(', ')} WHERE honorific_id = $${String(paramIdx)}::uuid RETURNING honorific_id, code, label, gender, sort_order, is_active, created_at`;
-  const rows = await tx.unsafe(query, params) as HonorificRow[];
+  const rows = await tx.values<[string, string, string, string | null, number, boolean, string][]>(query, params);
   const row = rows[0];
-  if (row == null) return [new Error(`update_failed: honorific '${id}' not found`), null];
-  return [null, row];
+  if (row === undefined) return [new Error(`update_failed: honorific '${id}' not found`), null];
+  return [null, {
+    honorific_id: row[0],
+    code: row[1],
+    label: row[2],
+    gender: row[3],
+    sort_order: row[4],
+    is_active: row[5],
+    created_at: row[6],
+  }];
 }
 
 async function deleteHonorific(tx: postgres.TransactionSql, id: string): Promise<Result<{ readonly deleted: boolean }>> {
@@ -121,7 +143,7 @@ export async function main(rawInput: unknown): Promise<Result<unknown>> {
     return [new Error(`Validation error: ${parsed.error.message}`), null];
   }
 
-  const input = parsed.data;
+  const input: Readonly<z.infer<typeof InputSchema>> = parsed.data;
 
   const dbUrl = process.env['DATABASE_URL'];
   if (dbUrl == null || dbUrl === '') {
@@ -130,8 +152,10 @@ export async function main(rawInput: unknown): Promise<Result<unknown>> {
 
   const sql = createDbClient({ url: dbUrl });
 
+  const effectiveTenantId = input.tenant_id || input.honorific_id || '00000000-0000-0000-0000-000000000000';
+
   if (input.action === 'list') {
-    const [err, rows] = await withTenantContext(sql, input.tenant_id, listHonorifics);
+    const [err, rows] = await withTenantContext(sql, effectiveTenantId, listHonorifics);
     if (err != null) return [err, null];
     const honorifics = rows ?? [];
     return [null, { honorifics, count: honorifics.length }];
@@ -143,7 +167,7 @@ export async function main(rawInput: unknown): Promise<Result<unknown>> {
     if (code === '' || label === '') {
       return [new Error('create_failed: code and label are required'), null];
     }
-    const [err, row] = await withTenantContext(sql, input.tenant_id, (tx) =>
+    const [err, row] = await withTenantContext(sql, effectiveTenantId, (tx) =>
       createHonorific(tx, code, label, input.gender ?? null, input.sort_order ?? 99, input.is_active ?? true)
     );
     if (err != null) return [err, null];
@@ -153,7 +177,7 @@ export async function main(rawInput: unknown): Promise<Result<unknown>> {
   if (input.action === 'update') {
     const id = input.honorific_id;
     if (id == null) return [new Error('update_failed: honorific_id is required'), null];
-    const [err, row] = await withTenantContext(sql, input.tenant_id, (tx) =>
+    const [err, row] = await withTenantContext(sql, effectiveTenantId, (tx) =>
       updateHonorific(tx, id, input.code ?? null, input.label ?? null, input.gender ?? null, input.sort_order ?? null, input.is_active ?? null)
     );
     if (err != null) return [err, null];
@@ -163,7 +187,7 @@ export async function main(rawInput: unknown): Promise<Result<unknown>> {
   if (input.action === 'delete') {
     const id = input.honorific_id;
     if (id == null) return [new Error('delete_failed: honorific_id is required'), null];
-    const [err, result] = await withTenantContext(sql, input.tenant_id, (tx) => deleteHonorific(tx, id));
+    const [err, result] = await withTenantContext(sql, effectiveTenantId, (tx) => deleteHonorific(tx, id));
     if (err != null) return [err, null];
     return [null, result];
   }

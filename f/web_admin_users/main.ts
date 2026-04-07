@@ -6,6 +6,8 @@
 
 import { z } from 'zod';
 import postgres from 'postgres';
+import { withTenantContext } from '../internal/tenant-context';
+import { createDbClient } from '../internal/db/client';
 
 const InputSchema = z.object({
   admin_user_id: z.uuid(),
@@ -49,179 +51,185 @@ export async function main(rawInput: unknown): Promise<[Error | null, UserInfo |
     return [new Error('CONFIGURATION_ERROR: DATABASE_URL is not set'), null];
   }
 
-  const sql = postgres(dbUrl, { ssl: 'require' });
+  const sql = createDbClient({ url: dbUrl });
+  const tenantId = admin_user_id || '00000000-0000-0000-0000-000000000000';
 
   try {
-    const adminRows = await sql`
-      SELECT role FROM users WHERE user_id = ${admin_user_id}::uuid AND is_active = true LIMIT 1
-    `;
+    const [txErr, txData] = await withTenantContext(sql, tenantId, async (tx) => {
+      const adminRows = await tx`
+        SELECT role FROM users WHERE user_id = ${admin_user_id}::uuid AND is_active = true LIMIT 1
+      `;
 
-    const adminRow = adminRows[0];
-    if (adminRow === undefined) {
-      return [new Error('Admin not found or inactive'), null];
-    }
-
-    if (String(adminRow['role']) !== 'admin') {
-      return [new Error('Forbidden: admin access required'), null];
-    }
-
-    switch (action) {
-      case 'list': {
-        const rows = await sql`
-          SELECT user_id, full_name, email, rut, phone, role, is_active,
-                 telegram_chat_id, last_login, created_at
-          FROM users
-          ORDER BY created_at DESC
-          LIMIT 200
-        `;
-
-        const users: UserInfo[] = [];
-        for (const r of rows) {
-          users.push({
-            user_id: String(r['user_id']),
-            full_name: String(r['full_name']),
-            email: r['email'] !== null ? String(r['email']) : null,
-            rut: r['rut'] !== null ? String(r['rut']) : null,
-            phone: r['phone'] !== null ? String(r['phone']) : null,
-            role: String(r['role']),
-            is_active: Boolean(r['is_active']),
-            telegram_chat_id: r['telegram_chat_id'] !== null ? String(r['telegram_chat_id']) : null,
-            last_login: r['last_login'] !== null ? String(r['last_login']) : null,
-            created_at: String(r['created_at']),
-          });
-        }
-
-        const countRows = await sql`SELECT COUNT(*) AS total FROM users`;
-        const total = countRows[0] !== undefined ? Number(countRows[0]['total']) : 0;
-
-        return [null, { users: users, total: total }];
+      const adminRow = adminRows[0];
+      if (adminRow === undefined) {
+        return [new Error('Admin not found or inactive'), null];
       }
 
-      case 'get': {
-        const targetId = parsed.data.target_user_id;
-        if (targetId === undefined) {
-          return [new Error('target_user_id is required for get'), null];
-        }
-
-        const rows = await sql`
-          SELECT user_id, full_name, email, rut, phone, role, is_active,
-                 telegram_chat_id, last_login, created_at
-          FROM users WHERE user_id = ${targetId}::uuid LIMIT 1
-        `;
-
-        const row = rows[0];
-        if (row === undefined) {
-          return [new Error('User not found'), null];
-        }
-
-        return [null, {
-          user_id: String(row['user_id']),
-          full_name: String(row['full_name']),
-          email: row['email'] !== null ? String(row['email']) : null,
-          rut: row['rut'] !== null ? String(row['rut']) : null,
-          phone: row['phone'] !== null ? String(row['phone']) : null,
-          role: String(row['role']),
-          is_active: Boolean(row['is_active']),
-          telegram_chat_id: row['telegram_chat_id'] !== null ? String(row['telegram_chat_id']) : null,
-          last_login: row['last_login'] !== null ? String(row['last_login']) : null,
-          created_at: String(row['created_at']),
-        }];
+      if (String(adminRow['role']) !== 'admin') {
+        return [new Error('Forbidden: admin access required'), null];
       }
 
-      case 'update': {
-        const targetId = parsed.data.target_user_id;
-        if (targetId === undefined) {
-          return [new Error('target_user_id is required for update'), null];
+      switch (action) {
+        case 'list': {
+          const rows = await tx`
+            SELECT user_id, full_name, email, rut, phone, role, is_active,
+                   telegram_chat_id, last_login, created_at
+            FROM users
+            ORDER BY created_at DESC
+            LIMIT 200
+          `;
+
+          const users: UserInfo[] = [];
+          for (const r of rows) {
+            users.push({
+              user_id: String(r['user_id']),
+              full_name: String(r['full_name']),
+              email: r['email'] !== null ? String(r['email']) : null,
+              rut: r['rut'] !== null ? String(r['rut']) : null,
+              phone: r['phone'] !== null ? String(r['phone']) : null,
+              role: String(r['role']),
+              is_active: Boolean(r['is_active']),
+              telegram_chat_id: r['telegram_chat_id'] !== null ? String(r['telegram_chat_id']) : null,
+              last_login: r['last_login'] !== null ? String(r['last_login']) : null,
+              created_at: String(r['created_at']),
+            });
+          }
+
+          const countRows = await tx`SELECT COUNT(*) AS total FROM users`;
+          const total = countRows[0] !== undefined ? Number(countRows[0]['total']) : 0;
+
+          return [null, { users: users, total: total }];
         }
 
-        const updates: string[] = [];
-        const values: string[] = [];
+        case 'get': {
+          const targetId = parsed.data.target_user_id;
+          if (targetId === undefined) {
+            return [new Error('target_user_id is required for get'), null];
+          }
 
-        if (parsed.data.full_name !== undefined) {
-          updates.push('full_name = $' + String(values.length + 1));
-          values.push(parsed.data.full_name);
-        }
-        if (parsed.data.email !== undefined) {
-          updates.push('email = $' + String(values.length + 1));
-          values.push(parsed.data.email);
-        }
-        if (parsed.data.phone !== undefined) {
-          updates.push('phone = $' + String(values.length + 1));
-          values.push(parsed.data.phone);
-        }
-        if (parsed.data.role !== undefined) {
-          updates.push('role = $' + String(values.length + 1));
-          values.push(parsed.data.role);
-        }
+          const rows = await tx`
+            SELECT user_id, full_name, email, rut, phone, role, is_active,
+                   telegram_chat_id, last_login, created_at
+            FROM users WHERE user_id = ${targetId}::uuid LIMIT 1
+          `;
 
-        if (updates.length === 0) {
-          return [new Error('No fields to update'), null];
-        }
+          const row = rows[0];
+          if (row === undefined) {
+            return [new Error('User not found'), null];
+          }
 
-        updates.push('updated_at = NOW()');
-        values.push(targetId);
-
-        const queryText = 'UPDATE users SET ' + updates.join(', ') + ' WHERE user_id = $' + String(values.length) + '::uuid RETURNING user_id, full_name, email, rut, phone, role, is_active, telegram_chat_id, last_login, created_at';
-        const rows = await sql.unsafe(queryText, values);
-
-        const row = rows[0];
-        if (row === undefined) {
-          return [new Error('User not found'), null];
+          return [null, {
+            user_id: String(row['user_id']),
+            full_name: String(row['full_name']),
+            email: row['email'] !== null ? String(row['email']) : null,
+            rut: row['rut'] !== null ? String(row['rut']) : null,
+            phone: row['phone'] !== null ? String(row['phone']) : null,
+            role: String(row['role']),
+            is_active: Boolean(row['is_active']),
+            telegram_chat_id: row['telegram_chat_id'] !== null ? String(row['telegram_chat_id']) : null,
+            last_login: row['last_login'] !== null ? String(row['last_login']) : null,
+            created_at: String(row['created_at']),
+          }];
         }
 
-        return [null, {
-          user_id: String(row['user_id']),
-          full_name: String(row['full_name']),
-          email: row['email'] !== null ? String(row['email']) : null,
-          rut: row['rut'] !== null ? String(row['rut']) : null,
-          phone: row['phone'] !== null ? String(row['phone']) : null,
-          role: String(row['role']),
-          is_active: Boolean(row['is_active']),
-          telegram_chat_id: row['telegram_chat_id'] !== null ? String(row['telegram_chat_id']) : null,
-          last_login: row['last_login'] !== null ? String(row['last_login']) : null,
-          created_at: String(row['created_at']),
-        }];
+        case 'update': {
+          const targetId = parsed.data.target_user_id;
+          if (targetId === undefined) {
+            return [new Error('target_user_id is required for update'), null];
+          }
+
+          const updates: string[] = [];
+          const values: string[] = [];
+
+          if (parsed.data.full_name !== undefined) {
+            updates.push('full_name = $' + String(values.length + 1));
+            values.push(parsed.data.full_name);
+          }
+          if (parsed.data.email !== undefined) {
+            updates.push('email = $' + String(values.length + 1));
+            values.push(parsed.data.email);
+          }
+          if (parsed.data.phone !== undefined) {
+            updates.push('phone = $' + String(values.length + 1));
+            values.push(parsed.data.phone);
+          }
+          if (parsed.data.role !== undefined) {
+            updates.push('role = $' + String(values.length + 1));
+            values.push(parsed.data.role);
+          }
+
+          if (updates.length === 0) {
+            return [new Error('No fields to update'), null];
+          }
+
+          updates.push('updated_at = NOW()');
+          values.push(targetId);
+
+          const queryText = 'UPDATE users SET ' + updates.join(', ') + ' WHERE user_id = $' + String(values.length) + '::uuid RETURNING user_id, full_name, email, rut, phone, role, is_active, telegram_chat_id, last_login, created_at';
+          const rows = await tx.unsafe(queryText, values);
+
+          const row = rows[0];
+          if (row === undefined) {
+            return [new Error('User not found'), null];
+          }
+
+          return [null, {
+            user_id: String(row['user_id']),
+            full_name: String(row['full_name']),
+            email: row['email'] !== null ? String(row['email']) : null,
+            rut: row['rut'] !== null ? String(row['rut']) : null,
+            phone: row['phone'] !== null ? String(row['phone']) : null,
+            role: String(row['role']),
+            is_active: Boolean(row['is_active']),
+            telegram_chat_id: row['telegram_chat_id'] !== null ? String(row['telegram_chat_id']) : null,
+            last_login: row['last_login'] !== null ? String(row['last_login']) : null,
+            created_at: String(row['created_at']),
+          }];
+        }
+
+        case 'deactivate':
+        case 'activate': {
+          const targetId = parsed.data.target_user_id;
+          if (targetId === undefined) {
+            return [new Error('target_user_id is required'), null];
+          }
+
+          const isActive = action === 'activate';
+
+          const rows = await tx`
+            UPDATE users SET is_active = ${isActive}, updated_at = NOW()
+            WHERE user_id = ${targetId}::uuid
+            RETURNING user_id, full_name, email, rut, phone, role, is_active, telegram_chat_id, last_login, created_at
+          `;
+
+          const row = rows[0];
+          if (row === undefined) {
+            return [new Error('User not found'), null];
+          }
+
+          return [null, {
+            user_id: String(row['user_id']),
+            full_name: String(row['full_name']),
+            email: row['email'] !== null ? String(row['email']) : null,
+            rut: row['rut'] !== null ? String(row['rut']) : null,
+            phone: row['phone'] !== null ? String(row['phone']) : null,
+            role: String(row['role']),
+            is_active: Boolean(row['is_active']),
+            telegram_chat_id: row['telegram_chat_id'] !== null ? String(row['telegram_chat_id']) : null,
+            last_login: row['last_login'] !== null ? String(row['last_login']) : null,
+            created_at: String(row['created_at']),
+          }];
+        }
+
+        default: {
+          const _exhaustive: never = action;
+          return [new Error(`Unknown action: ${String(_exhaustive)}`), null];
+        }
       }
+    });
 
-      case 'deactivate':
-      case 'activate': {
-        const targetId = parsed.data.target_user_id;
-        if (targetId === undefined) {
-          return [new Error('target_user_id is required'), null];
-        }
-
-        const isActive = action === 'activate';
-
-        const rows = await sql`
-          UPDATE users SET is_active = ${isActive}, updated_at = NOW()
-          WHERE user_id = ${targetId}::uuid
-          RETURNING user_id, full_name, email, rut, phone, role, is_active, telegram_chat_id, last_login, created_at
-        `;
-
-        const row = rows[0];
-        if (row === undefined) {
-          return [new Error('User not found'), null];
-        }
-
-        return [null, {
-          user_id: String(row['user_id']),
-          full_name: String(row['full_name']),
-          email: row['email'] !== null ? String(row['email']) : null,
-          rut: row['rut'] !== null ? String(row['rut']) : null,
-          phone: row['phone'] !== null ? String(row['phone']) : null,
-          role: String(row['role']),
-          is_active: Boolean(row['is_active']),
-          telegram_chat_id: row['telegram_chat_id'] !== null ? String(row['telegram_chat_id']) : null,
-          last_login: row['last_login'] !== null ? String(row['last_login']) : null,
-          created_at: String(row['created_at']),
-        }];
-      }
-
-      default: {
-        const _exhaustive: never = action;
-        return [new Error(`Unknown action: ${String(_exhaustive)}`), null];
-      }
-    }
+    if (txErr) return [txErr, null];
+    return [null, txData];
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     if (message.includes('duplicate key') || message.includes('unique constraint')) {
