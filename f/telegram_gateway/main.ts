@@ -15,36 +15,38 @@ import postgres from 'postgres';
 
 // ============================================================================
 // INPUT SCHEMA — Telegram webhook payload
+// When called via Windmill webhook, the body arrives as a JSON string
+// that we need to parse first.
 // ============================================================================
 
-const TelegramInputSchema = z.object({
-  update_id: z.number(),
+const RawBodySchema = z.object({
+  update_id: z.number().optional(),
   message: z.object({
-    message_id: z.number(),
+    message_id: z.number().optional(),
     from: z.object({
-      id: z.number(),
-      is_bot: z.boolean(),
-      first_name: z.string(),
+      id: z.number().optional(),
+      is_bot: z.boolean().optional(),
+      first_name: z.string().optional().default('Usuario'),
       last_name: z.string().optional(),
       username: z.string().optional(),
     }).optional(),
     chat: z.object({
       id: z.number(),
-      type: z.enum(['private', 'group', 'supergroup', 'channel']),
+      type: z.enum(['private', 'group', 'supergroup', 'channel']).optional(),
       first_name: z.string().optional(),
       last_name: z.string().optional(),
       username: z.string().optional(),
     }),
-    date: z.number(),
+    date: z.number().optional(),
     text: z.string().optional(),
   }).optional(),
   callback_query: z.object({
     id: z.string(),
     from: z.object({ id: z.number() }),
-    message: z.any(),
+    message: z.any().optional(),
     data: z.string(),
   }).optional(),
-}).optional();
+});
 
 // ============================================================================
 // RESPONSE HELPERS
@@ -180,14 +182,30 @@ async function handleUnknownCommand(chatId: string, text: string): Promise<[Erro
 
 // ============================================================================
 // MAIN — Webhook entry point
+// Windmill maps JSON keys to function parameters individually
 // ============================================================================
 
-export async function main(rawInput: unknown): Promise<{
+export async function main(args: {
+  update_id?: number;
+  message?: {
+    message_id?: number;
+    from?: { id?: number; is_bot?: boolean; first_name?: string; last_name?: string; username?: string };
+    chat: { id: number; type?: string; first_name?: string; last_name?: string; username?: string };
+    date?: number;
+    text?: string;
+  };
+  callback_query?: {
+    id: string;
+    from: { id: number };
+    message?: unknown;
+    data: string;
+  };
+}): Promise<{
   readonly success: boolean;
   readonly data: { readonly message: string } | null;
   readonly error_message: string | null;
 }> {
-  const input = TelegramInputSchema.safeParse(rawInput);
+  const input = RawBodySchema.safeParse(args);
   if (!input.success) {
     return { success: false, data: null, error_message: `Validation error: ${input.error.message}` };
   }

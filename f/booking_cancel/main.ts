@@ -2,13 +2,18 @@
 // BOOKING CANCEL — Cancel an existing medical appointment
 // ============================================================================
 // Go-style: no throw for control flow, no any, no as.
-// All errors returned as Error values. All DB operations use typed interfaces.
-// Uses tx.unsafe() with parameterized queries inside transactions (no generic overload).
+// All errors returned as Error values. All DB operations use withTenantContext.
+// Uses tx.unsafe() with parameterized queries inside transactions.
+// Enforces state machine transitions via shared module.
 // ============================================================================
 
 import { z } from 'zod';
 import postgres from 'postgres';
 import type { UUID } from '../internal/db-types';
+import { toUUID } from '../internal/db-types';
+import { withTenantContext } from '../internal/tenant-context';
+import { validateTransition } from '../internal/state-machine';
+import { createDbClient } from '../internal/db/client';
 
 // ─── Input Validation ───────────────────────────────────────────────────────
 const InputSchema = z.object({
@@ -46,30 +51,30 @@ interface UpdatedBooking {
   readonly cancellation_reason: string | null;
 }
 
-// ─── Constants ──────────────────────────────────────────────────────────────
-const CANCELLABLE_STATUSES: readonly string[] = ['pending', 'confirmed'];
+// ─── Constants ─────────────────────────────────────────────────────────────
+// Note: CANCELLABLE_STATUSES removed. State machine validation is now used.
 
 // ─── Main Entry Point ───────────────────────────────────────────────────────
 export async function main(
   rawInput: unknown,
-): Promise<{ success: boolean; data: CancelResult | null; error_message: string | null }> {
+): Promise<[Error | null, CancelResult | null]> {
   const parsed = InputSchema.safeParse(rawInput);
   if (!parsed.success) {
-    return { success: false, data: null, error_message: `Validation error: ${parsed.error.message}` };
+    return [new Error(`Validation error: ${parsed.error.message}`), null];
   }
 
   const input: Readonly<CancelBookingInput> = parsed.data;
 
   const dbUrl = process.env['DATABASE_URL'];
-  if (!dbUrl) {
-    return { success: false, data: null, error_message: 'CONFIGURATION_ERROR: DATABASE_URL is required' };
+  if (dbUrl === undefined || dbUrl === '') {
+    return [new Error('CONFIGURATION_ERROR: DATABASE_URL is required'), null];
   }
 
-  const sql = postgres(dbUrl, { ssl: 'require' });
+  const sql = createDbClient({ url: dbUrl });
 
   try {
-    // 1. Find booking
-    const bookingRows = await sql<BookingLookup[]>`
+    // 1. Find booking (admin read — booking_id acts as capability token)
+    const bookingRows = await sql.values<[string, string, string, string, string | null, string | null][]>`
       SELECT booking_id, status, client_id, provider_id,
              gcal_provider_event_id, gcal_client_event_id
       FROM bookings
@@ -78,49 +83,58 @@ export async function main(
     `;
     const bookingRow = bookingRows[0];
     if (bookingRow === undefined) {
-      return { success: false, data: null, error_message: `Booking ${input.booking_id} not found` };
+      return [new Error(`Booking ${input.booking_id} not found`), null];
     }
 
-    const booking: BookingLookup = bookingRow;
+    const booking: BookingLookup = {
+      booking_id: bookingRow[0],
+      status: bookingRow[1],
+      client_id: bookingRow[2],
+      provider_id: bookingRow[3],
+      gcal_provider_event_id: bookingRow[4],
+      gcal_client_event_id: bookingRow[5],
+    };
 
-    // 2. Validate cancellable state
-    if (!CANCELLABLE_STATUSES.includes(booking.status)) {
-      return {
-        success: false,
-        data: null,
-        error_message: `Cannot cancel booking with status '${booking.status}'. Only pending, confirmed bookings can be cancelled.`,
-      };
+    // 2. Validate state machine transition
+    const [transitionErr] = validateTransition(booking.status, 'cancelled');
+    if (transitionErr !== null) {
+      return [transitionErr, null];
     }
 
     // 3. Validate actor permission
     if (input.actor === 'client' && booking.client_id !== input.actor_id) {
-      return { success: false, data: null, error_message: 'Unauthorized: client_id mismatch' };
+      return [new Error('Unauthorized: client_id mismatch'), null];
     }
     if (input.actor === 'provider' && booking.provider_id !== input.actor_id) {
-      return { success: false, data: null, error_message: 'Unauthorized: provider_id mismatch' };
+      return [new Error('Unauthorized: provider_id mismatch'), null];
     }
 
-    // 4. Update status + audit trail atomically
-    let updated: UpdatedBooking | undefined;
-    let txError: Error | undefined;
+    // 4. Update status + audit trail atomically under tenant context
+    const [txErr, updated] = await withTenantContext<UpdatedBooking>(
+      sql,
+      booking.provider_id,
+      async (tx) => {
+        const updRows = await tx.values<[string, string, string, string | null][]>`
+          UPDATE bookings
+          SET status = 'cancelled',
+              cancelled_by = ${input.actor},
+              cancellation_reason = ${input.reason ?? null},
+              updated_at = NOW()
+          WHERE booking_id = ${input.booking_id}::uuid
+          RETURNING booking_id, status, cancelled_by, cancellation_reason
+        `;
 
-    try {
-      updated = await sql.begin(async (tx) => {
-        const updRows: unknown[] = await tx.unsafe(
-          `UPDATE bookings
-           SET status = 'cancelled',
-               cancelled_by = $1,
-               cancellation_reason = $2,
-               updated_at = NOW()
-           WHERE booking_id = $3::uuid
-           RETURNING booking_id, status, cancelled_by, cancellation_reason`,
-          [input.actor, input.reason ?? null, input.booking_id]
-        );
-
-        const updRow: UpdatedBooking | undefined = updRows[0] as UpdatedBooking | undefined;
+        const updRow = updRows[0];
         if (updRow === undefined) {
-          throw new Error('Failed to update booking status');
+          return [new Error('Failed to update booking status'), null];
         }
+
+        const updatedBooking: UpdatedBooking = {
+          booking_id: updRow[0],
+          status: updRow[1],
+          cancelled_by: updRow[2],
+          cancellation_reason: updRow[3],
+        };
 
         await tx.unsafe(
           `INSERT INTO booking_audit (booking_id, from_status, to_status, changed_by, actor_id, reason, metadata)
@@ -135,22 +149,15 @@ export async function main(
               gcal_provider_event_id: booking.gcal_provider_event_id,
               gcal_client_event_id: booking.gcal_client_event_id,
             }),
-          ]
+          ],
         );
 
-        return {
-          booking_id: updRow.booking_id,
-          status: updRow.status,
-          cancelled_by: updRow.cancelled_by,
-          cancellation_reason: updRow.cancellation_reason,
-        };
-      });
-    } catch (e) {
-      txError = e instanceof Error ? e : new Error(String(e));
-    }
+        return [null, updatedBooking];
+      },
+    );
 
-    if (txError !== undefined || updated === undefined) {
-      return { success: false, data: null, error_message: txError?.message ?? 'Unknown transaction error' };
+    if (txErr !== null || updated === null) {
+      return [txErr ?? new Error('Unknown transaction error'), null];
     }
 
     // 5. Mark GCal events for cleanup
@@ -162,20 +169,18 @@ export async function main(
       `;
     }
 
-    return {
-      success: true,
-      data: {
-        booking_id: updated.booking_id as UUID,
-        previous_status: booking.status,
-        new_status: updated.status,
-        cancelled_by: updated.cancelled_by,
-        cancellation_reason: updated.cancellation_reason,
-      },
-      error_message: null,
+    const result: CancelResult = {
+      booking_id: toUUID(updated.booking_id),
+      previous_status: booking.status,
+      new_status: updated.status,
+      cancelled_by: updated.cancelled_by,
+      cancellation_reason: updated.cancellation_reason,
     };
+
+    return [null, result];
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
-    return { success: false, data: null, error_message: `Internal error: ${message}` };
+    return [new Error(`Internal error: ${message}`), null];
   } finally {
     await sql.end();
   }

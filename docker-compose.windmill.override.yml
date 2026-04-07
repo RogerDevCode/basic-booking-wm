@@ -1,24 +1,29 @@
-# Windmill override — use external Neon DB, disable bundled Postgres, disable extra services
+# Windmill override — use external Neon DB, disable extra workers/services, pass env vars
 services:
+  # Disable bundled Postgres — we use Neon cloud
   db:
     deploy:
       replicas: 0
 
+  # 1 standard TypeScript worker (bun runtime)
   windmill_worker:
     deploy:
       replicas: 1
       resources:
         limits:
           memory: 1024M
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_ID=${TELEGRAM_ID}
+      - DATABASE_URL=${DATABASE_URL}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
 
+  # Disable Go native worker — our project uses TypeScript only
   windmill_worker_native:
     deploy:
-      replicas: 1
-      resources:
-        limits:
-          memory: 1024M
+      replicas: 0
 
-  # Disable optional services we don't need
+  # Disable optional services
   windmill_extra:
     image: alpine:latest
     command: ["tail", "-f", "/dev/null"]
@@ -30,3 +35,11 @@ services:
     command: ["tail", "-f", "/dev/null"]
     deploy:
       replicas: 0
+
+  # Pass env vars to server
+  windmill_server:
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_ID=${TELEGRAM_ID}
+      - DATABASE_URL=${DATABASE_URL}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}

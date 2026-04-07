@@ -2,17 +2,24 @@
 // BOOKING RESCHEDULE — Cancel old booking + create new one atomically
 // ============================================================================
 // Reschedules a booking by running ALL 4 DB operations in a single
-// sql.begin() transaction:
+// sql.begin() transaction with RLS tenant context:
 //   1. INSERT new booking
 //   2. UPDATE old booking to 'rescheduled'
 //   3. INSERT audit for old booking
 //   4. INSERT audit for new booking
 //
 // Atomic: if ANY step fails, ALL steps rollback. No partial state.
+// Go-style: no throw for control flow, no any, no as.
+// Enforces state machine transitions via shared module.
 // ============================================================================
 
 import { z } from 'zod';
 import postgres from 'postgres';
+import type { UUID } from '../internal/db-types';
+import { toUUID } from '../internal/db-types';
+import { withTenantContext } from '../internal/tenant-context';
+import { validateTransition } from '../internal/state-machine';
+import { createDbClient } from '../internal/db/client';
 
 type Sql = postgres.Sql;
 
@@ -25,224 +32,251 @@ const InputSchema = z.object({
   reason: z.string().max(500).optional(),
 });
 
-interface RescheduleResult {
-  old_booking_id: string;
-  new_booking_id: string;
-  old_status: string;
-  new_status: string;
-  old_start_time: string;
-  new_start_time: string;
-  new_end_time: string;
+// ─── Output Types ───────────────────────────────────────────────────────────
+export interface RescheduleResult {
+  readonly old_booking_id: UUID;
+  readonly new_booking_id: UUID;
+  readonly old_status: string;
+  readonly new_status: string;
+  readonly old_start_time: string;
+  readonly new_start_time: string;
+  readonly new_end_time: string;
 }
 
-// --- Typed Row Interfaces ---
+// ─── Typed Row Interfaces ───────────────────────────────────────────────────
 interface OldBookingRow {
-  booking_id: string;
-  status: string;
-  client_id: string;
-  provider_id: string;
-  service_id: string;
-  start_time: string;
-  end_time: string;
-  idempotency_key: string;
+  readonly booking_id: string;
+  readonly status: string;
+  readonly client_id: string;
+  readonly provider_id: string;
+  readonly service_id: string;
+  readonly start_time: string;
+  readonly end_time: string;
+  readonly idempotency_key: string;
 }
 
 interface ServiceRow {
-  service_id: string;
-  duration_minutes: number;
+  readonly service_id: string;
+  readonly duration_minutes: number;
 }
 
-interface OverlapRow {
-  booking_id: string;
+interface RescheduleWriteResult {
+  readonly new_booking_id: string;
+  readonly new_status: string;
+  readonly new_start_time: string;
+  readonly new_end_time: string;
+  readonly old_booking_id: string;
+  readonly old_status: string;
 }
 
-interface InsertedBookingRow {
-  booking_id: string;
-  status: string;
-  start_time: string;
-  end_time: string;
-}
+// Note: RESCHEDULABLE_STATUSES removed. State machine validation is now used.
 
-interface UpdatedBookingRow {
-  booking_id: string;
-  status: string;
-}
-
-const RESCHEDULABLE_STATUSES = ['pending', 'confirmed'];
-
-async function validateSlot(
+// ─── Validation Functions ───────────────────────────────────────────────────
+async function lookupService(
   sql: Sql,
-  providerId: string,
-  startTime: string,
-  durationMinutes: number,
-  excludeBookingId: string
-): Promise<{ available: boolean; error?: string }> {
-  const start = new Date(startTime);
-  const end = new Date(start.getTime() + durationMinutes * 60 * 1000);
-
-  const [overlap] = await sql<OverlapRow[]>`
-    SELECT booking_id FROM bookings
-    WHERE provider_id = ${providerId}::uuid
-      AND status NOT IN ('cancelled', 'no_show', 'rescheduled')
-      AND booking_id != ${excludeBookingId}::uuid
-      AND start_time < ${end.toISOString()}::timestamptz
-      AND end_time > ${start.toISOString()}::timestamptz
-    LIMIT 1
+  serviceId: string,
+): Promise<[Error | null, ServiceRow | null]> {
+  const rows = await sql.values<[string, number][]>`
+    SELECT service_id, duration_minutes FROM services
+    WHERE service_id = ${serviceId}::uuid AND is_active = true LIMIT 1
   `;
-  if (overlap) return { available: false, error: 'New time slot is already booked' };
-  return { available: true };
+  const row = rows[0];
+  if (row === undefined) {
+    return [new Error(`Service ${serviceId} not found or inactive`), null];
+  }
+  return [null, { service_id: row[0], duration_minutes: row[1] }];
 }
 
-export async function main(rawInput: unknown): Promise<{
-  success: boolean;
-  data: RescheduleResult | null;
-  error_message: string | null;
-}> {
+// ─── Main Entry Point ───────────────────────────────────────────────────────
+export async function main(
+  rawInput: unknown,
+): Promise<[Error | null, RescheduleResult | null]> {
+  const parsed = InputSchema.safeParse(rawInput);
+  if (!parsed.success) {
+    return [new Error(`Validation error: ${parsed.error.message}`), null];
+  }
+
+  const input: Readonly<z.infer<typeof InputSchema>> = parsed.data;
+
+  const dbUrl = process.env['DATABASE_URL'];
+  if (dbUrl === undefined || dbUrl === '') {
+    return [new Error('CONFIGURATION_ERROR: DATABASE_URL is required'), null];
+  }
+
+  const sql = createDbClient({ url: dbUrl });
+
   try {
-    const parsed = InputSchema.safeParse(rawInput);
-    if (!parsed.success) {
-      return { success: false, data: null, error_message: `Validation error: ${parsed.error.message}` };
+    // 1. Find old booking (admin read — booking_id as capability token)
+    const bookingRows = await sql.values<[string, string, string, string, string, string, string, string][]>`
+      SELECT booking_id, status, client_id, provider_id, service_id,
+             start_time, end_time, idempotency_key
+      FROM bookings
+      WHERE booking_id = ${input.booking_id}::uuid
+      LIMIT 1
+    `;
+    const bookingRow = bookingRows[0];
+    if (bookingRow === undefined) {
+      return [new Error(`Booking ${input.booking_id} not found`), null];
     }
 
-    const { booking_id, new_start_time, new_service_id, actor, actor_id, reason } = parsed.data;
+    const oldBooking: OldBookingRow = {
+      booking_id: bookingRow[0],
+      status: bookingRow[1],
+      client_id: bookingRow[2],
+      provider_id: bookingRow[3],
+      service_id: bookingRow[4],
+      start_time: bookingRow[5],
+      end_time: bookingRow[6],
+      idempotency_key: bookingRow[7],
+    };
 
-    const dbUrl = process.env['DATABASE_URL'];
-    if (!dbUrl) {
-      return { success: false, data: null, error_message: 'DATABASE_URL not configured' };
+    // 2. Validate state machine transition
+    const [transitionErr] = validateTransition(oldBooking.status, 'rescheduled');
+    if (transitionErr !== null) {
+      return [transitionErr, null];
     }
 
-    const sql = postgres(dbUrl, { ssl: 'require' });
+    // 3. Validate actor permission
+    if (input.actor === 'client' && oldBooking.client_id !== input.actor_id) {
+      return [new Error('Unauthorized: client_id mismatch'), null];
+    }
+    if (input.actor === 'provider' && oldBooking.provider_id !== input.actor_id) {
+      return [new Error('Unauthorized: provider_id mismatch'), null];
+    }
 
-    try {
-      const newStartDateTime = new_start_time;
-      const [oldBooking] = await sql<OldBookingRow[]>`
-        SELECT booking_id, status, client_id, provider_id, service_id,
-               start_time, end_time, idempotency_key
-        FROM bookings
-        WHERE booking_id = ${booking_id}::uuid
-        LIMIT 1
-      `;
+    // 4. Lookup new service
+    const serviceId = input.new_service_id ?? oldBooking.service_id;
+    const [serviceErr, service] = await lookupService(sql, serviceId);
+    if (serviceErr !== null || service === null) {
+      return [serviceErr ?? new Error('Service not found'), null];
+    }
 
-      if (!oldBooking) {
-        return { success: false, data: null, error_message: `Booking ${booking_id} not found` };
-      }
+    // 5-8. All writes inside tenant context transaction
+    const newStartDateTime = input.new_start_time;
+    const newEndTime = new Date(newStartDateTime.getTime() + service.duration_minutes * 60 * 1000);
+    const newIdempotencyKey = `reschedule-${oldBooking.idempotency_key}-${String(Date.now())}`;
 
-      if (!RESCHEDULABLE_STATUSES.includes(oldBooking.status)) {
-        return {
-          success: false,
-          data: null,
-          error_message: `Cannot reschedule booking with status '${oldBooking.status}'. Only ${RESCHEDULABLE_STATUSES.join(', ')} allowed.`,
-        };
-      }
+    const [txErr, writeResult] = await withTenantContext<RescheduleWriteResult>(
+      sql,
+      oldBooking.provider_id,
+      async (tx) => {
+        // 5. Check slot overlap (inside transaction — prevents race condition)
+        const overlapRows = await tx.values<[string][]>`
+          SELECT booking_id FROM bookings
+          WHERE provider_id = ${oldBooking.provider_id}::uuid
+            AND status NOT IN ('cancelled', 'no_show', 'rescheduled')
+            AND booking_id != ${input.booking_id}::uuid
+            AND start_time < ${newEndTime.toISOString()}::timestamptz
+            AND end_time > ${newStartDateTime.toISOString()}::timestamptz
+          LIMIT 1
+        `;
+        if (overlapRows[0] !== undefined) {
+          return [new Error('New time slot is already booked'), null];
+        }
 
-      if (actor === 'client' && oldBooking.client_id !== actor_id) {
-        return { success: false, data: null, error_message: 'Unauthorized: client_id mismatch' };
-      }
-      if (actor === 'provider' && oldBooking.provider_id !== actor_id) {
-        return { success: false, data: null, error_message: 'Unauthorized: provider_id mismatch' };
-      }
-
-      const serviceId = new_service_id ?? oldBooking.service_id;
-      const [service] = await sql<ServiceRow[]>`
-        SELECT service_id, duration_minutes FROM services
-        WHERE service_id = ${serviceId}::uuid AND is_active = true LIMIT 1
-      `;
-      if (!service) {
-        return { success: false, data: null, error_message: `Service ${serviceId} not found or inactive` };
-      }
-
-      const slotCheck = await validateSlot(
-        sql, oldBooking.provider_id, newStartDateTime.toISOString(), service.duration_minutes, booking_id
-      );
-      if (!slotCheck.available) {
-        return { success: false, data: null, error_message: slotCheck.error ?? 'Slot not available' };
-      }
-
-      const newStartTime = newStartDateTime;
-      const newEndTime = new Date(newStartTime.getTime() + service.duration_minutes * 60 * 1000);
-      const newIdempotencyKey = `reschedule-${oldBooking.idempotency_key}-${String(Date.now())}`;
-
-      // ALL 4 writes in one atomic transaction:
-      const [newBooking, updatedOld] = await sql.begin(async (tx) => {
-        const q = tx as unknown as postgres.Sql;
-        // 1. Create new booking
-        const newRows = await q<InsertedBookingRow[]>`
+        // 6. Create new booking
+        const newRows = await tx.values<[string, string, string, string][]>`
           INSERT INTO bookings (
             client_id, provider_id, service_id,
             start_time, end_time, status, idempotency_key, rescheduled_from,
-            gcal_sync_status, notification_sent,
-            reminder_24h_sent, reminder_2h_sent, reminder_30min_sent
+            gcal_sync_status, notification_sent
           ) VALUES (
             ${oldBooking.client_id}::uuid, ${oldBooking.provider_id}::uuid, ${serviceId}::uuid,
-            ${newStartTime.toISOString()}::timestamptz, ${newEndTime.toISOString()}::timestamptz,
-            'confirmed', ${newIdempotencyKey}, ${booking_id}::uuid,
-            'pending', false, false, false, false
+            ${newStartDateTime.toISOString()}::timestamptz, ${newEndTime.toISOString()}::timestamptz,
+            'confirmed', ${newIdempotencyKey}, ${input.booking_id}::uuid,
+            'pending', false
           )
           RETURNING booking_id, status, start_time, end_time
         `;
-        const nb = newRows[0];
-        if (!nb) throw new Error('Failed to create new booking');
+        const nbRow = newRows[0];
+        if (nbRow === undefined) {
+          return [new Error('Failed to create new booking'), null];
+        }
 
-        // 2. Update old booking to rescheduled
-        const updRows = await q<UpdatedBookingRow[]>`
+        // 7. Update old booking to rescheduled
+        const updRows = await tx.values<[string, string][]>`
           UPDATE bookings
-          SET status = 'rescheduled', rescheduled_to = ${nb.booking_id}::uuid, updated_at = NOW()
-          WHERE booking_id = ${booking_id}::uuid
+          SET status = 'rescheduled', updated_at = NOW()
+          WHERE booking_id = ${input.booking_id}::uuid
           RETURNING booking_id, status
         `;
-        const uo = updRows[0];
-        if (!uo) throw new Error('Failed to update old booking status');
+        const uoRow = updRows[0];
+        if (uoRow === undefined) {
+          return [new Error('Failed to update old booking status'), null];
+        }
 
-        // 3. Audit for old booking
-        await q`
-          INSERT INTO booking_audit (booking_id, from_status, to_status, changed_by, actor_id, reason, metadata)
-          VALUES (
-            ${booking_id}::uuid, ${oldBooking.status}, 'rescheduled',
-            ${actor}, ${actor_id ?? null}::uuid,
-            ${reason ?? 'Rescheduled to new time'},
-            ${JSON.stringify({ new_booking_id: nb.booking_id })}::jsonb
-          )
-        `;
+        // 8. Audit for old booking
+        await tx.unsafe(
+          `INSERT INTO booking_audit (booking_id, from_status, to_status, changed_by, actor_id, reason, metadata)
+           VALUES ($1::uuid, $2, 'rescheduled', $3, $4::uuid, $5, $6::jsonb)`,
+          [
+            input.booking_id,
+            oldBooking.status,
+            input.actor,
+            input.actor_id ?? null,
+            input.reason ?? 'Rescheduled to new time',
+            JSON.stringify({ new_booking_id: nbRow[0] }),
+          ],
+        );
 
-        // 4. Audit for new booking
-        await q`
-          INSERT INTO booking_audit (booking_id, from_status, to_status, changed_by, actor_id, reason, metadata)
-          VALUES (
-            ${nb.booking_id}::uuid, null, 'confirmed',
-            ${actor}, ${actor_id ?? null}::uuid,
+        // 9. Audit for new booking
+        await tx.unsafe(
+          `INSERT INTO booking_audit (booking_id, from_status, to_status, changed_by, actor_id, reason, metadata)
+           VALUES ($1::uuid, null, 'confirmed', $2, $3::uuid, $4, $5::jsonb)`,
+          [
+            nbRow[0],
+            input.actor,
+            input.actor_id ?? null,
             'Created via reschedule',
-            ${JSON.stringify({ old_booking_id: booking_id })}::jsonb
-          )
-        `;
+            JSON.stringify({ old_booking_id: input.booking_id }),
+          ],
+        );
 
-        return [nb, uo] as [InsertedBookingRow, UpdatedBookingRow];
-      });
+        const result: RescheduleWriteResult = {
+          new_booking_id: nbRow[0],
+          new_status: nbRow[1],
+          new_start_time: nbRow[2],
+          new_end_time: nbRow[3],
+          old_booking_id: uoRow[0],
+          old_status: uoRow[1],
+        };
 
-      return {
-        success: true,
-        data: {
-          old_booking_id: updatedOld.booking_id,
-          new_booking_id: newBooking.booking_id,
-          old_status: oldBooking.status,
-          new_status: newBooking.status,
-          old_start_time: oldBooking.start_time,
-          new_start_time: newBooking.start_time,
-          new_end_time: newBooking.end_time,
-        },
-        error_message: null,
-      };
-    } finally {
-      await sql.end();
+        return [null, result];
+      },
+    );
+
+    if (txErr !== null || writeResult === null) {
+      const msg = txErr?.message ?? 'Unknown transaction error';
+      if (msg.includes('duplicate key') || msg.includes('unique constraint')) {
+        return [new Error('Idempotency key conflict'), null];
+      }
+      if (msg.includes('booking_no_overlap') || msg.includes('exclusion constraint')) {
+        return [new Error('This time slot was just booked. Please choose a different time.'), null];
+      }
+      return [txErr ?? new Error(msg), null];
     }
+
+    const result: RescheduleResult = {
+      old_booking_id: toUUID(writeResult.old_booking_id),
+      new_booking_id: toUUID(writeResult.new_booking_id),
+      old_status: writeResult.old_status,
+      new_status: writeResult.new_status,
+      old_start_time: oldBooking.start_time,
+      new_start_time: writeResult.new_start_time,
+      new_end_time: writeResult.new_end_time,
+    };
+
+    return [null, result];
   } catch (e) {
-    const error = e instanceof Error ? e : new Error(String(e));
-    const msg = error.message;
-    if (msg.includes('duplicate key') || msg.includes('unique constraint')) {
-      return { success: false, data: null, error_message: 'Idempotency key conflict' };
+    const message = e instanceof Error ? e.message : String(e);
+    if (message.includes('duplicate key') || message.includes('unique constraint')) {
+      return [new Error('Idempotency key conflict'), null];
     }
-    if (msg.includes('booking_no_overlap') || msg.includes('exclusion constraint') || msg.includes('overlaps')) {
-      return { success: false, data: null, error_message: 'This time slot was just booked. Please choose a different time.' };
+    if (message.includes('booking_no_overlap') || message.includes('exclusion constraint') || message.includes('overlaps')) {
+      return [new Error('This time slot was just booked. Please choose a different time.'), null];
     }
-    return { success: false, data: null, error_message: `Internal error: ${msg}` };
+    return [new Error(`Internal error: ${message}`), null];
+  } finally {
+    await sql.end();
   }
 }

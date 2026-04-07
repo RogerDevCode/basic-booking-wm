@@ -2,12 +2,14 @@
 // DISTRIBUTED LOCK — Advisory lock for race condition prevention
 // ============================================================================
 // Uses booking_locks table for application-level locks.
-// Also supports PostgreSQL advisory locks for stronger guarantees.
+// Go-style: no throw, no any, no as. Tuple return.
 // Usage: acquire() → do work → release()
 // ============================================================================
 
 import { z } from 'zod';
 import postgres from 'postgres';
+import { withTenantContext } from '../internal/tenant-context';
+import { createDbClient } from '../internal/db/client';
 
 const InputSchema = z.object({
   action: z.enum(['acquire', 'release', 'check', 'cleanup']),
@@ -49,44 +51,43 @@ interface LockResult {
   readonly expires_at?: string;
 }
 
-export async function main(rawInput: unknown): Promise<{
-  success: boolean;
-  data: LockResult | null;
-  error_message: string | null;
-}> {
+// ─── Main Entry Point ───────────────────────────────────────────────────────
+export async function main(
+  rawInput: unknown,
+): Promise<[Error | null, LockResult | null]> {
   const parsed = InputSchema.safeParse(rawInput);
   if (!parsed.success) {
-    return { success: false, data: null, error_message: `Validation error: ${parsed.error.message}` };
+    return [new Error(`Validation error: ${parsed.error.message}`), null];
   }
 
-  const { action, lock_key, owner_token, provider_id, start_time, ttl_seconds } = parsed.data;
+  const input: Readonly<z.infer<typeof InputSchema>> = parsed.data;
 
   const dbUrl = process.env['DATABASE_URL'];
   if (dbUrl === undefined || dbUrl === '') {
-    return { success: false, data: null, error_message: 'CONFIGURATION_ERROR: DATABASE_URL is required' };
+    return [new Error('CONFIGURATION_ERROR: DATABASE_URL is required'), null];
   }
 
-  const sql = postgres(dbUrl, { ssl: 'require' });
+  const sql = createDbClient({ url: dbUrl });
 
   try {
-    switch (action) {
+    switch (input.action) {
       case 'acquire': {
-        if (owner_token === undefined) {
-          return { success: false, data: null, error_message: 'owner_token is required for acquire' };
+        if (input.owner_token === undefined) {
+          return [new Error('owner_token is required for acquire'), null];
         }
-        if (provider_id === undefined) {
-          return { success: false, data: null, error_message: 'provider_id is required for acquire' };
+        if (input.provider_id === undefined) {
+          return [new Error('provider_id is required for acquire'), null];
         }
-        if (start_time === undefined) {
-          return { success: false, data: null, error_message: 'start_time is required for acquire' };
+        if (input.start_time === undefined) {
+          return [new Error('start_time is required for acquire'), null];
         }
 
-        const expiresAt = new Date(Date.now() + ttl_seconds * 1000);
+        const expiresAt = new Date(Date.now() + input.ttl_seconds * 1000);
 
         // Try to insert lock (unique constraint on lock_key prevents duplicates)
-        const rows = await sql<LockRow[]>`
+        const rows = await sql.values<[number, string, string, string, string, string, string][]>`
           INSERT INTO booking_locks (lock_key, owner_token, provider_id, start_time, expires_at)
-          VALUES (${lock_key}, ${owner_token}, ${provider_id}::uuid, ${start_time}::timestamptz, ${expiresAt.toISOString()}::timestamptz)
+          VALUES (${input.lock_key}, ${input.owner_token}, ${input.provider_id}::uuid, ${input.start_time}::timestamptz, ${expiresAt.toISOString()}::timestamptz)
           ON CONFLICT (lock_key) DO NOTHING
           RETURNING lock_id, lock_key, owner_token, provider_id, start_time, acquired_at, expires_at
         `;
@@ -94,93 +95,101 @@ export async function main(rawInput: unknown): Promise<{
         const row = rows[0];
         if (row === undefined) {
           // Check if existing lock is expired (steal it)
-          const existingRows = await sql<LockRow[]>`
+          const existingRows = await sql.values<[number, string, string, string, string, string, string][]>`
             SELECT lock_id, lock_key, owner_token, provider_id, start_time, acquired_at, expires_at
             FROM booking_locks
-            WHERE lock_key = ${lock_key} AND expires_at < NOW()
+            WHERE lock_key = ${input.lock_key} AND expires_at < NOW()
             LIMIT 1
           `;
           const existing = existingRows[0];
           if (existing !== undefined) {
             // Lock is expired — update it
-            const updatedRows = await sql<LockRow[]>`
+            const updatedRows = await sql.values<[number, string, string, string, string, string, string][]>`
               UPDATE booking_locks
-              SET owner_token = ${owner_token},
+              SET owner_token = ${input.owner_token},
                   expires_at = ${expiresAt.toISOString()}::timestamptz,
                   acquired_at = NOW()
-              WHERE lock_key = ${lock_key} AND expires_at < NOW()
+              WHERE lock_key = ${input.lock_key} AND expires_at < NOW()
               RETURNING lock_id, lock_key, owner_token, provider_id, start_time, acquired_at, expires_at
             `;
             const updated = updatedRows[0];
             if (updated !== undefined) {
               const lockInfo: LockInfo = {
-                lock_id: updated.lock_id,
-                lock_key: updated.lock_key,
-                owner_token: updated.owner_token,
-                provider_id: updated.provider_id,
-                start_time: updated.start_time,
-                acquired_at: updated.acquired_at,
-                expires_at: updated.expires_at,
+                lock_id: updated[0],
+                lock_key: updated[1],
+                owner_token: updated[2],
+                provider_id: updated[3],
+                start_time: updated[4],
+                acquired_at: updated[5],
+                expires_at: updated[6],
               };
-              return { success: true, data: { acquired: true, lock: lockInfo }, error_message: null };
+              const result: LockResult = { acquired: true, lock: lockInfo };
+              return [null, result];
             }
           }
-          return { success: true, data: { acquired: false, reason: 'Lock already held' }, error_message: null };
+          const result: LockResult = { acquired: false, reason: 'Lock already held' };
+          return [null, result];
         }
 
         const lockInfo: LockInfo = {
-          lock_id: row.lock_id,
-          lock_key: row.lock_key,
-          owner_token: row.owner_token,
-          provider_id: row.provider_id,
-          start_time: row.start_time,
-          acquired_at: row.acquired_at,
-          expires_at: row.expires_at,
+          lock_id: row[0],
+          lock_key: row[1],
+          owner_token: row[2],
+          provider_id: row[3],
+          start_time: row[4],
+          acquired_at: row[5],
+          expires_at: row[6],
         };
-        return { success: true, data: { acquired: true, lock: lockInfo }, error_message: null };
+        const result: LockResult = { acquired: true, lock: lockInfo };
+        return [null, result];
       }
 
       case 'release': {
-        if (owner_token === undefined) {
-          return { success: false, data: null, error_message: 'owner_token is required for release' };
+        if (input.owner_token === undefined) {
+          return [new Error('owner_token is required for release'), null];
         }
 
         const rows = await sql`
           DELETE FROM booking_locks
-          WHERE lock_key = ${lock_key} AND owner_token = ${owner_token}
+          WHERE lock_key = ${input.lock_key} AND owner_token = ${input.owner_token}
           RETURNING lock_key
         `;
         const row = rows[0];
         if (row === undefined) {
-          return { success: true, data: { released: false, reason: 'Lock not found or wrong owner' }, error_message: null };
+          const result: LockResult = { released: false, reason: 'Lock not found or wrong owner' };
+          return [null, result];
         }
-        return { success: true, data: { released: true }, error_message: null };
+        const result: LockResult = { released: true };
+        return [null, result];
       }
 
       case 'check': {
-        const rows = await sql<LockRow[]>`
+        const rows = await sql.values<[number, string, string, string, string, string, string][]>`
           SELECT lock_id, lock_key, owner_token, provider_id, start_time, acquired_at, expires_at
           FROM booking_locks
-          WHERE lock_key = ${lock_key} AND expires_at > NOW()
+          WHERE lock_key = ${input.lock_key} AND expires_at > NOW()
           LIMIT 1
         `;
         const row = rows[0];
         if (row === undefined) {
-          return { success: true, data: { locked: false }, error_message: null };
+          const result: LockResult = { locked: false };
+          return [null, result];
         }
-        return { success: true, data: { locked: true, owner: row.owner_token, expires_at: row.expires_at }, error_message: null };
+        const result: LockResult = { locked: true, owner: row[2], expires_at: row[6] };
+        return [null, result];
       }
 
       case 'cleanup': {
         const rows = await sql`
           DELETE FROM booking_locks WHERE expires_at < NOW() RETURNING lock_key
         `;
-        return { success: true, data: { cleaned: rows.length }, error_message: null };
+        const result: LockResult = { cleaned: rows.length };
+        return [null, result];
       }
     }
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
-    return { success: false, data: null, error_message: `Internal error: ${message}` };
+    return [new Error(`Internal error: ${message}`), null];
   } finally {
     await sql.end();
   }

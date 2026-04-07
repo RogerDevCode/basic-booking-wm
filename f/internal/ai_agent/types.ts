@@ -32,7 +32,7 @@ export const EntityMapSchema = z.object({
   booking_id: z.string().nullable().catch(null),
   channel: z.string().nullable().catch(null),
   reminder_window: z.string().nullable().catch(null),
-}).readonly();
+}).catchall(z.string()).readonly();
 
 export const AvailabilityContextSchema = z.object({
   is_today: z.boolean(),
