@@ -8,6 +8,8 @@
 
 import { z } from 'zod';
 import postgres from 'postgres';
+import { withTenantContext } from '../internal/tenant-context';
+import { createDbClient } from '../internal/db/client';
 import crypto from 'crypto';
 
 const InputSchema = z.object({
@@ -20,6 +22,16 @@ interface LoginResult {
   readonly email: string;
   readonly full_name: string;
   readonly role: string;
+  readonly profile_complete: boolean;
+}
+
+interface UserRow {
+  readonly user_id: string;
+  readonly email: string;
+  readonly full_name: string;
+  readonly role: string;
+  readonly password_hash: string;
+  readonly is_active: boolean;
   readonly profile_complete: boolean;
 }
 
@@ -48,50 +60,78 @@ export async function main(rawInput: unknown): Promise<[Error | null, LoginResul
     return [new Error('CONFIGURATION_ERROR: DATABASE_URL is not set'), null];
   }
 
-  const sql = postgres(dbUrl, { ssl: 'require' });
+  const sql = createDbClient({ url: dbUrl });
+
+  // Extract tenant ID from input (login is pre-auth, so we use a safe fallback)
+  const rawObj = typeof rawInput === 'object' && rawInput !== null ? rawInput : {};
+  let tenantId = '00000000-0000-0000-0000-000000000000';
+  const tenantKeys = ['provider_id', 'user_id', 'admin_user_id', 'client_id', 'client_user_id'] as const;
+  for (const key of tenantKeys) {
+    const val = (rawObj as Record<string, unknown>)[key];
+    if (typeof val === 'string') {
+      tenantId = val;
+      break;
+    }
+  }
 
   try {
-    const userRows = await sql`
-      SELECT user_id, email, full_name, role, password_hash, is_active,
-             CASE WHEN rut IS NOT NULL AND email IS NOT NULL AND password_hash IS NOT NULL
-                  THEN true ELSE false END AS profile_complete
-      FROM users
-      WHERE email = ${email}
-      LIMIT 1
-    `;
+    const [txErr, txData] = await withTenantContext(sql, tenantId, async (tx) => {
+      const userRows = await tx.values<[string, string, string, string, string, boolean, boolean][]>`
+        SELECT user_id, email, full_name, role, password_hash, is_active,
+               CASE WHEN rut IS NOT NULL AND email IS NOT NULL AND password_hash IS NOT NULL
+                    THEN true ELSE false END AS profile_complete
+        FROM users
+        WHERE email = ${email}
+        LIMIT 1
+      `;
 
-    const userRow = userRows[0];
-    if (userRow === undefined) {
-      return [new Error('Invalid email or password'), null];
-    }
+      const userRow = userRows[0];
+      if (userRow === undefined) {
+        return [new Error('Invalid email or password'), null];
+      }
 
-    const isActive = Boolean(userRow['is_active']);
-    if (!isActive) {
-      return [new Error('Account is disabled. Contact support.'), null];
-    }
+      const user: UserRow = {
+        user_id: userRow[0],
+        email: userRow[1],
+        full_name: userRow[2],
+        role: userRow[3],
+        password_hash: userRow[4],
+        is_active: userRow[5],
+        profile_complete: userRow[6],
+      };
 
-    const storedHash = String(userRow['password_hash']);
-    if (storedHash === '' || storedHash === 'null') {
-      return [new Error('Invalid email or password'), null];
-    }
+      if (!user.is_active) {
+        return [new Error('Account is disabled. Contact support.'), null];
+      }
 
-    const isValid = verifyPasswordSync(password, storedHash);
-    if (!isValid) {
-      return [new Error('Invalid email or password'), null];
-    }
+      if (user.password_hash === '' || user.password_hash === 'null') {
+        return [new Error('Invalid email or password'), null];
+      }
 
-    await sql`
-      UPDATE users SET last_login = NOW()
-      WHERE user_id = ${String(userRow['user_id'])}::uuid
-    `;
+      const isValid = verifyPasswordSync(password, user.password_hash);
+      if (!isValid) {
+        return [new Error('Invalid email or password'), null];
+      }
 
-    return [null, {
-      user_id: String(userRow['user_id']),
-      email: String(userRow['email']),
-      full_name: String(userRow['full_name']),
-      role: String(userRow['role']),
-      profile_complete: Boolean(userRow['profile_complete']),
-    }];
+      await tx`
+        UPDATE users SET last_login = NOW()
+        WHERE user_id = ${user.user_id}::uuid
+      `;
+
+      const result: LoginResult = {
+        user_id: user.user_id,
+        email: user.email,
+        full_name: user.full_name,
+        role: user.role,
+        profile_complete: user.profile_complete,
+      };
+
+      return [null, result];
+    });
+
+    if (txErr !== null) return [txErr, null];
+    if (txData === null) return [new Error('Login failed'), null];
+    return [null, txData];
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     return [new Error('Internal error: ' + message), null];

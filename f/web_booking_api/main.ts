@@ -8,6 +8,8 @@
 import { z } from 'zod';
 import postgres from 'postgres';
 import crypto from 'crypto';
+import { withTenantContext } from '../internal/tenant-context';
+import { createDbClient } from '../internal/db/client';
 
 const InputSchema = z.object({
   action: z.enum(['create', 'cancel', 'reschedule']),
@@ -40,202 +42,221 @@ export async function main(rawInput: unknown): Promise<[Error | null, BookingRes
     return [new Error('CONFIGURATION_ERROR: DATABASE_URL is not set'), null];
   }
 
-  const sql = postgres(dbUrl, { ssl: 'require' });
+  const sql = createDbClient({ url: dbUrl });
+  const tenantId = provider_id ?? user_id ?? '00000000-0000-0000-0000-000000000000';
 
   try {
-    const userRows = await sql`
-      SELECT u.user_id, u.email, p.client_id
-      FROM users u
-      LEFT JOIN clients p ON p.client_id = u.user_id OR p.email = u.email
-      WHERE u.user_id = ${user_id}::uuid
-      LIMIT 1
-    `;
-
-    const userRow = userRows[0];
-    if (userRow === undefined) {
-      return [new Error('User not found'), null];
-    }
-
-    let clientId = userRow['client_id'] !== null ? String(userRow['client_id']) : null;
-
-    if (clientId === null && userRow['email'] !== null) {
-      const clientRows = await sql`
-        SELECT client_id FROM clients WHERE email = ${String(userRow['email'])} LIMIT 1
+    const [txErr, txData] = await withTenantContext(sql, tenantId, async (tx) => {
+      const userRows = await tx`
+        SELECT u.user_id, u.email, p.client_id
+        FROM users u
+        LEFT JOIN clients p ON p.client_id = u.user_id OR p.email = u.email
+        WHERE u.user_id = ${user_id}::uuid
+        LIMIT 1
       `;
-      const pRow = clientRows[0];
-      if (pRow !== undefined) {
-        clientId = String(pRow['client_id']);
+
+      const userRow = userRows[0];
+      if (userRow === undefined) {
+        return [new Error('User not found'), null];
       }
+
+      let clientId = userRow['client_id'] !== null ? String(userRow['client_id']) : null;
+
+      if (clientId === null && userRow['email'] !== null) {
+        const clientRows = await tx`
+          SELECT client_id FROM clients WHERE email = ${String(userRow['email'])} LIMIT 1
+        `;
+        const pRow = clientRows[0];
+        if (pRow !== undefined) {
+          clientId = String(pRow['client_id']);
+        }
+      }
+
+      if (clientId === null) {
+        return [new Error('Client record not found. Please complete your profile first.'), null];
+      }
+
+      switch (action) {
+        case 'create': {
+          if (provider_id === undefined || service_id === undefined || start_time === undefined) {
+            return [new Error('provider_id, service_id, and start_time are required for create'), null];
+          }
+
+          const serviceRows = await tx`
+            SELECT duration_minutes FROM services WHERE service_id = ${service_id}::uuid LIMIT 1
+          `;
+          const sRow = serviceRows[0];
+          if (sRow === undefined) {
+            return [new Error('Service not found'), null];
+          }
+
+          const startTime = new Date(start_time);
+          const endTime = new Date(startTime.getTime() + Number(sRow['duration_minutes']) * 60000);
+
+          const idempotencyKey = parsed.data.idempotency_key ?? crypto.randomUUID();
+
+          const insertRows = await tx`
+            INSERT INTO bookings (
+              provider_id, client_id, service_id, start_time, end_time,
+              status, idempotency_key, gcal_sync_status
+            ) VALUES (
+              ${provider_id}::uuid, ${clientId}::uuid, ${service_id}::uuid,
+              ${start_time}, ${endTime.toISOString()},
+              'pending', ${idempotencyKey}, 'pending'
+            )
+            RETURNING booking_id, status
+          `;
+
+          const newRow = insertRows[0];
+          if (newRow === undefined) {
+            return [new Error('Failed to create booking. The slot may already be taken.'), null];
+          }
+
+          return [null, {
+            booking_id: String(newRow['booking_id']),
+            status: String(newRow['status']),
+            message: 'Booking created successfully',
+          }];
+        }
+
+        case 'cancel': {
+          if (booking_id === undefined) {
+            return [new Error('booking_id is required for cancel'), null];
+          }
+
+          const bookingRows = await tx`
+            SELECT booking_id, status, client_id FROM bookings
+            WHERE booking_id = ${booking_id}::uuid LIMIT 1
+          `;
+
+          const bRow = bookingRows[0];
+          if (bRow === undefined) {
+            return [new Error('Booking not found'), null];
+          }
+
+          if (String(bRow['client_id']) !== clientId) {
+            return [new Error('You can only cancel your own bookings'), null];
+          }
+
+          const status = String(bRow['status']);
+          if (status !== 'pending' && status !== 'confirmed') {
+            return [new Error('Cannot cancel booking with status: ' + status), null];
+          }
+
+          const updateRows = await tx`
+            UPDATE bookings SET
+              status = 'cancelled',
+              cancellation_reason = ${cancellation_reason ?? null},
+              cancelled_by = 'client',
+              updated_at = NOW()
+            WHERE booking_id = ${booking_id}::uuid
+            RETURNING booking_id, status
+          `;
+
+          const updatedRow = updateRows[0];
+          if (updatedRow === undefined) {
+            return [new Error('Failed to cancel booking'), null];
+          }
+
+          return [null, {
+            booking_id: String(updatedRow['booking_id']),
+            status: String(updatedRow['status']),
+            message: 'Booking cancelled successfully',
+          }];
+        }
+
+        case 'reschedule': {
+          if (booking_id === undefined || start_time === undefined) {
+            return [new Error('booking_id and start_time are required for reschedule'), null];
+          }
+
+          const bookingRows = await tx`
+            SELECT booking_id, status, client_id, provider_id, service_id FROM bookings
+            WHERE booking_id = ${booking_id}::uuid LIMIT 1
+          `;
+
+          const bRow = bookingRows[0];
+          if (bRow === undefined) {
+            return [new Error('Booking not found'), null];
+          }
+
+          if (String(bRow['client_id']) !== clientId) {
+            return [new Error('You can only reschedule your own bookings'), null];
+          }
+
+          const status = String(bRow['status']);
+          if (status !== 'pending' && status !== 'confirmed') {
+            return [new Error('Cannot reschedule booking with status: ' + status), null];
+          }
+
+          const serviceRows = await tx`
+            SELECT duration_minutes FROM services WHERE service_id = ${String(bRow['service_id'])}::uuid LIMIT 1
+          `;
+          const sRow = serviceRows[0];
+          if (sRow === undefined) {
+            return [new Error('Service not found'), null];
+          }
+
+          const startTime = new Date(start_time);
+          const endTime = new Date(startTime.getTime() + Number(sRow['duration_minutes']) * 60000);
+
+          const idempotencyKey = parsed.data.idempotency_key ?? crypto.randomUUID();
+
+          const insertRows = await tx`
+            INSERT INTO bookings (
+              provider_id, client_id, service_id, start_time, end_time,
+              status, idempotency_key, rescheduled_from, gcal_sync_status
+            ) VALUES (
+              ${String(bRow['provider_id'])}::uuid, ${clientId}::uuid, ${String(bRow['service_id'])}::uuid,
+              ${start_time}, ${endTime.toISOString()},
+              'pending', ${idempotencyKey}, ${booking_id}::uuid, 'pending'
+            )
+            RETURNING booking_id, status
+          `;
+
+          const newRow = insertRows[0];
+          if (newRow === undefined) {
+            return [new Error('Failed to create rescheduled booking. The slot may already be taken.'), null];
+          }
+
+          await tx`
+            UPDATE bookings SET status = 'rescheduled', updated_at = NOW()
+            WHERE booking_id = ${booking_id}::uuid
+          `;
+
+          return [null, {
+            booking_id: String(newRow['booking_id']),
+            status: String(newRow['status']),
+            message: 'Booking rescheduled successfully',
+          }];
+        }
+
+        default: {
+          const _exhaustive: never = action;
+          return [new Error(`Unknown action: ${String(_exhaustive)}`), null];
+        }
+      }
+    });
+
+    if (txErr !== null) {
+      // Re-throw so that it can be caught by the outer catch and handle the constraints
+      throw txErr;
     }
+    
+    return [null, txData];
 
-    if (clientId === null) {
-      return [new Error('Client record not found. Please complete your profile first.'), null];
-    }
-
-    switch (action) {
-      case 'create': {
-        if (provider_id === undefined || service_id === undefined || start_time === undefined) {
-          return [new Error('provider_id, service_id, and start_time are required for create'), null];
-        }
-
-        const serviceRows = await sql`
-          SELECT duration_minutes FROM services WHERE service_id = ${service_id}::uuid LIMIT 1
-        `;
-        const sRow = serviceRows[0];
-        if (sRow === undefined) {
-          return [new Error('Service not found'), null];
-        }
-
-        const startTime = new Date(start_time);
-        const endTime = new Date(startTime.getTime() + Number(sRow['duration_minutes']) * 60000);
-
-        const idempotencyKey = parsed.data.idempotency_key ?? crypto.randomUUID();
-
-        const insertRows = await sql`
-          INSERT INTO bookings (
-            provider_id, client_id, service_id, start_time, end_time,
-            status, idempotency_key, gcal_sync_status
-          ) VALUES (
-            ${provider_id}::uuid, ${clientId}::uuid, ${service_id}::uuid,
-            ${start_time}, ${endTime.toISOString()},
-            'pending', ${idempotencyKey}, 'pending'
-          )
-          RETURNING booking_id, status
-        `;
-
-        const newRow = insertRows[0];
-        if (newRow === undefined) {
-          return [new Error('Failed to create booking. The slot may already be taken.'), null];
-        }
-
-        return [null, {
-          booking_id: String(newRow['booking_id']),
-          status: String(newRow['status']),
-          message: 'Booking created successfully',
-        }];
-      }
-
-      case 'cancel': {
-        if (booking_id === undefined) {
-          return [new Error('booking_id is required for cancel'), null];
-        }
-
-        const bookingRows = await sql`
-          SELECT booking_id, status, client_id FROM bookings
-          WHERE booking_id = ${booking_id}::uuid LIMIT 1
-        `;
-
-        const bRow = bookingRows[0];
-        if (bRow === undefined) {
-          return [new Error('Booking not found'), null];
-        }
-
-        if (String(bRow['client_id']) !== clientId) {
-          return [new Error('You can only cancel your own bookings'), null];
-        }
-
-        const status = String(bRow['status']);
-        if (status !== 'pending' && status !== 'confirmed') {
-          return [new Error('Cannot cancel booking with status: ' + status), null];
-        }
-
-        const updateRows = await sql`
-          UPDATE bookings SET
-            status = 'cancelled',
-            cancellation_reason = ${cancellation_reason ?? null},
-            cancelled_by = 'client',
-            updated_at = NOW()
-          WHERE booking_id = ${booking_id}::uuid
-          RETURNING booking_id, status
-        `;
-
-        const updatedRow = updateRows[0];
-        if (updatedRow === undefined) {
-          return [new Error('Failed to cancel booking'), null];
-        }
-
-        return [null, {
-          booking_id: String(updatedRow['booking_id']),
-          status: String(updatedRow['status']),
-          message: 'Booking cancelled successfully',
-        }];
-      }
-
-      case 'reschedule': {
-        if (booking_id === undefined || start_time === undefined) {
-          return [new Error('booking_id and start_time are required for reschedule'), null];
-        }
-
-        const bookingRows = await sql`
-          SELECT booking_id, status, client_id, provider_id, service_id FROM bookings
-          WHERE booking_id = ${booking_id}::uuid LIMIT 1
-        `;
-
-        const bRow = bookingRows[0];
-        if (bRow === undefined) {
-          return [new Error('Booking not found'), null];
-        }
-
-        if (String(bRow['client_id']) !== clientId) {
-          return [new Error('You can only reschedule your own bookings'), null];
-        }
-
-        const status = String(bRow['status']);
-        if (status !== 'pending' && status !== 'confirmed') {
-          return [new Error('Cannot reschedule booking with status: ' + status), null];
-        }
-
-        const serviceRows = await sql`
-          SELECT duration_minutes FROM services WHERE service_id = ${String(bRow['service_id'])}::uuid LIMIT 1
-        `;
-        const sRow = serviceRows[0];
-        if (sRow === undefined) {
-          return [new Error('Service not found'), null];
-        }
-
-        const startTime = new Date(start_time);
-        const endTime = new Date(startTime.getTime() + Number(sRow['duration_minutes']) * 60000);
-
-        const idempotencyKey = parsed.data.idempotency_key ?? crypto.randomUUID();
-
-        const insertRows = await sql`
-          INSERT INTO bookings (
-            provider_id, client_id, service_id, start_time, end_time,
-            status, idempotency_key, rescheduled_from, gcal_sync_status
-          ) VALUES (
-            ${String(bRow['provider_id'])}::uuid, ${clientId}::uuid, ${String(bRow['service_id'])}::uuid,
-            ${start_time}, ${endTime.toISOString()},
-            'pending', ${idempotencyKey}, ${booking_id}::uuid, 'pending'
-          )
-          RETURNING booking_id, status
-        `;
-
-        const newRow = insertRows[0];
-        if (newRow === undefined) {
-          return [new Error('Failed to create rescheduled booking. The slot may already be taken.'), null];
-        }
-
-        await sql`
-          UPDATE bookings SET status = 'rescheduled', updated_at = NOW()
-          WHERE booking_id = ${booking_id}::uuid
-        `;
-
-        return [null, {
-          booking_id: String(newRow['booking_id']),
-          status: String(newRow['status']),
-          message: 'Booking rescheduled successfully',
-        }];
-      }
-
-      default: {
-        const _exhaustive: never = action;
-        return [new Error(`Unknown action: ${String(_exhaustive)}`), null];
-      }
-    }
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     if (message.includes('duplicate key') || message.includes('unique constraint') || message.includes('conflicting key value violates exclusion constraint')) {
       return [new Error('The selected time slot is already booked. Please choose another time.'), null];
+    }
+    // Check if the original txErr had a message without the wrapping 'transaction_failed:' 
+    if (message.startsWith('transaction_failed: ')) {
+      const realMsg = message.substring(20);
+      if (realMsg.includes('duplicate key') || realMsg.includes('unique constraint') || realMsg.includes('conflicting key value violates exclusion constraint')) {
+        return [new Error('The selected time slot is already booked. Please choose another time.'), null];
+      }
+      return [new Error(realMsg), null];
     }
     return [new Error('Internal error: ' + message), null];
   } finally {

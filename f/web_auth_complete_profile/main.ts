@@ -9,6 +9,8 @@
 import { z } from 'zod';
 import postgres from 'postgres';
 import crypto from 'crypto';
+import { withTenantContext } from '../internal/tenant-context';
+import { createDbClient } from '../internal/db/client';
 
 const InputSchema = z.object({
   chat_id: z.string().min(1),
@@ -97,63 +99,77 @@ export async function main(rawInput: unknown): Promise<[Error | null, CompletePr
 
   const passwordHash = hashPasswordSync(password);
 
-  const sql = postgres(dbUrl, { ssl: 'require' });
+  const sql = createDbClient({ url: dbUrl });
+  const tenantId = '00000000-0000-0000-0000-000000000000';
 
   try {
-    const userRows = await sql`
-      SELECT user_id, full_name, telegram_chat_id FROM users
-      WHERE telegram_chat_id = ${chat_id}
-      LIMIT 1
-    `;
+    const [txErr, txData] = await withTenantContext(sql, tenantId, async (tx) => {
+      const userRows = await tx`
+        SELECT user_id, full_name, telegram_chat_id FROM users
+        WHERE telegram_chat_id = ${chat_id}
+        LIMIT 1
+      `;
 
-    const userRow = userRows[0];
-    if (userRow === undefined) {
-      return [new Error('No Telegram user found. Please interact with the bot first.'), null];
+      const userRow = userRows[0];
+      if (userRow === undefined) {
+        return [new Error('No Telegram user found. Please interact with the bot first.'), null];
+      }
+
+      const existingRows = await tx`
+        SELECT user_id FROM users
+        WHERE (email = ${email} OR rut = ${rut})
+          AND telegram_chat_id != ${chat_id}
+        LIMIT 1
+      `;
+
+      const existingRow = existingRows[0];
+      if (existingRow !== undefined) {
+        return [new Error('This email or RUT is already in use by another account'), null];
+      }
+
+      const updateRows = await tx`
+        UPDATE users SET
+          rut = ${rut},
+          email = ${email},
+          address = ${address},
+          phone = ${phone},
+          password_hash = ${passwordHash},
+          timezone = ${timezone},
+          updated_at = NOW()
+        WHERE telegram_chat_id = ${chat_id}
+        RETURNING user_id, full_name, email, rut, role
+      `;
+
+      const updatedRow = updateRows[0];
+      if (updatedRow === undefined) {
+        return [new Error('Failed to update profile'), null];
+      }
+
+      return [null, {
+        user_id: String(updatedRow['user_id']),
+        full_name: String(updatedRow['full_name']),
+        email: String(updatedRow['email']),
+        rut: String(updatedRow['rut']),
+        role: String(updatedRow['role']),
+      }];
+    });
+
+    if (txErr !== null) {
+      throw txErr;
     }
 
-    const existingRows = await sql`
-      SELECT user_id FROM users
-      WHERE (email = ${email} OR rut = ${rut})
-        AND telegram_chat_id != ${chat_id}
-      LIMIT 1
-    `;
+    return [null, txData];
 
-    const existingRow = existingRows[0];
-    if (existingRow !== undefined) {
-      return [new Error('This email or RUT is already in use by another account'), null];
-    }
-
-    const updateRows = await sql`
-      UPDATE users SET
-        rut = ${rut},
-        email = ${email},
-        address = ${address},
-        phone = ${phone},
-        password_hash = ${passwordHash},
-        timezone = ${timezone},
-        updated_at = NOW()
-      WHERE telegram_chat_id = ${chat_id}
-      RETURNING user_id, full_name, email, rut, role
-    `;
-
-    const updatedRow = updateRows[0];
-    if (updatedRow === undefined) {
-      return [new Error('Failed to update profile'), null];
-    }
-
-    return [null, {
-      user_id: String(updatedRow['user_id']),
-      full_name: String(updatedRow['full_name']),
-      email: String(updatedRow['email']),
-      rut: String(updatedRow['rut']),
-      role: String(updatedRow['role']),
-    }];
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
-    if (message.includes('duplicate key') || message.includes('unique constraint')) {
+    let errorMsg = message;
+    if (message.startsWith('transaction_failed: ')) {
+      errorMsg = message.substring(20);
+    }
+    if (errorMsg.includes('duplicate key') || errorMsg.includes('unique constraint')) {
       return [new Error('This email or RUT is already in use by another account'), null];
     }
-    return [new Error('Internal error: ' + message), null];
+    return [new Error('Internal error: ' + errorMsg), null];
   } finally {
     await sql.end();
   }

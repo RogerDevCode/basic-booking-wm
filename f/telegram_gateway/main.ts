@@ -12,6 +12,8 @@
 import "@total-typescript/ts-reset";
 import { z } from 'zod';
 import postgres from 'postgres';
+import { withTenantContext } from '../internal/tenant-context';
+import { createDbClient } from '../internal/db/client';
 
 // ============================================================================
 // INPUT SCHEMA — Telegram webhook payload
@@ -76,7 +78,7 @@ async function sendTelegramMessage(chatId: string, text: string, options?: { par
       return [new Error(`Telegram API error: ${response.status} ${errorText}`), null];
     }
 
-    const data = await response.json() as unknown;
+    const data = await response.json();
     return [null, data];
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -185,29 +187,10 @@ async function handleUnknownCommand(chatId: string, text: string): Promise<[Erro
 // Windmill maps JSON keys to function parameters individually
 // ============================================================================
 
-export async function main(args: {
-  update_id?: number;
-  message?: {
-    message_id?: number;
-    from?: { id?: number; is_bot?: boolean; first_name?: string; last_name?: string; username?: string };
-    chat: { id: number; type?: string; first_name?: string; last_name?: string; username?: string };
-    date?: number;
-    text?: string;
-  };
-  callback_query?: {
-    id: string;
-    from: { id: number };
-    message?: unknown;
-    data: string;
-  };
-}): Promise<{
-  readonly success: boolean;
-  readonly data: { readonly message: string } | null;
-  readonly error_message: string | null;
-}> {
-  const input = RawBodySchema.safeParse(args);
+export async function main(rawInput: unknown): Promise<[Error | null, { readonly message: string } | null]> {
+  const input = RawBodySchema.safeParse(rawInput);
   if (!input.success) {
-    return { success: false, data: null, error_message: `Validation error: ${input.error.message}` };
+    return [new Error(`Validation error: ${input.error.message}`), null];
   }
 
   const data = input.data;
@@ -219,27 +202,27 @@ export async function main(args: {
 
     if (callbackData.startsWith('cmd:')) {
       const cmd = callbackData.split(':')[1] ?? '';
-      if (cmd === 'book') return { success: true, data: { message: 'Booking flow triggered' }, error_message: null };
-      if (cmd === 'mybookings') return { success: true, data: { message: 'My bookings flow triggered' }, error_message: null };
-      if (cmd === 'cancel') return { success: true, data: { message: 'Cancel flow triggered' }, error_message: null };
+      if (cmd === 'book') return [null, { message: 'Booking flow triggered' }];
+      if (cmd === 'mybookings') return [null, { message: 'My bookings flow triggered' }];
+      if (cmd === 'cancel') return [null, { message: 'Cancel flow triggered' }];
     }
 
     if (callbackData.startsWith('admin:')) {
       const action = callbackData.split(':')[1] ?? '';
-      return { success: true, data: { message: `Admin action: ${action}` }, error_message: null };
+      return [null, { message: `Admin action: ${action}` }];
     }
 
     if (callbackData.startsWith('provider:')) {
       const action = callbackData.split(':')[1] ?? '';
-      return { success: true, data: { message: `Provider action: ${action}` }, error_message: null };
+      return [null, { message: `Provider action: ${action}` }];
     }
 
-    return { success: true, data: { message: `Callback handled: ${callbackData}` }, error_message: null };
+    return [null, { message: `Callback handled: ${callbackData}` }];
   }
 
   // Handle messages
-  if (data?.message == null || data.message.text == null) {
-    return { success: false, data: null, error_message: 'No message or text found' };
+  if (data?.message?.text == null) {
+    return [new Error('No message or text found'), null];
   }
 
   const message = data.message;
@@ -253,12 +236,16 @@ export async function main(args: {
   const dbUrl = process.env['DATABASE_URL'];
   if (dbUrl != null && dbUrl !== '') {
     try {
-      const sql = postgres(dbUrl, { ssl: 'require' });
-      await sql`
-        INSERT INTO clients (client_id, name, email, phone, timezone)
-        VALUES (gen_random_uuid(), ${fullName}, NULL, NULL, 'America/Santiago')
-        ON CONFLICT DO NOTHING
-      `;
+      const sql = createDbClient({ url: dbUrl });
+      const tenantId = '00000000-0000-0000-0000-000000000000';
+      await withTenantContext(sql, tenantId, async (tx) => {
+        await tx`
+          INSERT INTO clients (client_id, name, email, phone, timezone)
+          VALUES (gen_random_uuid(), ${fullName}, NULL, NULL, 'America/Santiago')
+          ON CONFLICT DO NOTHING
+        `;
+        return [null, null];
+      });
       await sql.end();
     } catch {
       // Silently fail — user registration is not critical
@@ -268,24 +255,24 @@ export async function main(args: {
   // Route command
   if (text === '/start') {
     const [err, msg] = await handleStart(chatId, firstName);
-    if (err != null) return { success: false, data: null, error_message: err.message };
-    return { success: true, data: { message: msg }, error_message: null };
+    if (err != null) return [new Error(err.message), null];
+    return [null, { message: msg }];
   }
 
   if (text === '/admin') {
     const [err, msg] = await handleAdmin(chatId);
-    if (err != null) return { success: false, data: null, error_message: err.message };
-    return { success: true, data: { message: msg }, error_message: null };
+    if (err != null) return [new Error(err.message), null];
+    return [null, { message: msg }];
   }
 
   if (text === '/provider') {
     const [err, msg] = await handleProvider(chatId);
-    if (err != null) return { success: false, data: null, error_message: err.message };
-    return { success: true, data: { message: msg }, error_message: null };
+    if (err != null) return [new Error(err.message), null];
+    return [null, { message: msg }];
   }
 
   // Unknown command — send help
   const [err, msg] = await handleUnknownCommand(chatId, text);
-  if (err != null) return { success: false, data: null, error_message: err.message };
-  return { success: true, data: { message: msg }, error_message: null };
+  if (err != null) return [new Error(err.message), null];
+  return [null, { message: msg }];
 }

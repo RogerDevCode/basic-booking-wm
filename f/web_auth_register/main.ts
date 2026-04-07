@@ -9,6 +9,8 @@
 import { z } from 'zod';
 import postgres from 'postgres';
 import crypto from 'crypto';
+import { withTenantContext } from '../internal/tenant-context';
+import { createDbClient } from '../internal/db/client';
 
 const InputSchema = z.object({
   full_name: z.string().min(3).max(200),
@@ -95,41 +97,46 @@ export async function main(rawInput: unknown): Promise<[Error | null, RegisterRe
   }
 
   const passwordHash = hashPasswordSync(password);
-
-  const sql = postgres(dbUrl, { ssl: 'require' });
+  const sql = createDbClient({ url: dbUrl });
+  const tenantId = '00000000-0000-0000-0000-000000000000'; // No user_id yet
 
   try {
-    const existingRows = await sql`
-      SELECT user_id FROM users WHERE email = ${email} OR rut = ${rut} LIMIT 1
-    `;
+    const [txErr, txData] = await withTenantContext(sql, tenantId, async (tx) => {
+      const existingRows = await tx`
+        SELECT user_id FROM users WHERE email = ${email} OR rut = ${rut} LIMIT 1
+      `;
 
-    const existingRow = existingRows[0];
-    if (existingRow !== undefined) {
-      return [new Error('A user with this email or RUT already exists'), null];
-    }
+      const existingRow = existingRows[0];
+      if (existingRow !== undefined) {
+        return [new Error('A user with this email or RUT already exists'), null];
+      }
 
-    const insertRows = await sql`
-      INSERT INTO users (
-        full_name, rut, email, address, phone, password_hash,
-        role, is_active, timezone
-      ) VALUES (
-        ${full_name}, ${rut}, ${email}, ${address}, ${phone}, ${passwordHash},
-        'client', true, ${timezone}
-      )
-      RETURNING user_id, email, full_name, role
-    `;
+      const insertRows = await tx`
+        INSERT INTO users (
+          full_name, rut, email, address, phone, password_hash,
+          role, is_active, timezone
+        ) VALUES (
+          ${full_name}, ${rut}, ${email}, ${address}, ${phone}, ${passwordHash},
+          'client', true, ${timezone}
+        )
+        RETURNING user_id, email, full_name, role
+      `;
 
-    const newRow = insertRows[0];
-    if (newRow === undefined) {
-      return [new Error('Failed to create user record'), null];
-    }
+      const newRow = insertRows[0];
+      if (newRow === undefined) {
+        return [new Error('Failed to create user record'), null];
+      }
 
-    return [null, {
-      user_id: String(newRow['user_id']),
-      email: String(newRow['email']),
-      full_name: String(newRow['full_name']),
-      role: String(newRow['role']),
-    }];
+      return [null, {
+        user_id: String(newRow['user_id']),
+        email: String(newRow['email']),
+        full_name: String(newRow['full_name']),
+        role: String(newRow['role']),
+      }];
+    });
+
+    if (txErr) return [txErr, null];
+    return [null, txData];
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     if (message.includes('duplicate key') || message.includes('unique constraint')) {
