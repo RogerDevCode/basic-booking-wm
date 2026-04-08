@@ -19,6 +19,7 @@ const InputSchema = z.object({
   booking_id: z.uuid().optional(),
   client_id: z.uuid().optional(),
   content: z.string().min(1).max(5000).optional(),
+  tag_ids: z.array(z.uuid()).optional().default([]),
 });
 
 interface NoteRow {
@@ -31,9 +32,36 @@ interface NoteRow {
   readonly encryption_version: number;
   readonly created_at: string;
   readonly updated_at: string;
+  readonly tags: readonly { readonly tag_id: string; readonly name: string; readonly color: string }[];
 }
 
 type Result<T> = [Error | null, T | null];
+
+// ============================================================================
+// TAG HELPERS
+// ============================================================================
+
+async function assignTags(tx: postgres.TransactionSql, noteId: string, tagIds: readonly string[]): Promise<Result<true>> {
+  for (const tagId of tagIds) {
+    await tx`
+      INSERT INTO note_tags (note_id, tag_id)
+      VALUES (${noteId}::uuid, ${tagId}::uuid)
+      ON CONFLICT (note_id, tag_id) DO NOTHING
+    `;
+  }
+  return [null, true];
+}
+
+async function getNoteTags(tx: postgres.TransactionSql, noteId: string): Promise<Result<{ tag_id: string; name: string; color: string }[]>> {
+  const rows = await tx.values<[string, string, string][]>`
+    SELECT t.tag_id, t.name, t.color
+    FROM note_tags nt
+    JOIN tags t ON t.tag_id = nt.tag_id
+    WHERE nt.note_id = ${noteId}::uuid
+    ORDER BY t.name ASC
+  `;
+  return [null, rows.map((row) => ({ tag_id: row[0], name: row[1], color: row[2] }))];
+}
 
 // ============================================================================
 // ENCRYPT content before storing
@@ -66,7 +94,8 @@ async function createNote(
   providerId: string,
   bookingId: string,
   clientId: string,
-  content: string
+  content: string,
+  tagIds: readonly string[],
 ): Promise<Result<NoteRow>> {
   const { encrypted, version } = encryptContent(content);
 
@@ -79,6 +108,14 @@ async function createNote(
 
   if (row === undefined) return [new Error('create_failed: no row returned'), null];
 
+  // Assign tags
+  if (tagIds.length > 0) {
+    await assignTags(tx, row[0], tagIds);
+  }
+
+  // Get tags for response
+  const [tagErr, tags] = await getNoteTags(tx, row[0]);
+
   return [null, {
     note_id: row[0],
     booking_id: row[1],
@@ -89,6 +126,7 @@ async function createNote(
     created_at: row[6],
     updated_at: row[7],
     content: content,
+    tags: tags ?? [],
   }];
 }
 
@@ -107,6 +145,8 @@ async function readNote(tx: postgres.TransactionSql, providerId: string, noteId:
 
   if (row === undefined) return [new Error('Note not found or access denied'), null];
 
+  const [tagErr, tags] = await getNoteTags(tx, row[0]);
+
   return [null, {
     note_id: row[0],
     booking_id: row[1],
@@ -117,6 +157,7 @@ async function readNote(tx: postgres.TransactionSql, providerId: string, noteId:
     created_at: row[6],
     updated_at: row[7],
     content: decryptContent(row[4]),
+    tags: tags ?? [],
   }];
 }
 
@@ -128,7 +169,8 @@ async function updateNote(
   tx: postgres.TransactionSql,
   providerId: string,
   noteId: string,
-  content: string
+  content: string,
+  tagIds: readonly string[],
 ): Promise<Result<NoteRow>> {
   const { encrypted, version } = encryptContent(content);
 
@@ -142,6 +184,14 @@ async function updateNote(
 
   if (row === undefined) return [new Error('Note not found or access denied'), null];
 
+  // Replace tags
+  await tx`DELETE FROM note_tags WHERE note_id = ${noteId}::uuid`;
+  if (tagIds.length > 0) {
+    await assignTags(tx, noteId, tagIds);
+  }
+
+  const [tagErr, tags] = await getNoteTags(tx, noteId);
+
   return [null, {
     note_id: row[0],
     booking_id: row[1],
@@ -152,6 +202,7 @@ async function updateNote(
     created_at: row[6],
     updated_at: row[7],
     content: content,
+    tags: tags ?? [],
   }];
 }
 
@@ -173,37 +224,59 @@ async function listNotes(
   providerId: string,
   bookingId?: string
 ): Promise<Result<NoteRow[]>> {
-  let rows: [string, string, string, string, string | null, number, string, string][];
+  // Fetch notes with tags in a single query
+  let rows: [string, string, string, string, string | null, number, string, string, string | null, string | null, string | null][];
   if (bookingId != null) {
-    rows = await tx.values<[string, string, string, string, string | null, number, string, string][]>`
-      SELECT note_id, booking_id, client_id, provider_id, content_encrypted, encryption_version, created_at, updated_at
-      FROM service_notes
-      WHERE provider_id = ${providerId}::uuid AND booking_id = ${bookingId}::uuid
-      ORDER BY created_at DESC
+    rows = await tx.values<[string, string, string, string, string | null, number, string, string, string | null, string | null, string | null][]>`
+      SELECT sn.note_id, sn.booking_id, sn.client_id, sn.provider_id, sn.content_encrypted,
+             sn.encryption_version, sn.created_at, sn.updated_at,
+             t.tag_id, t.name, t.color
+      FROM service_notes sn
+      LEFT JOIN note_tags nt ON nt.note_id = sn.note_id
+      LEFT JOIN tags t ON t.tag_id = nt.tag_id
+      WHERE sn.provider_id = ${providerId}::uuid
+        AND sn.booking_id = ${bookingId}::uuid
+      ORDER BY sn.created_at DESC, t.name ASC
     `;
   } else {
-    rows = await tx.values<[string, string, string, string, string | null, number, string, string][]>`
-      SELECT note_id, booking_id, client_id, provider_id, content_encrypted, encryption_version, created_at, updated_at
-      FROM service_notes
-      WHERE provider_id = ${providerId}::uuid
-      ORDER BY created_at DESC
+    rows = await tx.values<[string, string, string, string, string | null, number, string, string, string | null, string | null, string | null][]>`
+      SELECT sn.note_id, sn.booking_id, sn.client_id, sn.provider_id, sn.content_encrypted,
+             sn.encryption_version, sn.created_at, sn.updated_at,
+             t.tag_id, t.name, t.color
+      FROM service_notes sn
+      LEFT JOIN note_tags nt ON nt.note_id = sn.note_id
+      LEFT JOIN tags t ON t.tag_id = nt.tag_id
+      WHERE sn.provider_id = ${providerId}::uuid
+      ORDER BY sn.created_at DESC, t.name ASC
       LIMIT 100
     `;
   }
 
-  const notes: NoteRow[] = rows.map((row) => ({
-    note_id: row[0],
-    booking_id: row[1],
-    client_id: row[2],
-    provider_id: row[3],
-    content_encrypted: row[4],
-    encryption_version: row[5],
-    created_at: row[6],
-    updated_at: row[7],
-    content: decryptContent(row[4]),
-  }));
+  // Group by note_id
+  const noteMap = new Map<string, NoteRow>();
+  for (const row of rows) {
+    const noteId = row[0];
+    if (!noteMap.has(noteId)) {
+      noteMap.set(noteId, {
+        note_id: row[0],
+        booking_id: row[1],
+        client_id: row[2],
+        provider_id: row[3],
+        content_encrypted: row[4],
+        encryption_version: row[5],
+        created_at: row[6],
+        updated_at: row[7],
+        content: decryptContent(row[4]),
+        tags: [],
+      });
+    }
+    const note = noteMap.get(noteId);
+    if (note != null && row[8] !== null) {
+      note.tags = [...note.tags, { tag_id: row[8], name: row[9], color: row[10] }];
+    }
+  }
 
-  return [null, notes];
+  return [null, Array.from(noteMap.values())];
 }
 
 // ============================================================================
@@ -235,7 +308,7 @@ export async function main(rawInput: unknown): Promise<[Error | null, unknown | 
         if (bookingId == null || clientId == null || content == null) {
           return [new Error('create requires booking_id, client_id, and content'), null];
         }
-        return createNote(tx, input.provider_id, bookingId, clientId, content);
+        return createNote(tx, input.provider_id, bookingId, clientId, content, input.tag_ids);
       }
 
       if (input.action === 'read') {
@@ -248,7 +321,7 @@ export async function main(rawInput: unknown): Promise<[Error | null, unknown | 
         const noteId = input.note_id;
         const content = input.content;
         if (noteId == null || content == null) return [new Error('update requires note_id and content'), null];
-        return updateNote(tx, input.provider_id, noteId, content);
+        return updateNote(tx, input.provider_id, noteId, content, input.tag_ids);
       }
 
       if (input.action === 'delete') {
