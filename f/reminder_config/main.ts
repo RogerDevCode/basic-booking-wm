@@ -117,7 +117,9 @@ async function loadPreferences(sql: SqlClient, clientId: string): Promise<Remind
     if (!firstRow?.metadata) return defaults;
 
     const raw = firstRow.metadata;
-    const reminderPrefs = raw['reminder_preferences'] as ReminderPrefs | undefined;
+    const reminderPrefsRaw = raw['reminder_preferences'];
+    if (typeof reminderPrefsRaw !== 'object' || reminderPrefsRaw === null) return defaults;
+    const reminderPrefs = reminderPrefsRaw as Readonly<Record<string, unknown>>;
     if (!reminderPrefs) return defaults;
 
     return {
@@ -210,8 +212,8 @@ export async function main(rawInput: unknown): Promise<[Error | null, ReminderCo
     await sql.end();
 
     if (txErr) return [new Error(txErr.message), null];
-
-    return [null, txData as ReminderConfigResult];
+    if (txData === null) return [new Error('Operation failed'), null];
+    return [null, txData];
   } catch (e) {
     const error = e instanceof Error ? e : new Error(String(e));
     return [new Error(error.message), null];
