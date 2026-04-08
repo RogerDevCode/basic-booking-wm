@@ -360,9 +360,18 @@ async function handleGetMyBookings(
     readonly status: string;
   }
 
+  function isBookingRow(obj: unknown): obj is BookingRow {
+    if (typeof obj !== 'object' || obj === null) return false;
+    const r = obj as Record<string, unknown>;
+    return typeof r['start_time'] === 'string'
+      && typeof r['provider_name'] === 'string'
+      && typeof r['service_name'] === 'string'
+      && typeof r['status'] === 'string';
+  }
+
   const bookingList = bookings
-    .map((b: unknown) => {
-      const bb = b as BookingRow;
+    .filter(isBookingRow)
+    .map((bb: BookingRow) => {
       const d = new Date(bb.start_time);
       const dateStr = d.toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric', month: 'short' });
       const timeStr = d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });

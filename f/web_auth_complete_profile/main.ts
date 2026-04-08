@@ -155,7 +155,7 @@ export async function main(rawInput: unknown): Promise<[Error | null, CompletePr
     });
 
     if (txErr !== null) {
-      throw txErr;
+      return [txErr, null];
     }
 
     return [null, txData];

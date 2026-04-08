@@ -3,13 +3,7 @@
 // ============================================================================
 // Stops an existing channel (if provided) and registers a new one for the
 // same calendar. Run via cron schedule ~24h before expiration.
-//
-// workflow:
-// 1. If old_channel_id and old_resource_id provided → stop the old channel
-// 2. Register a new watch channel for the same calendar
-// 3. Return new channel details to persist in DB or Windmill Variables
-//
-// Reference: https://developers.google.com/calendar/api/v3/reference/channels/stop
+// Go-style: no throw, no any, no as. Tuple return.
 // ============================================================================
 
 import { z } from 'zod';
@@ -25,13 +19,13 @@ const InputSchema = z.object({
 });
 
 interface RenewResult {
-  stopped_old: boolean;
-  channel_id: string;
-  resource_id: string;
-  calendar_id: string;
-  expiration_unix_ms: number;
-  expiration_iso: string;
-  webhook_url: string;
+  readonly stopped_old: boolean;
+  readonly channel_id: string;
+  readonly resource_id: string;
+  readonly calendar_id: string;
+  readonly expiration_unix_ms: number;
+  readonly expiration_iso: string;
+  readonly webhook_url: string;
 }
 
 async function stopChannel(accessToken: string, channelId: string, resourceId: string): Promise<boolean> {
@@ -45,57 +39,52 @@ async function stopChannel(accessToken: string, channelId: string, resourceId: s
       body: JSON.stringify({ id: channelId, resourceId }),
       signal: AbortSignal.timeout(10000),
     });
-    // 204 = success (no content), 404 = already stopped (treat as OK)
     return response.status === 204 || response.status === 404;
   } catch {
-    return false; // Non-fatal: proceed to create new channel
+    return false;
   }
 }
 
-export async function main(rawInput: unknown): Promise<{
-  success: boolean;
-  data: RenewResult | null;
-  error_message: string | null;
-}> {
+export async function main(rawInput: unknown): Promise<[Error | null, RenewResult | null]> {
+  const parsed = InputSchema.safeParse(rawInput);
+  if (!parsed.success) {
+    return [new Error(`Validation error: ${parsed.error.message}`), null];
+  }
+
+  const input: Readonly<z.infer<typeof InputSchema>> = parsed.data;
+
+  const accessToken = process.env['GCAL_ACCESS_TOKEN'];
+  if (!accessToken) {
+    return [new Error('GCAL_ACCESS_TOKEN not configured'), null];
+  }
+
+  const webhookBaseUrl = input.webhook_base_url ?? process.env['WINDMILL_WEBHOOK_BASE_URL'];
+  if (!webhookBaseUrl) {
+    return [new Error('webhook_base_url or WINDMILL_WEBHOOK_BASE_URL must be set'), null];
+  }
+
+  // Step 1: Stop old channel (non-fatal if it fails)
+  let stoppedOld = false;
+  if (input.old_channel_id && input.old_resource_id) {
+    stoppedOld = await stopChannel(accessToken, input.old_channel_id, input.old_resource_id);
+  }
+
+  // Step 2: Register new channel
+  const newChannelId = randomUUID();
+  const webhookUrl = `${webhookBaseUrl}/api/w/booking-titanium/jobs/run/p/f/gcal_webhook_receiver`;
+
+  const body = {
+    id: newChannelId,
+    type: 'web_hook',
+    address: webhookUrl,
+    token: process.env['GCAL_WEBHOOK_SECRET'] ?? newChannelId,
+    params: { calendar_type: input.calendar_type },
+    expiration: String(Date.now() + input.ttl_seconds * 1000),
+  };
+
   try {
-    const parsed = InputSchema.safeParse(rawInput);
-    if (!parsed.success) {
-      return { success: false, data: null, error_message: `Validation error: ${parsed.error.message}` };
-    }
-
-    const { calendar_id, calendar_type, old_channel_id, old_resource_id, ttl_seconds } = parsed.data;
-
-    const accessToken = process.env['GCAL_ACCESS_TOKEN'];
-    if (!accessToken) {
-      return { success: false, data: null, error_message: 'GCAL_ACCESS_TOKEN not configured' };
-    }
-
-    const webhookBaseUrl = parsed.data.webhook_base_url ?? process.env['WINDMILL_WEBHOOK_BASE_URL'];
-    if (!webhookBaseUrl) {
-      return { success: false, data: null, error_message: 'webhook_base_url or WINDMILL_WEBHOOK_BASE_URL must be set' };
-    }
-
-    // Step 1: Stop old channel (non-fatal if it fails)
-    let stoppedOld = false;
-    if (old_channel_id && old_resource_id) {
-      stoppedOld = await stopChannel(accessToken, old_channel_id, old_resource_id);
-    }
-
-    // Step 2: Register new channel
-    const newChannelId = randomUUID();
-    const webhookUrl = `${webhookBaseUrl}/api/w/booking-titanium/jobs/run/p/f/gcal_webhook_receiver`;
-
-    const body = {
-      id: newChannelId,
-      type: 'web_hook',
-      address: webhookUrl,
-      token: process.env['GCAL_WEBHOOK_SECRET'] ?? newChannelId,
-      params: { calendar_type },
-      expiration: String((Date.now() + ttl_seconds * 1000)),
-    };
-
     const response = await fetch(
-      `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendar_id)}/events/watch`,
+      `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(input.calendar_id)}/events/watch`,
       {
         method: 'POST',
         headers: {
@@ -109,31 +98,30 @@ export async function main(rawInput: unknown): Promise<{
 
     if (!response.ok) {
       const errorText = await response.text().catch(() => '');
-      return {
-        success: false,
-        data: null,
-        error_message: `GCal API ${String(response.status)}: ${errorText}`,
-      };
+      return [new Error(`GCal API ${String(response.status)}: ${errorText}`), null];
     }
 
-    const data = await response.json() as Record<string, unknown>;
-    const expirationMs = Number(data['expiration'] ?? (Date.now() + ttl_seconds * 1000));
+    const data = await response.json();
+    if (typeof data !== 'object' || data === null) {
+      return [new Error('Invalid GCal API response'), null];
+    }
 
-    return {
-      success: true,
-      data: {
-        stopped_old: stoppedOld,
-        channel_id: data['id'] as string,
-        resource_id: data['resourceId'] as string,
-        calendar_id,
-        expiration_unix_ms: expirationMs,
-        expiration_iso: new Date(expirationMs).toISOString(),
-        webhook_url: webhookUrl,
-      },
-      error_message: null,
-    };
+    const responseObj = data as Record<string, unknown>;
+    const channelIdValue = typeof responseObj['id'] === 'string' ? responseObj['id'] : newChannelId;
+    const resourceIdValue = typeof responseObj['resourceId'] === 'string' ? responseObj['resourceId'] : '';
+    const expirationMs = Number(responseObj['expiration'] ?? (Date.now() + input.ttl_seconds * 1000));
+
+    return [null, {
+      stopped_old: stoppedOld,
+      channel_id: channelIdValue,
+      resource_id: resourceIdValue,
+      calendar_id: input.calendar_id,
+      expiration_unix_ms: expirationMs,
+      expiration_iso: new Date(expirationMs).toISOString(),
+      webhook_url: webhookUrl,
+    }];
   } catch (e) {
     const error = e instanceof Error ? e : new Error(String(e));
-    return { success: false, data: null, error_message: `Internal error: ${error.message}` };
+    return [new Error(`Internal error: ${error.message}`), null];
   }
 }

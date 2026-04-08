@@ -209,7 +209,7 @@ export async function main(rawInput: unknown): Promise<[Error | null, WaitlistRe
     });
 
     if (txErr !== null) {
-      throw txErr;
+      return [txErr, null];
     }
 
     return [null, txData];

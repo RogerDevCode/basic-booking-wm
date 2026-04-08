@@ -5,6 +5,7 @@
 //   - admin_generate_temp: Admin generates 4-char readable temp password
 //   - provider_change: Provider changes password (must know current or use temp)
 //   - provider_verify: Verify provider login credentials
+// Go-style: no throw, no any, no as. Tuple return.
 // ============================================================================
 
 import "@total-typescript/ts-reset";
@@ -19,29 +20,17 @@ import {
   validatePasswordPolicy,
 } from '../internal/crypto';
 
-// ============================================================================
-// TYPES & SCHEMAS
-// ============================================================================
-
 const ActionSchema = z.enum(['admin_generate_temp', 'provider_change', 'provider_verify']);
 
 const InputSchema = z.object({
   tenant_id: z.uuid(),
   action: ActionSchema,
   provider_id: z.uuid(),
-  current_password: z.string().optional(),  // For provider_change and provider_verify
-  new_password: z.string().optional(),       // For provider_change
+  current_password: z.string().optional(),
+  new_password: z.string().optional(),
 });
 
 type Result<T> = [Error | null, T | null];
-
-// ============================================================================
-// DB HELPERS
-// ============================================================================
-
-// ============================================================================
-// ADMIN: Generate temporary password (4-char readable)
-// ============================================================================
 
 interface TempPasswordResult {
   readonly provider_id: string;
@@ -52,23 +41,18 @@ interface TempPasswordResult {
 }
 
 async function adminGenerateTempPassword(tx: postgres.TransactionSql, providerId: string): Promise<Result<TempPasswordResult>> {
-  // Verify provider exists
-  const providers = await tx`SELECT id, name, email FROM providers WHERE id = ${providerId}::uuid LIMIT 1`;
-  const provider = providers[0] as { id: string; name: string; email: string } | undefined;
+  const providers = await tx.values<[string, string, string][]>`
+    SELECT provider_id, name, email FROM providers WHERE provider_id = ${providerId}::uuid LIMIT 1
+  `;
+  const provider = providers[0];
   if (provider == null) {
     return [new Error(`Provider '${providerId}' not found`), null];
   }
 
-  // Generate 4-char readable password
   const tempPassword = generateReadablePassword(4);
-
-  // Hash it with Argon2id
   const passwordHash = await hashPassword(tempPassword);
-
-  // Set expiration to 24 hours from now
   const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
-  // Update provider
   await tx`
     UPDATE providers
     SET password_hash = ${passwordHash},
@@ -76,24 +60,20 @@ async function adminGenerateTempPassword(tx: postgres.TransactionSql, providerId
         password_reset_expires = NULL,
         last_password_change = NOW(),
         updated_at = NOW()
-    WHERE id = ${providerId}::uuid
+    WHERE provider_id = ${providerId}::uuid
   `;
 
   return [null, {
-    provider_id: provider.id,
-    provider_name: provider.name,
-    temp_password: tempPassword,
+    provider_id: provider[0],
+    provider_name: provider[1],
+    temp_password,
     expires_at: expiresAt,
-    message: `Temp password for ${provider.name}: ${tempPassword} (expires in 24h, must change on first login)`,
+    message: `Temp password for ${provider[1]} (${provider[2]}): ${tempPassword} (expires in 24h)`,
   }];
 }
 
-// ============================================================================
-// PROVIDER: Change password
-// ============================================================================
-
 interface PasswordChangeResult {
-  readonly success: boolean;
+  readonly provider_id: string;
   readonly message: string;
 }
 
@@ -103,33 +83,25 @@ async function providerChangePassword(
   currentPassword: string,
   newPassword: string
 ): Promise<Result<PasswordChangeResult>> {
-  // Validate new password policy
   const policy = validatePasswordPolicy(newPassword);
   if (!policy.valid) {
     return [new Error(`Password policy failed: ${policy.errors.join(', ')}`), null];
   }
 
-  // Fetch provider with password hash
-  const providers = await tx`SELECT id, name, password_hash FROM providers WHERE id = ${providerId}::uuid LIMIT 1`;
-  const provider = providers[0] as { id: string; name: string; password_hash: string | null } | undefined;
-  if (provider == null) {
-    return [new Error(`Provider '${providerId}' not found`), null];
+  const providers = await tx.values<[string | null][]>`
+    SELECT password_hash FROM providers WHERE provider_id = ${providerId}::uuid LIMIT 1
+  `;
+  const provider = providers[0];
+  if (provider === undefined || provider[0] === null) {
+    return [new Error('Provider not found or no password set'), null];
   }
 
-  // Verify current password
-  if (provider.password_hash == null) {
-    return [new Error('Provider has no password set. Ask admin to generate a temp password.'), null];
-  }
-
-  const isValid = await verifyPassword(currentPassword, provider.password_hash);
+  const isValid = await verifyPassword(currentPassword, provider[0]);
   if (!isValid) {
     return [new Error('Current password is incorrect'), null];
   }
 
-  // Hash new password
   const newHash = await hashPassword(newPassword);
-
-  // Update
   await tx`
     UPDATE providers
     SET password_hash = ${newHash},
@@ -137,23 +109,16 @@ async function providerChangePassword(
         password_reset_expires = NULL,
         last_password_change = NOW(),
         updated_at = NOW()
-    WHERE id = ${providerId}::uuid
+    WHERE provider_id = ${providerId}::uuid
   `;
 
-  return [null, { success: true, message: 'Password changed successfully' }];
+  return [null, { provider_id: providerId, message: 'Password changed successfully' }];
 }
 
-// ============================================================================
-// PROVIDER: Verify login credentials
-// ============================================================================
-
 interface VerifyResult {
-  readonly valid: boolean;
   readonly provider_id: string;
-  readonly provider_name: string;
-  readonly email: string;
-  readonly must_change_password: boolean;
-  readonly message: string;
+  readonly valid: boolean;
+  readonly provider_name: string | null;
 }
 
 async function providerVerify(
@@ -161,67 +126,24 @@ async function providerVerify(
   providerId: string,
   password: string
 ): Promise<Result<VerifyResult>> {
-  const providers = await tx`
-    SELECT id, name, email, password_hash, last_password_change
-    FROM providers
-    WHERE id = ${providerId}::uuid AND is_active = true
-    LIMIT 1
+  const providers = await tx.values<[string | null, string | null][]>`
+    SELECT provider_id, password_hash, name FROM providers WHERE provider_id = ${providerId}::uuid LIMIT 1
   `;
-  const provider = providers[0] as {
-    id: string;
-    name: string;
-    email: string;
-    password_hash: string | null;
-    last_password_change: string | null;
-  } | undefined;
-
-  if (provider == null) {
-    return [new Error('Provider not found or inactive'), null];
+  const provider = providers[0];
+  if (provider === undefined) {
+    return [new Error('Provider not found'), null];
   }
 
-  if (provider.password_hash == null) {
-    return [null, {
-      valid: false,
-      provider_id: provider.id,
-      provider_name: provider.name,
-      email: provider.email,
-      must_change_password: true,
-      message: 'No password set. Ask admin to generate a temp password.',
-    }];
+  const passwordHash = provider[1];
+  const name = provider[2];
+
+  if (passwordHash === null) {
+    return [null, { provider_id: providerId, valid: false, provider_name: name }];
   }
 
-  const isValid = await verifyPassword(password, provider.password_hash);
-  if (!isValid) {
-    return [null, {
-      valid: false,
-      provider_id: provider.id,
-      provider_name: provider.name,
-      email: provider.email,
-      must_change_password: false,
-      message: 'Invalid password',
-    }];
-  }
-
-  // Check if password was set by admin (temp password flow)
-  // If last_password_change is within 24h of creation, force change
-  const mustChange = provider.last_password_change != null &&
-    (Date.now() - new Date(provider.last_password_change).getTime()) < 24 * 60 * 60 * 1000;
-
-  return [null, {
-    valid: true,
-    provider_id: provider.id,
-    provider_name: provider.name,
-    email: provider.email,
-    must_change_password: mustChange,
-    message: mustChange
-      ? 'Login successful. You must change your password on first login.'
-      : 'Login successful',
-  }];
+  const isValid = await verifyPassword(password, passwordHash);
+  return [null, { provider_id: providerId, valid: isValid, provider_name: name }];
 }
-
-// ============================================================================
-// MAIN
-// ============================================================================
 
 export async function main(rawInput: unknown): Promise<Result<unknown>> {
   const parsed = InputSchema.safeParse(rawInput);
@@ -229,41 +151,57 @@ export async function main(rawInput: unknown): Promise<Result<unknown>> {
     return [new Error(`Validation error: ${parsed.error.message}`), null];
   }
 
-  const input = parsed.data;
+  const input: Readonly<z.infer<typeof InputSchema>> = parsed.data;
 
   const dbUrl = process.env['DATABASE_URL'];
-  if (dbUrl == null || dbUrl === '') {
+  if (dbUrl === undefined || dbUrl === '') {
     return [new Error('CONFIGURATION_ERROR: DATABASE_URL is required'), null];
   }
 
   const sql = createDbClient({ url: dbUrl });
 
-  if (input.action === 'admin_generate_temp') {
-    const [err, result] = await withTenantContext(sql, input.tenant_id, (tx) => adminGenerateTempPassword(tx, input.provider_id));
-    if (err != null) return [err, null];
-    return [null, result];
-  }
-
-  if (input.action === 'provider_change') {
-    const currentPassword = input.current_password;
-    const newPassword = input.new_password;
-    if (currentPassword == null || newPassword == null) {
-      return [new Error('provider_change requires current_password and new_password'), null];
+  try {
+    if (input.action === 'admin_generate_temp') {
+      const [err, result] = await withTenantContext(sql, input.tenant_id, (tx) =>
+        adminGenerateTempPassword(tx, input.provider_id)
+      );
+      if (err !== null) return [err, null];
+      if (result === null) return [new Error('Failed to generate temp password'), null];
+      return [null, result];
     }
-    const [err, result] = await withTenantContext(sql, input.tenant_id, (tx) => providerChangePassword(tx, input.provider_id, currentPassword, newPassword));
-    if (err != null) return [err, null];
-    return [null, result];
-  }
 
-  if (input.action === 'provider_verify') {
-    const password = input.current_password;
-    if (password == null) {
-      return [new Error('provider_verify requires current_password'), null];
+    if (input.action === 'provider_change') {
+      const currentPw = input.current_password;
+      const newPw = input.new_password;
+      if (currentPw == null || newPw == null) {
+        return [new Error('provider_change requires current_password and new_password'), null];
+      }
+      const [err, result] = await withTenantContext(sql, input.tenant_id, (tx) =>
+        providerChangePassword(tx, input.provider_id, currentPw, newPw)
+      );
+      if (err !== null) return [err, null];
+      if (result === null) return [new Error('Failed to change password'), null];
+      return [null, result];
     }
-    const [err, result] = await withTenantContext(sql, input.tenant_id, (tx) => providerVerify(tx, input.provider_id, password));
-    if (err != null) return [err, null];
-    return [null, result];
-  }
 
-  return [new Error(`Unknown action: ${input.action}`), null];
+    if (input.action === 'provider_verify') {
+      const password = input.current_password;
+      if (password == null) {
+        return [new Error('provider_verify requires current_password'), null];
+      }
+      const [err, result] = await withTenantContext(sql, input.tenant_id, (tx) =>
+        providerVerify(tx, input.provider_id, password)
+      );
+      if (err !== null) return [err, null];
+      if (result === null) return [new Error('Failed to verify password'), null];
+      return [null, result];
+    }
+
+    return [new Error(`Unknown action: ${input.action}`), null];
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return [new Error(`Internal error: ${msg}`), null];
+  } finally {
+    await sql.end();
+  }
 }

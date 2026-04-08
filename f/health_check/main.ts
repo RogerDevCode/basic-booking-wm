@@ -30,8 +30,11 @@ async function checkDatabase(dbUrl: string): Promise<ComponentStatus> {
       await tx`SELECT 1`;
       return [null, true];
     });
-    
-    if (txErr) throw txErr;
+
+    if (txErr) {
+      const latency = Date.now() - start;
+      return { component: 'database', status: 'unhealthy', latency_ms: latency, message: txErr.message };
+    }
 
     const latency = Date.now() - start;
     await sql.end();

@@ -239,10 +239,16 @@ export async function main(rawInput: unknown): Promise<[Error | null, BookingRes
     });
 
     if (txErr !== null) {
-      // Re-throw so that it can be caught by the outer catch and handle the constraints
-      throw txErr;
+      const message = txErr.message;
+      if (message.includes('duplicate key') || message.includes('unique constraint') || message.includes('conflicting key value violates exclusion constraint')) {
+        return [new Error('The selected time slot is already booked. Please choose another time.'), null];
+      }
+      if (message.startsWith('transaction_failed: ')) {
+        return [new Error(message.substring(20)), null];
+      }
+      return [txErr, null];
     }
-    
+
     return [null, txData];
 
   } catch (e) {
