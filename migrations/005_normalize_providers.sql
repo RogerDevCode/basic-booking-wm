@@ -13,12 +13,11 @@
 --   (no separate id column)
 --
 -- Strategy:
---   1. Update all FK references from providers.id → providers.provider_id
---   2. Drop old FK constraints
---   3. Copy provider_id values to id where they differ
---   4. Make provider_id the PK
---   5. Drop id column
---   6. Recreate FK constraints pointing to provider_id
+--   1. Clean orphan data (references to non-existent providers)
+--   2. Drop ALL FK constraints referencing providers
+--   3. Drop old PK on id, drop unique on provider_id
+--   4. Make provider_id the PK, drop id column
+--   5. Recreate ALL FK constraints pointing to provider_id
 -- ============================================================================
 
 BEGIN;
@@ -27,83 +26,61 @@ BEGIN;
 DO $$
 DECLARE
   has_id_column BOOLEAN;
-  has_provider_id_column BOOLEAN;
-  has_duplicate BOOLEAN;
 BEGIN
   SELECT EXISTS (
     SELECT 1 FROM information_schema.columns
     WHERE table_name = 'providers' AND column_name = 'id'
   ) INTO has_id_column;
 
-  SELECT EXISTS (
-    SELECT 1 FROM information_schema.columns
-    WHERE table_name = 'providers' AND column_name = 'provider_id'
-  ) INTO has_provider_id_column;
-
-  -- If we already have only provider_id as PK, skip
-  IF has_id_column = FALSE AND has_provider_id_column = TRUE THEN
-    RAISE NOTICE 'ℹ️  providers table already normalized — no id column, only provider_id';
+  IF has_id_column = FALSE THEN
+    RAISE NOTICE 'ℹ️  providers table already normalized — no id column';
     RETURN;
   END IF;
 
-  -- Check if any rows have mismatched id vs provider_id
-  SELECT EXISTS (
-    SELECT 1 FROM providers WHERE id != provider_id
-  ) INTO has_duplicate;
+  -- ── Step 2: Clean orphan data ─────────────────────────────────────────────
+  -- Delete orphan booking_locks (ephemeral, safe to delete)
+  DELETE FROM booking_locks WHERE provider_id NOT IN (SELECT provider_id FROM providers);
+  
+  -- Delete orphan booking_dlq (DLQ for non-existent providers is useless)
+  DELETE FROM booking_dlq WHERE provider_id NOT IN (SELECT provider_id FROM providers);
+  
+  -- Delete orphan booking_intents (intents for non-existent providers are useless)
+  DELETE FROM booking_intents WHERE provider_id NOT IN (SELECT provider_id FROM providers);
+  
+  -- Delete orphan provider_schedules
+  DELETE FROM provider_schedules WHERE provider_id NOT IN (SELECT provider_id FROM providers);
+  
+  -- Delete orphan bookings (provider doesn't exist)
+  DELETE FROM bookings WHERE provider_id NOT IN (SELECT provider_id FROM providers);
+  
+  -- Delete services with NULL or invalid provider_id
+  DELETE FROM services WHERE provider_id IS NULL OR provider_id NOT IN (SELECT provider_id FROM providers);
 
-  IF has_duplicate THEN
-    RAISE WARNING '⚠️  providers has rows where id != provider_id — data migration needed';
-  END IF;
+  RAISE NOTICE '✅ Orphan data cleaned';
 
-  -- ── Step 2: Update FK references to point to provider_id instead of id ─────
+  -- ── Step 3: Drop ALL FK constraints referencing providers ─────────────────
+  ALTER TABLE booking_dlq DROP CONSTRAINT IF EXISTS booking_dlq_provider_id_fkey;
+  ALTER TABLE booking_intents DROP CONSTRAINT IF EXISTS booking_intents_provider_id_fkey;
+  ALTER TABLE booking_locks DROP CONSTRAINT IF EXISTS booking_locks_provider_id_fkey;
+  ALTER TABLE bookings DROP CONSTRAINT IF EXISTS fk_booking_provider;
+  ALTER TABLE provider_schedules DROP CONSTRAINT IF EXISTS fk_provider;
+  ALTER TABLE schedule_overrides DROP CONSTRAINT IF EXISTS schedule_overrides_provider_id_fkey;
+  ALTER TABLE service_notes DROP CONSTRAINT IF EXISTS service_notes_provider_id_fkey;
+  ALTER TABLE services DROP CONSTRAINT IF EXISTS services_provider_id_fkey;
 
-  -- 2a. booking_dlq.provider_id → providers.provider_id (already correct by constraint name)
-  -- Check and update if needed
-  IF EXISTS (
-    SELECT 1 FROM information_schema.referential_constraints rc
-    JOIN information_schema.key_column_usage kcu ON rc.constraint_name = kcu.constraint_name
-    WHERE kcu.table_name = 'booking_dlq'
-    AND rc.unique_constraint_schema = 'public'
-    AND rc.unique_constraint_name IN (
-      SELECT conname FROM pg_constraint WHERE conrelid = 'providers'::regclass AND contype = 'u'
-    )
-  ) THEN
-    RAISE NOTICE 'ℹ️  booking_dlq FK already references providers';
-  END IF;
-
-  -- 2b. booking_intents.provider_id → providers.provider_id
-  -- 2c. booking_locks.provider_id → providers.provider_id
-  -- 2d. bookings.provider_id → providers.provider_id
-  -- 2e. provider_schedules.provider_id → providers.provider_id
-
-  -- ── Step 3: Synchronize id and provider_id values ────────────────────────
-  -- Make provider_id = id for all rows so we can safely transition
-  UPDATE providers SET provider_id = id WHERE provider_id IS NULL OR provider_id != id;
-
-  -- ── Step 4: Drop and recreate FK constraints ─────────────────────────────
-
-  -- Drop old FKs that reference providers.id
-  ALTER TABLE IF EXISTS booking_dlq DROP CONSTRAINT IF EXISTS booking_dlq_provider_id_fkey;
-  ALTER TABLE IF EXISTS booking_intents DROP CONSTRAINT IF EXISTS booking_intents_provider_id_fkey;
-  ALTER TABLE IF EXISTS booking_locks DROP CONSTRAINT IF EXISTS booking_locks_provider_id_fkey;
-  ALTER TABLE IF EXISTS bookings DROP CONSTRAINT IF EXISTS fk_booking_provider;
-  ALTER TABLE IF EXISTS provider_schedules DROP CONSTRAINT IF EXISTS fk_provider;
-
-  -- ── Step 5: Make provider_id the primary key ─────────────────────────────
-
-  -- First drop the old PK on id
+  -- ── Step 4: Drop old PK on id ────────────────────────────────────────────
   ALTER TABLE providers DROP CONSTRAINT IF EXISTS providers_pkey;
 
-  -- Drop the unique constraint on provider_id (it was unique but not PK)
+  -- ── Step 5: Drop unique constraint on provider_id ────────────────────────
   ALTER TABLE providers DROP CONSTRAINT IF EXISTS uq_providers_provider_id;
 
-  -- Now make provider_id the PK
+  -- ── Step 6: Make provider_id the primary key ─────────────────────────────
   ALTER TABLE providers ADD PRIMARY KEY (provider_id);
 
-  -- ── Step 6: Drop the old id column ───────────────────────────────────────
+  -- ── Step 7: Drop the old id column ───────────────────────────────────────
   ALTER TABLE providers DROP COLUMN IF EXISTS id;
 
-  -- ── Step 7: Recreate FK constraints pointing to provider_id ──────────────
+  -- ── Step 8: Recreate ALL FK constraints pointing to provider_id ──────────
   ALTER TABLE bookings
     ADD CONSTRAINT fk_booking_provider
     FOREIGN KEY (provider_id) REFERENCES providers(provider_id);
@@ -124,7 +101,19 @@ BEGIN
     ADD CONSTRAINT fk_provider
     FOREIGN KEY (provider_id) REFERENCES providers(provider_id);
 
-  RAISE NOTICE '✅ providers table normalized: provider_id is now the PK, id column removed';
+  ALTER TABLE schedule_overrides
+    ADD CONSTRAINT schedule_overrides_provider_id_fkey
+    FOREIGN KEY (provider_id) REFERENCES providers(provider_id);
+
+  ALTER TABLE service_notes
+    ADD CONSTRAINT service_notes_provider_id_fkey
+    FOREIGN KEY (provider_id) REFERENCES providers(provider_id);
+
+  ALTER TABLE services
+    ADD CONSTRAINT services_provider_id_fkey
+    FOREIGN KEY (provider_id) REFERENCES providers(provider_id);
+
+  RAISE NOTICE '✅ providers table normalized: provider_id is now the PK, id column removed, orphan data cleaned';
 END $$;
 
 COMMIT;

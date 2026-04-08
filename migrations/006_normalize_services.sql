@@ -46,15 +46,19 @@ BEGIN
     RETURN;
   END IF;
 
-  -- ── Step 2: Add service_id column if missing ─────────────────────────────
+  -- ── Step 2: Drop FK constraints that reference services ───────────────────
+  ALTER TABLE bookings DROP CONSTRAINT IF EXISTS fk_booking_service;
+  ALTER TABLE bookings DROP CONSTRAINT IF EXISTS bookings_service_id_fkey;
+  ALTER TABLE booking_dlq DROP CONSTRAINT IF EXISTS booking_dlq_service_id_fkey;
+  ALTER TABLE booking_intents DROP CONSTRAINT IF EXISTS booking_intents_service_id_fkey;
+
+  -- ── Step 3: Add service_id column if missing ─────────────────────────────
   IF NOT has_service_id_col THEN
     ALTER TABLE services ADD COLUMN service_id UUID DEFAULT gen_random_uuid();
-    -- Copy existing id values to service_id
     UPDATE services SET service_id = id WHERE service_id IS NULL;
   END IF;
 
-  -- ── Step 3: Rename columns to match §6 schema ────────────────────────────
-  -- duration_min → duration_minutes
+  -- ── Step 4: Rename columns to match §6 schema ────────────────────────────
   IF EXISTS (
     SELECT 1 FROM information_schema.columns
     WHERE table_name = 'services' AND column_name = 'duration_min'
@@ -62,7 +66,6 @@ BEGIN
     ALTER TABLE services RENAME COLUMN duration_min TO duration_minutes;
   END IF;
 
-  -- buffer_min → buffer_minutes
   IF EXISTS (
     SELECT 1 FROM information_schema.columns
     WHERE table_name = 'services' AND column_name = 'buffer_min'
@@ -70,27 +73,24 @@ BEGIN
     ALTER TABLE services RENAME COLUMN buffer_min TO buffer_minutes;
   END IF;
 
-  -- price → price_cents (convert from decimal to integer cents)
+  -- price → price_cents
   IF EXISTS (
     SELECT 1 FROM information_schema.columns
     WHERE table_name = 'services' AND column_name = 'price'
   ) THEN
-    -- Convert decimal price to integer cents
     ALTER TABLE services ADD COLUMN price_cents INT DEFAULT 0;
     UPDATE services SET price_cents = COALESCE((price * 100)::INT, 0);
     ALTER TABLE services DROP COLUMN price;
   END IF;
 
-  -- ── Step 4: Make service_id the primary key ──────────────────────────────
+  -- ── Step 5: Make service_id the primary key ──────────────────────────────
   ALTER TABLE services DROP CONSTRAINT IF EXISTS services_pkey;
   ALTER TABLE services ADD PRIMARY KEY (service_id);
 
   -- Drop old id column
   ALTER TABLE services DROP COLUMN IF EXISTS id;
 
-  -- ── Step 5: Add missing columns per §6 schema ────────────────────────────
-
-  -- description column
+  -- ── Step 6: Add missing columns per §6 schema ────────────────────────────
   IF NOT EXISTS (
     SELECT 1 FROM information_schema.columns
     WHERE table_name = 'services' AND column_name = 'description'
@@ -98,17 +98,32 @@ BEGIN
     ALTER TABLE services ADD COLUMN description TEXT;
   END IF;
 
-  -- provider_id NOT NULL constraint (after ensuring no nulls)
+  -- provider_id NOT NULL
   UPDATE services SET provider_id = '00000000-0000-0000-0000-000000000000' WHERE provider_id IS NULL;
   ALTER TABLE services ALTER COLUMN provider_id SET NOT NULL;
 
-  -- ── Step 6: Recreate FK constraints ──────────────────────────────────────
+  -- ── Step 7: Recreate FK constraints ──────────────────────────────────────
   ALTER TABLE services DROP CONSTRAINT IF EXISTS services_provider_id_fkey;
   ALTER TABLE services
     ADD CONSTRAINT services_provider_id_fkey
     FOREIGN KEY (provider_id) REFERENCES providers(provider_id);
 
-  -- ── Step 7: Recreate indexes ─────────────────────────────────────────────
+  ALTER TABLE bookings DROP CONSTRAINT IF EXISTS fk_booking_service;
+  ALTER TABLE bookings
+    ADD CONSTRAINT fk_booking_service
+    FOREIGN KEY (service_id) REFERENCES services(service_id);
+
+  ALTER TABLE booking_dlq DROP CONSTRAINT IF EXISTS booking_dlq_service_id_fkey;
+  ALTER TABLE booking_dlq
+    ADD CONSTRAINT booking_dlq_service_id_fkey
+    FOREIGN KEY (service_id) REFERENCES services(service_id);
+
+  ALTER TABLE booking_intents DROP CONSTRAINT IF EXISTS booking_intents_service_id_fkey;
+  ALTER TABLE booking_intents
+    ADD CONSTRAINT booking_intents_service_id_fkey
+    FOREIGN KEY (service_id) REFERENCES services(service_id);
+
+  -- ── Step 8: Recreate indexes ─────────────────────────────────────────────
   DROP INDEX IF EXISTS idx_services_provider;
   CREATE INDEX idx_services_provider ON services(provider_id);
 
