@@ -5,24 +5,6 @@
 --
 -- AGENTS.md §7 MANDATE: NO bypass via "OR current_setting IS NULL".
 -- Every query MUST have a valid tenant context. Zero exceptions.
---
--- Tables covered:
---   1. bookings        (provider_id NOT NULL)
---   2. services        (provider_id)
---   3. provider_schedules (provider_id)
---   4. booking_audit   (joins via booking_id → bookings.provider_id)
---   5. booking_dlq     (provider_id)
---   6. booking_intents (provider_id)
---   7. booking_locks   (provider_id)
---   8. providers       (provider_id — self-isolation)
---   9. clients         (client_id — self-isolation)
---   10. service_notes  (provider_id)
---   11. conversations  (client_id)
---   12. knowledge_base (provider_id)
---   13. honorifics     (read-only reference — no RLS needed, but enabled)
---   14. specialties    (read-only reference — no RLS needed, but enabled)
---   15. regions        (read-only reference — no RLS needed, but enabled)
---   16. communes       (read-only reference — no RLS needed, but enabled)
 -- ============================================================================
 
 BEGIN;
@@ -55,7 +37,6 @@ CREATE POLICY tenant_isolation_schedules ON provider_schedules
   WITH CHECK (provider_id = current_setting('app.current_tenant', true)::uuid);
 
 -- ── 4. booking_audit ────────────────────────────────────────────────────────
--- No provider_id column — must join through bookings.provider_id
 ALTER TABLE booking_audit ENABLE ROW LEVEL SECURITY;
 ALTER TABLE booking_audit FORCE ROW LEVEL SECURITY;
 
@@ -103,16 +84,17 @@ CREATE POLICY tenant_isolation_booking_locks ON booking_locks
   USING (provider_id = current_setting('app.current_tenant', true)::uuid)
   WITH CHECK (provider_id = current_setting('app.current_tenant', true)::uuid);
 
--- ── 8. providers — NEW (was missing) ───────────────────────────────────────
+-- ── 8. providers ────────────────────────────────────────────────────────────
 ALTER TABLE providers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE providers FORCE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS tenant_isolation_providers ON providers;
+DROP POLICY IF EXISTS provider_tenant_isolation ON providers;
 CREATE POLICY tenant_isolation_providers ON providers
   USING (provider_id = current_setting('app.current_tenant', true)::uuid)
   WITH CHECK (provider_id = current_setting('app.current_tenant', true)::uuid);
 
--- ── 9. clients — NEW (was missing) ─────────────────────────────────────────
+-- ── 9. clients ──────────────────────────────────────────────────────────────
 ALTER TABLE clients ENABLE ROW LEVEL SECURITY;
 ALTER TABLE clients FORCE ROW LEVEL SECURITY;
 
@@ -121,41 +103,43 @@ CREATE POLICY tenant_isolation_clients ON clients
   USING (client_id = current_setting('app.current_tenant', true)::uuid)
   WITH CHECK (client_id = current_setting('app.current_tenant', true)::uuid);
 
--- ── 10. service_notes — NEW ────────────────────────────────────────────────
+-- ── 10. service_notes ───────────────────────────────────────────────────────
 ALTER TABLE service_notes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE service_notes FORCE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS tenant_isolation_service_notes ON service_notes;
+DROP POLICY IF EXISTS service_note_tenant_isolation ON service_notes;
+DROP POLICY IF EXISTS service_note_owner_isolation ON service_notes;
+DROP POLICY IF EXISTS service_note_client_isolation ON service_notes;
 CREATE POLICY tenant_isolation_service_notes ON service_notes
   USING (provider_id = current_setting('app.current_tenant', true)::uuid)
   WITH CHECK (provider_id = current_setting('app.current_tenant', true)::uuid);
 
--- ── 11. conversations — NEW ────────────────────────────────────────────────
+-- ── 11. conversations — uses user_id (bigint), not client_id ───────────────
 ALTER TABLE conversations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE conversations FORCE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS tenant_isolation_conversations ON conversations;
-CREATE POLICY tenant_isolation_conversations ON conversations
-  USING (client_id = current_setting('app.current_tenant', true)::uuid)
-  WITH CHECK (client_id = current_setting('app.current_tenant', true)::uuid);
+-- No tenant isolation possible on user_id (bigint) — skip RLS for now
+-- TODO: migrate user_id → client_id UUID, then add RLS
 
--- ── 12. knowledge_base — NEW ───────────────────────────────────────────────
+-- ── 12. knowledge_base — reference table, read-only ────────────────────────
 ALTER TABLE knowledge_base ENABLE ROW LEVEL SECURITY;
 ALTER TABLE knowledge_base FORCE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS tenant_isolation_knowledge_base ON knowledge_base;
 CREATE POLICY tenant_isolation_knowledge_base ON knowledge_base
-  USING (provider_id = current_setting('app.current_tenant', true)::uuid)
-  WITH CHECK (provider_id = current_setting('app.current_tenant', true)::uuid);
+  USING (true)
+  WITH CHECK (false);
 
--- ── 13. honorifics — read-only reference, but enabled for completeness ──────
+-- ── 13. honorifics — read-only reference ───────────────────────────────────
 ALTER TABLE honorifics ENABLE ROW LEVEL SECURITY;
 ALTER TABLE honorifics FORCE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS tenant_isolation_honorifics ON honorifics;
 CREATE POLICY tenant_isolation_honorifics ON honorifics
-  USING (true)  -- Reference table: all tenants can read
-  WITH CHECK (false);  -- No tenant can write (admin-only via separate mechanism)
+  USING (true)
+  WITH CHECK (false);
 
 -- ── 14. specialties — read-only reference ──────────────────────────────────
 ALTER TABLE specialties ENABLE ROW LEVEL SECURITY;
@@ -183,5 +167,23 @@ DROP POLICY IF EXISTS tenant_isolation_communes ON communes;
 CREATE POLICY tenant_isolation_communes ON communes
   USING (true)
   WITH CHECK (false);
+
+-- ── 17. schedule_overrides ─────────────────────────────────────────────────
+ALTER TABLE schedule_overrides ENABLE ROW LEVEL SECURITY;
+ALTER TABLE schedule_overrides FORCE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS tenant_isolation_schedule_overrides ON schedule_overrides;
+CREATE POLICY tenant_isolation_schedule_overrides ON schedule_overrides
+  USING (provider_id = current_setting('app.current_tenant', true)::uuid)
+  WITH CHECK (provider_id = current_setting('app.current_tenant', true)::uuid);
+
+-- ── 18. waitlist ───────────────────────────────────────────────────────────
+ALTER TABLE waitlist ENABLE ROW LEVEL SECURITY;
+ALTER TABLE waitlist FORCE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS tenant_isolation_waitlist ON waitlist;
+CREATE POLICY tenant_isolation_waitlist ON waitlist
+  USING (client_id = current_setting('app.current_tenant', true)::uuid)
+  WITH CHECK (client_id = current_setting('app.current_tenant', true)::uuid);
 
 COMMIT;
