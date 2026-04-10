@@ -464,7 +464,7 @@ export async function main(
   };
   const maybeNormalized: OrchestratorBookingIntent | undefined = legacyAliasMap[input.intent];
   // If not a legacy alias, check if it's already a canonical intent
-  const normalizedIntent: OrchestratorBookingIntent = maybeNormalized ?? (
+  const normalizedIntent: OrchestratorBookingIntent | undefined = maybeNormalized ?? (
     isOrchestratorBookingIntent(input.intent) ? input.intent : undefined
   );
   if (normalizedIntent === undefined) {
