@@ -370,7 +370,7 @@ export async function callLLM(
           console.log('[STRUCTURED OUTPUT PARSE WARNING] Response is not valid JSON despite strict mode');
         }
       }
-      void cacheSet(userMessage, res.content, 'unknown');
+      void cacheSet(userMessage, res.content, INTENT.DESCONOCIDO);
       return [null, res];
     }
   }

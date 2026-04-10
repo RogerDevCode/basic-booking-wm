@@ -1,4 +1,3 @@
-import { NULL_TENANT_UUID } from '../internal/config';
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : CRUD for honorifics management (list, create, update, delete)
@@ -101,6 +100,26 @@ async function listHonorifics(tx: postgres.Sql): Promise<Result<HonorificRow[]>>
   return [null, honorifics];
 }
 
+/**
+ * Global honorifics list — no tenant context needed (reference data table).
+ */
+async function listHonorificsGlobal(client: postgres.Sql): Promise<Result<HonorificRow[]>> {
+  const reserved = await client.reserve();
+  try {
+    await reserved`BEGIN`;
+    const [err, data] = await listHonorifics(reserved);
+    if (err !== null) { await reserved`ROLLBACK`; return [err, null]; }
+    await reserved`COMMIT`;
+    return [null, data];
+  } catch (error: unknown) {
+    await reserved`ROLLBACK`.catch(() => {});
+    const msg = error instanceof Error ? error.message : String(error);
+    return [new Error(`transaction_failed: ${msg}`), null];
+  } finally {
+    reserved.release();
+  }
+}
+
 async function createHonorific(
   tx: postgres.Sql,
   code: string,
@@ -192,13 +211,21 @@ export async function main(rawInput: unknown): Promise<Result<unknown>> {
 
   const sql = createDbClient({ url: dbUrl });
 
-  const effectiveTenantId = input.tenant_id || input.honorific_id || NULL_TENANT_UUID;
+  // Honorifics are global reference data — only 'list' action needs no tenant context
+  // For mutations, require explicit tenant_id from authenticated admin session
+  const effectiveTenantId = input.tenant_id;
 
   if (input.action === 'list') {
-    const [err, rows] = await withTenantContext(sql, effectiveTenantId, listHonorifics);
+    // List is global — use a direct transaction without tenant context
+    const [err, rows] = await listHonorificsGlobal(sql);
     if (err != null) return [err, null];
     const honorifics = rows ?? [];
     return [null, { honorifics, count: honorifics.length }];
+  }
+
+  // All mutations require explicit tenant_id
+  if (effectiveTenantId == null) {
+    return [new Error('tenant_id is required for honorific mutations'), null];
   }
 
   if (input.action === 'create') {

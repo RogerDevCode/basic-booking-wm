@@ -36,7 +36,6 @@
  * → CLEARED FOR CODE GENERATION
  */
 
-import { NULL_TENANT_UUID } from '../internal/config';
 // ============================================================================
 // WEB AUTH LOGIN — Authenticate email+password, return session + role
 // ============================================================================
@@ -46,9 +45,31 @@ import { NULL_TENANT_UUID } from '../internal/config';
 // ============================================================================
 
 import { z } from 'zod';
-import { withTenantContext } from '../internal/tenant-context';
+import postgres from 'postgres';
 import { createDbClient } from '../internal/db/client';
 import crypto from 'crypto';
+
+type Result<T> = [Error | null, T | null];
+
+async function getGlobalTx<T>(
+  client: postgres.Sql,
+  operation: (tx: postgres.Sql) => Promise<Result<T>>,
+): Promise<Result<T>> {
+  const reserved = await client.reserve();
+  try {
+    await reserved`BEGIN`;
+    const [err, data] = await operation(reserved);
+    if (err !== null) { await reserved`ROLLBACK`; return [err, null]; }
+    await reserved`COMMIT`;
+    return [null, data];
+  } catch (error: unknown) {
+    await reserved`ROLLBACK`.catch(() => {});
+    const msg = error instanceof Error ? error.message : String(error);
+    return [new Error(`transaction_failed: ${msg}`), null];
+  } finally {
+    reserved.release();
+  }
+}
 
 const InputSchema = z.object({
   email: z.email(),
@@ -100,11 +121,8 @@ export async function main(rawInput: unknown): Promise<[Error | null, LoginResul
 
   const sql = createDbClient({ url: dbUrl });
 
-  // Auth endpoint — pre-authentication, no tenant isolation available
-  const tenantId = NULL_TENANT_UUID;
-
   try {
-    const [txErr, txData] = await withTenantContext(sql, tenantId, async (tx) => {
+    const [txErr, txData] = await getGlobalTx(sql, async (tx) => {
       const userRows = await tx.values<[string, string, string, string, string, boolean, boolean][]>`
         SELECT user_id, email, full_name, role, password_hash, is_active,
                CASE WHEN rut IS NOT NULL AND email IS NOT NULL AND password_hash IS NOT NULL

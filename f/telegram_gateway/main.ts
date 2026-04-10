@@ -272,10 +272,9 @@ export async function main(rawInput: unknown): Promise<[Error | null, { readonly
   const fullName = lastName !== '' ? `${firstName} ${lastName}` : firstName;
 
   // Auto-register client if not exists.
-  // clients table has NO RLS (migration 008 disabled it — clients are global entities,
-  // not tied to a single provider). Using withTenantContext here would be wrong:
-  // there is no provider_id available at this stage and NULL_TENANT_UUID is rejected
-  // by withTenantContext's UUID validation. Use the raw pool directly.
+  // clients/users table has NO RLS — users are global entities,
+  // not tied to a single provider. Using withTenantContext here would be wrong:
+  // there is no provider_id available at this stage. Use the raw pool directly.
   const dbUrl = process.env['DATABASE_URL'];
   if (dbUrl != null && dbUrl !== '') {
     try {

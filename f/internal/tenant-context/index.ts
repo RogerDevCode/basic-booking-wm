@@ -61,7 +61,13 @@ export async function withTenantContext<T>(
    * Zod Schemas     : YES — tenantId regex-validated before use
    */
 
-  // FAIL FAST: validate tenantId before consuming a pool connection
+  // FAIL FAST: reject sentinel/null UUID — critical RLS bypass prevention
+  // Any caller passing the legacy null-tenant sentinel is performing a security violation
+  if (tenantId === '00000000-0000-0000-0000-000000000000') {
+    return [new Error('null_tenant_uuid_rejected: sentinel values are not valid tenant IDs. Use explicit tenant context from authenticated session.'), null];
+  }
+
+  // FAIL FAST: validate tenantId format before consuming a pool connection
   const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   if (!uuidPattern.test(tenantId)) {
     return [new Error(`invalid_tenant_id: "${tenantId}" is not a valid UUID`), null];

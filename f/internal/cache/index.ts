@@ -9,11 +9,12 @@
 import Redis from "ioredis";
 import { createHash } from "node:crypto";
 import type { Result } from '../result';
+import type { IntentType } from '../ai_agent/constants';
 
 interface CacheEntry {
   readonly query_hash: string;
   readonly response: string;
-  readonly intent: string;
+  readonly intent: IntentType;
   readonly created_at: string;
   readonly ttl_seconds: number;
 }
@@ -92,7 +93,7 @@ export async function cacheGet(
 export async function cacheSet(
   text: string,
   response: string,
-  intent: string,
+  intent: IntentType,
   ttlSeconds: number = DEFAULT_TTL,
 ): Promise<Result<null>> {
   const [clientErr, redis] = createRedisClient();

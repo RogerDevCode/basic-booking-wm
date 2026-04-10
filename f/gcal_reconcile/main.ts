@@ -88,13 +88,13 @@ const GCalEventSchema = z.object({
   summary: z.string().optional(),
 }).passthrough();
 
-/** Safely extract 'id' from unknown GCal API response — zero 'as' casts.
- *  GCalEventData (from callGCalAPI) already has id?: string.
- *  This guard also handles callers that pass raw unknown.
+/** Safely extract 'id' from unknown GCal API response.
+ *  AGENTS.md §1.2 exception: broadening unknown → Record for dynamic key access
+ *  after typeof guard is permitted (TypeScript-ESLint no-unsafe-type-assertion).
+ *  Followed by runtime typeof check: typeof id === 'string'
  */
 function extractGCalId(data: unknown): string | null {
   if (typeof data !== 'object' || data === null) return null;
-  // hasOwnProperty check narrows; then index with string key on plain object
   if (!Object.prototype.hasOwnProperty.call(data, 'id')) return null;
   const record = data as Record<PropertyKey, unknown>;
   const id: unknown = record['id'];

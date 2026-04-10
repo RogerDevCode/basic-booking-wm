@@ -41,7 +41,7 @@
  * → CLEARED FOR CODE GENERATION
  */
 
-import { DEFAULT_TIMEZONE, NULL_TENANT_UUID } from '../internal/config';
+import { DEFAULT_TIMEZONE } from '../internal/config';
 // ============================================================================
 // WEB AUTH COMPLETE PROFILE — Complete profile for Telegram user
 // ============================================================================
@@ -52,8 +52,30 @@ import { DEFAULT_TIMEZONE, NULL_TENANT_UUID } from '../internal/config';
 
 import { z } from 'zod';
 import crypto from 'crypto';
-import { withTenantContext } from '../internal/tenant-context';
+import postgres from 'postgres';
 import { createDbClient } from '../internal/db/client';
+
+type Result<T> = [Error | null, T | null];
+
+async function getGlobalTx<T>(
+  client: postgres.Sql,
+  operation: (tx: postgres.Sql) => Promise<Result<T>>,
+): Promise<Result<T>> {
+  const reserved = await client.reserve();
+  try {
+    await reserved`BEGIN`;
+    const [err, data] = await operation(reserved);
+    if (err !== null) { await reserved`ROLLBACK`; return [err, null]; }
+    await reserved`COMMIT`;
+    return [null, data];
+  } catch (error: unknown) {
+    await reserved`ROLLBACK`.catch(() => {});
+    const msg = error instanceof Error ? error.message : String(error);
+    return [new Error(`transaction_failed: ${msg}`), null];
+  } finally {
+    reserved.release();
+  }
+}
 
 const InputSchema = z.object({
   chat_id: z.string().min(1),
@@ -143,10 +165,9 @@ export async function main(rawInput: unknown): Promise<[Error | null, CompletePr
   const passwordHash = hashPasswordSync(password);
 
   const sql = createDbClient({ url: dbUrl });
-  const tenantId = NULL_TENANT_UUID;
 
   try {
-    const [txErr, txData] = await withTenantContext(sql, tenantId, async (tx) => {
+    const [txErr, txData] = await getGlobalTx(sql, async (tx) => {
       const userRows = await tx`
         SELECT user_id, full_name, telegram_chat_id FROM users
         WHERE telegram_chat_id = ${chat_id}

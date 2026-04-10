@@ -150,7 +150,8 @@ export function getOptionalEnv(name: string, defaultValue?: string): string | un
 }
 
 // ─── Default Values — AGENTS.md §2.1: No hardcoded magic values ───────────
-export const NULL_TENANT_UUID = '00000000-0000-0000-0000-000000000000';
+// REMOVED: NULL_TENANT_UUID — sentinel values violate RLS guarantees (AGENTS.md §7)
+// All callers must use explicit tenant IDs from authenticated session context.
 export const DEFAULT_TIMEZONE = 'America/Mexico_City';
 export const DEFAULT_SPECIALTY_PROVIDER = 'Medicina General';
 export const DEFAULT_TAG_COLOR = '#808080';

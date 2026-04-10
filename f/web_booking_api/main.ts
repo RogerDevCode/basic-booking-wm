@@ -205,7 +205,7 @@ export async function main(rawInput: unknown): Promise<[Error | null, BookingRes
           }
 
           const startTime = new Date(start_time);
-          if (isNaN(startTime.getTime())) {
+          if (Number.isNaN(startTime.getTime())) {
             return [new Error('Invalid start_time format'), null];
           }
           const endTime = new Date(startTime.getTime() + sRow.duration_minutes * 60000);
@@ -336,7 +336,7 @@ export async function main(rawInput: unknown): Promise<[Error | null, BookingRes
           }
 
           const startTime = new Date(start_time);
-          if (isNaN(startTime.getTime())) {
+          if (Number.isNaN(startTime.getTime())) {
             return [new Error('Invalid start_time format'), null];
           }
           const endTime = new Date(startTime.getTime() + sRow.duration_minutes * 60000);

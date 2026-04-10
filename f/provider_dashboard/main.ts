@@ -1,4 +1,3 @@
-import { NULL_TENANT_UUID } from '../internal/config';
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : Provider dashboard backend (schedule, bookings, overrides, stats)
@@ -83,13 +82,18 @@ export async function main(rawInput: unknown): Promise<[Error | null, Record<str
   }
 
   const sql = createDbClient({ url: dbUrl });
-  const tenantId = input.provider_id ?? NULL_TENANT_UUID // admin listing falls back to system context;
+
+  // Admin dashboard requires explicit provider_id — no fallback
+  if (input.provider_id == null) {
+    return [new Error('provider_id is required'), null];
+  }
+  const tenantId = input.provider_id;
 
   try {
     const [txErr, txData] = await withTenantContext<unknown>(sql, tenantId, async (tx) => {
       switch (input.action) {
         case 'get_provider': {
-          const pid = input.provider_id ?? NULL_TENANT_UUID // admin listing falls back to system context;
+          const pid = input.provider_id;
           if (pid == null) {
             const rows = await tx.values<[string, string, string, string, string][]>`SELECT provider_id, name, email, specialty, timezone FROM providers WHERE is_active = true LIMIT 1`;
             const row = rows[0];

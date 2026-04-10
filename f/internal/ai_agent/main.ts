@@ -19,6 +19,9 @@ import {
   GREETING_PHRASES,
   FAREWELLS,
   FAREWELL_PHRASES,
+  ESCALATION_THRESHOLDS,
+  RULE_CONFIDENCE_VALUES,
+  SOCIAL_CONFIDENCE_VALUES,
 } from './constants';
 import { buildSystemPrompt, buildUserMessage } from './prompt-builder';
 import { callLLM } from './llm-client';
@@ -278,13 +281,13 @@ function determineEscalationLevel(
   confidence: number,
 ): IntentResult['escalation_level'] {
   const lower = text.toLowerCase();
-  if (intent === INTENT.URGENCIA && confidence >= 0.8) {
+  if (intent === INTENT.URGENCIA && confidence >= ESCALATION_THRESHOLDS.medical_emergency_min) {
     if (/muerte|morir|no respiro|infarto|desmay|sangr|convul|paro|dolor.*pecho|dificultad.*respir|no puedo.*respir/.test(lower)) {
       return 'medical_emergency';
     }
   }
-  if (intent === INTENT.URGENCIA && confidence < 0.6) return 'priority_queue';
-  if (confidence < 0.4 && intent !== INTENT.SALUDO && intent !== INTENT.DESPEDIDA && intent !== INTENT.AGRADECIMIENTO) return 'human_handoff';
+  if (intent === INTENT.URGENCIA && confidence < ESCALATION_THRESHOLDS.priority_queue_max) return 'priority_queue';
+  if (confidence < ESCALATION_THRESHOLDS.human_handoff_max && intent !== INTENT.SALUDO && intent !== INTENT.DESPEDIDA && intent !== INTENT.AGRADECIMIENTO) return 'human_handoff';
   return 'none';
 }
 
@@ -425,7 +428,7 @@ function detectIntentRules(text: string): { readonly intent: IntentType; readonl
   const hasMedicalUrgency = medicalUrgencyPatterns.some(w => lower.includes(w));
   // Exclude non-medical contexts
   const hasNonMedicalContext = lower.includes('emergencia familiar') || lower.includes('emergencia laboral');
-  if (hasMedicalUrgency && !hasNonMedicalContext) return { intent: INTENT.URGENCIA, confidence: 0.9 };
+  if (hasMedicalUrgency && !hasNonMedicalContext) return { intent: INTENT.URGENCIA, confidence: RULE_CONFIDENCE_VALUES.urgencia_medical };
   
   // Reminder intents — check before general keywords (multi-word phrases first)
   const reminderLower = lower.trim();
@@ -434,13 +437,13 @@ function detectIntentRules(text: string): { readonly intent: IntentType; readonl
   const prefKw = INTENT_KEYWORDS[INTENT.PREFERENCIAS_RECORDATORIO]?.keywords ?? [];
   // Check deactivate FIRST (desactiva contains activa)
   if (deactivateKw.some(k => reminderLower.includes(k))) {
-    return { intent: INTENT.DESACTIVAR_RECORDATORIOS, confidence: 0.85 };
+    return { intent: INTENT.DESACTIVAR_RECORDATORIOS, confidence: RULE_CONFIDENCE_VALUES.reminder_rule };
   }
   if (activateKw.some(k => reminderLower.includes(k))) {
-    return { intent: INTENT.ACTIVAR_RECORDATORIOS, confidence: 0.85 };
+    return { intent: INTENT.ACTIVAR_RECORDATORIOS, confidence: RULE_CONFIDENCE_VALUES.reminder_rule };
   }
   if (prefKw.some(k => reminderLower.includes(k))) {
-    return { intent: INTENT.PREFERENCIAS_RECORDATORIO, confidence: 0.85 };
+    return { intent: INTENT.PREFERENCIAS_RECORDATORIO, confidence: RULE_CONFIDENCE_VALUES.reminder_rule };
   }
 
   // Reschedule check — but only when NOT explicitly creating new appointment
@@ -455,20 +458,20 @@ function detectIntentRules(text: string): { readonly intent: IntentType; readonl
   // If user says "agendar"/"reservar", it's create (even with "otro día")
   // Otherwise if reschedule keywords match, use reschedule
   if (hasRescheduleKeyword && !hasCreateKeyword) {
-    return { intent: INTENT.REAGENDAR, confidence: 0.8 };
+    return { intent: INTENT.REAGENDAR, confidence: RULE_CONFIDENCE_VALUES.reschedule_rule };
   }
 
   // Check availability when asking for "hora" with a day preference
   const hasDayPref = Object.keys(DAY_NAMES).some(d => lower.includes(d));
   const hasRelDate = RELATIVE_DATES.some(r => lower.includes(r));
   if ((hasDayPref || hasRelDate) && lower.includes('hora')) {
-    return { intent: INTENT.CONSULTAR_DISPONIBILIDAD, confidence: 0.7 };
+    return { intent: INTENT.CONSULTAR_DISPONIBILIDAD, confidence: RULE_CONFIDENCE_VALUES.availability_rule };
   }
 
   // Cancel check before create (cancelar/anular + cita/turno = cancel)
   const cancelKw = INTENT_KEYWORDS[INTENT.CANCELAR_CITA]?.keywords ?? [];
   if (cancelKw.some(k => lower.includes(k))) {
-    return { intent: INTENT.CANCELAR_CITA, confidence: 0.8 };
+    return { intent: INTENT.CANCELAR_CITA, confidence: RULE_CONFIDENCE_VALUES.cancel_rule };
   }
 
   for (const [intent, config] of Object.entries(INTENT_KEYWORDS)) {
@@ -485,7 +488,7 @@ function detectIntentRules(text: string): { readonly intent: IntentType; readonl
     }
   }
 
-  return { intent: INTENT.DESCONOCIDO, confidence: 0.1 };
+  return { intent: INTENT.DESCONOCIDO, confidence: RULE_CONFIDENCE_VALUES.desconocido };
 }
 
 // ============================================================================
@@ -528,7 +531,7 @@ export async function main(rawInput: unknown): Promise<{ readonly success: boole
 
     // Only use TF-IDF if confidence is strong AND input has enough content
     const hasEnoughContent = text.trim().split(/\s+/).length >= 2;
-    if (tfidfResult.confidence >= 0.4 && hasEnoughContent) {
+    if (tfidfResult.confidence >= ESCALATION_THRESHOLDS.tfidf_minimum && hasEnoughContent) {
       const tfidfIntent = tfidfResult.intent as IntentType;
       if (isIntentType(tfidfIntent)) {
         intent = tfidfIntent;
@@ -644,12 +647,12 @@ function detectSocial(text: string): { readonly intent: IntentType; readonly con
 
   if (hasActionableKeywords && text.length > 30) return null;
 
-  if (GREETINGS.some(g => lower === g)) return { intent: INTENT.SALUDO, confidence: 0.95 };
-  if (GREETING_PHRASES.some(p => lower.includes(p))) return { intent: INTENT.SALUDO, confidence: 0.9 };
-  if (FAREWELLS.some(f => lower === f)) return { intent: INTENT.DESPEDIDA, confidence: 0.95 };
-  if (FAREWELL_PHRASES.some(p => lower.includes(p))) return { intent: INTENT.DESPEDIDA, confidence: 0.9 };
-  if (THANK_YOU_WORDS.some(t => lower.includes(t)) && text.length < 20) return { intent: INTENT.AGRADECIMIENTO, confidence: 0.95 };
-  if (OFF_TOPIC_PATTERNS.some(p => lower.includes(p))) return { intent: INTENT.PREGUNTA_GENERAL, confidence: 0.85 };
+  if (GREETINGS.some(g => lower === g)) return { intent: INTENT.SALUDO, confidence: SOCIAL_CONFIDENCE_VALUES.greeting_exact };
+  if (GREETING_PHRASES.some(p => lower.includes(p))) return { intent: INTENT.SALUDO, confidence: SOCIAL_CONFIDENCE_VALUES.greeting_phrase };
+  if (FAREWELLS.some(f => lower === f)) return { intent: INTENT.DESPEDIDA, confidence: SOCIAL_CONFIDENCE_VALUES.farewell_exact };
+  if (FAREWELL_PHRASES.some(p => lower.includes(p))) return { intent: INTENT.DESPEDIDA, confidence: SOCIAL_CONFIDENCE_VALUES.farewell_phrase };
+  if (THANK_YOU_WORDS.some(t => lower.includes(t)) && text.length < 20) return { intent: INTENT.AGRADECIMIENTO, confidence: SOCIAL_CONFIDENCE_VALUES.thank_you };
+  if (OFF_TOPIC_PATTERNS.some(p => lower.includes(p))) return { intent: INTENT.PREGUNTA_GENERAL, confidence: SOCIAL_CONFIDENCE_VALUES.off_topic };
   return null;
 }
 

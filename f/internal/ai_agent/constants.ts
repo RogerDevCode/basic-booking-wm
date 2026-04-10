@@ -221,3 +221,41 @@ export const SERVICE_TYPES = [
   'psicología', 'psicologia', 'odontología', 'odontologia',
   'limpieza', 'rayos x', 'laboratorio', 'análisis', 'analisis',
 ];
+
+// ============================================================================
+// ESCALATION THRESHOLDS — When to route to human/priority queue
+// Separate from CONFIDENCE_THRESHOLDS (detection minimums per intent)
+// ============================================================================
+
+export const ESCALATION_THRESHOLDS = Object.freeze({
+  medical_emergency_min: 0.8,    // urgency + this → medical_emergency escalation
+  priority_queue_max: 0.6,       // urgency + below this → priority_queue
+  human_handoff_max: 0.4,        // non-social + below this → human_handoff
+  tfidf_minimum: 0.4,            // TF-IDF minimum to accept result
+});
+
+// ============================================================================
+// RULE-BASED DETECTION CONFIDENCE — Values returned by detectIntentRules()
+// ============================================================================
+
+export const RULE_CONFIDENCE_VALUES = Object.freeze({
+  urgencia_medical: 0.9,
+  reminder_rule: 0.85,
+  reschedule_rule: 0.8,
+  cancel_rule: 0.8,
+  availability_rule: 0.7,
+  desconocido: 0.1,
+});
+
+// ============================================================================
+// SOCIAL FAST-PATH CONFIDENCE — Values from detectSocial()
+// ============================================================================
+
+export const SOCIAL_CONFIDENCE_VALUES = Object.freeze({
+  greeting_exact: 0.95,
+  greeting_phrase: 0.9,
+  farewell_exact: 0.95,
+  farewell_phrase: 0.9,
+  thank_you: 0.95,
+  off_topic: 0.85,
+});

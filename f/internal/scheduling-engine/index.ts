@@ -279,6 +279,9 @@ function generateSlotsForRule(
   const month = parseInt(date.slice(5, 7), 10) - 1;
   const day = parseInt(date.slice(8, 10), 10);
 
+  // Fail-safe: if date components are NaN, return empty slots (no crash)
+  if (Number.isNaN(year) || Number.isNaN(month) || Number.isNaN(day)) return [];
+
   let currentMin = startMin;
   while (currentMin + slotDurationMin <= endMin) {
     const slotStartMin = currentMin;

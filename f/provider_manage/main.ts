@@ -37,7 +37,7 @@
  * → CLEARED FOR CODE GENERATION
  */
 
-import { DEFAULT_TIMEZONE, NULL_TENANT_UUID } from '../internal/config';
+import { DEFAULT_TIMEZONE } from '../internal/config';
 // ============================================================================
 // PROVIDER MANAGE — CRUD for providers, services, schedules, and overrides
 // ============================================================================
@@ -49,6 +49,9 @@ import { DEFAULT_TIMEZONE, NULL_TENANT_UUID } from '../internal/config';
 import { z } from 'zod';
 import { withTenantContext } from '../internal/tenant-context';
 import { createDbClient } from '../internal/db/client';
+
+// Zod schema for provider manage operation results — replaces 'as Record<string, unknown>'
+const ProviderManageResultSchema = z.object({}).passthrough();
 
 const InputSchema = z.object({
   action: z.enum([
@@ -94,8 +97,11 @@ export async function main(rawInput: unknown): Promise<[Error | null, Readonly<R
 
   const sql = createDbClient({ url: dbUrl });
 
-  // Tenant ID from validated input
-  const tenantId = input.provider_id ?? NULL_TENANT_UUID; // admin operations fall back to system context
+  // Tenant ID from validated input — admin operations require explicit provider_id
+  if (input.provider_id === undefined) {
+    return [new Error('provider_id is required for admin operations'), null];
+  }
+  const tenantId = input.provider_id;
 
   try {
     const [txErr, txData] = await withTenantContext<unknown>(sql, tenantId, async (tx) => {
@@ -255,7 +261,13 @@ export async function main(rawInput: unknown): Promise<[Error | null, Readonly<R
 
     if (txErr !== null) return [txErr, null];
     if (txData === null) return [new Error('Operation failed'), null];
-    return [null, txData as Readonly<Record<string, unknown>> | null];
+
+    // Validate result is an object — no 'as' cast needed
+    const result = ProviderManageResultSchema.safeParse(txData);
+    if (!result.success) {
+      return [new Error(`unexpected_operation_shape: ${result.error.message}`), null];
+    }
+    return [null, result.data];
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     return [new Error('Internal error: ' + message), null];

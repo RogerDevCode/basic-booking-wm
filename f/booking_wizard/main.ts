@@ -204,8 +204,10 @@ function parseTimeFromInput(input: string): string | null {
     const hStr = match[1];
     if (hStr == null) return null;
     const h = parseInt(hStr, 10);
+    if (Number.isNaN(h)) return null;
     const mStr = match[2];
     const m = mStr !== undefined ? parseInt(mStr, 10) : 0;
+    if (Number.isNaN(m)) return null;
     if (h >= 0 && h < 24 && m >= 0 && m < 60) {
       return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
     }

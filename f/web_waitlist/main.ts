@@ -77,6 +77,20 @@ interface WaitlistResult {
   readonly message: string;
 }
 
+const WaitlistResultSchema = z.object({
+  entries: z.array(z.object({
+    waitlist_id: z.string(),
+    service_id: z.string(),
+    preferred_date: z.string().nullable(),
+    preferred_start_time: z.string().nullable(),
+    status: z.string(),
+    position: z.number(),
+    created_at: z.string(),
+  })),
+  position: z.number().nullable(),
+  message: z.string(),
+});
+
 export async function main(rawInput: unknown): Promise<[Error | null, WaitlistResult | null]> {
   const parsed = InputSchema.safeParse(rawInput);
   if (!parsed.success) {
@@ -252,7 +266,12 @@ export async function main(rawInput: unknown): Promise<[Error | null, WaitlistRe
       return [txErr, null];
     }
 
-    return [null, txData as WaitlistResult];
+    // Validate transaction result shape — no 'as' cast needed
+    const result = WaitlistResultSchema.safeParse(txData);
+    if (!result.success) {
+      return [new Error(`unexpected_transaction_shape: ${result.error.message}`), null];
+    }
+    return [null, result.data];
 
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);

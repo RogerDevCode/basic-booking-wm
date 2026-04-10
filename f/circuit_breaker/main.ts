@@ -1,4 +1,3 @@
-import { NULL_TENANT_UUID } from '../internal/config';
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : Service health monitor and failure isolation (circuit breaker pattern)
@@ -50,8 +49,36 @@ import { NULL_TENANT_UUID } from '../internal/config';
 
 import { z } from 'zod';
 import postgres from 'postgres';
-import { withTenantContext } from '../internal/tenant-context';
 import { createDbClient } from '../internal/db/client';
+
+type Result<T> = [Error | null, T | null];
+
+/**
+ * Circuit breaker state table is system-global (no provider_id column).
+ * Executes in a transaction without tenant context — no RLS needed.
+ */
+async function getCircuitBreakerTx<T>(
+  client: postgres.Sql,
+  operation: (tx: postgres.Sql) => Promise<Result<T>>,
+): Promise<Result<T>> {
+  const reserved = await client.reserve();
+  try {
+    await reserved`BEGIN`;
+    const [err, data] = await operation(reserved);
+    if (err !== null) {
+      await reserved`ROLLBACK`;
+      return [err, null];
+    }
+    await reserved`COMMIT`;
+    return [null, data];
+  } catch (error: unknown) {
+    await reserved`ROLLBACK`.catch(() => {});
+    const msg = error instanceof Error ? error.message : String(error);
+    return [new Error(`transaction_failed: ${msg}`), null];
+  } finally {
+    reserved.release();
+  }
+}
 
 const InputSchema = z.object({
   action: z.enum(['check', 'record_success', 'record_failure', 'reset', 'status']),
@@ -150,11 +177,8 @@ export async function main(rawInput: unknown): Promise<[Error | null, CircuitBre
 
   const sql = createDbClient({ url: dbUrl });
 
-  // No UUID in input, use fallback tenant ID
-  const tenantId = NULL_TENANT_UUID; // system script, global state
-
   try {
-    const [txErr, txData] = await withTenantContext(sql, tenantId, async (tx) => {
+    const [txErr, txData] = await getCircuitBreakerTx(sql, async (tx) => {
       await initService(tx, service_id);
 
       switch (action) {

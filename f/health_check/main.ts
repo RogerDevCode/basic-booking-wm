@@ -1,4 +1,3 @@
-import { NULL_TENANT_UUID } from '../internal/config';
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : System health monitoring (DB, GCal, Telegram, Gmail)
@@ -6,7 +5,7 @@ import { NULL_TENANT_UUID } from '../internal/config';
  * Concurrency Risk: NO — read-only health probes
  * GCal Calls      : YES — health probe to GCal API
  * Idempotency Key : N/A — read-only health check
- * RLS Tenant ID   : NO — infrastructure check, no tenant-specific data
+ * RLS Tenant ID   : NO — infrastructure check, no tenant-specific data (uses raw pool)
  * Zod Schemas     : YES — InputSchema validates optional component filter
  */
 
@@ -44,7 +43,6 @@ import { NULL_TENANT_UUID } from '../internal/config';
 // ============================================================================
 
 import { z } from 'zod';
-import { withTenantContext } from '../internal/tenant-context';
 import { createDbClient } from '../internal/db/client';
 
 const InputSchema = z.object({
@@ -62,17 +60,8 @@ async function checkDatabase(dbUrl: string): Promise<ComponentStatus> {
   const start = Date.now();
   try {
     const sql = createDbClient({ url: dbUrl });
-    const tenantId = NULL_TENANT_UUID; // health check, connectivity probe
-    const [txErr] = await withTenantContext(sql, tenantId, async (tx) => {
-      await tx`SELECT 1`;
-      return [null, true];
-    });
-
-    if (txErr) {
-      const latency = Date.now() - start;
-      return { component: 'database', status: 'unhealthy', latency_ms: latency, message: txErr.message };
-    }
-
+    // Health check uses raw pool — no tenant context needed for SELECT 1
+    await sql`SELECT 1`;
     const latency = Date.now() - start;
     await sql.end();
     return { component: 'database', status: 'healthy', latency_ms: latency, message: 'OK' };

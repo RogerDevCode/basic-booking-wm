@@ -373,7 +373,7 @@ export async function main(rawInput: unknown): Promise<[Error | null, unknown | 
     if (input.action === 'list') {
       const [listErr, listData] = await listProviders(sql);
       if (listErr != null) return [listErr, null];
-      return [null, { providers: listData, action: 'list' } as unknown as Record<string, unknown>];
+      return [null, { providers: listData, action: 'list' }];
     }
 
     // All other actions require a specific provider_id as tenant

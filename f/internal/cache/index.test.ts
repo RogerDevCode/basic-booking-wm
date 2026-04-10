@@ -1,4 +1,5 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
+import { INTENT } from '../ai_agent/constants';
 
 describe("Semantic Cache", () => {
   beforeEach(() => {
@@ -37,7 +38,7 @@ describe("Semantic Cache", () => {
     const cachedEntry = JSON.stringify({
       query_hash: "abc123",
       response: "Hola, soy tu asistente médico.",
-      intent: "greeting",
+      intent: INTENT.SALUDO,
       created_at: "2026-04-04T10:00:00.000Z",
       ttl_seconds: 3600,
     });
@@ -59,7 +60,7 @@ describe("Semantic Cache", () => {
 
     expect(err).toBeNull();
     expect(data).not.toBeNull();
-    expect(data?.intent).toBe("greeting");
+    expect(data?.intent).toBe(INTENT.SALUDO);
     expect(data?.response).toBe("Hola, soy tu asistente médico.");
   });
 
@@ -77,7 +78,7 @@ describe("Semantic Cache", () => {
     });
 
     const { cacheSet } = await import("./index");
-    const [err] = await cacheSet("hola", "Hola! ¿Cómo puedo ayudarte?", "greeting", 1800);
+    const [err] = await cacheSet("hola", "Hola! ¿Cómo puedo ayudarte?", INTENT.SALUDO, 1800);
 
     expect(err).toBeNull();
   });

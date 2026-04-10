@@ -37,7 +37,6 @@
  * → CLEARED FOR CODE GENERATION
  */
 
-import { NULL_TENANT_UUID } from '../internal/config';
 // ============================================================================
 // WEB ADMIN SPECIALTIES CRUD — Manage medical specialties
 // ============================================================================
@@ -48,9 +47,28 @@ import { NULL_TENANT_UUID } from '../internal/config';
 import "@total-typescript/ts-reset";
 import { z } from 'zod';
 import postgres from 'postgres';
-import { withTenantContext } from '../internal/tenant-context';
 import { createDbClient } from '../internal/db/client';
 import type { Result } from '../internal/result';
+
+async function getGlobalTx(
+  client: postgres.Sql,
+  operation: (tx: postgres.Sql) => Promise<Result<unknown>>,
+): Promise<Result<unknown>> {
+  const reserved = await client.reserve();
+  try {
+    await reserved`BEGIN`;
+    const [err, data] = await operation(reserved);
+    if (err !== null) { await reserved`ROLLBACK`; return [err, null]; }
+    await reserved`COMMIT`;
+    return [null, data];
+  } catch (error: unknown) {
+    await reserved`ROLLBACK`.catch(() => {});
+    const msg = error instanceof Error ? error.message : String(error);
+    return [new Error(`transaction_failed: ${msg}`), null];
+  } finally {
+    reserved.release();
+  }
+}
 
 const ActionSchema = z.enum(['list', 'create', 'update', 'delete', 'activate', 'deactivate']);
 
@@ -171,11 +189,8 @@ export async function main(rawInput: unknown): Promise<[Error | null, unknown | 
 
   const sql = createDbClient({ url: dbUrl });
 
-  // Admin CRUD on global reference data — no per-tenant isolation needed
-  const tenantId = NULL_TENANT_UUID;
-
   try {
-    const [txErr, txData] = await withTenantContext<unknown>(sql, tenantId, async (tx) => {
+    const [txErr, txData] = await getGlobalTx(sql, async (tx) => {
       if (input.action === 'list') {
         return listSpecialties(tx);
       }

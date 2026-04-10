@@ -35,16 +35,34 @@
  * → CLEARED FOR CODE GENERATION
  */
 
-import { NULL_TENANT_UUID } from '../internal/config';
-// ============================================================================
-// DLQ PROCESSOR — Dead Letter Queue handler for failed bookings
-// States: pending -> resolved | discarded
-// Go-style: no throw, no any, no as. Tuple return.
-// ============================================================================
-
 import { z } from 'zod';
-import { withTenantContext } from '../internal/tenant-context';
+import postgres from 'postgres';
 import { createDbClient } from '../internal/db/client';
+
+type Result<T> = [Error | null, T | null];
+
+/**
+ * DLQ table is system-global queue — operations span all tenants.
+ */
+async function getGlobalTx(
+  client: postgres.Sql,
+  operation: (tx: postgres.Sql) => Promise<Result<unknown>>,
+): Promise<Result<unknown>> {
+  const reserved = await client.reserve();
+  try {
+    await reserved`BEGIN`;
+    const [err, data] = await operation(reserved);
+    if (err !== null) { await reserved`ROLLBACK`; return [err, null]; }
+    await reserved`COMMIT`;
+    return [null, data];
+  } catch (error: unknown) {
+    await reserved`ROLLBACK`.catch(() => {});
+    const msg = error instanceof Error ? error.message : String(error);
+    return [new Error(`transaction_failed: ${msg}`), null];
+  } finally {
+    reserved.release();
+  }
+}
 
 const InputSchema = z.object({
   action: z.enum(['list', 'retry', 'resolve', 'discard', 'status']),
@@ -126,7 +144,7 @@ function parseRawInput(raw: unknown): DLQInput {
   };
 }
 
-export async function main(rawInput: unknown): Promise<[Error | null, Readonly<Record<string, unknown>> | null]> {
+export async function main(rawInput: unknown): Promise<Result<unknown>> {
   const parsed = InputSchema.safeParse(rawInput);
   if (!parsed.success) {
     return [new Error('Validation error: ' + parsed.error.message), null];
@@ -142,11 +160,8 @@ export async function main(rawInput: unknown): Promise<[Error | null, Readonly<R
 
   const sql = createDbClient({ url: dbUrl });
 
-  // System admin tool — operates on global DLQ state
-  const tenantId = NULL_TENANT_UUID;
-
   try {
-    const [txErr, txData] = await withTenantContext<unknown>(sql, tenantId, async (tx) => {
+    const [txErr, txData] = await getGlobalTx(sql, async (tx) => {
       switch (action) {
         case 'list': {
           const status = extraInput.status_filter !== undefined && ['pending', 'resolved', 'discarded'].includes(extraInput.status_filter) ? extraInput.status_filter : 'pending';
@@ -164,7 +179,11 @@ export async function main(rawInput: unknown): Promise<[Error | null, Readonly<R
             ORDER BY created_at ASC
             LIMIT 100
           `;
-          const entries: DLQEntry[] = rows.map((row) => parseDLQRow({
+          const entries: DLQEntry[] = rows.map((row: [
+            number, string | null, string | null, string | null,
+            string, string, string | null, Readonly<Record<string, unknown>> | null,
+            string, string, string, string, string | null, string | null, string | null,
+          ]) => parseDLQRow({
             dlq_id: row[0],
             booking_id: row[1],
             provider_id: row[2],
