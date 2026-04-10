@@ -134,13 +134,21 @@ interface DLQInput {
   readonly resolved_by?: string | undefined;
 }
 
+// Zod schema for DLQ operation results — replaces 'as Readonly<Record<string, unknown>>'
+const DLQOperationResultSchema = z.object({}).passthrough();
+const DLQRawInputSchema = z.object({
+  status_filter: z.string().optional(),
+  resolution_notes: z.string().optional(),
+  resolved_by: z.string().optional(),
+});
+
 function parseRawInput(raw: unknown): DLQInput {
-  if (typeof raw !== 'object' || raw === null) return {};
-  const obj = raw as Record<string, unknown>;
+  const parsed = DLQRawInputSchema.safeParse(raw);
+  if (!parsed.success) return {};
   return {
-    status_filter: typeof obj['status_filter'] === 'string' ? obj['status_filter'] : undefined,
-    resolution_notes: typeof obj['resolution_notes'] === 'string' ? obj['resolution_notes'] : undefined,
-    resolved_by: typeof obj['resolved_by'] === 'string' ? obj['resolved_by'] : undefined,
+    status_filter: parsed.data.status_filter,
+    resolution_notes: parsed.data.resolution_notes,
+    resolved_by: parsed.data.resolved_by,
   };
 }
 
@@ -297,7 +305,13 @@ export async function main(rawInput: unknown): Promise<Result<unknown>> {
 
     if (txErr !== null) return [txErr, null];
     if (txData === null) return [new Error('DLQ operation failed'), null];
-    return [null, txData as Readonly<Record<string, unknown>> | null];
+
+    // Validate result shape — no 'as' cast needed
+    const result = DLQOperationResultSchema.safeParse(txData);
+    if (!result.success) {
+      return [new Error(`unexpected_dlq_result_shape: ${result.error.message}`), null];
+    }
+    return [null, result.data];
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     return [new Error(`Internal error: ${msg}`), null];
