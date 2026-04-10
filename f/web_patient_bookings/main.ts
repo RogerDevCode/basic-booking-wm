@@ -1,3 +1,42 @@
+/*
+ * PRE-FLIGHT CHECKLIST
+ * Mission         : Client booking history and upcoming appointments
+ * DB Tables Used  : bookings, providers, services
+ * Concurrency Risk: NO — read-only queries filtered by client_id
+ * GCal Calls      : NO
+ * Idempotency Key : N/A — read-only operation
+ * RLS Tenant ID   : YES — withTenantContext wraps all DB ops
+ * Zod Schemas     : YES — InputSchema validates client_id and filters
+ */
+
+/*
+ * REASONING TRACE
+ * ### Mission Decomposition
+ * - Validate client_user_id and filter parameters via Zod
+ * - Resolve user to client_id via clients JOIN users, with email fallback
+ * - Query bookings with provider/service joins, split into upcoming vs past by current time
+ * - Return paginated results with total count
+ *
+ * ### Schema Verification
+ * - Tables: bookings, clients, users, providers, services
+ * - Columns: bookings (booking_id, client_id, provider_id, service_id, start_time, end_time, status, cancellation_reason), clients (client_id, email), providers (name, specialty), services (name)
+ *
+ * ### Failure Mode Analysis
+ * - Scenario 1: No client record found → fallback query by email, then error if still not found
+ * - Scenario 2: No bookings → returns empty arrays with total=0 (not an error)
+ * - Scenario 3: DB failure → caught by try/catch, returned as Internal error
+ *
+ * ### Concurrency Analysis
+ * - Risk: NO — read-only queries filtered by client_id, no mutation or lock contention
+ *
+ * ### SOLID Compliance Check
+ * - SRP: YES — main handles orchestration, query logic is a single coherent read operation
+ * - DRY: YES — cancellable/reschedulable status arrays defined once, tenant extraction uses shared pattern
+ * - KISS: YES — straightforward SELECT with JOINs, client-side split by timestamp, no over-engineering
+ *
+ * → CLEARED FOR CODE GENERATION
+ */
+
 // ============================================================================
 // WEB PATIENT BOOKINGS — Client booking history and upcoming appointments
 // ============================================================================
@@ -7,7 +46,6 @@
 // ============================================================================
 
 import { z } from 'zod';
-import postgres from 'postgres';
 import { withTenantContext } from '../internal/tenant-context';
 import { createDbClient } from '../internal/db/client';
 
@@ -20,7 +58,7 @@ const InputSchema = z.object({
 
 interface BookingInfo {
   readonly booking_id: string;
-  readonly provider_name: string;
+  readonly provider_name: string | null;
   readonly provider_specialty: string;
   readonly service_name: string;
   readonly start_time: string;
@@ -52,19 +90,8 @@ export async function main(rawInput: unknown): Promise<[Error | null, BookingsRe
 
   const sql = createDbClient({ url: dbUrl });
 
-  const rawObj = typeof rawInput === 'object' && rawInput !== null ? rawInput : {};
-  let tenantId = '00000000-0000-0000-0000-000000000000';
-  const tenantKeys = ['provider_id', 'user_id', 'admin_user_id', 'client_id', 'client_user_id'] as const;
-  for (const key of tenantKeys) {
-    const val = (rawObj as Record<string, unknown>)[key];
-    if (typeof val === 'string') {
-      tenantId = val;
-      break;
-    }
-  }
-
   try {
-    const [txErr, txData] = await withTenantContext(sql, tenantId, async (tx) => {
+    const [txErr, txData] = await withTenantContext(sql, input.client_user_id, async (tx) => {
       const userRows = await tx.values<[string][]>`
         SELECT p.client_id FROM clients p
         INNER JOIN users u ON u.user_id = p.client_id

@@ -1,3 +1,43 @@
+/*
+ * PRE-FLIGHT CHECKLIST
+ * Mission         : Search and filter bookings (by date, provider, client, status, service)
+ * DB Tables Used  : bookings, providers, clients, services
+ * Concurrency Risk: NO — read-only query
+ * GCal Calls      : NO
+ * Idempotency Key : N/A — read-only operation
+ * RLS Tenant ID   : YES — withTenantContext wraps all DB ops
+ * Zod Schemas     : YES — InputSchema validates all inputs
+ */
+
+/*
+ * REASONING TRACE
+ * ### Mission Decomposition
+ * - Validate input (optional filters: provider_id, client_id, status, date range, service_id, pagination)
+ * - Dynamically build WHERE clauses based on provided filter parameters
+ * - Execute COUNT query for total matching rows
+ * - Execute paginated SELECT query with JOINs for provider, client, and service names
+ * - Map raw rows to typed BookingSearchRow objects
+ *
+ * ### Schema Verification
+ * - Tables: bookings (booking_id, start_time, end_time, status, idempotency_key, gcal_sync_status, notification_sent, created_at, provider_id, client_id, service_id), providers (provider_id, name), clients (client_id, name), services (service_id, name)
+ * - Columns: All verified against §6 schema; notification_sent is an extension column on bookings
+ *
+ * ### Failure Mode Analysis
+ * - Scenario 1: Invalid filter values → caught by Zod validation before any DB call
+ * - Scenario 2: No matching rows → return empty result with total=0, not an error
+ * - Scenario 3: SQL syntax error in dynamic query → caught in catch block, returned as error
+ *
+ * ### Concurrency Analysis
+ * - Risk: NO — read-only query, no locks needed
+ *
+ * ### SOLID Compliance Check
+ * - SRP: Single function handles search — YES (one responsibility: filter, paginate, return results)
+ * - DRY: No duplicated logic — YES (parameterized index counter avoids repeating $N patterns)
+ * - KISS: No unnecessary complexity — YES (direct SQL with dynamic WHERE, no ORM abstraction)
+ *
+ * → CLEARED FOR CODE GENERATION
+ */
+
 // ============================================================================
 // BOOKING SEARCH — Search and filter bookings
 // ============================================================================

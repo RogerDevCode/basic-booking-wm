@@ -137,7 +137,14 @@ CREATE TABLE IF NOT EXISTS bookings_new (
     updated_at    TIMESTAMPTZ DEFAULT NOW(),
 
     -- Constraints
-    CONSTRAINT valid_booking_time CHECK (start_time < end_time)
+    CONSTRAINT valid_booking_time CHECK (start_time < end_time),
+
+    -- AGENTS.md §6: GIST exclusion constraint prevents double-booking at DB level
+    -- This constraint ensures no two active bookings for the same provider can overlap
+    CONSTRAINT booking_no_overlap_gist EXCLUDE USING gist (
+        provider_id WITH =,
+        tstzrange(start_time, end_time) WITH &&
+    ) WHERE (status NOT IN ('cancelled', 'no_show', 'rescheduled'))
 );
 
 -- 3b. Migrate existing booking data

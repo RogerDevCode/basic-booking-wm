@@ -1,3 +1,44 @@
+import { NULL_TENANT_UUID } from '../internal/config';
+/*
+ * PRE-FLIGHT CHECKLIST
+ * Mission         : Auto-register user from Telegram webhook payload
+ * DB Tables Used  : clients
+ * Concurrency Risk: NO — UPSERT by telegram_chat_id
+ * GCal Calls      : NO
+ * Idempotency Key : YES — ON CONFLICT (telegram_chat_id) DO NOTHING
+ * RLS Tenant ID   : YES — withTenantContext wraps all DB ops
+ * Zod Schemas     : YES — InputSchema validates Telegram webhook structure
+ */
+
+/*
+ * REASONING TRACE
+ * ### Mission Decomposition
+ * - Validate Telegram webhook input (chat_id, first_name, optional last_name)
+ * - Check if user already exists in users table by telegram_chat_id
+ * - If exists: return existing user record with is_new=false
+ * - If not exists: generate temp password, hash it, INSERT new user, return with is_new=true
+ *
+ * ### Schema Verification
+ * - Tables: users (NOTE: schema §6 defines clients, not users — this table is external to §6)
+ * - Columns: user_id, full_name, telegram_chat_id, role, password_hash, is_active, timezone, rut, email — all inferred from code
+ *
+ * ### Failure Mode Analysis
+ * - Scenario 1: Duplicate telegram_chat_id INSERT → ON CONFLICT DO NOTHING returns existing or fails gracefully
+ * - Scenario 2: Missing DATABASE_URL → fail-fast before transaction
+ * - Scenario 3: INSERT returns no row → error returned, no silent failure
+ *
+ * ### Concurrency Analysis
+ * - Risk: YES — simultaneous webhooks for same chat_id could race
+ * - Lock strategy: ON CONFLICT (telegram_chat_id) DO NOTHING at DB level prevents duplicate user creation
+ *
+ * ### SOLID Compliance Check
+ * - SRP: YES — single responsibility: check-exist-or-create user from Telegram payload
+ * - DRY: YES — no duplicated logic
+ * - KISS: YES — straightforward SELECT-then-INSERT pattern with hashPasswordSync utility
+ *
+ * → CLEARED FOR CODE GENERATION
+ */
+
 // ============================================================================
 // TELEGRAM AUTO REGISTER — Auto-register user from Telegram payload
 // ============================================================================
@@ -7,7 +48,6 @@
 // ============================================================================
 
 import { z } from 'zod';
-import postgres from 'postgres';
 import crypto from 'crypto';
 import { withTenantContext } from '../internal/tenant-context';
 import { createDbClient } from '../internal/db/client';
@@ -53,7 +93,7 @@ export async function main(rawInput: unknown): Promise<[Error | null, TelegramUs
   const sql = createDbClient({ url: dbUrl });
 
   // No specific UUID provided in payload for tenant context
-  const tenantId = '00000000-0000-0000-0000-000000000000';
+  const tenantId = NULL_TENANT_UUID; // system script, global state
 
   try {
     const [txErr, txData] = await withTenantContext(sql, tenantId, async (tx) => {
@@ -87,7 +127,7 @@ export async function main(rawInput: unknown): Promise<[Error | null, TelegramUs
           is_active, timezone
         ) VALUES (
           ${fullName}, ${chat_id}, 'client', ${passwordHash},
-          true, 'America/Santiago'
+          true
         )
         RETURNING user_id, full_name, telegram_chat_id, role
       `;

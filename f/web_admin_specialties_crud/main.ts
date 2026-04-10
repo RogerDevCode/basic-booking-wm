@@ -1,3 +1,43 @@
+/*
+ * PRE-FLIGHT CHECKLIST
+ * Mission         : Manage medical specialties (CRUD + activate/deactivate)
+ * DB Tables Used  : specialties
+ * Concurrency Risk: NO — single-row CRUD operations
+ * GCal Calls      : NO
+ * Idempotency Key : N/A — CRUD operations are inherently non-idempotent
+ * RLS Tenant ID   : YES — withTenantContext wraps all DB ops
+ * Zod Schemas     : YES — InputSchema validates action and specialty fields
+ */
+
+/*
+ * REASONING TRACE
+ * ### Mission Decomposition
+ * - Validate action type and specialty fields via Zod InputSchema
+ * - Route to listSpecialties, createSpecialty, updateSpecialty, deleteSpecialty, or activate/deactivate
+ * - On create: insert name/description/category with default sort_order of 99
+ * - On update: dynamically build SET clause from provided fields only
+ *
+ * ### Schema Verification
+ * - Tables: specialties (specialty_id, name, description, category, is_active, sort_order, created_at)
+ * - Columns: All columns verified against extended schema; category defaults to 'Medicina'
+ *
+ * ### Failure Mode Analysis
+ * - Scenario 1: Create with empty name → Zod min(2) validation fails before DB call
+ * - Scenario 2: Update with no fields → early return error before building dynamic SQL
+ * - Scenario 3: Delete with foreign key constraint from providers → DB constraint violation, error propagated
+ *
+ * ### Concurrency Analysis
+ * - Risk: NO — single-row CRUD operations with UUID primary key
+ *
+ * ### SOLID Compliance Check
+ * - SRP: YES — each CRUD function handles exactly one operation
+ * - DRY: YES — shared SpecialtyRow type; dynamic UPDATE builder pattern consistent with provider CRUD
+ * - KISS: YES — direct SQL with parameterized queries; no unnecessary ORM abstraction
+ *
+ * → CLEARED FOR CODE GENERATION
+ */
+
+import { NULL_TENANT_UUID } from '../internal/config';
 // ============================================================================
 // WEB ADMIN SPECIALTIES CRUD — Manage medical specialties
 // ============================================================================
@@ -10,6 +50,7 @@ import { z } from 'zod';
 import postgres from 'postgres';
 import { withTenantContext } from '../internal/tenant-context';
 import { createDbClient } from '../internal/db/client';
+import type { Result } from '../internal/result';
 
 const ActionSchema = z.enum(['list', 'create', 'update', 'delete', 'activate', 'deactivate']);
 
@@ -32,13 +73,11 @@ interface SpecialtyRow {
   readonly created_at: string;
 }
 
-type Result<T> = [Error | null, T | null];
-
 // ============================================================================
 // DB OPERATIONS
 // ============================================================================
 
-async function listSpecialties(tx: postgres.TransactionSql): Promise<Result<SpecialtyRow[]>> {
+async function listSpecialties(tx: postgres.Sql): Promise<Result<SpecialtyRow[]>> {
   try {
     const rows = await tx.values<[string, string, string | null, string | null, boolean, number, string][]>`
       SELECT specialty_id, name, description, category, is_active, sort_order, created_at
@@ -60,7 +99,7 @@ async function listSpecialties(tx: postgres.TransactionSql): Promise<Result<Spec
   }
 }
 
-async function createSpecialty(tx: postgres.TransactionSql, input: Readonly<z.infer<typeof InputSchema>>): Promise<Result<SpecialtyRow>> {
+async function createSpecialty(tx: postgres.Sql, input: Readonly<z.infer<typeof InputSchema>>): Promise<Result<SpecialtyRow>> {
   const name = input.name ?? '';
   if (name === '') return [new Error('create_failed: name is required'), null];
 
@@ -83,7 +122,7 @@ async function createSpecialty(tx: postgres.TransactionSql, input: Readonly<z.in
   }];
 }
 
-async function updateSpecialty(tx: postgres.TransactionSql, id: string, input: Readonly<z.infer<typeof InputSchema>>): Promise<Result<SpecialtyRow>> {
+async function updateSpecialty(tx: postgres.Sql, id: string, input: Readonly<z.infer<typeof InputSchema>>): Promise<Result<SpecialtyRow>> {
   const fields: string[] = [];
   const params: (string | number | null)[] = [];
   let pIdx = 1;
@@ -109,7 +148,7 @@ async function updateSpecialty(tx: postgres.TransactionSql, id: string, input: R
   }];
 }
 
-async function deleteSpecialty(tx: postgres.TransactionSql, id: string): Promise<Result<{ readonly deleted: boolean }>> {
+async function deleteSpecialty(tx: postgres.Sql, id: string): Promise<Result<{ readonly deleted: boolean }>> {
   await tx`DELETE FROM specialties WHERE specialty_id = ${id}::uuid`;
   return [null, { deleted: true }];
 }
@@ -132,19 +171,11 @@ export async function main(rawInput: unknown): Promise<[Error | null, unknown | 
 
   const sql = createDbClient({ url: dbUrl });
 
-  const rawObj = typeof rawInput === 'object' && rawInput !== null ? rawInput : {};
-  let tenantId = '00000000-0000-0000-0000-000000000000';
-  const tenantKeys = ['provider_id', 'user_id', 'admin_user_id', 'client_id', 'client_user_id'] as const;
-  for (const key of tenantKeys) {
-    const val = (rawObj as Record<string, unknown>)[key];
-    if (typeof val === 'string') {
-      tenantId = val;
-      break;
-    }
-  }
+  // Admin CRUD on global reference data — no per-tenant isolation needed
+  const tenantId = NULL_TENANT_UUID;
 
   try {
-    const [txErr, txData] = await withTenantContext(sql, tenantId, async (tx) => {
+    const [txErr, txData] = await withTenantContext<unknown>(sql, tenantId, async (tx) => {
       if (input.action === 'list') {
         return listSpecialties(tx);
       }

@@ -1,3 +1,47 @@
+/*
+ * PRE-FLIGHT CHECKLIST
+ * Mission         : Cancel old booking + create new one atomically (reschedule)
+ * DB Tables Used  : bookings, booking_audit, providers, clients, services
+ * Concurrency Risk: YES — full transaction with SELECT FOR UPDATE + GIST constraint
+ * GCal Calls      : NO — gcal_sync handles async sync after reschedule
+ * Idempotency Key : YES — new booking uses `reschedule-{old_key}-{timestamp}`
+ * RLS Tenant ID   : YES — withTenantContext wraps all DB ops
+ * Zod Schemas     : YES — InputSchema validates all inputs
+ */
+
+/*
+ * REASONING TRACE
+ * ### Mission Decomposition
+ * - Validate input (booking_id, new_start_time, actor, optional new_service_id, reason)
+ * - Lookup old booking row to verify existence, status, and metadata
+ * - Validate state machine transition (current status → 'rescheduled')
+ * - Verify actor authorization (client/provider must match booking)
+ * - Lookup new service (or reuse old service if not specified)
+ * - Inside transaction: check slot overlap, INSERT new booking, UPDATE old booking to 'rescheduled', INSERT two audit rows
+ * - Return reschedule result with both old and new booking IDs and timestamps
+ *
+ * ### Schema Verification
+ * - Tables: bookings (booking_id, status, client_id, provider_id, service_id, start_time, end_time, idempotency_key, rescheduled_from, gcal_sync_status, notification_sent), booking_audit (booking_id, from_status, to_status, changed_by, actor_id, reason, metadata), services (service_id, duration_minutes, is_active)
+ * - Columns: All verified against §6 schema; rescheduled_from, notification_sent, gcal_sync_status are extension columns on bookings
+ *
+ * ### Failure Mode Analysis
+ * - Scenario 1: Old booking not found → return error before any mutation
+ * - Scenario 2: Invalid state transition (e.g., cancelled → rescheduled) → return error from state machine
+ * - Scenario 3: Actor unauthorized → return error, no DB writes
+ * - Scenario 4: New slot already booked → return error, transaction rolls back, old booking untouched
+ * - Scenario 5: Service not found → return error before transaction
+ *
+ * ### Concurrency Analysis
+ * - Risk: YES — full transaction with slot overlap check inside transaction prevents TOCTOU race; GIST exclusion constraint on bookings prevents double-booking at DB level; old booking excluded from overlap check via booking_id != comparison
+ *
+ * ### SOLID Compliance Check
+ * - SRP: Each function does one thing — YES (lookupService isolated, main handles orchestration, transaction handles all 4 write steps atomically)
+ * - DRY: No duplicated logic — YES (shared validateTransition, withTenantContext, typed row interfaces)
+ * - KISS: No unnecessary complexity — YES (atomic cancel+create pattern in single transaction, no partial state possible)
+ *
+ * → CLEARED FOR CODE GENERATION
+ */
+
 // ============================================================================
 // BOOKING RESCHEDULE — Cancel old booking + create new one atomically
 // ============================================================================
@@ -15,8 +59,8 @@
 
 import { z } from 'zod';
 import postgres from 'postgres';
-import type { UUID } from '../internal/db-types';
-import { toUUID } from '../internal/db-types';
+import type { UUID, BookingStatus } from '../internal/db-types';
+import { toUUID, isBookingStatus } from '../internal/db-types';
 import { withTenantContext } from '../internal/tenant-context';
 import { validateTransition } from '../internal/state-machine';
 import { createDbClient } from '../internal/db/client';
@@ -46,7 +90,7 @@ export interface RescheduleResult {
 // ─── Typed Row Interfaces ───────────────────────────────────────────────────
 interface OldBookingRow {
   readonly booking_id: string;
-  readonly status: string;
+  readonly status: BookingStatus;
   readonly client_id: string;
   readonly provider_id: string;
   readonly service_id: string;
@@ -119,9 +163,14 @@ export async function main(
       return [new Error(`Booking ${input.booking_id} not found`), null];
     }
 
+    const rawStatus = bookingRow[1];
+    if (!isBookingStatus(rawStatus)) {
+      return [new Error(`Invalid booking status: ${rawStatus}`), null];
+    }
+
     const oldBooking: OldBookingRow = {
       booking_id: bookingRow[0],
-      status: bookingRow[1],
+      status: rawStatus,
       client_id: bookingRow[2],
       provider_id: bookingRow[3],
       service_id: bookingRow[4],
@@ -256,9 +305,15 @@ export async function main(
       return [txErr ?? new Error(msg), null];
     }
 
+    const oldBookingId = toUUID(writeResult.old_booking_id);
+    const newBookingId = toUUID(writeResult.new_booking_id);
+    if (oldBookingId === null || newBookingId === null) {
+      return [new Error('reschedule_failed: invalid booking_id returned from DB'), null];
+    }
+
     const result: RescheduleResult = {
-      old_booking_id: toUUID(writeResult.old_booking_id),
-      new_booking_id: toUUID(writeResult.new_booking_id),
+      old_booking_id: oldBookingId,
+      new_booking_id: newBookingId,
       old_status: writeResult.old_status,
       new_status: writeResult.new_status,
       old_start_time: oldBooking.start_time,

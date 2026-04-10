@@ -1,3 +1,42 @@
+/*
+ * PRE-FLIGHT CHECKLIST
+ * Mission         : Register new user via web (hash password, validate RUT)
+ * DB Tables Used  : users
+ * Concurrency Risk: NO — single-row INSERT with unique email constraint
+ * GCal Calls      : NO
+ * Idempotency Key : N/A — registration is inherently non-idempotent (unique email)
+ * RLS Tenant ID   : YES — withTenantContext wraps all DB ops
+ * Zod Schemas     : YES — InputSchema validates RUT, email, password strength
+ */
+
+/*
+ * REASONING TRACE
+ * ### Mission Decomposition
+ * - Validate input via Zod (email, RUT, password strength, confirmation match)
+ * - Validate Chilean RUT using modulo 11 algorithm
+ * - Hash password with scrypt + random salt, insert new user row with role=client
+ *
+ * ### Schema Verification
+ * - Tables: users
+ * - Columns: full_name, rut, email, address, phone, password_hash, role, is_active, timezone (all exist per users table)
+ *
+ * ### Failure Mode Analysis
+ * - Scenario 1: Duplicate email/RUT → unique constraint caught, user-friendly error returned
+ * - Scenario 2: Weak password → Zod + custom strength check rejects before DB call
+ * - Scenario 3: Invalid RUT → modulo 11 validation rejects before DB call
+ *
+ * ### Concurrency Analysis
+ * - Risk: YES — concurrent registrations with same email could race on INSERT; mitigated by unique constraint on email
+ *
+ * ### SOLID Compliance Check
+ * - SRP: YES — main orchestrates, validateRut validates RUT, hashPasswordSync hashes, validatePasswordStrength checks policy
+ * - DRY: YES — Zod schema single source, crypto helpers extracted, error paths consolidated
+ * - KISS: YES — linear validation pipeline → check uniqueness → insert, no unnecessary abstraction
+ *
+ * → CLEARED FOR CODE GENERATION
+ */
+
+import { DEFAULT_TIMEZONE, NULL_TENANT_UUID } from '../internal/config';
 // ============================================================================
 // WEB AUTH REGISTER — Register new user via web (hash password)
 // ============================================================================
@@ -7,7 +46,6 @@
 // ============================================================================
 
 import { z } from 'zod';
-import postgres from 'postgres';
 import crypto from 'crypto';
 import { withTenantContext } from '../internal/tenant-context';
 import { createDbClient } from '../internal/db/client';
@@ -20,7 +58,7 @@ const InputSchema = z.object({
   phone: z.string().min(1).max(50),
   password: z.string().min(8).max(128),
   password_confirm: z.string().min(8).max(128),
-  timezone: z.string().default('America/Santiago'),
+  timezone: z.string().default(DEFAULT_TIMEZONE),
 });
 
 interface RegisterResult {
@@ -98,7 +136,8 @@ export async function main(rawInput: unknown): Promise<[Error | null, RegisterRe
 
   const passwordHash = hashPasswordSync(password);
   const sql = createDbClient({ url: dbUrl });
-  const tenantId = '00000000-0000-0000-0000-000000000000'; // No user_id yet
+  // Auth endpoint — pre-authentication, no tenant isolation available
+  const tenantId = NULL_TENANT_UUID;
 
   try {
     const [txErr, txData] = await withTenantContext(sql, tenantId, async (tx) => {

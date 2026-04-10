@@ -1,3 +1,41 @@
+/*
+ * PRE-FLIGHT CHECKLIST
+ * Mission         : Send Telegram messages with keyboard support (inline/reply/force)
+ * DB Tables Used  : NONE — pure Telegram API dispatcher
+ * Concurrency Risk: NO — independent message dispatch
+ * GCal Calls      : NO
+ * Idempotency Key : N/A — message sends are inherently non-idempotent
+ * RLS Tenant ID   : NO — no DB queries, pure Telegram API
+ * Zod Schemas     : YES — InputSchema validates chat_id, text, keyboard_mode
+ */
+
+/*
+ * REASONING TRACE
+ * ### Mission Decomposition
+ * - Build formatted message text from message_type and booking_details with MarkdownV2 sanitization
+ * - Construct ReplyMarkup from inline_buttons, reply_keyboard, or force_reply options
+ * - Dispatch to Telegram Bot API with 3-attempt exponential backoff retry
+ *
+ * ### Schema Verification
+ * - Tables: NONE — this is a pure Telegram API dispatcher
+ * - Columns: N/A
+ *
+ * ### Failure Mode Analysis
+ * - Scenario 1: Telegram API returns 429 rate limit → extract retry_after parameter, wait capped at 30s
+ * - Scenario 2: Network timeout or 5xx error → exponential backoff (3^attempt seconds), fail after 3 retries
+ * - Scenario 3: 4xx client error (non-429) → permanent failure, return immediately without retry
+ *
+ * ### Concurrency Analysis
+ * - Risk: NO — each invocation is independent; 50ms inter-request delay prevents rate limit collisions
+ *
+ * ### SOLID Compliance Check
+ * - SRP: YES — buildMessage, buildReplyMarkup, sendWithRetry each have single responsibility
+ * - DRY: YES — sanitizeForMarkdownV2 and safeString are shared helpers; message templates are centralized
+ * - KISS: YES — linear switch/case for templates; iterative row-chunking for inline keyboard layout
+ *
+ * → CLEARED FOR CODE GENERATION
+ */
+
 // ============================================================================
 // TELEGRAM SEND — Notification Service with ReplyMarkup Support
 // ============================================================================
@@ -268,7 +306,7 @@ export async function main(rawInput: unknown): Promise<[Error | null, TelegramSe
   try {
     const parsed = InputSchema.safeParse(rawInput);
     if (!parsed.success) {
-      return [new Error(`Invalid input: ${parsed.error.message), null]` };
+      return [new Error(`Invalid input: ${parsed.error.message}`), null];
     }
 
     const { chat_id, message_type, booking_details, inline_buttons, reply_keyboard, force_reply, reply_placeholder, remove_keyboard, parse_mode } = parsed.data;

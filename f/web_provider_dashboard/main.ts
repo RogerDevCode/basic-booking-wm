@@ -1,3 +1,42 @@
+/*
+ * PRE-FLIGHT CHECKLIST
+ * Mission         : Provider stats + agenda for today's appointments
+ * DB Tables Used  : providers, bookings, clients, services
+ * Concurrency Risk: NO — read-only queries
+ * GCal Calls      : NO
+ * Idempotency Key : N/A — read-only operation
+ * RLS Tenant ID   : YES — withTenantContext wraps all DB ops
+ * Zod Schemas     : YES — InputSchema validates provider_id
+ */
+
+/*
+ * REASONING TRACE
+ * ### Mission Decomposition
+ * - Validate provider_user_id and optional date via Zod
+ * - Resolve provider record via email or provider_id lookup
+ * - Query today's agenda ordered by start_time, compute monthly stats with FILTER aggregates
+ * - Calculate attendance rate from completed vs total monthly bookings
+ *
+ * ### Schema Verification
+ * - Tables: providers, users, bookings, clients, services
+ * - Columns: providers (provider_id, name, specialty, email), bookings (booking_id, provider_id, client_id, service_id, start_time, end_time, status), clients (client_id, name, email), services (service_id, name)
+ *
+ * ### Failure Mode Analysis
+ * - Scenario 1: Provider not found → return error, no partial data
+ * - Scenario 2: No bookings for day/month → returns empty agenda, stats with zeros (not an error)
+ * - Scenario 3: Invalid date format → Zod validation or Date parsing handles gracefully
+ *
+ * ### Concurrency Analysis
+ * - Risk: NO — read-only queries, no mutation or lock contention
+ *
+ * ### SOLID Compliance Check
+ * - SRP: YES — main orchestrates provider lookup, agenda query, and stats computation as separate logical steps
+ * - DRY: YES — Zod schema single source, AgendaItem interface reused for mapping
+ * - KISS: YES — direct SELECTs with FILTER aggregates, no unnecessary CTEs or subqueries
+ *
+ * → CLEARED FOR CODE GENERATION
+ */
+
 // ============================================================================
 // WEB PROVIDER DASHBOARD — Provider stats + agenda
 // ============================================================================
@@ -5,7 +44,6 @@
 // ============================================================================
 
 import { z } from 'zod';
-import postgres from 'postgres';
 import { withTenantContext } from '../internal/tenant-context';
 import { createDbClient } from '../internal/db/client';
 
@@ -48,7 +86,7 @@ export async function main(rawInput: unknown): Promise<[Error | null, DashboardR
 
   const { provider_user_id, date } = parsed.data;
 
-  const tenantId = provider_user_id || '00000000-0000-0000-0000-000000000000';
+  const tenantId = provider_user_id;
 
   const dbUrl = process.env['DATABASE_URL'];
   if (dbUrl === undefined || dbUrl === '') {

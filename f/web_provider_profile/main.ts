@@ -1,3 +1,43 @@
+/*
+ * PRE-FLIGHT CHECKLIST
+ * Mission         : Provider self-service profile management (get/update/change password)
+ * DB Tables Used  : providers, honorifics, specialties, timezones, regions, communes
+ * Concurrency Risk: NO — single-row SELECT/UPDATE
+ * GCal Calls      : NO
+ * Idempotency Key : N/A — profile updates are inherently idempotent
+ * RLS Tenant ID   : YES — withTenantContext wraps all DB ops
+ * Zod Schemas     : YES — InputSchema validates action and provider fields
+ */
+
+/*
+ * REASONING TRACE
+ * ### Mission Decomposition
+ * - Validate action (get_profile/update_profile/change_password) and provider fields via Zod
+ * - get_profile: JOIN providers with honorifics, specialties, timezones, regions, communes for enriched view
+ * - update_profile: dynamically build SET clause from provided fields, re-fetch profile after update
+ * - change_password: verify current password, validate new password policy, hash and store
+ *
+ * ### Schema Verification
+ * - Tables: providers, honorifics, specialties, timezones, regions, communes
+ * - Columns: providers (id, name, email, password_hash, phone_app, phone_contact, telegram_chat_id, gcal_calendar_id, address_street, address_number, address_complement, address_sector, region_id, commune_id, honorific_id, specialty_id, timezone_id, is_active, last_password_change, updated_at)
+ *
+ * ### Failure Mode Analysis
+ * - Scenario 1: Provider not found → return error from getProfile, propagates to caller
+ * - Scenario 2: Wrong current password → verifyPassword fails before any mutation
+ * - Scenario 3: Password policy violation → validatePasswordPolicy catches before hashing
+ * - Scenario 4: Update with no fields → early return with "no fields provided" error
+ *
+ * ### Concurrency Analysis
+ * - Risk: NO — single-row SELECT/UPDATE per operation, no cross-row dependencies
+ *
+ * ### SOLID Compliance Check
+ * - SRP: YES — getProfile, updateProfile, changePassword each handle one action exclusively
+ * - DRY: YES — dynamic field builder avoids repetitive UPDATE branches, getProfile reused by updateProfile for post-update fetch
+ * - KISS: YES — parameterized query builder for update is simpler than 12 separate UPDATE statements
+ *
+ * → CLEARED FOR CODE GENERATION
+ */
+
 // ============================================================================
 // WEB PROVIDER PROFILE — Provider self-service profile management
 // ============================================================================
@@ -11,6 +51,7 @@ import postgres from 'postgres';
 import { hashPassword, verifyPassword, validatePasswordPolicy } from '../internal/crypto';
 import { withTenantContext } from '../internal/tenant-context';
 import { createDbClient } from '../internal/db/client';
+import type { Result } from '../internal/result';
 
 const ActionSchema = z.enum(['get_profile', 'update_profile', 'change_password']);
 
@@ -32,8 +73,6 @@ const InputSchema = z.object({
   current_password: z.string().optional(),
   new_password: z.string().optional(),
 });
-
-type Result<T> = [Error | null, T | null];
 
 interface ProfileRow {
   readonly id: string;
@@ -57,7 +96,7 @@ interface ProfileRow {
   readonly last_password_change: string | null;
 }
 
-async function getProfile(sql: postgres.Sql | postgres.TransactionSql, providerId: string): Promise<Result<ProfileRow>> {
+async function getProfile(sql: postgres.Sql  , providerId: string): Promise<Result<ProfileRow>> {
   const rows = await sql.values<[
     string, string, string, string | null, string | null, string | null,
     string | null, string | null, string | null, string | null,
@@ -106,7 +145,7 @@ async function getProfile(sql: postgres.Sql | postgres.TransactionSql, providerI
   }];
 }
 
-async function updateProfile(sql: postgres.Sql | postgres.TransactionSql, providerId: string, input: Readonly<z.infer<typeof InputSchema>>): Promise<Result<ProfileRow>> {
+async function updateProfile(sql: postgres.Sql  , providerId: string, input: Readonly<z.infer<typeof InputSchema>>): Promise<Result<ProfileRow>> {
   const fields: string[] = [];
   const params: (string | number | null)[] = [];
   let pIdx = 1;
@@ -134,7 +173,7 @@ async function updateProfile(sql: postgres.Sql | postgres.TransactionSql, provid
 }
 
 async function changePassword(
-  sql: postgres.Sql | postgres.TransactionSql,
+  sql: postgres.Sql  ,
   providerId: string,
   currentPassword: string,
   newPassword: string
@@ -172,7 +211,7 @@ export async function main(rawInput: unknown): Promise<[Error | null, unknown | 
   }
 
   const sql = createDbClient({ url: dbUrl });
-  const tenantId = input.provider_id || '00000000-0000-0000-0000-000000000000';
+  const tenantId = input.provider_id;
 
   try {
     if (input.action === 'get_profile') {

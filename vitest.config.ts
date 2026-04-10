@@ -17,12 +17,18 @@ export default defineConfig({
     globals: true,
     include: ["f/**/*.test.ts", "tests/**/*.test.ts"],
     exclude: ["node_modules", "dist"],
-    // Pass env vars explicitly to workers
+    globalSetup: ["./vitest.global-setup.ts"],
+    setupFiles: ["./vitest.env.setup.ts"],
+    // Pass non-DB env vars to workers; DATABASE_URL comes from .env.test.runtime (testcontainers)
+    // AI_AGENT_LLM_MODE="test" forces rule-based fast-path — no real LLM calls during test runs.
+    // For LLM integration tests, override this env var in the specific test file or run with:
+    //   AI_AGENT_LLM_MODE=llm npx vitest run <file>
     env: {
-      ...(existsSync(envPath) ? dotenv.parse(readFileSync(envPath, "utf-8")) : {}),
       AI_AGENT_LLM_MODE: "test",
-      GROQ_LLM_TIMEOUT_MS: "2000",
+      GROQ_LLM_TIMEOUT_MS: "15000",
     },
+    testTimeout: 60000,
+    passWithNoTests: true,
   },
   esbuild: {
     target: "es2022",

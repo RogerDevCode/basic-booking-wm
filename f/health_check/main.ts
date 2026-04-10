@@ -1,3 +1,41 @@
+import { NULL_TENANT_UUID } from '../internal/config';
+/*
+ * PRE-FLIGHT CHECKLIST
+ * Mission         : System health monitoring (DB, GCal, Telegram, Gmail)
+ * DB Tables Used  : NONE — simple connectivity check (SELECT 1)
+ * Concurrency Risk: NO — read-only health probes
+ * GCal Calls      : YES — health probe to GCal API
+ * Idempotency Key : N/A — read-only health check
+ * RLS Tenant ID   : NO — infrastructure check, no tenant-specific data
+ * Zod Schemas     : YES — InputSchema validates optional component filter
+ */
+
+/*
+ * REASONING TRACE
+ * ### Mission Decomposition
+ * - Validate optional component filter (all/database/gcal/telegram/gmail)
+ * - Run health probe for each requested component: DB connectivity (SELECT 1), GCal API (getMe), Telegram API (getMe)
+ * - Aggregate results into overall status (healthy/degraded/unhealthy) with per-component latency
+ *
+ * ### Schema Verification
+ * - Tables: NONE — simple connectivity check (SELECT 1)
+ * - Columns: N/A — no schema-dependent columns accessed
+ *
+ * ### Failure Mode Analysis
+ * - Scenario 1: Database unreachable → withTenantContext catches error, returns unhealthy status with error message
+ * - Scenario 2: GCal token expired → returns 'degraded' status (not unhealthy) since it's a configuration issue, not a service outage
+ *
+ * ### Concurrency Analysis
+ * - Risk: NO — read-only health probes; no mutable state or shared locks
+ *
+ * ### SOLID Compliance Check
+ * - SRP: YES — each check function (checkDatabase, checkGCal, checkTelegram) handles one component only
+ * - DRY: YES — consistent ComponentStatus interface across all checks; same timing/error pattern
+ * - KISS: YES — simple parallel-ish checks with status aggregation; no complex health logic
+ *
+ * → CLEARED FOR CODE GENERATION
+ */
+
 // ============================================================================
 // HEALTH CHECK — System health monitoring endpoint
 // ============================================================================
@@ -6,7 +44,6 @@
 // ============================================================================
 
 import { z } from 'zod';
-import postgres from 'postgres';
 import { withTenantContext } from '../internal/tenant-context';
 import { createDbClient } from '../internal/db/client';
 
@@ -25,7 +62,7 @@ async function checkDatabase(dbUrl: string): Promise<ComponentStatus> {
   const start = Date.now();
   try {
     const sql = createDbClient({ url: dbUrl });
-    const tenantId = '00000000-0000-0000-0000-000000000000';
+    const tenantId = NULL_TENANT_UUID; // health check, connectivity probe
     const [txErr] = await withTenantContext(sql, tenantId, async (tx) => {
       await tx`SELECT 1`;
       return [null, true];

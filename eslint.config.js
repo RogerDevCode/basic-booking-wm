@@ -61,6 +61,16 @@ export default tseslint.config(
       '@typescript-eslint/no-invalid-void-type': 'error',
 
       // ============================================================================
+      // CONDITIONAL ANALYSIS (from strictTypeChecked)
+      // DISABLED: no-unnecessary-condition generates 184 false positives for
+      // defensive null-checks on postgres query results. TypeScript doesn't
+      // include `undefined` in array[index] types, but runtime CAN produce
+      // empty arrays. The 9 real dead-code bugs will be fixed manually.
+      // See: docs/red_team_investigation_2026-04-08.md
+      // ============================================================================
+      '@typescript-eslint/no-unnecessary-condition': 'off',
+
+      // ============================================================================
       // CODE QUALITY
       // ============================================================================
       'no-constant-condition': 'error',
@@ -143,7 +153,7 @@ export default tseslint.config(
       '@typescript-eslint/consistent-type-definitions': 'off', // Allow type aliases
       '@typescript-eslint/non-nullable-type-assertion-style': 'warn',
       '@typescript-eslint/dot-notation': 'warn',
-      '@typescript-eslint/no-unnecessary-condition': 'warn',
+      '@typescript-eslint/no-unnecessary-condition': 'off', // See comment at line 65
     },
   },
 

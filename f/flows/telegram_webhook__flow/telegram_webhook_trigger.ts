@@ -15,8 +15,8 @@ interface TelegramEvent {
 
 function isTelegramEvent(raw: unknown): raw is TelegramEvent {
   return typeof raw === 'object' && raw !== null && (
-    'message' in (raw as Record<string, unknown>) ||
-    'channel_post' in (raw as Record<string, unknown>)
+    'message' in raw ||
+    'channel_post' in raw
   );
 }
 

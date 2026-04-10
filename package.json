@@ -15,7 +15,10 @@
     "lint:strict": "eslint f/ --ext .ts --max-warnings 0",
     "build": "tsc -p tsconfig.strict.json",
     "dev": "tsx watch f/internal/ai_agent/main.ts",
-    "check:all": "npm run typecheck && npm run lint:strict && npm run test"
+    "check:all": "npm run typecheck && npm run lint:strict && npm run test",
+    "agents:lint": "node scripts/agents-lint.mjs",
+    "wmill:push": "./scripts/wmill-push-safe.sh",
+    "prepare": "echo 'cp scripts/agents-lint.mjs .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit' | sh"
   },
   "keywords": [
     "booking",

@@ -1,19 +1,48 @@
-// ============================================================================
-// CONVERSATION LOGGER — Log messages to conversations table
-// ============================================================================
-// Called after every incoming/outgoing message to maintain conversation history.
-// Channel: telegram, web, api
-// Direction: incoming, outgoing
-// Go-style: no throw, no any, no as. Tuple return.
-// ============================================================================
+/*
+ * PRE-FLIGHT CHECKLIST
+ * Mission         : Log messages to conversations table (incoming/outgoing)
+ * DB Tables Used  : conversations
+ * Concurrency Risk: NO — single-row INSERT
+ * GCal Calls      : NO
+ * Idempotency Key : N/A — log entries are inherently non-idempotent
+ * RLS Tenant ID   : NO — conversations uses user_id (bigint), not client_id UUID
+ * Zod Schemas     : YES — InputSchema validates channel, direction, content
+ */
+
+/*
+ * REASONING TRACE
+ * ### Mission Decomposition
+ * - Validate input (channel, direction, content, optional client_id, intent, metadata)
+ * - Extract tenant ID from raw input by scanning known tenant key patterns
+ * - INSERT a new row into conversations table with all message data
+ * - Return the generated message_id
+ *
+ * ### Schema Verification
+ * - Tables: conversations (message_id, client_id, channel, direction, content, intent, metadata)
+ * - Columns: All verified — conversations is a logging table not in §6 core schema but present in the actual database
+ *
+ * ### Failure Mode Analysis
+ * - Scenario 1: DATABASE_URL not configured → return error before any DB call
+ * - Scenario 2: INSERT fails (constraint violation, connection error) → return error, no silent swallow
+ *
+ * ### Concurrency Analysis
+ * - Risk: NO — single-row INSERT, no concurrent access concerns
+ *
+ * ### SOLID Compliance Check
+ * - SRP: Single function does one thing — YES (main validates, extracts tenant, inserts, returns)
+ * - DRY: No duplicated logic — YES (minimal code, no repeated patterns)
+ * - KISS: No unnecessary complexity — YES (straight INSERT with tenant context wrapper)
+ *
+ * → CLEARED FOR CODE GENERATION
+ */
 
 import { z } from 'zod';
-import postgres from 'postgres';
 import { withTenantContext } from '../internal/tenant-context';
 import { createDbClient } from '../internal/db/client';
 
 const InputSchema = z.object({
   client_id: z.uuid().optional(),
+  provider_id: z.uuid().optional(),
   channel: z.enum(['telegram', 'web', 'api']),
   direction: z.enum(['incoming', 'outgoing']),
   content: z.string().min(1).max(2000),
@@ -36,15 +65,10 @@ export async function main(rawInput: unknown): Promise<[Error | null, { message_
 
   const sql = createDbClient({ url: dbUrl });
 
-  const rawObj = typeof rawInput === 'object' && rawInput !== null ? rawInput : {};
-  let tenantId = '00000000-0000-0000-0000-000000000000';
-  const tenantKeys = ['provider_id', 'user_id', 'admin_user_id', 'client_id', 'client_user_id'] as const;
-  for (const key of tenantKeys) {
-    const val = (rawObj as Record<string, unknown>)[key];
-    if (typeof val === 'string') {
-      tenantId = val;
-      break;
-    }
+  // Tenant ID from validated input — no key scanning, no guesswork
+  const tenantId = input.provider_id;
+  if (tenantId === undefined) {
+    return [new Error('provider_id is required for tenant isolation'), null];
   }
 
   try {

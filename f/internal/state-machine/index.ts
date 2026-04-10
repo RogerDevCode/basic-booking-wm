@@ -1,51 +1,50 @@
 // ============================================================================
 // STATE MACHINE — Booking Status Transition Validator
 // ============================================================================
-// Implements AGENTS.md §8.1: State Machine (Strict)
-// Centralized transition logic used by both application code and DB trigger.
+// AGENTS.md §5.2: Strict state machine with explicit terminal states.
+// Single source of truth for booking status transitions.
+// DRY: re-exports BookingStatus from db-types (single definition).
+// KISS: function fits in 15 lines, does one thing (SRP).
 // ============================================================================
 
-export interface StateTransitionRule {
-  readonly from: string;
-  readonly to: readonly string[];
-}
+import type { BookingStatus } from '../db-types';
 
-export const STATE_MACHINE: Record<string, readonly string[]> = {
+// Re-export for convenience — consumers import from here or db-types
+export type { BookingStatus } from '../db-types';
+
+// ============================================================================
+// VALID_TRANSITIONS — Authoritative transition map (AGENTS.md §5.2)
+// Terminal states (completed, cancelled, no_show, rescheduled) have empty arrays.
+// Any mutation outside this matrix is a catastrophic bug.
+// ============================================================================
+export const VALID_TRANSITIONS: Readonly<Record<BookingStatus, readonly BookingStatus[]>> = {
   pending: ['confirmed', 'cancelled', 'rescheduled'],
   confirmed: ['in_service', 'cancelled', 'rescheduled'],
-  'in_service': ['completed', 'no_show'],
+  in_service: ['completed', 'no_show'],
+  completed: [],
+  cancelled: [],
+  no_show: [],
+  rescheduled: [],
 } as const;
 
-export type BookingStatus = keyof typeof STATE_MACHINE | 'completed' | 'no_show' | 'cancelled' | 'rescheduled';
+// Legacy alias for backwards compatibility
+/** @deprecated Use VALID_TRANSITIONS instead */
+export const STATE_MACHINE: Readonly<Record<BookingStatus, readonly BookingStatus[]>> = VALID_TRANSITIONS;
 
-/**
- * Validates a state transition.
- * Returns [Error | null, null].
- * If error is null, transition is valid.
- */
+// ============================================================================
+// validateTransition — Golang-style error tuple return
+// Returns [Error | null, true | null]. No throw. No exceptions.
+// ============================================================================
 export function validateTransition(
-  oldStatus: string,
-  newStatus: string,
-): [Error | null, null] {
-  // No change is always valid
-  if (oldStatus === newStatus) {
-    return [null, null];
-  }
-
-  const allowed = STATE_MACHINE[oldStatus];
-  if (allowed === undefined) {
+  current: BookingStatus,
+  next: BookingStatus,
+): [Error | null, true | null] {
+  const allowed = VALID_TRANSITIONS[current];
+  if (allowed === undefined || !allowed.includes(next)) {
     return [
-      new Error(`Invalid state transition: ${oldStatus} -> ${newStatus} (state '${oldStatus}' is terminal or unknown)`),
+      new Error(`invalid_transition: ${current} -> ${next}`),
       null,
     ];
   }
-
-  if (!allowed.includes(newStatus)) {
-    return [
-      new Error(`Invalid state transition: ${oldStatus} -> ${newStatus}. Allowed: ${allowed.join(', ')}`),
-      null,
-    ];
-  }
-
-  return [null, null];
+  return [null, true];
 }

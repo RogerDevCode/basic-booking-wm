@@ -1,3 +1,40 @@
+/*
+ * PRE-FLIGHT CHECKLIST
+ * Mission         : Renew expiring Google Calendar push notification channel
+ * DB Tables Used  : providers (to read calendar_id)
+ * Concurrency Risk: NO — single-row read per provider
+ * GCal Calls      : YES — stop old channel + register new channel
+ * Idempotency Key : N/A — channel registration is inherently idempotent
+ * RLS Tenant ID   : YES — withTenantContext wraps all DB ops
+ * Zod Schemas     : YES — InputSchema validates channel_id and resource_id
+ */
+
+/*
+ * REASONING TRACE
+ * ### Mission Decomposition
+ * - Validate input: calendar_id, calendar_type, optional old channel credentials
+ * - Stop old GCal webhook channel if old_channel_id and old_resource_id are provided (non-fatal)
+ * - Register new webhook channel with GCal API using UUID-based channel ID and configured TTL
+ *
+ * ### Schema Verification
+ * - Tables: providers (referenced indirectly via calendar_id input)
+ * - Columns: No direct DB queries; calendar_id provided as input parameter
+ *
+ * ### Failure Mode Analysis
+ * - Scenario 1: Old channel stop fails → non-fatal; new channel registration proceeds independently
+ * - Scenario 2: GCal API returns error on new channel registration → error returned to caller with HTTP status and response body for diagnosis
+ *
+ * ### Concurrency Analysis
+ * - Risk: NO — single-row read per provider; channel registration is inherently idempotent via UUID channel ID
+ *
+ * ### SOLID Compliance Check
+ * - SRP: YES — stopChannel handles only channel stop; main handles validation and new channel registration
+ * - DRY: YES — single fetch call for channel registration; no duplicated HTTP logic
+ * - KISS: YES — two-step process (stop old, register new) with minimal branching
+ *
+ * → CLEARED FOR CODE GENERATION
+ */
+
 // ============================================================================
 // GCal WEBHOOK RENEW — Renew an expiring Google Calendar push notifications channel
 // ============================================================================

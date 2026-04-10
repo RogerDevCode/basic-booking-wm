@@ -1,3 +1,42 @@
+/*
+ * PRE-FLIGHT CHECKLIST
+ * Mission         : Password management for providers (generate temp, change, verify)
+ * DB Tables Used  : providers
+ * Concurrency Risk: NO — single-row UPDATE by provider_id
+ * GCal Calls      : NO
+ * Idempotency Key : N/A — password changes are inherently non-idempotent
+ * RLS Tenant ID   : YES — withTenantContext wraps all DB ops
+ * Zod Schemas     : YES — InputSchema validates all inputs
+ */
+
+/*
+ * REASONING TRACE
+ * ### Mission Decomposition
+ * - Validate action (admin_generate_temp/provider_change/provider_verify) + inputs
+ * - Route to corresponding password function within withTenantContext
+ * - Hash new passwords with argon2, verify with bcrypt/argon2 compare
+ * - Return typed result or error tuple
+ *
+ * ### Schema Verification
+ * - Table: providers (provider_id PK, name, email, password_hash, last_password_change)
+ * - Columns: password_hash, password_reset_token, password_reset_expires verified in 003/005
+ *
+ * ### Failure Mode Analysis
+ * - Wrong current password → verifyPassword returns false, error returned
+ * - Weak new password → validatePasswordPolicy rejects, error returned
+ * - Provider not found → SELECT returns empty, error returned
+ *
+ * ### Concurrency Analysis
+ * - Risk: NO — single-row UPDATE by provider_id, no locks needed
+ *
+ * ### SOLID Compliance Check
+ * - SRP: each function handles one password operation — YES
+ * - DRY: shared crypto module for hash/verify — YES
+ * - KISS: action-based routing with clear branches — YES
+ *
+ * → CLEARED FOR CODE GENERATION
+ */
+
 // ============================================================================
 // AUTH PROVIDER — Password management (admin + provider)
 // ============================================================================
@@ -13,6 +52,7 @@ import { z } from 'zod';
 import postgres from 'postgres';
 import { withTenantContext } from '../internal/tenant-context';
 import { createDbClient } from '../internal/db/client';
+import type { Result } from '../internal/result';
 import {
   hashPassword,
   verifyPassword,
@@ -30,17 +70,15 @@ const InputSchema = z.object({
   new_password: z.string().optional(),
 });
 
-type Result<T> = [Error | null, T | null];
-
 interface TempPasswordResult {
   readonly provider_id: string;
   readonly provider_name: string;
-  readonly temp_password: string;
+  readonly tempPassword: string;
   readonly expires_at: string;
   readonly message: string;
 }
 
-async function adminGenerateTempPassword(tx: postgres.TransactionSql, providerId: string): Promise<Result<TempPasswordResult>> {
+async function adminGenerateTempPassword(tx: postgres.Sql, providerId: string): Promise<Result<TempPasswordResult>> {
   const providers = await tx.values<[string, string, string][]>`
     SELECT provider_id, name, email FROM providers WHERE provider_id = ${providerId}::uuid LIMIT 1
   `;
@@ -66,7 +104,7 @@ async function adminGenerateTempPassword(tx: postgres.TransactionSql, providerId
   return [null, {
     provider_id: provider[0],
     provider_name: provider[1],
-    temp_password,
+    tempPassword,
     expires_at: expiresAt,
     message: `Temp password for ${provider[1]} (${provider[2]}): ${tempPassword} (expires in 24h)`,
   }];
@@ -78,7 +116,7 @@ interface PasswordChangeResult {
 }
 
 async function providerChangePassword(
-  tx: postgres.TransactionSql,
+  tx: postgres.Sql,
   providerId: string,
   currentPassword: string,
   newPassword: string
@@ -122,11 +160,11 @@ interface VerifyResult {
 }
 
 async function providerVerify(
-  tx: postgres.TransactionSql,
+  tx: postgres.Sql,
   providerId: string,
   password: string
 ): Promise<Result<VerifyResult>> {
-  const providers = await tx.values<[string | null, string | null][]>`
+  const providers = await tx.values<[string | null, string | null, string | null][]>`
     SELECT provider_id, password_hash, name FROM providers WHERE provider_id = ${providerId}::uuid LIMIT 1
   `;
   const provider = providers[0];

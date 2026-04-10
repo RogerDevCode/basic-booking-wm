@@ -1,4 +1,42 @@
-// ============================================================================
+/*
+ * PRE-FLIGHT CHECKLIST
+ * Mission         : Get current user profile + role by user_id
+ * DB Tables Used  : users
+ * Concurrency Risk: NO — read-only single-row SELECT
+ * GCal Calls      : NO
+ * Idempotency Key : N/A — read-only operation
+ * RLS Tenant ID   : YES — withTenantContext wraps all DB ops
+ * Zod Schemas     : YES — InputSchema validates user_id
+ */
+
+/*
+ * REASONING TRACE
+ * ### Mission Decomposition
+ * - Validate user_id from input via Zod schema
+ * - Query users table for full profile including computed profile_complete flag
+ * - Return structured profile or error if user not found/disabled
+ *
+ * ### Schema Verification
+ * - Tables: users
+ * - Columns: user_id, email, full_name, role, rut, phone, address, telegram_chat_id, timezone, is_active, last_login, password_hash (for profile_complete computation)
+ *
+ * ### Failure Mode Analysis
+ * - Scenario 1: User not found → return "User not found" error
+ * - Scenario 2: Account disabled → return "disabled" error after row lookup
+ * - Scenario 3: DB connection failure → caught by outer try/catch, returned as Internal error
+ *
+ * ### Concurrency Analysis
+ * - Risk: NO — read-only single-row SELECT, no mutation
+ *
+ * ### SOLID Compliance Check
+ * - SRP: YES — single responsibility: fetch user profile by ID
+ * - DRY: YES — tenant extraction logic shared pattern, Zod schema single source
+ * - KISS: YES — direct SELECT → map → return with no intermediate layers
+ *
+ * → CLEARED FOR CODE GENERATION
+ */
+
+// ===
 // WEB AUTH ME — Get current user profile + role
 // ============================================================================
 // Returns full user profile by user_id.
@@ -6,7 +44,6 @@
 // ============================================================================
 
 import { z } from 'zod';
-import postgres from 'postgres';
 import { withTenantContext } from '../internal/tenant-context';
 import { createDbClient } from '../internal/db/client';
 
@@ -44,20 +81,9 @@ export async function main(rawInput: unknown): Promise<[Error | null, UserProfil
 
   const sql = createDbClient({ url: dbUrl });
 
-  // Extract tenant ID from input
-  const rawObj = typeof rawInput === 'object' && rawInput !== null ? rawInput : {};
-  let tenantId = user_id;
-  const tenantKeys = ['provider_id', 'admin_user_id', 'client_id', 'client_user_id'] as const;
-  for (const key of tenantKeys) {
-    const val = (rawObj as Record<string, unknown>)[key];
-    if (typeof val === 'string') {
-      tenantId = val;
-      break;
-    }
-  }
-
+  // user_id IS the tenant context — no key scanning needed
   try {
-    const [txErr, txData] = await withTenantContext(sql, tenantId, async (tx) => {
+    const [txErr, txData] = await withTenantContext(sql, user_id, async (tx) => {
       const userRows = await tx.values<[string, string | null, string, string, string | null, string | null, string | null, string | null, string, boolean, string | null, boolean][]>`
         SELECT user_id, email, full_name, role, rut, phone, address,
                telegram_chat_id, timezone, is_active, last_login,

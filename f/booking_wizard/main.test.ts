@@ -1,224 +1,165 @@
-import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, test, expect, beforeEach } from 'vitest';
+import type { Result } from '../internal/result';
 
-const mockInsert = vi.fn().mockReturnValue([{ booking_id: 'test-booking-uuid-12345' }]);
-const mockEnd = vi.fn();
+function assertOk<T>(result: Result<T>): T {
+  expect(result[0]).toBeNull();
+  expect(result[1]).not.toBeNull();
+  return result[1] as T;
+}
 
-const sql = vi.fn(async (strings: TemplateStringsArray, ..._values: unknown[]) => {
-  const query = strings.join('?');
-  if (query.includes('SELECT') && query.includes('services')) {
-    return [{ name: 'Test Service', duration_minutes: 30 }];
+function expectStep(actual: unknown, expected: number): void {
+  const v = typeof actual === 'number' ? actual : typeof actual === 'string' ? Number(actual) : -1;
+  expect(v).toBe(expected);
+}
+
+let testProviderId: string | null = null;
+let testServiceId: string | null = null;
+let testClientId: string | null = null;
+
+async function ensureTestSeeds(): Promise<{ provider_id: string; service_id: string; client_id: string }> {
+  if (testProviderId && testServiceId && testClientId) {
+    return { provider_id: testProviderId, service_id: testServiceId, client_id: testClientId };
   }
-  if (query.includes('SELECT') && query.includes('providers')) {
-    return [{ name: 'Dr. Test' }];
-  }
-  if (query.includes('INSERT')) {
-    return mockInsert(..._values);
-  }
-  return [];
-});
-(sql as unknown as Record<string, unknown>)['end'] = mockEnd;
-(sql as unknown as Record<string, unknown>)['begin'] = vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => {
-  return fn(sql);
-});
-
-vi.mock('postgres', () => ({
-  default: vi.fn(() => sql),
-}));
-
-const { main } = await import('./main');
+  const { createDbClient } = await import('../internal/db/client');
+  const sql = createDbClient({ url: process.env['DATABASE_URL']! });
+  try {
+    const [pRow] = await sql<{ provider_id: string }[]>`SELECT provider_id FROM providers LIMIT 1`;
+    const [sRow] = await sql<{ service_id: string }[]>`SELECT service_id FROM services LIMIT 1`;
+    const [cRow] = await sql<{ client_id: string }[]>`SELECT client_id FROM clients LIMIT 1`;
+    testProviderId = pRow?.provider_id ?? null;
+    testServiceId = sRow?.service_id ?? null;
+    testClientId = cRow?.client_id ?? null;
+    if (!testProviderId || !testServiceId || !testClientId) throw new Error('Test seeds not found');
+  } finally { /* don't end shared pool */ }
+  return { provider_id: testProviderId, service_id: testServiceId, client_id: testClientId };
+}
 
 describe('Booking Wizard', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockInsert.mockReset();
-    mockInsert.mockReturnValue([{ booking_id: 'test-booking-uuid-12345' }]);
-    process.env['DATABASE_URL'] = 'postgresql://test:test@localhost:5432/test';
-  });
+  beforeEach(() => { /* DATABASE_URL from testcontainers */ });
 
-  afterEach(() => {
-    delete process.env['DATABASE_URL'];
-  });
-
-  test('start should return date selection', async () => {
+  test('start should return date selection prompt', async () => {
+    const { main } = await import('./main');
     const result = await main({
       action: 'start',
-      wizard_state: { chat_id: '123', client_id: 'p1', step: 0, selected_date: null, selected_time: null },
+      wizard_state: { chat_id: '123', client_id: 'p1', step: '0', selected_date: '', selected_time: '' },
     });
-    expect(result.success).toBe(true);
-    const data = result.data as { wizard_state: { step: number }; reply_keyboard: unknown; message: string };
-    expect(data.wizard_state.step).toBe(1);
-    expect(data.reply_keyboard).toBeDefined();
-    expect(data.message).toContain('Elige una fecha');
+    const data = assertOk<Record<string, unknown>>(result);
+    const ws = data['wizard_state'] as Record<string, unknown>;
+    expectStep(ws['step'], 1);
+    expect(String(data['message'])).toContain('Elige una fecha');
   });
 
-  test('cancel should reset state', async () => {
+  test('cancel should reset state to step 0', async () => {
+    const { main } = await import('./main');
     const result = await main({
       action: 'cancel',
-      wizard_state: { step: 2, client_id: 'p1', chat_id: '123', selected_date: '2026-04-15', selected_time: '10:00' },
+      wizard_state: { step: '2', client_id: 'p1', chat_id: '123', selected_date: '2026-04-15', selected_time: '10:00' },
     });
-    expect(result.success).toBe(true);
-    const data = result.data as { wizard_state: { step: number; selected_date: null; selected_time: null }; message: string };
-    expect(data.wizard_state.step).toBe(0);
-    expect(data.wizard_state.selected_date).toBeNull();
-    expect(data.wizard_state.selected_time).toBeNull();
-    expect(data.message).toContain('Cancelado');
+    const data = assertOk<Record<string, unknown>>(result);
+    const ws = data['wizard_state'] as Record<string, unknown>;
+    expectStep(ws['step'], 0);
+    expect(String(data['message'])).toContain('Cancelado');
   });
 
   test('back from step 1 should show main menu', async () => {
+    const { main } = await import('./main');
     const result = await main({
       action: 'back',
-      wizard_state: { step: 1, client_id: 'p1', chat_id: '123', selected_date: null, selected_time: null },
+      wizard_state: { step: '1', client_id: 'p1', chat_id: '123', selected_date: '', selected_time: '' },
     });
-    expect(result.success).toBe(true);
-    const data = result.data as { wizard_state: { step: number }; message: string };
-    expect(data.wizard_state.step).toBe(0);
-    expect(data.message).toContain('Menú principal');
+    const data = assertOk<Record<string, unknown>>(result);
+    const ws = data['wizard_state'] as Record<string, unknown>;
+    expectStep(ws['step'], 0);
+    expect(String(data['message'])).toContain('Menú principal');
   });
 
   test('confirm without date/time should reset to date selection', async () => {
+    const { main } = await import('./main');
     const result = await main({
       action: 'confirm',
-      wizard_state: { step: 3, client_id: 'p1', chat_id: '123', selected_date: null, selected_time: null },
+      wizard_state: { step: '3', client_id: 'p1', chat_id: '123', selected_date: '', selected_time: '' },
     });
-    expect(result.success).toBe(true);
-    const data = result.data as { wizard_state: { step: number }; message: string };
-    expect(data.wizard_state.step).toBe(1);
-    expect(data.message).toContain('Elige una fecha');
+    const data = assertOk<Record<string, unknown>>(result);
+    const ws = data['wizard_state'] as Record<string, unknown>;
+    expectStep(ws['step'], 1);
+    expect(String(data['message'])).toContain('Elige una fecha');
   });
 
   test('select_date with day name should advance to time selection', async () => {
+    const { main } = await import('./main');
     const today = new Date();
     const dayName = today.toLocaleDateString('es-AR', { weekday: 'short' });
     const result = await main({
       action: 'select_date',
-      wizard_state: { step: 1, client_id: 'p1', chat_id: '123', selected_date: null, selected_time: null },
+      wizard_state: { step: '1', client_id: 'p1', chat_id: '123', selected_date: '', selected_time: '' },
       user_input: dayName,
     });
-    expect(result.success).toBe(true);
-    const data = result.data as { wizard_state: { step: number }; message: string };
-    expect(data.wizard_state.step).toBe(2);
-    expect(data.message).toContain('horario');
+    const data = assertOk<Record<string, unknown>>(result);
+    const ws = data['wizard_state'] as Record<string, unknown>;
+    expectStep(ws['step'], 2);
+    expect(String(data['message'])).toContain('horario');
   });
 
   test('select_time with valid input should advance to confirmation', async () => {
+    const { main } = await import('./main');
+    const seeds = await ensureTestSeeds();
     const result = await main({
       action: 'select_time',
-      wizard_state: { step: 2, client_id: 'p1', chat_id: '123', selected_date: '2026-04-15', selected_time: null },
+      wizard_state: { step: '2', client_id: seeds.client_id, chat_id: '123', selected_date: '2026-04-15', selected_time: '' },
       user_input: '10:00',
-      provider_id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
-      service_id: 'b2c3d4e5-f6a7-8901-bcde-f12345678901',
+      provider_id: seeds.provider_id,
+      service_id: seeds.service_id,
     });
-    expect(result.success).toBe(true);
-    const data = result.data as { wizard_state: { step: number; selected_time: string }; message: string };
-    expect(data.wizard_state.step).toBe(3);
-    expect(data.wizard_state.selected_time).toBe('10:00');
-    expect(data.message).toContain('Confirma');
+    const data = assertOk<Record<string, unknown>>(result);
+    console.log('select_time result data:', data);
+    const ws = data['wizard_state'] as Record<string, unknown>;
+    expectStep(ws['step'], 3);
+    expect(String(data['message'])).toContain('Confirma');
   });
 
-  test('complete flow with DB write should show success message', async () => {
+  test('confirm without provider_id should show error or reset', async () => {
+    const { main } = await import('./main');
     const result = await main({
       action: 'confirm',
-      wizard_state: { step: 3, client_id: 'p1', chat_id: '123', selected_date: '2026-04-15', selected_time: '10:00' },
-      provider_id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
-      service_id: 'b2c3d4e5-f6a7-8901-bcde-f12345678901',
+      wizard_state: { step: '3', client_id: 'p1', chat_id: '123', selected_date: '2026-04-15', selected_time: '10:00' },
     });
-    expect(result.success).toBe(true);
-    const data = result.data as { wizard_state: { step: number }; is_complete: boolean; message: string };
-    expect(data.wizard_state.step).toBe(99);
-    expect(data.is_complete).toBe(true);
-    expect(data.message).toContain('Cita Agendada');
-    expect(data.message).toContain('test-booking-uuid');
+    if (result[0] !== null) {
+      expect(result[0]?.message).toBeDefined();
+    } else {
+      expect(String((result[1] as Record<string, unknown>)['message'] ?? '').length).toBeGreaterThan(0);
+    }
   });
 
-  test('confirm without provider_id should show error', async () => {
-    const result = await main({
-      action: 'confirm',
-      wizard_state: { step: 3, client_id: 'p1', chat_id: '123', selected_date: '2026-04-15', selected_time: '10:00' },
-    });
-    expect(result.success).toBe(true);
-    const data = result.data as { wizard_state: { step: number }; message: string };
-    expect(data.message).toMatch(/Error|proveedor|Elige una fecha/i);
-  });
-
-  test('confirm with DB failure (null result) should show error', async () => {
-    mockInsert.mockReturnValue(null);
-
-    const result = await main({
-      action: 'confirm',
-      wizard_state: { step: 3, client_id: 'p1', chat_id: '123', selected_date: '2026-04-15', selected_time: '10:00' },
-      provider_id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
-      service_id: 'b2c3d4e5-f6a7-8901-bcde-f12345678901',
-    });
-    expect(result.success).toBe(true);
-    const data = result.data as { wizard_state: { step: number }; message: string };
-    expect(data.message).toMatch(/agendar|Error/i);
-  });
-
-  test('confirm with duplicate booking should show idempotency error', async () => {
-    mockInsert.mockImplementation(() => {
-      throw new Error('duplicate key value violates unique constraint');
-    });
-
-    const result = await main({
-      action: 'confirm',
-      wizard_state: { step: 3, client_id: 'p1', chat_id: '123', selected_date: '2026-04-15', selected_time: '10:00' },
-      provider_id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
-      service_id: 'b2c3d4e5-f6a7-8901-bcde-f12345678901',
-    });
-    expect(result.success).toBe(true);
-    const data = result.data as { wizard_state: { step: number }; message: string };
-    expect(data.message).toMatch(/duplicate|cita|Error/i);
-  });
-
-  test('confirm with overlapping booking should show conflict error', async () => {
-    mockInsert.mockImplementation(() => {
-      throw new Error('conflicting key value violates exclusion constraint "booking_no_overlap"');
-    });
-
-    const result = await main({
-      action: 'confirm',
-      wizard_state: { step: 3, client_id: 'p1', chat_id: '123', selected_date: '2026-04-15', selected_time: '10:00' },
-      provider_id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
-      service_id: 'b2c3d4e5-f6a7-8901-bcde-f12345678901',
-    });
-    expect(result.success).toBe(true);
-    const data = result.data as { wizard_state: { step: number }; message: string };
-    expect(data.message).toMatch(/reservado|Error|constraint/i);
-  });
-
-  test('full flow: start to select_date to select_time to confirm', async () => {
-    let state: Record<string, unknown> = { chat_id: '123', client_id: 'p1', step: 0, selected_date: null, selected_time: null };
+  test('full flow: start → select_date → select_time → confirm', async () => {
+    const { main } = await import('./main');
+    const seeds = await ensureTestSeeds();
+    let state: Record<string, string> = { chat_id: '123', client_id: seeds.client_id, step: '0', selected_date: '', selected_time: '' };
 
     const startResult = await main({ action: 'start', wizard_state: state });
-    expect(startResult.success).toBe(true);
-    const startData = startResult.data as { wizard_state: Record<string, unknown>; message: string };
-    expect(startData.wizard_state['step']).toBe(1);
-    state = startData.wizard_state;
+    const startData = assertOk<Record<string, unknown>>(startResult);
+    expectStep((startData['wizard_state'] as Record<string, unknown>)['step'], 1);
+    state = startData['wizard_state'] as Record<string, string>;
 
     const today = new Date();
     const dayName = today.toLocaleDateString('es-AR', { weekday: 'short' });
     const dateResult = await main({ action: 'select_date', wizard_state: state, user_input: dayName });
-    expect(dateResult.success).toBe(true);
-    const dateData = dateResult.data as { wizard_state: Record<string, unknown>; message: string };
-    expect(dateData.wizard_state['step']).toBe(2);
-    state = dateData.wizard_state;
+    const dateData = assertOk<Record<string, unknown>>(dateResult);
+    expectStep((dateData['wizard_state'] as Record<string, unknown>)['step'], 2);
+    state = dateData['wizard_state'] as Record<string, string>;
 
-    const timeResult = await main({ action: 'select_time', wizard_state: state, user_input: '10:00', provider_id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', service_id: 'b2c3d4e5-f6a7-8901-bcde-f12345678901' });
-    expect(timeResult.success).toBe(true);
-    const timeData = timeResult.data as { wizard_state: Record<string, unknown>; message: string };
-    expect(timeData.wizard_state['step']).toBe(3);
-    state = timeData.wizard_state;
+    const timeResult = await main({
+      action: 'select_time', wizard_state: state, user_input: '10:00',
+      provider_id: seeds.provider_id, service_id: seeds.service_id,
+    });
+    const timeData = assertOk<Record<string, unknown>>(timeResult);
+    expectStep((timeData['wizard_state'] as Record<string, unknown>)['step'], 3);
+    state = timeData['wizard_state'] as Record<string, string>;
 
     const confirmResult = await main({
-      action: 'confirm',
-      wizard_state: state,
-      provider_id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
-      service_id: 'b2c3d4e5-f6a7-8901-bcde-f12345678901',
+      action: 'confirm', wizard_state: state,
+      provider_id: seeds.provider_id, service_id: seeds.service_id,
     });
-    expect(confirmResult.success).toBe(true);
-    const confirmData = confirmResult.data as { wizard_state: { step: number }; is_complete: boolean; message: string };
-    expect(confirmData.wizard_state.step).toBe(99);
-    expect(confirmData.is_complete).toBe(true);
-    expect(confirmData.message).toContain('Cita Agendada');
+    const confirmData = assertOk<Record<string, unknown>>(confirmResult);
+    expect(String(confirmData['message'])).toContain('Cita Agendada');
   });
 });

@@ -1,3 +1,43 @@
+/*
+ * PRE-FLIGHT CHECKLIST
+ * Mission         : Configure reminder preferences (channel toggles, time windows)
+ * DB Tables Used  : clients
+ * Concurrency Risk: NO — single-row UPDATE for client preferences
+ * GCal Calls      : NO
+ * Idempotency Key : N/A — preference updates are inherently idempotent
+ * RLS Tenant ID   : YES — withTenantContext wraps all DB ops
+ * Zod Schemas     : YES — InputSchema validates client_id and action
+ */
+
+/*
+ * REASONING TRACE
+ * ### Mission Decomposition
+ * - Validate input (action enum, client_id, optional channel/window params)
+ * - Load existing reminder preferences from clients.metadata JSONB column
+ * - Apply action: show prefs, toggle channel, toggle window, activate/deactivate all
+ * - Persist updated preferences via jsonb_set UPDATE
+ * - Build formatted response message with emoji status and reply keyboard
+ *
+ * ### Schema Verification
+ * - Tables: clients
+ * - Columns: client_id, metadata (JSONB with reminder_preferences key), updated_at — metadata inferred from code
+ *
+ * ### Failure Mode Analysis
+ * - Scenario 1: client_id missing → early validation rejection
+ * - Scenario 2: No existing metadata row → defaults loaded, UPDATE creates reminder_preferences key via jsonb_set
+ * - Scenario 3: DATABASE_URL missing → returns error, no DB client created
+ *
+ * ### Concurrency Analysis
+ * - Risk: NO — single-row UPDATE for client preferences, inherently idempotent
+ *
+ * ### SOLID Compliance Check
+ * - SRP: YES — toggleValue, setAll, buildConfigMessage, buildWindowConfig each have single responsibility
+ * - DRY: YES — toggleValue uses dynamic key access via keyof ReminderPrefs, acceptable for config toggling
+ * - KISS: YES — preference management via JSONB is simpler than dedicated columns
+ *
+ * → CLEARED FOR CODE GENERATION
+ */
+
 // ============================================================================
 // REMINDER CONFIG — Preference Configuration UI
 // ============================================================================
@@ -75,7 +115,7 @@ function setAll(_prefs: ReminderPrefs, value: boolean): ReminderPrefs {
 
 async function savePreferences(sql: SqlClient, clientId: string, prefs: ReminderPrefs): Promise<boolean> {
   try {
-    await sql`
+    await (sql as postgres.TransactionSql)`
       UPDATE clients
       SET metadata = jsonb_set(
             COALESCE(metadata, '{}'::jsonb),
@@ -110,7 +150,7 @@ async function loadPreferences(sql: SqlClient, clientId: string): Promise<Remind
   };
 
   try {
-    const rows = await sql<ClientMetadataRow[]>`
+    const rows = await (sql as postgres.TransactionSql)<ClientMetadataRow[]>`
       SELECT metadata FROM clients WHERE client_id = ${clientId}::uuid LIMIT 1
     `;
     const firstRow = rows[0];
@@ -123,10 +163,10 @@ async function loadPreferences(sql: SqlClient, clientId: string): Promise<Remind
     if (!reminderPrefs) return defaults;
 
     return {
-      telegram_24h: Boolean(reminderPrefs.telegram_24h ?? true),
-      gmail_24h: Boolean(reminderPrefs.gmail_24h ?? true),
-      telegram_2h: Boolean(reminderPrefs.telegram_2h ?? true),
-      telegram_30min: Boolean(reminderPrefs.telegram_30min ?? true),
+      telegram_24h: Boolean(reminderPrefs['telegram_24h'] ?? true),
+      gmail_24h: Boolean(reminderPrefs['gmail_24h'] ?? true),
+      telegram_2h: Boolean(reminderPrefs['telegram_2h'] ?? true),
+      telegram_30min: Boolean(reminderPrefs['telegram_30min'] ?? true),
     };
   } catch {
     return defaults;
@@ -153,7 +193,11 @@ export async function main(rawInput: unknown): Promise<[Error | null, ReminderCo
       return [new Error('No DB configured'), null];
     }
 
-    const tenantId = client_id || '00000000-0000-0000-0000-000000000000';
+    // FAIL FAST: client_id is mandatory. No fallback to null UUID.
+    if (!client_id) {
+      return [new Error('client_id is required for tenant isolation'), null];
+    }
+    const tenantId = client_id;
 
     const [txErr, txData] = await withTenantContext(sql, tenantId, async (tx) => {
       let prefs: ReminderPrefs = await loadPreferences(tx, client_id);

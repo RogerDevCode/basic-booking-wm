@@ -1,3 +1,43 @@
+/*
+ * PRE-FLIGHT CHECKLIST
+ * Mission         : Routes AI intents to booking actions (create, cancel, reschedule, list)
+ * DB Tables Used  : bookings, providers, clients, services, provider_schedules
+ * Concurrency Risk: YES — delegates to booking_create/cancel/reschedule which use transactions
+ * GCal Calls      : NO — delegates to gcal_sync
+ * Idempotency Key : YES — delegates to child scripts
+ * RLS Tenant ID   : YES — withTenantContext wraps all DB ops
+ * Zod Schemas     : YES — InputSchema validates all inputs
+ */
+
+/*
+ * REASONING TRACE
+ * ### Mission Decomposition
+ * - Validate input (tenant_id, intent, entities, optional IDs)
+ * - Route to appropriate handler based on intent enum
+ * - Each handler extracts entities, validates required fields, delegates to child script
+ * - Build user-friendly Spanish response from child script result
+ *
+ * ### Schema Verification
+ * - Tables: bookings, providers, clients, services, provider_schedules (accessed via delegated child scripts)
+ * - Columns: All verified against §6 schema; orchestrator itself performs one direct query on bookings/providers/services for get_my_bookings
+ *
+ * ### Failure Mode Analysis
+ * - Scenario 1: Missing required entities → return follow-up message requesting missing data, no DB call
+ * - Scenario 2: Child script returns error → wrap error in user-friendly Spanish message
+ * - Scenario 3: Dynamic import failure → caught as error, returned as failure result
+ * - Scenario 4: Empty bookings list → return informational message, not an error
+ *
+ * ### Concurrency Analysis
+ * - Risk: YES — delegates to booking_create/cancel/reschedule which use transactions with GIST constraints; orchestrator itself is a pure router
+ *
+ * ### SOLID Compliance Check
+ * - SRP: Each handler does one thing — YES (handleCreateBooking, handleCancelBooking, handleReschedule, handleListAvailable, handleGetMyBookings each handle one intent)
+ * - DRY: No duplicated logic — YES (getEntity helper for entity extraction, shared OrchestratorResult type)
+ * - KISS: No unnecessary complexity — YES (switch-based routing, each handler is linear validate→delegate→format)
+ *
+ * → CLEARED FOR CODE GENERATION
+ */
+
 // ============================================================================
 // BOOKING ORCHESTRATOR — Routes AI intents to booking actions
 // ============================================================================
@@ -6,13 +46,28 @@
 // ============================================================================
 
 import { z } from 'zod';
-import postgres from 'postgres';
 import { createDbClient } from '../internal/db/client';
 import { withTenantContext } from '../internal/tenant-context';
 
+// ── Orchestrator intent types — Spanish, matching AutorizadoIntent (§5.1) ──
+type OrchestratorBookingIntent =
+  | 'crear_cita'
+  | 'cancelar_cita'
+  | 'reagendar_cita'
+  | 'ver_disponibilidad'
+  | 'mis_citas';
+
+function isOrchestratorBookingIntent(value: string): value is OrchestratorBookingIntent {
+  return ['crear_cita', 'cancelar_cita', 'reagendar_cita', 'ver_disponibilidad', 'mis_citas'].includes(value);
+}
+
 const InputSchema = z.object({
   tenant_id: z.uuid(),
-  intent: z.enum(['create_booking', 'cancel_booking', 'reschedule', 'list_available', 'get_my_bookings']),
+  intent: z.enum([
+    'crear_cita', 'cancelar_cita', 'reagendar_cita', 'ver_disponibilidad', 'mis_citas',
+    // Legacy aliases accepted but normalized to canonical form
+    'reagendar', 'consultar_disponible', 'consultar_disponibilidad', 'ver_mis_citas',
+  ]),
   entities: z.record(z.string(), z.string()).default({}),
   client_id: z.uuid().optional(),
   provider_id: z.uuid().optional(),
@@ -48,7 +103,7 @@ async function handleCreateBooking(
 
   if (clientId === undefined || providerId === undefined || serviceId === undefined || date === undefined || time === undefined) {
     const result: OrchestratorResult = {
-      action: 'create_booking',
+      action: 'crear_cita',
       success: false,
       data: null,
       message: 'Faltan datos para agendar la cita.',
@@ -76,7 +131,7 @@ async function handleCreateBooking(
 
   if (err === null && data !== null) {
     const result: OrchestratorResult = {
-      action: 'create_booking',
+      action: 'crear_cita',
       success: true,
       data,
       message: `✅ Cita agendada para el ${date} a las ${time}.`,
@@ -85,7 +140,7 @@ async function handleCreateBooking(
   }
 
   const result: OrchestratorResult = {
-    action: 'create_booking',
+    action: 'crear_cita',
     success: false,
     data: null,
     message: `❌ No se pudo agendar: ${err?.message ?? 'Error desconocido'}`,
@@ -102,7 +157,7 @@ async function handleCancelBooking(
 
   if (bookingId === undefined) {
     const result: OrchestratorResult = {
-      action: 'cancel_booking',
+      action: 'cancelar_cita',
       success: false,
       data: null,
       message: 'Necesito el ID de la cita que quieres cancelar.',
@@ -123,7 +178,7 @@ async function handleCancelBooking(
 
   if (err === null && data !== null) {
     const result: OrchestratorResult = {
-      action: 'cancel_booking',
+      action: 'cancelar_cita',
       success: true,
       data,
       message: '✅ Tu cita ha sido cancelada exitosamente.',
@@ -132,7 +187,7 @@ async function handleCancelBooking(
   }
 
   const result: OrchestratorResult = {
-    action: 'cancel_booking',
+    action: 'cancelar_cita',
     success: false,
     data: null,
     message: `❌ No se pudo cancelar: ${err?.message ?? 'Error desconocido'}`,
@@ -150,7 +205,7 @@ async function handleReschedule(
 
   if (bookingId === undefined || date === undefined || time === undefined) {
     const result: OrchestratorResult = {
-      action: 'reschedule',
+      action: 'reagendar_cita',
       success: false,
       data: null,
       message: 'Necesito el ID de la cita y la nueva fecha/hora.',
@@ -174,7 +229,7 @@ async function handleReschedule(
 
   if (err === null && data !== null) {
     const result: OrchestratorResult = {
-      action: 'reschedule',
+      action: 'reagendar_cita',
       success: true,
       data,
       message: `✅ Tu cita ha sido reagendada para el ${date} a las ${time}.`,
@@ -183,7 +238,7 @@ async function handleReschedule(
   }
 
   const result: OrchestratorResult = {
-    action: 'reschedule',
+    action: 'reagendar_cita',
     success: false,
     data: null,
     message: `❌ No se pudo reagendar: ${err?.message ?? 'Error desconocido'}`,
@@ -201,7 +256,7 @@ async function handleListAvailable(
 
   if (providerId === undefined || date === undefined) {
     const result: OrchestratorResult = {
-      action: 'list_available',
+      action: 'ver_disponibilidad',
       success: false,
       data: null,
       message: 'Necesito el doctor y la fecha para consultar disponibilidad.',
@@ -229,10 +284,10 @@ async function handleListAvailable(
 
     function isAvailabilityData(d: unknown): d is AvailabilityData {
       if (typeof d !== 'object' || d === null) return false;
-      const obj = d;
-      const isBlocked = (obj as Record<string, unknown>)['is_blocked'];
-      const totalAvailable = (obj as Record<string, unknown>)['total_available'];
-      const slots = (obj as Record<string, unknown>)['slots'];
+      const obj = d as Record<string, unknown>;
+      const isBlocked = obj['is_blocked'];
+      const totalAvailable = obj['total_available'];
+      const slots = obj['slots'];
       return (
         isBlocked === undefined || typeof isBlocked === 'boolean'
       ) && (
@@ -244,7 +299,7 @@ async function handleListAvailable(
 
     if (!isAvailabilityData(data)) {
       const result: OrchestratorResult = {
-        action: 'list_available',
+        action: 'ver_disponibilidad',
         success: false,
         data: null,
         message: '❌ Formato de disponibilidad inesperado.',
@@ -256,7 +311,7 @@ async function handleListAvailable(
 
     if (availData.is_blocked === true) {
       const result: OrchestratorResult = {
-        action: 'list_available',
+        action: 'ver_disponibilidad',
         success: true,
         data,
         message: `😅 No hay disponibilidad el ${date}: ${availData.block_reason ?? 'Motivo desconocido'}`,
@@ -266,7 +321,7 @@ async function handleListAvailable(
 
     if (availData.total_available === 0) {
       const result: OrchestratorResult = {
-        action: 'list_available',
+        action: 'ver_disponibilidad',
         success: true,
         data,
         message: `😅 No hay horarios disponibles el ${date}. ¿Quieres ver otra fecha?`,
@@ -286,7 +341,7 @@ async function handleListAvailable(
 
       const remainingCount = (availData.total_available ?? 0) - 10;
       const result: OrchestratorResult = {
-        action: 'list_available',
+        action: 'ver_disponibilidad',
         success: true,
         data,
         message: `📅 Horarios disponibles el ${date}:\n${slotTimes}${remainingCount > 0 ? ` y ${String(remainingCount)} más` : ''}`,
@@ -296,7 +351,7 @@ async function handleListAvailable(
   }
 
   const result: OrchestratorResult = {
-    action: 'list_available',
+    action: 'ver_disponibilidad',
     success: false,
     data: null,
     message: `❌ Error al consultar disponibilidad: ${err?.message ?? 'Error desconocido'}`,
@@ -311,7 +366,7 @@ async function handleGetMyBookings(
 
   if (clientId === undefined) {
     const result: OrchestratorResult = {
-      action: 'get_my_bookings',
+      action: 'mis_citas',
       success: false,
       data: null,
       message: 'Necesito tu ID de paciente para consultar tus citas.',
@@ -327,7 +382,7 @@ async function handleGetMyBookings(
   const sql = createDbClient({ url: dbUrl });
 
   const [dbErr, bookings] = await withTenantContext<readonly unknown[]>(sql, input.tenant_id, async (tx) => {
-    return await tx`
+    const rows = await tx`
       SELECT b.booking_id, b.status, b.start_time, b.end_time,
              p.name as provider_name, s.name as service_name
       FROM bookings b
@@ -338,13 +393,14 @@ async function handleGetMyBookings(
       ORDER BY b.start_time ASC
       LIMIT 20
     `;
+    return [null, rows as readonly unknown[]];
   });
   if (dbErr !== null) return [dbErr, null];
   if (bookings === null) return [new Error('Unexpected null bookings'), null];
 
   if (bookings.length === 0) {
     const result: OrchestratorResult = {
-      action: 'get_my_bookings',
+      action: 'mis_citas',
       success: true,
       data: [],
       message: '📋 No tienes citas programadas.',
@@ -380,7 +436,7 @@ async function handleGetMyBookings(
     .join('\n');
 
   const result: OrchestratorResult = {
-    action: 'get_my_bookings',
+    action: 'mis_citas',
     success: true,
     data: bookings,
     message: `📋 Tus próximas citas:\n${bookingList}`,
@@ -399,19 +455,35 @@ export async function main(
 
   const input: Readonly<z.infer<typeof InputSchema>> = parsed.data;
 
-  switch (input.intent) {
-    case 'create_booking':
+  // Normalize legacy Spanish intent aliases to canonical form
+  const legacyAliasMap: Record<string, OrchestratorBookingIntent> = {
+    'reagendar': 'reagendar_cita',
+    'consultar_disponible': 'ver_disponibilidad',
+    'consultar_disponibilidad': 'ver_disponibilidad',
+    'ver_mis_citas': 'mis_citas',
+  };
+  const maybeNormalized: OrchestratorBookingIntent | undefined = legacyAliasMap[input.intent];
+  // If not a legacy alias, check if it's already a canonical intent
+  const normalizedIntent: OrchestratorBookingIntent = maybeNormalized ?? (
+    isOrchestratorBookingIntent(input.intent) ? input.intent : undefined
+  );
+  if (normalizedIntent === undefined) {
+    return [new Error(`Unknown intent: ${String(input.intent)}`), null];
+  }
+
+  switch (normalizedIntent) {
+    case 'crear_cita':
       return handleCreateBooking(input);
-    case 'cancel_booking':
+    case 'cancelar_cita':
       return handleCancelBooking(input);
-    case 'reschedule':
+    case 'reagendar_cita':
       return handleReschedule(input);
-    case 'list_available':
+    case 'ver_disponibilidad':
       return handleListAvailable(input);
-    case 'get_my_bookings':
+    case 'mis_citas':
       return handleGetMyBookings(input);
     default: {
-      const _exhaustiveCheck: never = input.intent;
+      const _exhaustiveCheck: never = normalizedIntent;
       return [new Error(`Unknown intent: ${String(_exhaustiveCheck)}`), null];
     }
   }

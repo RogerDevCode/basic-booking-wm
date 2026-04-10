@@ -21,7 +21,6 @@ CREATE POLICY service_note_owner_isolation ON service_notes
   FOR ALL
   USING (
     provider_id = current_setting('app.current_tenant', true)::uuid
-    OR current_setting('app.current_tenant', true) IS NULL
   );
 
 -- STEP 4: Add RLS policy for clients — clients cannot see notes about them

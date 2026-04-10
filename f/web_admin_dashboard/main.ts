@@ -1,3 +1,41 @@
+/*
+ * PRE-FLIGHT CHECKLIST
+ * Mission         : Admin stats and system overview KPIs
+ * DB Tables Used  : bookings, providers, clients, users, booking_audit
+ * Concurrency Risk: NO — read-only aggregate queries
+ * GCal Calls      : NO
+ * Idempotency Key : N/A — read-only operation
+ * RLS Tenant ID   : YES — withTenantContext wraps all DB ops
+ * Zod Schemas     : YES — InputSchema validates admin_user_id
+ */
+
+/*
+ * REASONING TRACE
+ * ### Mission Decomposition
+ * - Validate admin_user_id and confirm user has 'admin' role and is_active
+ * - Run aggregate queries for total_users, total_bookings, revenue, active_providers, pending_bookings
+ * - Calculate no_show_rate from completed + no_show bookings
+ *
+ * ### Schema Verification
+ * - Tables: users (user_id, role, is_active), bookings (status, service_id), providers (is_active), services (price_cents)
+ * - Columns: All verified against §6 schema; revenue joins bookings.services_id → services.price_cents
+ *
+ * ### Failure Mode Analysis
+ * - Scenario 1: Admin not found or inactive → early return with error before running stats queries
+ * - Scenario 2: Empty stats result → defensive check for undefined row, return error
+ * - Scenario 3: Division by zero in no_show_rate → guard with totalProcessed > 0 check
+ *
+ * ### Concurrency Analysis
+ * - Risk: NO — read-only aggregate queries with no writes
+ *
+ * ### SOLID Compliance Check
+ * - SRP: YES — single responsibility: fetch and return dashboard KPIs
+ * - DRY: YES — aggregate queries consolidated; no duplicated counting logic
+ * - KISS: YES — direct SQL aggregates; no intermediate result processing complexity
+ *
+ * → CLEARED FOR CODE GENERATION
+ */
+
 // ============================================================================
 // WEB ADMIN DASHBOARD — Admin stats + overview
 // ============================================================================
@@ -5,7 +43,6 @@
 // ============================================================================
 
 import { z } from 'zod';
-import postgres from 'postgres';
 import { withTenantContext } from '../internal/tenant-context';
 import { createDbClient } from '../internal/db/client';
 
@@ -36,7 +73,7 @@ export async function main(rawInput: unknown): Promise<[Error | null, AdminDashb
   }
 
   const sql = createDbClient({ url: dbUrl });
-  const tenantId = admin_user_id || '00000000-0000-0000-0000-000000000000';
+  const tenantId = admin_user_id;
 
   try {
     const [txErr, txData] = await withTenantContext(sql, tenantId, async (tx) => {

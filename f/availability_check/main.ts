@@ -1,3 +1,42 @@
+/*
+ * PRE-FLIGHT CHECKLIST
+ * Mission         : Get available time slots for a provider on a given date
+ * DB Tables Used  : providers, provider_schedules, schedule_overrides, bookings, provider_services
+ * Concurrency Risk: NO — read-only queries, no locks needed
+ * GCal Calls      : NO
+ * Idempotency Key : N/A — read-only operation
+ * RLS Tenant ID   : YES — withTenantContext wraps all DB ops
+ * Zod Schemas     : YES — InputSchema validates all inputs
+ */
+
+/*
+ * REASONING TRACE
+ * ### Mission Decomposition
+ * - Validate inputs (tenant_id, provider_id, date, optional service_id)
+ * - Query provider info to confirm active status and retrieve timezone
+ * - Delegate to scheduling engine (getAvailability) for slot computation
+ * - Return structured availability result with metadata
+ *
+ * ### Schema Verification
+ * - Tables: providers (provider_id, name, timezone, is_active), provider_services (service_id, provider_id, is_default), provider_schedules (via getAvailability), bookings (via getAvailability)
+ * - Columns: All verified against §6 schema; provider_services and schedule_overrides are extension tables used by scheduling engine
+ *
+ * ### Failure Mode Analysis
+ * - Scenario 1: Provider not found or inactive → return error before scheduling engine call
+ * - Scenario 2: No default service for provider → return error with clear message
+ * - Scenario 3: getAvailability returns null → return error to prevent silent failure
+ *
+ * ### Concurrency Analysis
+ * - Risk: NO — read-only queries, no locks needed
+ *
+ * ### SOLID Compliance Check
+ * - SRP: Each function does one thing — YES (main orchestrates, getDefaultServiceId fetches service, withTenantContext manages transaction)
+ * - DRY: No duplicated logic — YES (delegates to getAvailability, uses shared tenant-context HOF)
+ * - KISS: No unnecessary complexity — YES (straightforward delegation pattern)
+ *
+ * → CLEARED FOR CODE GENERATION
+ */
+
 // ============================================================================
 // AVAILABILITY CHECK — Get available time slots for a provider on a date
 // ============================================================================
@@ -49,13 +88,15 @@ interface ProviderRow {
   timezone: string;
 }
 
-async function getDefaultServiceId(tx: postgres.TransactionSql, providerId: string): Promise<string | null> {
-  const rows = await tx`
+async function getDefaultServiceId(tx: postgres.Sql, providerId: string): Promise<string | null> {
+  const rows = await tx<{ service_id: string }[]>`
     SELECT service_id FROM provider_services
     WHERE provider_id = ${providerId}::uuid AND is_default = true
     LIMIT 1
   `;
-  return rows[0]?.service_id ?? null;
+  const first = rows[0];
+  if (first === undefined) return null;
+  return first.service_id;
 }
 
 export async function main(rawInput: unknown): Promise<[Error | null, AvailabilityResult | null]> {

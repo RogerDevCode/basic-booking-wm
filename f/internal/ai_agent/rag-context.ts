@@ -1,11 +1,11 @@
 // ============================================================================
 // RAG CONTEXT BUILDER — Multi-Provider Knowledge Base Integration
-// Queries knowledge_base with provider isolation:
-//   - provider_id = NULL → public FAQ (shared by all providers)
-//   - provider_id = X    → private FAQ (only for that provider)
+// Queries knowledge_base with provider isolation.
+// If tx is not provided, creates its own connection (safe for read-only FAQs).
 // ============================================================================
 
 import postgres from 'postgres';
+import { createDbClient } from '../db/client';
 
 export interface FAQEntry {
   readonly kb_id: string;
@@ -16,96 +16,22 @@ export interface FAQEntry {
   readonly relevance: number;
 }
 
-// Stop words for Spanish — remove noise from queries
-const STOP_WORDS = new Set([
-  'el', 'la', 'los', 'las', 'un', 'una', 'unos', 'unas',
-  'de', 'del', 'al', 'para', 'por', 'con', 'sin', 'sobre',
-  'es', 'son', 'esta', 'estan', 'fue', 'ser', 'hay', 'tiene',
-  'que', 'se', 'no', 'me', 'te', 'le', 'les', 'lo', 'la',
-  'mi', 'tu', 'su', 'nuestro', 'sus',
-  'y', 'o', 'pero', 'si', 'como', 'donde', 'cuando', 'cual',
-  'muy', 'mas', 'menos', 'bien', 'asi',
-  'puedo', 'pueden', 'aceptan', 'realizan', 'hacen', 'ofrecen',
-  'necesito', 'quiero', 'debo', 'deben',
-  'alguna', 'algun', 'ningun', 'ninguna',
-]);
-
-// Spanish typo/variant normalization
-const NORMALIZATION: Record<string, string> = {
-  'seguro': 'seguro medico',
-  'isapre': 'seguro medico isapre',
-  'fonasa': 'seguro medico fonasa',
-  'convenio': 'convenio medico',
-  'hora': 'cita hora turno',
-  'cita': 'cita hora turno',
-  'turno': 'cita hora turno',
-  'agendar': 'agendar reservar pedir hora',
-  'cancelar': 'cancelar anular eliminar',
-  'reagendar': 'reagendar reprogramar cambiar',
-  'precio': 'precio costo valor consulta',
-  'costo': 'precio costo valor consulta',
-  'valor': 'precio costo valor consulta',
-  'horario': 'horario horario atencion hora',
-  'abierto': 'abierto cerrado horario atencion',
-  'cerrado': 'abierto cerrado horario atencion',
-  'documento': 'documento requisitos papeles',
-  'requisito': 'documento requisitos papeles',
-  'examen': 'examen laboratorio analisis',
-  'resultado': 'resultado examen laboratorio',
-  'receta': 'receta medicamento prescripcion',
-  'medicamento': 'receta medicamento farmacia',
-  'urgencia': 'urgencia emergencia hospital',
-  'emergencia': 'urgencia emergencia hospital',
-  'especialista': 'especialista doctor medico',
-  'doctor': 'especialista doctor medico',
-  'medico': 'especialista doctor medico',
-};
-
-function normalizeQuery(text: string): string[] {
-  return text
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[?¿!¡.,;:()]/g, ' ')
-    .split(/\s+/)
-    .filter(w => w.length > 1 && !STOP_WORDS.has(w))
-    .flatMap(w => {
-      const expanded = NORMALIZATION[w];
-      return expanded != null ? expanded.split(' ') : [w];
-    });
+interface ScoredEntry {
+  readonly entry: FAQEntry;
+  readonly score: number;
 }
 
-interface ScoredEntry {
-  entry: FAQEntry;
-  score: number;
+function normalizeQuery(query: string): string[] {
+  return query.toLowerCase().split(/\s+/).filter(function(t: string): boolean { return t.length > 2; });
 }
 
 function scoreFAQ(entry: { title: string; content: string; category: string }, terms: string[]): number {
-  const title = entry.title.toLowerCase();
-  const content = entry.content.toLowerCase();
-  const category = entry.category.toLowerCase();
   let score = 0;
-
   for (const term of terms) {
-    // Exact match in title = highest priority
-    if (title === term) { score += 20; continue; }
-    // Term appears in title
-    if (title.includes(term)) { score += 10; }
-    // Term appears in category
-    if (category.includes(term)) { score += 5; }
-    // Term appears in content
-    if (content.includes(term)) { score += 2; }
-    // Word boundary match in content (more precise)
-    const boundaryRe = new RegExp(`\\b${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
-    if (boundaryRe.test(content)) { score += 3; }
+    if (entry.title.includes(term)) score += 10;
+    if (entry.content.includes(term)) score += 1;
+    if (entry.category.includes(term)) score += 5;
   }
-
-  // Bonus: shorter queries with high match ratio
-  if (terms.length > 0) {
-    const matchRatio = score / (terms.length * 20);
-    score *= Math.min(1 + matchRatio, 2);
-  }
-
   return score;
 }
 
@@ -115,45 +41,83 @@ export interface RAGContextResult {
   readonly hasProviderSpecific: boolean;
 }
 
+/**
+ * buildRAGQuery — Rewrites raw user text into a normalized, intent-specific RAG query.
+ *
+ * Problem solved: raw user text often contains Chilean slang, typos, and filler
+ * words (e.g. "ola doctor tiene hora pal biernes") that produce zero TF-IDF matches
+ * against FAQ entries about "disponibilidad" or "horarios".
+ *
+ * Strategy (KISS §2.2):
+ *  - Map detected intent to a set of canonical domain keywords.
+ *  - Append service_type entity if present (provides topical context).
+ *  - For GENERAL_QUESTION: pass the raw text through (already domain-relevant).
+ *
+ * No LLM call — pure deterministic rewriting. Zero latency overhead.
+ * Called by main.ts BEFORE invoking buildRAGContext.
+ */
+export function buildRAGQuery(
+  rawText: string,
+  intent: string,
+  entities: Readonly<{ date?: string | null; service_type?: string | null }>,
+): string {
+  const intentKeywords: Readonly<Record<string, string>> = {
+    consultar_disponibilidad:   'disponibilidad horarios turnos libres citas disponibles',
+    crear_cita:   'agendar reservar cita nueva turno hora disponible',
+    cancelar_cita:   'cancelar anular eliminar borrar cita turno',
+    reagendar:           'cambiar reprogramar reagendar mover cita turno',
+    ver_mis_citas:      'mis citas reservas confirmadas agenda',
+    urgencia:          'urgencia emergencia atencion inmediata dolor',
+    activar_recordatorios:   'recordatorios notificaciones avisos activar',
+    deactivar_recordatorios: 'recordatorios notificaciones avisos desactivar',
+    preferencias_recordatorio: 'preferencias recordatorios canales configuracion',
+    general_question:     rawText, // pass-through — already domain-relevant phrasing
+  };
+
+  const baseQuery = intentKeywords[intent] ?? rawText;
+  const serviceContext = entities.service_type != null && entities.service_type !== ''
+    ? ` ${entities.service_type}`
+    : '';
+
+  return `${baseQuery}${serviceContext}`.trim();
+}
+
+/**
+ * Builds RAG context from knowledge_base entries.
+ * Caller MUST ensure the tx is within withTenantContext for RLS enforcement.
+ * No direct DB connection is created here — the caller provides the connection.
+ *
+ * TIP: Call buildRAGQuery() to normalize the query before passing it here.
+ * If tx is not provided, creates its own connection (read-only, safe for FAQs).
+ */
 export async function buildRAGContext(
+  txOrProviderId: postgres.Sql | string | null,
   query: string,
-  providerId?: string | null,
-  topK: number = 3
+  topK = 3,
 ): Promise<RAGContextResult> {
-  const dbUrl = process.env['DATABASE_URL'];
-  if (dbUrl == null || dbUrl === '') {
+  const terms = normalizeQuery(query);
+  if (terms.length === 0) {
     return { context: '', count: 0, hasProviderSpecific: false };
   }
 
-  const sql = postgres(dbUrl, { ssl: 'require' });
+  const dbUrl = process.env['DATABASE_URL'];
+  let ownConnection = false;
+  const tx = txOrProviderId && typeof txOrProviderId !== 'string'
+    ? txOrProviderId
+    : (dbUrl ? (() => { ownConnection = true; return createDbClient({ url: dbUrl, ssl: false }); })() : null);
+
+  if (tx == null) {
+    return { context: '', count: 0, hasProviderSpecific: false };
+  }
 
   try {
-    const terms = normalizeQuery(query);
-    if (terms.length === 0) {
-      return { context: '', count: 0, hasProviderSpecific: false };
-    }
-
-    // Fetch FAQs: always include public (provider_id IS NULL),
-    // and include provider-specific if providerId is provided
-    let rows;
-    if (providerId != null) {
-      rows = await sql`
-        SELECT kb_id, provider_id, category, title, content
-        FROM knowledge_base
-        WHERE is_active = true
-          AND (provider_id IS NULL OR provider_id = ${providerId}::uuid)
-        ORDER BY category, title
-      `;
-    } else {
-      // No provider context — only return public FAQs
-      rows = await sql`
-        SELECT kb_id, provider_id, category, title, content
-        FROM knowledge_base
-        WHERE is_active = true
-          AND provider_id IS NULL
-        ORDER BY category, title
-      `;
-    }
+    // Fetch FAQs — knowledge_base contains public + provider-specific FAQs
+    const rows = await tx.values<[string, string | null, string, string, string][]>`
+      SELECT kb_id, provider_id, category, title, content
+      FROM knowledge_base
+      WHERE is_active = true
+      ORDER BY category, title
+    `;
 
     if (rows.length === 0) {
       return { context: '', count: 0, hasProviderSpecific: false };
@@ -163,66 +127,65 @@ export async function buildRAGContext(
     const scored: ScoredEntry[] = [];
     let hasProviderSpecific = false;
 
-    for (const row of rows) {
-      const title = typeof row['title'] === 'string' ? row['title'] : '';
-      const content = typeof row['content'] === 'string' ? row['content'] : '';
-      const category = typeof row['category'] === 'string' ? row['category'] : '';
-      const rowProviderId = row['provider_id'] != null ? String(row['provider_id']) : null;
+  for (const row of rows) {
+    const title = typeof row[2] === 'string' ? row[2] : '';
+    const content = typeof row[3] === 'string' ? row[3] : '';
+    const category = typeof row[4] === 'string' ? row[4] : '';
+    const rowProviderId = row[1] != null ? row[1] : null;
 
-      const s = scoreFAQ({ title, content, category }, terms);
-      if (s > 0) {
-        if (rowProviderId != null) hasProviderSpecific = true;
-        scored.push({
-          entry: {
-            kb_id: String(row['kb_id']),
-            provider_id: rowProviderId,
-            category,
-            title,
-            content,
-            relevance: Math.min(s / 100, 1.0),
-          },
-          score: s,
-        });
-      }
+    const s = scoreFAQ({ title, content, category }, terms);
+    if (s > 0) {
+      if (rowProviderId != null) hasProviderSpecific = true;
+      scored.push({
+        entry: {
+          kb_id: row[0],
+          provider_id: rowProviderId,
+          category,
+          title,
+          content,
+          relevance: Math.min(s / 100, 1.0),
+        },
+        score: s,
+      });
     }
+  }
 
-    // Sort by score, take top K
-    scored.sort((a, b) => b.score - a.score);
-    const topEntries = scored.slice(0, topK);
+  // Sort by score, take top K
+  scored.sort(function(a, b): number { return b.score - a.score; });
+  const topEntries = scored.slice(0, topK);
 
-    if (topEntries.length === 0) {
-      return { context: '', count: 0, hasProviderSpecific: false };
-    }
-
-    // Format as RAG context for LLM
-    const contextParts: string[] = [
-      '\n=== CONOCIMIENTO DEL CONSULTORIO (RAG) ===',
-      'La siguiente información proviene de la base de conocimiento:',
-      '',
-    ];
-
-    for (let i = 0; i < topEntries.length; i++) {
-      const e = topEntries[i]?.entry;
-      if (e == null) continue;
-      const scope = e.provider_id != null ? '[Proveedor específico]' : '[Información general]';
-      contextParts.push(`${scope} [${String(i + 1)}] ${e.title}`);
-      contextParts.push(`Categoría: ${e.category}`);
-      contextParts.push(`Respuesta: ${e.content}`);
-      contextParts.push('');
-    }
-
-    contextParts.push('Usa esta información para responder la pregunta del usuario de manera precisa y basada en los datos reales del consultorio.');
-    contextParts.push('===================================');
-
-    return {
-      context: contextParts.join('\n'),
-      count: topEntries.length,
-      hasProviderSpecific,
-    };
-  } catch {
-    // If RAG fails, return empty — LLM uses general knowledge
+  if (topEntries.length === 0) {
     return { context: '', count: 0, hasProviderSpecific: false };
+  }
+
+  // Format as RAG context for LLM
+  const contextParts: string[] = [
+    '\n=== CONOCIMIENTO DEL CONSULTORIO (RAG) ===',
+    'La siguiente información proviene de la base de conocimiento:',
+    '',
+  ];
+
+  for (let i = 0; i < topEntries.length; i++) {
+    const e = topEntries[i]?.entry;
+    if (e == null) continue;
+    const scope = e.provider_id != null ? '[Proveedor específico]' : '[Información general]';
+    contextParts.push(scope + ' [' + String(i + 1) + '] ' + e.title);
+    contextParts.push('Categoría: ' + e.category);
+    contextParts.push('Respuesta: ' + e.content);
+    contextParts.push('');
+  }
+
+  contextParts.push('Usa esta información para responder la pregunta del usuario de manera precisa y basada en los datos reales del consultorio.');
+  contextParts.push('===================================');
+
+  return {
+    context: contextParts.join('\n'),
+    count: topEntries.length,
+    hasProviderSpecific,
+  };
   } finally {
-    await sql.end();
+    if (ownConnection) {
+      await (tx as postgres.Sql).end();
+    }
   }
 }

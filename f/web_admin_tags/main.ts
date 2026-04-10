@@ -9,6 +9,35 @@
  * Zod Schemas     : YES — all inputs validated
  */
 
+/*
+ * REASONING TRACE
+ * ### Mission Decomposition
+ * - Validate admin_user_id, action, and tag/category fields via Zod InputSchema
+ * - Verify admin role from users table before any operation
+ * - Route to category CRUD (list/create/update/delete/activate/deactivate) or tag CRUD
+ * - list_all action fetches both categories and tags in a single transaction
+ *
+ * ### Schema Verification
+ * - Tables: tag_categories (category_id, name, description, is_active, sort_order, created_at, updated_at), tags (tag_id, category_id, name, description, color, is_active, sort_order, created_at, updated_at), users (user_id, role, is_active)
+ * - Columns: All verified; tags JOIN tag_categories for category_name enrichment
+ *
+ * ### Failure Mode Analysis
+ * - Scenario 1: Admin not found or non-admin role → early rejection before any CRUD operation
+ * - Scenario 2: Delete category with existing tags → FK constraint violation, error propagated
+ * - Scenario 3: Color validation fails → Zod regex check catches invalid hex before DB
+ * - Scenario 4: Empty update fields → early return error prevents zero-field UPDATE query
+ *
+ * ### Concurrency Analysis
+ * - Risk: NO — single-row CRUD with UUID primary keys; no concurrent write conflicts
+ *
+ * ### SOLID Compliance Check
+ * - SRP: YES — each function handles exactly one entity operation (category or tag)
+ * - DRY: YES — shared dynamic UPDATE builder pattern; toggle helper for activate/deactivate
+ * - KISS: YES — direct SQL with typed value arrays; exhaustive switch ensures no unknown action slips through
+ *
+ * → CLEARED FOR CODE GENERATION
+ */
+
 // ============================================================================
 // WEB ADMIN TAGS — Tag system management for admin dashboard
 // ============================================================================
@@ -26,6 +55,7 @@ import { z } from 'zod';
 import postgres from 'postgres';
 import { withTenantContext } from '../internal/tenant-context';
 import { createDbClient } from '../internal/db/client';
+import type { Result } from '../internal/result';
 
 // ─── Schemas ────────────────────────────────────────────────────────────────
 
@@ -81,11 +111,9 @@ interface TagRow {
   readonly created_at: string;
 }
 
-type Result<T> = [Error | null, T | null];
-
 // ─── Category CRUD ──────────────────────────────────────────────────────────
 
-async function listCategories(tx: postgres.TransactionSql): Promise<Result<CategoryRow[]>> {
+async function listCategories(tx: postgres.Sql): Promise<Result<CategoryRow[]>> {
   const rows = await tx.values<[string, string, string | null, boolean, number, string, number][]>`
     SELECT tc.category_id, tc.name, tc.description, tc.is_active, tc.sort_order, tc.created_at,
            COUNT(t.tag_id) FILTER (WHERE t.is_active = true) AS tag_count
@@ -109,7 +137,7 @@ async function listCategories(tx: postgres.TransactionSql): Promise<Result<Categ
 }
 
 async function createCategory(
-  tx: postgres.TransactionSql,
+  tx: postgres.Sql,
   name: string,
   description: string | null,
   sortOrder: number,
@@ -135,7 +163,7 @@ async function createCategory(
 }
 
 async function updateCategory(
-  tx: postgres.TransactionSql,
+  tx: postgres.Sql,
   categoryId: string,
   name: string | null,
   description: string | null,
@@ -170,7 +198,7 @@ async function updateCategory(
   }];
 }
 
-async function toggleCategory(tx: postgres.TransactionSql, categoryId: string, active: boolean): Promise<Result<{ readonly category_id: string; readonly is_active: boolean }>> {
+async function toggleCategory(tx: postgres.Sql, categoryId: string, active: boolean): Promise<Result<{ readonly category_id: string; readonly is_active: boolean }>> {
   await tx`
     UPDATE tag_categories SET is_active = ${active}, updated_at = NOW()
     WHERE category_id = ${categoryId}::uuid
@@ -178,14 +206,14 @@ async function toggleCategory(tx: postgres.TransactionSql, categoryId: string, a
   return [null, { category_id: categoryId, is_active: active }];
 }
 
-async function deleteCategory(tx: postgres.TransactionSql, categoryId: string): Promise<Result<{ readonly deleted: boolean }>> {
+async function deleteCategory(tx: postgres.Sql, categoryId: string): Promise<Result<{ readonly deleted: boolean }>> {
   await tx`DELETE FROM tag_categories WHERE category_id = ${categoryId}::uuid`;
   return [null, { deleted: true }];
 }
 
 // ─── Tag CRUD ───────────────────────────────────────────────────────────────
 
-async function listTags(tx: postgres.TransactionSql, categoryId?: string): Promise<Result<TagRow[]>> {
+async function listTags(tx: postgres.Sql, categoryId?: string): Promise<Result<TagRow[]>> {
   let rows: [string, string, string, string, string | null, string, boolean, number, string][];
 
   if (categoryId != null) {
@@ -223,14 +251,14 @@ async function listTags(tx: postgres.TransactionSql, categoryId?: string): Promi
 }
 
 async function createTag(
-  tx: postgres.TransactionSql,
+  tx: postgres.Sql,
   categoryId: string,
   name: string,
   description: string | null,
   color: string,
   sortOrder: number,
 ): Promise<Result<TagRow>> {
-  const rows = await tx.values<[string, string, string, string, string | null, string, boolean, number, string][]>`
+  const rows = await tx.values<[string, string, string, string | null, string, boolean, number, string][]>`
     INSERT INTO tags (category_id, name, description, color, sort_order)
     VALUES (${categoryId}::uuid, ${name}, ${description}, ${color}, ${sortOrder})
     RETURNING tag_id, category_id, name, description, color, is_active, sort_order, created_at
@@ -245,7 +273,7 @@ async function createTag(
     category_name: '',
     name: row[2],
     description: row[3],
-    color: row[4],
+    color: row[4] ?? '',
     is_active: row[5],
     sort_order: row[6],
     created_at: row[7],
@@ -253,7 +281,7 @@ async function createTag(
 }
 
 async function updateTag(
-  tx: postgres.TransactionSql,
+  tx: postgres.Sql,
   tagId: string,
   name: string | null,
   description: string | null,
@@ -294,12 +322,12 @@ async function updateTag(
   }];
 }
 
-async function toggleTag(tx: postgres.TransactionSql, tagId: string, active: boolean): Promise<Result<{ readonly tag_id: string; readonly is_active: boolean }>> {
+async function toggleTag(tx: postgres.Sql, tagId: string, active: boolean): Promise<Result<{ readonly tag_id: string; readonly is_active: boolean }>> {
   await tx`UPDATE tags SET is_active = ${active}, updated_at = NOW() WHERE tag_id = ${tagId}::uuid`;
   return [null, { tag_id: tagId, is_active: active }];
 }
 
-async function deleteTag(tx: postgres.TransactionSql, tagId: string): Promise<Result<{ readonly deleted: boolean }>> {
+async function deleteTag(tx: postgres.Sql, tagId: string): Promise<Result<{ readonly deleted: boolean }>> {
   await tx`DELETE FROM tags WHERE tag_id = ${tagId}::uuid`;
   return [null, { deleted: true }];
 }
@@ -320,10 +348,10 @@ export async function main(rawInput: unknown): Promise<Result<unknown>> {
   }
 
   const sql = createDbClient({ url: dbUrl });
-  const tenantId = input.admin_user_id || '00000000-0000-0000-0000-000000000000';
+  const tenantId = input.admin_user_id;
 
   try {
-    const [txErr, txData] = await withTenantContext(sql, tenantId, async (tx) => {
+    const [txErr, txData] = await withTenantContext<unknown>(sql, tenantId, async (tx) => {
       // Verify admin
       const adminRows = await tx.values<[string][]>`
         SELECT role FROM users WHERE user_id = ${input.admin_user_id}::uuid AND is_active = true LIMIT 1
@@ -417,7 +445,7 @@ export async function main(rawInput: unknown): Promise<Result<unknown>> {
 
     if (txErr !== null) return [txErr, null];
     if (txData === null) return [new Error('Operation failed'), null];
-    return [null, txData];
+    return [null, txData as unknown];
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     return [new Error(`Internal error: ${msg}`), null];

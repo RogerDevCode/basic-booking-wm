@@ -8,8 +8,7 @@
 
 import Redis from "ioredis";
 import { createHash } from "node:crypto";
-
-type Result<T> = [Error | null, T | null];
+import type { Result } from '../result';
 
 interface CacheEntry {
   readonly query_hash: string;
@@ -86,7 +85,7 @@ export async function cacheGet(
   } catch (err) {
     return [err instanceof Error ? err : new Error(String(err)), null];
   } finally {
-    redis.quit();
+    void redis.quit();
   }
 }
 
@@ -114,7 +113,7 @@ export async function cacheSet(
   } catch (err) {
     return [err instanceof Error ? err : new Error(String(err)), null];
   } finally {
-    redis.quit();
+    void redis.quit();
   }
 }
 
@@ -129,7 +128,7 @@ export async function cacheInvalidate(text: string): Promise<Result<null>> {
   } catch (err) {
     return [err instanceof Error ? err : new Error(String(err)), null];
   } finally {
-    redis.quit();
+    void redis.quit();
   }
 }
 
@@ -143,7 +142,7 @@ export async function cacheStats(): Promise<Result<CacheStats>> {
   } catch (err) {
     return [err instanceof Error ? err : new Error(String(err)), null];
   } finally {
-    redis.quit();
+    void redis.quit();
   }
 }
 
@@ -160,6 +159,6 @@ export async function cacheClear(): Promise<Result<number>> {
   } catch (err) {
     return [err instanceof Error ? err : new Error(String(err)), null];
   } finally {
-    redis.quit();
+    void redis.quit();
   }
 }

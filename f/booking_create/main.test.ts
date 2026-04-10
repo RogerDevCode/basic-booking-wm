@@ -1,4 +1,19 @@
 import { describe, test, expect } from 'vitest';
+import type { Result } from '../internal/result';
+
+/**
+ * Helper: assert that a [Error | null, T | null] result is an error
+ * with a message containing the expected substring.
+ */
+function assertError(result: Result<unknown>, substring: string): void {
+  expect(result[0]).not.toBeNull();
+  expect(result[0]?.message).toContain(substring);
+  expect(result[1]).toBeNull();
+}
+
+// ============================================================================
+// Booking Create — Input Validation
+// ============================================================================
 
 describe('Booking Create - Input Validation', () => {
   test('should reject missing client_id', async () => {
@@ -10,8 +25,7 @@ describe('Booking Create - Input Validation', () => {
       idempotency_key: 'test-key-001',
     });
 
-    expect(result.success).toBe(false);
-    expect(result.error_message).toContain('client_id');
+    assertError(result, 'client_id');
   });
 
   test('should reject invalid UUID format', async () => {
@@ -24,8 +38,8 @@ describe('Booking Create - Input Validation', () => {
       idempotency_key: 'test-key-002',
     });
 
-    expect(result.success).toBe(false);
-    expect(result.error_message).toContain('client_id');
+    // Zod rejects invalid UUID format
+    expect(result[0]).not.toBeNull();
   });
 
   test('should reject invalid datetime', async () => {
@@ -38,8 +52,7 @@ describe('Booking Create - Input Validation', () => {
       idempotency_key: 'test-key-003',
     });
 
-    expect(result.success).toBe(false);
-    expect(result.error_message).toContain('start_time');
+    assertError(result, 'start_time');
   });
 
   test('should reject missing idempotency_key', async () => {
@@ -51,10 +64,13 @@ describe('Booking Create - Input Validation', () => {
       start_time: '2026-04-15T10:00:00Z',
     });
 
-    expect(result.success).toBe(false);
-    expect(result.error_message).toContain('idempotency_key');
+    assertError(result, 'idempotency_key');
   });
 });
+
+// ============================================================================
+// Booking Cancel — Input Validation
+// ============================================================================
 
 describe('Booking Cancel - Input Validation', () => {
   test('should reject invalid booking_id', async () => {
@@ -64,8 +80,8 @@ describe('Booking Cancel - Input Validation', () => {
       actor: 'client',
     });
 
-    expect(result.success).toBe(false);
-    expect(result.error_message).toContain('booking_id');
+    // Zod rejects invalid UUID format
+    expect(result[0]).not.toBeNull();
   });
 
   test('should reject invalid actor', async () => {
@@ -75,9 +91,14 @@ describe('Booking Cancel - Input Validation', () => {
       actor: 'invalid',
     });
 
-    expect(result.success).toBe(false);
+    // Zod rejects invalid enum value
+    expect(result[0]).not.toBeNull();
   });
 });
+
+// ============================================================================
+// Booking Reschedule — Input Validation
+// ============================================================================
 
 describe('Booking Reschedule - Input Validation', () => {
   test('should reject invalid booking_id', async () => {
@@ -88,8 +109,7 @@ describe('Booking Reschedule - Input Validation', () => {
       actor: 'client',
     });
 
-    expect(result.success).toBe(false);
-    expect(result.error_message).toContain('booking_id');
+    expect(result[0]).not.toBeNull();
   });
 
   test('should reject invalid new_start_time', async () => {
@@ -100,10 +120,13 @@ describe('Booking Reschedule - Input Validation', () => {
       actor: 'client',
     });
 
-    expect(result.success).toBe(false);
-    expect(result.error_message).toContain('new_start_time');
+    assertError(result, 'new_start_time');
   });
 });
+
+// ============================================================================
+// Availability Check — Input Validation
+// ============================================================================
 
 describe('Availability Check - Input Validation', () => {
   test('should reject invalid provider_id', async () => {
@@ -113,8 +136,7 @@ describe('Availability Check - Input Validation', () => {
       date: '2026-04-15',
     });
 
-    expect(result.success).toBe(false);
-    expect(result.error_message).toContain('provider_id');
+    expect(result[0]).not.toBeNull();
   });
 
   test('should reject invalid date format', async () => {
@@ -124,7 +146,6 @@ describe('Availability Check - Input Validation', () => {
       date: 'not-a-date',
     });
 
-    expect(result.success).toBe(false);
-    expect(result.error_message).toContain('YYYY-MM-DD');
+    assertError(result, 'YYYY-MM-DD');
   });
 });

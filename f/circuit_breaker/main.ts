@@ -1,3 +1,44 @@
+import { NULL_TENANT_UUID } from '../internal/config';
+/*
+ * PRE-FLIGHT CHECKLIST
+ * Mission         : Service health monitor and failure isolation (circuit breaker pattern)
+ * DB Tables Used  : circuit_breaker_state
+ * Concurrency Risk: YES — concurrent state updates require atomic operations
+ * GCal Calls      : NO — monitors GCal but does not call it directly
+ * Idempotency Key : N/A — state machine operations are inherently idempotent
+ * RLS Tenant ID   : NO — infrastructure table, no provider_id column
+ * Zod Schemas     : YES — InputSchema validates action and parameters
+ */
+
+/*
+ * REASONING TRACE
+ * ### Mission Decomposition
+ * - Validate input (action: check/record_success/record_failure/reset/status, service_id)
+ * - Initialize service state if not present (INSERT ON CONFLICT DO NOTHING)
+ * - Execute action-specific logic: state checks, counter updates, threshold transitions
+ * - Return current circuit state or action result
+ *
+ * ### Schema Verification
+ * - Tables: circuit_breaker_state (service_id, state, failure_count, success_count, failure_threshold, success_threshold, timeout_seconds, opened_at, half_open_at, last_failure_at, last_success_at, last_error_message, updated_at)
+ * - Columns: All verified — this is an infrastructure table not in §6 core schema but present in the actual database
+ *
+ * ### Failure Mode Analysis
+ * - Scenario 1: Service not initialized → auto-initialized via INSERT ON CONFLICT DO NOTHING
+ * - Scenario 2: Circuit open threshold reached → state transitions to 'open', requests blocked until timeout
+ * - Scenario 3: Half-open timeout expires → state transitions to 'half-open', test request allowed
+ * - Scenario 4: Success during half-open meets threshold → state resets to 'closed'
+ *
+ * ### Concurrency Analysis
+ * - Risk: YES — concurrent recordFailure calls could race on threshold check; mitigated by withTenantContext wrapping each action in a transaction; UPDATE is atomic at Postgres level
+ *
+ * ### SOLID Compliance Check
+ * - SRP: Each action branch does one thing — YES (check, record_success, record_failure, reset, status are independent)
+ * - DRY: No duplicated logic — YES (getState and initService extracted as shared helpers)
+ * - KISS: No unnecessary complexity — YES (switch-based action routing, simple counter logic)
+ *
+ * → CLEARED FOR CODE GENERATION
+ */
+
 // ============================================================================
 // CIRCUIT BREAKER — Service health monitor and failure isolation
 // ============================================================================
@@ -47,7 +88,7 @@ interface CircuitBreakerRow {
   readonly last_error_message: string | null;
 }
 
-async function getState(tx: postgres.TransactionSql, serviceId: string): Promise<CircuitState | null> {
+async function getState(tx: postgres.Sql, serviceId: string): Promise<CircuitState | null> {
   const rows = await tx<CircuitBreakerRow[]>`
     SELECT service_id, state, failure_count, success_count,
            failure_threshold, success_threshold, timeout_seconds,
@@ -76,7 +117,7 @@ async function getState(tx: postgres.TransactionSql, serviceId: string): Promise
   };
 }
 
-async function initService(tx: postgres.TransactionSql, serviceId: string): Promise<void> {
+async function initService(tx: postgres.Sql, serviceId: string): Promise<void> {
   await tx`
     INSERT INTO circuit_breaker_state (service_id, state, failure_count, success_count)
     VALUES (${serviceId}, 'closed', 0, 0)
@@ -110,7 +151,7 @@ export async function main(rawInput: unknown): Promise<[Error | null, CircuitBre
   const sql = createDbClient({ url: dbUrl });
 
   // No UUID in input, use fallback tenant ID
-  const tenantId = '00000000-0000-0000-0000-000000000000';
+  const tenantId = NULL_TENANT_UUID; // system script, global state
 
   try {
     const [txErr, txData] = await withTenantContext(sql, tenantId, async (tx) => {
@@ -208,7 +249,6 @@ export async function main(rawInput: unknown): Promise<[Error | null, CircuitBre
           return [null, state];
         }
       }
-      return [new Error('Unknown action'), null];
     });
 
     if (txErr) {

@@ -99,16 +99,17 @@ export function sanitizeJSONResponse(raw: string): string {
   return cleaned;
 }
 
-/**
- * Cross-checks urgency intent against text content.
- * Returns a tuple style [Error | null, IntentResult | null]
- */
 export function verifyUrgency(result: IntentResult, text: string): IntentResult {
-  const lower = text.toLowerCase();
+  const lower = text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
+    
   const hasUrgency = URGENCY_WORDS.some(w => lower.includes(w));
-  const hasUrgencyTypos = lower.includes('urjente') || lower.includes('urgnete') || lower.includes('urjencia') || lower.includes('nececito atencion');
+  const hasUrgencyTypos = lower.includes('urjente') || lower.includes('urgnete') || lower.includes('urjencia') || lower.includes('nececito atencion') || lower.includes('duele');
 
-  if (result.intent === INTENT.URGENT_CARE) {
+  if (result.intent === INTENT.URGENCIA) {
     if (!hasUrgency && !hasUrgencyTypos) {
       return { 
         ...result, 
@@ -124,10 +125,10 @@ export function verifyUrgency(result: IntentResult, text: string): IntentResult 
   }
 
   // Detect urgency even if LLM didn't catch it
-  if (result.intent !== INTENT.URGENT_CARE && (hasUrgency || hasUrgencyTypos) && result.confidence < 0.5) {
+  if (result.intent !== INTENT.URGENCIA && (hasUrgency || hasUrgencyTypos) && result.confidence < 0.5) {
     return {
       ...result,
-      intent: INTENT.URGENT_CARE,
+      intent: INTENT.URGENCIA,
       confidence: 0.75,
       validation_errors: [...result.validation_errors, "Upgraded to urgent care based on urgency keywords"]
     };

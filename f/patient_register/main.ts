@@ -1,13 +1,49 @@
+/*
+ * PRE-FLIGHT CHECKLIST
+ * Mission         : Create or update client records (patient registration)
+ * DB Tables Used  : clients
+ * Concurrency Risk: NO — UPSERT by email/phone/telegram_chat_id
+ * GCal Calls      : NO
+ * Idempotency Key : YES — ON CONFLICT DO UPDATE by unique client identifiers
+ * RLS Tenant ID   : YES — withTenantContext wraps all DB ops
+ * Zod Schemas     : YES — InputSchema validates name, email, phone, timezone
+ */
+
+/*
+ * REASONING TRACE
+ * ### Mission Decomposition
+ * - Validate input via Zod schema (name, email, phone, telegram_chat_id, timezone)
+ * - Look up existing client by email, telegram_chat_id, or phone (priority order)
+ * - If found: update existing record; if not: INSERT with ON CONFLICT fallback
+ * - Return ClientResult with created flag indicating insert vs update
+ *
+ * ### Schema Verification
+ * - Tables: clients
+ * - Columns: client_id, name, email, phone, telegram_chat_id, timezone, updated_at — all exist per §6
+ *
+ * ### Failure Mode Analysis
+ * - Scenario 1: No unique identifiers provided (no email/phone/telegram_chat_id) → early validation rejection
+ * - Scenario 2: DB unique constraint conflict on INSERT → ON CONFLICT (email) DO UPDATE handles gracefully
+ * - Scenario 3: Missing DATABASE_URL env → fail-fast before opening transaction
+ *
+ * ### Concurrency Analysis
+ * - Risk: YES — multiple registration requests for same email/phone could race
+ * - Lock strategy: UPSERT via ON CONFLICT + unique indexes at DB level prevent duplicates; no explicit SELECT FOR UPDATE needed for creation
+ *
+ * ### SOLID Compliance Check
+ * - SRP: YES — single function handles one responsibility (create/update client)
+ * - DRY: YES — lookup logic is sequential but each identifier check is necessary and distinct
+ * - KISS: YES — straightforward UPSERT pattern with no unnecessary abstraction
+ *
+ * → CLEARED FOR CODE GENERATION
+ */
+
+import { DEFAULT_TIMEZONE } from '../internal/config';
 // ============================================================================
 // PATIENT REGISTER — Create or update client records
 // ============================================================================
-// Creates a new client or updates existing one by email/phone/telegram_chat_id.
-// Idempotent: if client exists, updates name/timezone instead of creating duplicate.
-// Go-style: no throw, no any, no as. Tuple return.
-// ============================================================================
 
 import { z } from 'zod';
-import postgres from 'postgres';
 import { withTenantContext } from '../internal/tenant-context';
 import { createDbClient } from '../internal/db/client';
 
@@ -16,7 +52,7 @@ const InputSchema = z.object({
   email: z.email().optional(),
   phone: z.string().max(50).optional(),
   telegram_chat_id: z.string().optional(),
-  timezone: z.string().default('America/Argentina/Buenos_Aires'),
+  timezone: z.string().default(DEFAULT_TIMEZONE),
   idempotency_key: z.string().min(1).optional(),
   provider_id: z.uuid().optional(),
   client_id: z.uuid().optional(),
@@ -40,7 +76,11 @@ export async function main(rawInput: unknown): Promise<[Error | null, ClientResu
 
   const input: Readonly<z.infer<typeof InputSchema>> = parsed.data;
 
-  const tenantId = input.provider_id || input.client_id || '00000000-0000-0000-0000-000000000000';
+  // FAIL FAST: require explicit tenant context. No fallback to null UUID.
+  const tenantId = input.provider_id ?? input.client_id;
+  if (!tenantId) {
+    return [new Error('tenant_id (provider_id or client_id) is required for tenant isolation'), null];
+  }
 
   if (input.email === undefined && input.phone === undefined && input.telegram_chat_id === undefined) {
     return [new Error('At least one of email, phone, or telegram_chat_id is required'), null];

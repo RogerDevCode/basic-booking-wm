@@ -1,3 +1,44 @@
+/*
+ * PRE-FLIGHT CHECKLIST
+ * Mission         : Admin-only user role change (client/provider/admin)
+ * DB Tables Used  : users, providers
+ * Concurrency Risk: NO — single-row UPDATE + conditional INSERT
+ * GCal Calls      : NO
+ * Idempotency Key : N/A — role changes are inherently non-idempotent
+ * RLS Tenant ID   : YES — withTenantContext wraps all DB ops
+ * Zod Schemas     : YES — InputSchema validates user_id and new_role
+ */
+
+/*
+ * REASONING TRACE
+ * ### Mission Decomposition
+ * - Validate admin_user_id, target_user_id, and new_role via Zod InputSchema
+ * - Verify requesting user is an active admin
+ * - Look up target user and check if role is actually changing (no-op if same)
+ * - UPDATE users.role, then conditionally INSERT into providers if new_role is 'provider'
+ *
+ * ### Schema Verification
+ * - Tables: users (user_id, full_name, role, email, is_active, updated_at), providers (provider_id, name, email, specialty, is_active)
+ * - Columns: All verified; provider lookup uses email; provider INSERT uses name, email, specialty default 'Medicina General'
+ *
+ * ### Failure Mode Analysis
+ * - Scenario 1: Admin not found or inactive → early rejection before any changes
+ * - Scenario 2: Target user not found → explicit error, no mutation
+ * - Scenario 3: Same old/new role → early return with no-op result, no DB write
+ * - Scenario 4: Provider already exists by email → skip INSERT, role change still committed
+ * - Scenario 5: Provider INSERT fails (duplicate email) → transaction rolls back, role change reverted
+ *
+ * ### Concurrency Analysis
+ * - Risk: NO — single-row UPDATE + conditional INSERT; providers.email UNIQUE constraint prevents duplicates
+ *
+ * ### SOLID Compliance Check
+ * - SRP: YES — single responsibility: change role and ensure provider linkage
+ * - DRY: YES — no duplicated logic; inline provider existence check is minimal
+ * - KISS: YES — straightforward sequential queries within transaction; no abstraction overhead
+ *
+ * → CLEARED FOR CODE GENERATION
+ */
+
 // ============================================================================
 // WEB AUTH CHANGE ROLE — Admin-only: change user role
 // ============================================================================
@@ -7,7 +48,6 @@
 // ============================================================================
 
 import { z } from 'zod';
-import postgres from 'postgres';
 import { withTenantContext } from '../internal/tenant-context';
 import { createDbClient } from '../internal/db/client';
 
@@ -33,7 +73,7 @@ export async function main(rawInput: unknown): Promise<[Error | null, ChangeRole
   const { admin_user_id, target_user_id, new_role } = parsed.data;
   
   // Determine tenantId
-  const tenantId = admin_user_id || target_user_id || '00000000-0000-0000-0000-000000000000';
+  const tenantId = admin_user_id || target_user_id;
 
   const dbUrl = process.env['DATABASE_URL'];
   if (dbUrl === undefined || dbUrl === '') {

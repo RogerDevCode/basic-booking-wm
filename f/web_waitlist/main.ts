@@ -1,3 +1,44 @@
+/*
+ * PRE-FLIGHT CHECKLIST
+ * Mission         : Waitlist management (join, leave, list, check position)
+ * DB Tables Used  : waitlist, clients
+ * Concurrency Risk: NO — single-row CRUD + aggregate queries
+ * GCal Calls      : NO
+ * Idempotency Key : N/A — waitlist operations are inherently non-idempotent
+ * RLS Tenant ID   : YES — withTenantContext wraps all DB ops
+ * Zod Schemas     : YES — InputSchema validates action and waitlist fields
+ */
+
+/*
+ * REASONING TRACE
+ * ### Mission Decomposition
+ * - Validate action (join/leave/list/check_position) and parameters via Zod
+ * - Resolve user to client_id via users LEFT JOIN clients
+ * - join: check for existing entry, calculate position, INSERT new waitlist row
+ * - leave: mark entry cancelled, recalculate positions via stored procedure
+ * - list: return all active waitlist entries for client
+ * - check_position: return current position for a specific waitlist entry
+ *
+ * ### Schema Verification
+ * - Tables: waitlist, users, clients
+ * - Columns: waitlist (waitlist_id, client_id, service_id, preferred_date, preferred_start_time, preferred_end_time, status, position, updated_at), users (user_id, email), clients (client_id)
+ *
+ * ### Failure Mode Analysis
+ * - Scenario 1: Already on waitlist → duplicate check returns friendly error before INSERT
+ * - Scenario 2: Leave non-existent entry → UPDATE with WHERE clause silently succeeds (idempotent), no error
+ * - Scenario 3: Client record not found → early return before any action logic
+ *
+ * ### Concurrency Analysis
+ * - Risk: YES — concurrent joins could compute same position; mitigated by checking existing entry before INSERT (race window exists but position is informational only)
+ *
+ * ### SOLID Compliance Check
+ * - SRP: YES — each case branch handles one action, user-to-client resolution is shared pre-action step
+ * - DRY: YES — Zod schema validates once, client ownership check extracted as common prefix
+ * - KISS: YES — switch-based dispatch with inline queries, position calculation is simple COUNT + 1
+ *
+ * → CLEARED FOR CODE GENERATION
+ */
+
 // ============================================================================
 // WEB WAITLIST — Waitlist CRUD (join, leave, list, position)
 // ============================================================================
@@ -6,7 +47,6 @@
 // ============================================================================
 
 import { z } from 'zod';
-import postgres from 'postgres';
 import { withTenantContext } from '../internal/tenant-context';
 import { createDbClient } from '../internal/db/client';
 
@@ -51,10 +91,10 @@ export async function main(rawInput: unknown): Promise<[Error | null, WaitlistRe
   }
 
   const sql = createDbClient({ url: dbUrl });
-  const tenantId = parsed.data.client_id ?? user_id ?? '00000000-0000-0000-0000-000000000000';
+  const tenantId = parsed.data.client_id ?? user_id;
 
   try {
-    const [txErr, txData] = await withTenantContext(sql, tenantId, async (tx) => {
+    const [txErr, txData] = await withTenantContext<unknown>(sql, tenantId, async (tx) => {
       const userRows = await tx`
         SELECT u.user_id, p.client_id FROM users u
         LEFT JOIN clients p ON p.client_id = u.user_id OR p.email = u.email
@@ -212,12 +252,12 @@ export async function main(rawInput: unknown): Promise<[Error | null, WaitlistRe
       return [txErr, null];
     }
 
-    return [null, txData];
+    return [null, txData as WaitlistResult];
 
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     if (message.startsWith('transaction_failed: ')) {
-      return [new Error('Internal error: ' + message.substring(20)), null];
+      return [new Error('Internal error: ' + message.slice(20)), null];
     }
     return [new Error('Internal error: ' + message), null];
   } finally {

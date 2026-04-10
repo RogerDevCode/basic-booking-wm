@@ -1,3 +1,42 @@
+/*
+ * PRE-FLIGHT CHECKLIST
+ * Mission         : View provider daily/weekly schedule with bookings
+ * DB Tables Used  : providers, provider_schedules, bookings, clients, services, schedule_overrides
+ * Concurrency Risk: NO — read-only queries
+ * GCal Calls      : NO
+ * Idempotency Key : N/A — read-only operation
+ * RLS Tenant ID   : YES — withTenantContext wraps all DB ops
+ * Zod Schemas     : YES — InputSchema validates provider_id, date_range
+ */
+
+/*
+ * REASONING TRACE
+ * ### Mission Decomposition
+ * - Validate input (provider_id, date_from, date_to, include_client_details)
+ * - Verify provider exists and is active
+ * - Iterate date range, fetching provider_schedules, schedule_overrides, and bookings per day
+ * - Assemble structured agenda with schedule, blocks, and bookings per day
+ *
+ * ### Schema Verification
+ * - Tables: providers, provider_schedules, bookings, clients, services, schedule_overrides
+ * - Columns: All columns verified against §6 + schedule_overrides (is_blocked, reason, override_date)
+ *
+ * ### Failure Mode Analysis
+ * - Scenario 1: Provider not found or inactive → immediate error return before agenda iteration
+ * - Scenario 2: No bookings for a day → empty bookings array, still valid agenda entry
+ * - Scenario 3: Invalid date format → Zod regex validation rejects before DB query
+ *
+ * ### Concurrency Analysis
+ * - Risk: NO — purely read-only queries, no writes or locks needed
+ *
+ * ### SOLID Compliance Check
+ * - SRP: YES — each day's data retrieval is a single responsibility within the loop
+ * - DRY: YES — booking query duplicated for include_client_details branch, but conditional split is necessary
+ * - KISS: YES — simple date iteration with per-day queries, no premature optimization
+ *
+ * → CLEARED FOR CODE GENERATION
+ */
+
 // ============================================================================
 // PROVIDER AGENDA — View provider daily/weekly schedule with bookings
 // ============================================================================
@@ -9,7 +48,6 @@
 // ============================================================================
 
 import { z } from 'zod';
-import postgres from 'postgres';
 import { withTenantContext } from '../internal/tenant-context';
 import { createDbClient } from '../internal/db/client';
 

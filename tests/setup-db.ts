@@ -3,6 +3,24 @@ import postgres from 'postgres';
 
 let container: StartedPostgreSqlContainer | null = null;
 let sql: postgres.Sql | null = null;
+let connectionUrl: string | null = null;
+
+/** Test seed data — available after setupTestDB() completes */
+const testSeed: { provider_id: string | null; service_id: string | null; client_id: string | null } = {
+  provider_id: null,
+  service_id: null,
+  client_id: null,
+};
+
+/** Returns the DATABASE_URL for the test container */
+export function getTestDbUrl(): string | null {
+  return connectionUrl;
+}
+
+/** Returns test seed data (provider_id, service_id, client_id) */
+export function getTestSeeds(): Readonly<typeof testSeed> {
+  return { ...testSeed };
+}
 
 export async function setupTestDB(): Promise<postgres.Sql> {
   if (sql != null) return sql;
@@ -14,8 +32,9 @@ export async function setupTestDB(): Promise<postgres.Sql> {
     .withExposedPorts(5432)
     .start();
 
-  const dbUrl = container.getConnectionUri();
-  sql = postgres(dbUrl, { ssl: false });
+  const mappedPort = container.getPort();
+  connectionUrl = `postgresql://test:test@localhost:${mappedPort}/test_booking`;
+  sql = postgres(connectionUrl, { ssl: false });
 
   await createSchema(sql);
   return sql;
@@ -70,8 +89,8 @@ async function createSchema(db: postgres.Sql): Promise<void> {
   `;
 
   await db`
-    CREATE TABLE IF NOT EXISTS patients (
-      patient_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    CREATE TABLE IF NOT EXISTS clients (
+      client_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       name TEXT NOT NULL,
       email TEXT UNIQUE,
       phone TEXT,
@@ -114,7 +133,7 @@ async function createSchema(db: postgres.Sql): Promise<void> {
     CREATE TABLE IF NOT EXISTS bookings (
       booking_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       provider_id UUID NOT NULL REFERENCES providers(provider_id),
-      patient_id UUID NOT NULL REFERENCES patients(patient_id),
+      client_id UUID NOT NULL REFERENCES clients(client_id),
       service_id UUID NOT NULL REFERENCES services(service_id),
       start_time TIMESTAMPTZ NOT NULL,
       end_time TIMESTAMPTZ NOT NULL,
@@ -126,7 +145,7 @@ async function createSchema(db: postgres.Sql): Promise<void> {
       rescheduled_to UUID,
       notes TEXT,
       gcal_provider_event_id TEXT,
-      gcal_patient_event_id TEXT,
+      gcal_client_event_id TEXT,
       gcal_sync_status TEXT DEFAULT 'pending',
       gcal_retry_count INT DEFAULT 0,
       gcal_last_sync TIMESTAMPTZ,
@@ -210,7 +229,7 @@ async function createSchema(db: postgres.Sql): Promise<void> {
   await db`
     CREATE TABLE IF NOT EXISTS waitlist (
       waitlist_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      patient_id UUID NOT NULL REFERENCES patients(patient_id),
+      client_id UUID NOT NULL REFERENCES clients(client_id),
       service_id UUID NOT NULL REFERENCES services(service_id),
       preferred_date DATE,
       preferred_start_time TIME,
@@ -226,7 +245,7 @@ async function createSchema(db: postgres.Sql): Promise<void> {
     CREATE TABLE IF NOT EXISTS clinical_notes (
       note_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       booking_id UUID NOT NULL REFERENCES bookings(booking_id),
-      patient_id UUID NOT NULL REFERENCES patients(patient_id),
+      client_id UUID NOT NULL REFERENCES clients(client_id),
       provider_id UUID NOT NULL REFERENCES providers(provider_id),
       content TEXT NOT NULL,
       created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -272,18 +291,21 @@ async function createSchema(db: postgres.Sql): Promise<void> {
     VALUES ('Dr. Test', 'test@clinic.com', 'Medicina General', 'America/Argentina/Buenos_Aires')
     RETURNING provider_id
   `;
+  testSeed.provider_id = provider.provider_id;
 
   const [service] = await db`
     INSERT INTO services (provider_id, name, duration_minutes, buffer_minutes)
     VALUES (${provider.provider_id}, 'Consulta General', 30, 10)
     RETURNING service_id
   `;
+  testSeed.service_id = service.service_id;
 
-  const [patient] = await db`
-    INSERT INTO patients (name, email, phone)
-    VALUES ('Test Patient', 'patient@test.com', '+5491112345678')
-    RETURNING patient_id
+  const [client] = await db`
+    INSERT INTO clients (name, email, phone)
+    VALUES ('Test Client', 'client@test.com', '+5491112345678')
+    RETURNING client_id
   `;
+  testSeed.client_id = client.client_id;
 
   await db`
     INSERT INTO provider_schedules (provider_id, day_of_week, start_time, end_time)

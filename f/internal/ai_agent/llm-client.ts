@@ -28,7 +28,7 @@ const DEFAULT_OPENAI_MODEL = 'gpt-4o-mini';
 const DEFAULT_PROVIDER_ORDER = 'groq,groq2,openai';
 
 function getEnv(key: string, fallback: string): string {
-  try { if (typeof wmill !== 'undefined' && wmill.env[key] != null) return wmill.env[key]; } catch { /* wmill not available */ }
+  try { if (wmill?.env[key] != null) return wmill.env[key]; } catch { /* wmill not available */ }
   if (typeof process !== 'undefined' && process.env[key] != null) {
     const val = process.env[key];
     if (val != null) return val;
@@ -37,7 +37,7 @@ function getEnv(key: string, fallback: string): string {
 }
 
 function getEnvOptional(key: string): string | null {
-  try { if (typeof wmill !== 'undefined' && wmill.env[key] != null) return wmill.env[key]; } catch { /* wmill not available */ }
+  try { if (wmill?.env[key] != null) return wmill.env[key]; } catch { /* wmill not available */ }
   if (typeof process !== 'undefined' && process.env[key] != null) {
     const val = process.env[key];
     if (val != null && val !== '') return val;
@@ -63,6 +63,7 @@ const CONFIG = {
 
 import { cacheGet, cacheSet } from '../cache';
 import { INTENT } from './constants';
+import { LLMRawAPIResponseSchema } from './types';
 
 const MAX_RETRIES = 2;
 const BACKOFF_MS = 500;
@@ -202,20 +203,25 @@ async function callProvider(
     return [new Error(`LLM API error ${String(response.status)}: ${body}`), null];
   }
 
-  const data = await response.json() as {
-    readonly choices: readonly { readonly message: { readonly content: string } }[];
-    readonly usage?: { readonly prompt_tokens: number; readonly completion_tokens: number };
-  };
+  // Zod replaces the banned 'as {choices}' cast — validates the HTTP response
+  // structure before accessing any fields. Defense-in-depth: provider bugs
+  // (wrong Content-Type, empty choices array) are caught here, not at the
+  // callsite. LLMRawAPIResponseSchema is the SSOT in types.ts.
+  const rawJson = await response.json();
+  const apiParsed = LLMRawAPIResponseSchema.safeParse(rawJson);
+  if (!apiParsed.success) {
+    return [new Error(`LLM API malformed response: ${apiParsed.error.message}`), null];
+  }
 
-  const choice = data.choices[0];
+  const choice = apiParsed.data.choices[0];
   if (choice == null || choice.message.content === '') {
     return [new Error('LLM API returned empty response'), null];
   }
 
   return [null, {
     content: choice.message.content,
-    tokens_in: data.usage?.prompt_tokens ?? 0,
-    tokens_out: data.usage?.completion_tokens ?? 0,
+    tokens_in: apiParsed.data.usage?.prompt_tokens ?? 0,
+    tokens_out: apiParsed.data.usage?.completion_tokens ?? 0,
   }];
 }
 
@@ -289,18 +295,18 @@ function validateIntentSchema(parsed: Record<string, unknown>): [Error | null, b
 export async function callLLM(
   systemPrompt: string,
   userMessage: string,
-): Promise<LLMResponse> {
+): Promise<[Error | null, LLMResponse | null]> {
   // Check cache first
   const [cacheErr, cachedEntry] = await cacheGet(userMessage);
   if (cacheErr == null && cachedEntry != null) {
-    return {
+    return [null, {
       content: cachedEntry.response,
       provider: 'groq',
       tokens_in: 0,
       tokens_out: 0,
       latency_ms: 0,
       cached: true,
-    };
+    }];
   }
 
   const messages: readonly ChatMessage[] = [
@@ -365,9 +371,9 @@ export async function callLLM(
         }
       }
       void cacheSet(userMessage, res.content, 'unknown');
-      return res;
+      return [null, res];
     }
   }
 
-  throw new Error('No LLM provider configured (set OPENAI_API_KEY or GROQ_API_KEY)');
+  return [new Error('No LLM provider configured (set OPENAI_API_KEY or GROQ_API_KEY)'), null];
 }

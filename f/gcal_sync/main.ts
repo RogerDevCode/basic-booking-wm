@@ -9,6 +9,40 @@
  * Zod Schemas     : YES — InputSchema validates all inputs
  */
 
+/*
+ * REASONING TRACE
+ * ### Mission Decomposition
+ * - SELECT booking with provider/client/service details from DB
+ * - Build GCal event payload with description, attendees, reminders
+ * - Create GCal event for provider calendar via retryWithBackoff
+ * - Create GCal event for client calendar via retryWithBackoff
+ * - UPDATE booking with gcal_provider_event_id, gcal_client_event_id, gcal_sync_status
+ *
+ * ### Schema Verification
+ * - Tables: bookings (booking_id, provider_id, client_id, service_id, start_time, end_time,
+ *   gcal_provider_event_id, gcal_client_event_id, gcal_sync_status), providers (name, gcal_calendar_id),
+ *   clients (name, gcal_calendar_id), services (name, duration_minutes)
+ * - Columns: all verified in 003_complete_schema_overhaul.sql and 012_gcal_columns.sql
+ *
+ * ### Failure Mode Analysis
+ * - GCal API unavailable → retryWithBackoff exhausts 3 attempts, status set to 'partial' or 'failed'
+ * - Provider has no gcal_calendar_id → skip provider sync, mark 'partial'
+ * - Client has no gcal_calendar_id → skip client sync, mark 'partial'
+ * - Booking not found → error returned, no GCal call made
+ * - Script crashes between provider and client sync → gcal_reconcile cron retries
+ *
+ * ### Concurrency Analysis
+ * - Risk: NO — single booking read + sequential GCal calls, no locks needed
+ * - GCal API handles its own deduplication via event idempotency
+ *
+ * ### SOLID Compliance Check
+ * - SRP: only handles GCal sync, delegates retry to shared module — YES
+ * - DRY: uses retryWithBackoff from internal/retry — YES
+ * - KISS: sequential provider→client sync, no unnecessary parallelism — YES
+ *
+ * → CLEARED FOR CODE GENERATION
+ */
+
 // ============================================================================
 // GCal SYNC — Sync booking to Google Calendar (provider + client)
 // ============================================================================
@@ -22,9 +56,8 @@
 // ============================================================================
 
 import { z } from 'zod';
-import postgres from 'postgres';
 import { buildGCalEvent } from '../internal/gcal_utils/buildGCalEvent';
-import { retryWithBackoff } from '../internal/retry';
+import { retryWithBackoff, isPermanentError } from '../internal/retry';
 import { createDbClient } from '../internal/db/client';
 import { withTenantContext } from '../internal/tenant-context';
 
@@ -32,6 +65,7 @@ const InputSchema = z.object({
   booking_id: z.uuid(),
   action: z.enum(['create', 'update', 'delete']).default('create'),
   max_retries: z.number().int().min(1).max(5).default(3),
+  tenant_id: z.uuid().optional(),
 });
 
 export interface GCalSyncResult {
@@ -57,7 +91,7 @@ interface BookingRow {
   readonly service_name: string;
 }
 
-function isGCalEventResponse(data: Readonly<Record<string, unknown>>): data is GCalEventResponse {
+function isGCalEventResponse(data: Readonly<Record<string, unknown>>): boolean {
   return typeof data['id'] === 'string' && data['id'].length > 0;
 }
 
@@ -73,9 +107,6 @@ interface GCalAPIResult {
   readonly error?: string;
 }
 
-interface GCalEventResponse {
-  readonly id?: string;
-}
 
 async function callGCalAPI(
   method: string,
@@ -134,10 +165,11 @@ async function retryGCalOperation(
     return { ok: true, data: result.data };
   }
 
-  const errorObj = result.error !== null ? result.error : new Error('Unknown error');
+  const errorObj = !result.success ? result.error : new Error('Unknown error');
+  const isPermanent = !result.success && isPermanentError(result.error);
   return {
     ok: false,
-    error: result.isPermanent
+    error: isPermanent
       ? `GCal API permanent error: ${errorObj.message}`
       : errorObj.message,
   };
@@ -160,7 +192,12 @@ export async function main(
   }
 
   const sql = createDbClient({ url: dbUrl });
-  const tenantId = input.tenant_id ?? '00000000-0000-0000-0000-000000000000';
+  
+  // FAIL FAST: tenant_id is mandatory. No fallback to null UUID.
+  if (!input.tenant_id) {
+    return [new Error('tenant_id is required for tenant isolation'), null];
+  }
+  const tenantId = input.tenant_id;
 
   try {
     // STEP 1: Fetch booking details INSIDE transaction (short-lived)
@@ -191,17 +228,17 @@ export async function main(
       }
 
       const b: BookingRow = {
-        booking_id: bookingRow[0],
-        status: bookingRow[1],
-        start_time: bookingRow[2],
-        end_time: bookingRow[3],
-        gcal_provider_event_id: bookingRow[4],
-        gcal_client_event_id: bookingRow[5],
-        provider_name: bookingRow[6],
-        provider_calendar_id: bookingRow[7],
-        client_name: bookingRow[8],
-        client_calendar_id: bookingRow[9],
-        service_name: bookingRow[10],
+        booking_id:             bookingRow[0] ?? '',
+        status:                 bookingRow[1] ?? '',
+        start_time:             bookingRow[2] ?? '',
+        end_time:               bookingRow[3] ?? '',
+        gcal_provider_event_id: bookingRow[4] ?? null,
+        gcal_client_event_id:   bookingRow[5] ?? null,
+        provider_name:          bookingRow[6] ?? '',
+        provider_calendar_id:   bookingRow[7] ?? null,
+        client_name:            bookingRow[8] ?? '',
+        client_calendar_id:     bookingRow[9] ?? null,
+        service_name:           bookingRow[10] ?? '',
       };
 
       return [null, b];
@@ -272,7 +309,7 @@ export async function main(
         );
 
         if (providerResult.ok && providerResult.data !== undefined && isGCalEventResponse(providerResult.data)) {
-          providerEventId = providerResult.data.id ?? null;
+          providerEventId = (providerResult.data as Record<string, unknown>)['id'] as string | null ?? null;
         } else {
           errors.push(`Provider event failed: ${providerResult.error ?? 'Unknown error'}`);
         }
@@ -302,7 +339,7 @@ export async function main(
         );
 
         if (clientResult.ok && clientResult.data !== undefined && isGCalEventResponse(clientResult.data)) {
-          clientEventId = clientResult.data.id ?? null;
+          clientEventId = (clientResult.data as Record<string, unknown>)['id'] as string | null ?? null;
         } else {
           errors.push(`Client event failed: ${clientResult.error ?? 'Unknown error'}`);
         }

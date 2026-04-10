@@ -21,9 +21,9 @@ describe('AI Agent v2.0 - Enhanced Availability Context', () => {
       const result = await main(input);
       
       expect(result.success).toBe(true);
-      expect(result.data?.intent).toBe('urgent_care');
+      expect(result.data?.intent).toBe('urgencia');
       expect(result.data?.context.is_urgent).toBe(true);
-      expect(result.data?.suggested_response_type).toBe('urgent_options');
+      expect(result.data?.dialogue_act).toBe('offer');
       expect(result.data?.confidence).toBeGreaterThan(0.7);
     });
     
@@ -35,7 +35,7 @@ describe('AI Agent v2.0 - Enhanced Availability Context', () => {
       
       const result = await main(input);
       
-      expect(result.data?.intent).toBe('urgent_care');
+      expect(result.data?.intent).toBe('urgencia');
       expect(result.data?.context.is_urgent).toBe(true);
     });
     
@@ -48,7 +48,7 @@ describe('AI Agent v2.0 - Enhanced Availability Context', () => {
       const result = await main(input);
       
       // La urgencia debe priorizarse sobre el booking
-      expect(result.data?.intent).toBe('urgent_care');
+      expect(result.data?.intent).toBe('urgencia');
       expect(result.data?.context.is_urgent).toBe(true);
       expect(result.data?.context.is_today).toBe(true);
     });
@@ -127,7 +127,7 @@ describe('AI Agent v2.0 - Enhanced Availability Context', () => {
       const result = await main(input);
       
       expect(result.data?.context.is_flexible).toBe(true);
-      expect(result.data?.suggested_response_type).toBe('general_search');
+      expect(result.data?.dialogue_act).toBe('offer');
     });
     
     test('Debe detectar flexibilidad con "lo que conviene"', async () => {
@@ -246,7 +246,7 @@ describe('AI Agent v2.0 - Enhanced Availability Context', () => {
       
       const result = await main(input);
       
-      expect(result.data?.suggested_response_type).toBe('urgent_options');
+      expect(result.data?.dialogue_act).toBe('offer');
     });
     
     test('Debe sugerir "no_availability_today" para hoy', async () => {
@@ -257,7 +257,7 @@ describe('AI Agent v2.0 - Enhanced Availability Context', () => {
       
       const result = await main(input);
       
-      expect(result.data?.suggested_response_type).toBe('no_availability_today');
+      expect(result.data?.dialogue_act).toBe('inform');
     });
     
     test('Debe sugerir "availability_list" para fecha específica', async () => {
@@ -268,7 +268,7 @@ describe('AI Agent v2.0 - Enhanced Availability Context', () => {
       
       const result = await main(input);
       
-      expect(result.data?.suggested_response_type).toBe('availability_list');
+      expect(result.data?.dialogue_act).toBe('inform');
     });
     
     test('Debe sugerir "general_search" para búsqueda flexible', async () => {
@@ -279,7 +279,7 @@ describe('AI Agent v2.0 - Enhanced Availability Context', () => {
       
       const result = await main(input);
       
-      expect(result.data?.suggested_response_type).toBe('general_search');
+      expect(result.data?.dialogue_act).toBe('offer');
     });
     
     test('Debe sugerir "filtered_search" con preferencias', async () => {
@@ -290,7 +290,7 @@ describe('AI Agent v2.0 - Enhanced Availability Context', () => {
       
       const result = await main(input);
       
-      expect(result.data?.suggested_response_type).toBe('filtered_search');
+      expect(result.data?.dialogue_act).toBe('offer');
     });
     
     test('Debe sugerir "clarifying_question" si faltan datos', async () => {
@@ -301,7 +301,7 @@ describe('AI Agent v2.0 - Enhanced Availability Context', () => {
       
       const result = await main(input);
       
-      expect(result.data?.suggested_response_type).toBe('clarifying_question');
+      expect(result.data?.dialogue_act).toBe('question');
       expect(result.data?.needs_more_info).toBe(true);
     });
   });
@@ -337,7 +337,7 @@ describe('AI Agent v2.0 - Enhanced Availability Context', () => {
       expect(result.data?.ai_response).toContain('mañana');
     });
     
-    test('Debe generar respuesta con follow_up_question cuando necesita más info', async () => {
+    test('Debe generar respuesta con follow_up cuando necesita más info', async () => {
       const input: AIAgentInput = {
         chat_id: '123456',
         text: 'Quiero agendar una cita'
@@ -346,8 +346,8 @@ describe('AI Agent v2.0 - Enhanced Availability Context', () => {
       const result = await main(input);
       
       expect(result.data?.needs_more_info).toBe(true);
-      expect(result.data?.follow_up_question).toBeDefined();
-      expect(result.data?.follow_up_question?.length).toBeGreaterThan(10);
+      expect(result.data?.follow_up).toBeDefined();
+      expect(result.data?.follow_up?.length).toBeGreaterThan(10);
     });
     
     test('Debe generar respuesta de greeting apropiada', async () => {
@@ -360,7 +360,7 @@ describe('AI Agent v2.0 - Enhanced Availability Context', () => {
       
       expect(result.data?.ai_response).toContain('👋');
       expect(result.data?.ai_response).toContain('Hola');
-      expect(result.data?.intent).toBe('greeting');
+      expect(result.data?.intent).toBe('saludo');
     });
   });
   
@@ -528,10 +528,10 @@ describe('AI Agent v2.0 - Enhanced Availability Context', () => {
       const result = await main(input);
       
       // Verificar detección correcta
-      expect(result.data?.intent).toBe('urgent_care');
+      expect(result.data?.intent).toBe('urgencia');
       expect(result.data?.context.is_urgent).toBe(true);
       expect(result.data?.context.is_today).toBe(true);
-      expect(result.data?.suggested_response_type).toBe('urgent_options');
+      expect(result.data?.dialogue_act).toBe('offer');
       
       // Verificar respuesta útil
       expect(result.data?.ai_response).toContain('urgente');
@@ -546,9 +546,9 @@ describe('AI Agent v2.0 - Enhanced Availability Context', () => {
       
       const result = await main(input);
       
-      expect(result.data?.intent).toBe('create_appointment');
+      expect(result.data?.intent).toBe('crear_cita');
       expect(result.data?.context.is_flexible).toBe(true);
-      expect(result.data?.suggested_response_type).toBe('general_search');
+      expect(result.data?.dialogue_act).toBe('offer');
       expect(result.data?.needs_more_info).toBe(true);
     });
     
@@ -562,7 +562,7 @@ describe('AI Agent v2.0 - Enhanced Availability Context', () => {
       
       expect(result.data?.context.day_preference).toBe('tuesday');
       expect(result.data?.context.time_preference).toBe('afternoon');
-      expect(result.data?.suggested_response_type).toBe('filtered_search');
+      expect(result.data?.dialogue_act).toBe('offer');
     });
     
     test('Escenario: Reagendamiento', async () => {
@@ -573,10 +573,10 @@ describe('AI Agent v2.0 - Enhanced Availability Context', () => {
       
       const result = await main(input);
       
-      expect(result.data?.intent).toBe('reschedule');
-      expect(result.data?.suggested_response_type).toBe('reschedule_flow');
+      expect(result.data?.intent).toBe('reagendar');
+      expect(result.data?.dialogue_act).toBe('request_action');
       expect(result.data?.needs_more_info).toBe(true);
-      expect(result.data?.follow_up_question).toContain('reserva actual');
+      expect(result.data?.follow_up).toContain('reserva actual');
     });
   });
 
@@ -594,7 +594,7 @@ describe('AI Agent v2.0 - Enhanced Availability Context', () => {
       const result = await main(input);
       
       expect(result.success).toBe(true);
-      expect(result.data?.intent).toBe('activate_reminders');
+      expect(result.data?.intent).toBe('activar_recordatorios');
     });
 
     test('Debe detectar deactivate_reminders', async () => {
@@ -606,7 +606,7 @@ describe('AI Agent v2.0 - Enhanced Availability Context', () => {
       const result = await main(input);
       
       expect(result.success).toBe(true);
-      expect(result.data?.intent).toBe('deactivate_reminders');
+      expect(result.data?.intent).toBe('desactivar_recordatorios');
     });
 
     test('Debe detectar reminder_preferences', async () => {
@@ -618,7 +618,7 @@ describe('AI Agent v2.0 - Enhanced Availability Context', () => {
       const result = await main(input);
       
       expect(result.success).toBe(true);
-      expect(result.data?.intent).toBe('reminder_preferences');
+      expect(result.data?.intent).toBe('preferencias_recordatorio');
     });
 
     test('Debe extraer canal de notificación', async () => {
@@ -654,7 +654,7 @@ describe('AI Agent v2.0 - Enhanced Availability Context', () => {
       const result = await main(input);
       
       expect(result.success).toBe(true);
-      expect(result.data?.suggested_response_type).toBe('activate_reminders_response');
+      expect(result.data?.dialogue_act).toBe('confirm');
       expect(result.data?.ai_response).toContain('recordatorio');
     });
 
@@ -667,7 +667,7 @@ describe('AI Agent v2.0 - Enhanced Availability Context', () => {
       const result = await main(input);
       
       expect(result.success).toBe(true);
-      expect(result.data?.suggested_response_type).toBe('deactivate_reminders_response');
+      expect(result.data?.dialogue_act).toBe('confirm');
     });
 
     test('Debe generar respuesta con follow_up para reminder_preferences', async () => {
@@ -679,7 +679,7 @@ describe('AI Agent v2.0 - Enhanced Availability Context', () => {
       const result = await main(input);
       
       expect(result.success).toBe(true);
-      expect(result.data?.suggested_response_type).toBe('reminder_preferences_response');
+      expect(result.data?.dialogue_act).toBe('question');
       expect(result.data?.needs_more_info).toBe(true);
     });
   });

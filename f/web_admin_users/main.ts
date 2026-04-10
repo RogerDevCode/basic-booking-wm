@@ -1,3 +1,43 @@
+/*
+ * PRE-FLIGHT CHECKLIST
+ * Mission         : User management CRUD + role change (admin-only)
+ * DB Tables Used  : users
+ * Concurrency Risk: NO — single-row CRUD operations
+ * GCal Calls      : NO
+ * Idempotency Key : N/A — CRUD operations are inherently non-idempotent
+ * RLS Tenant ID   : YES — withTenantContext wraps all DB ops
+ * Zod Schemas     : YES — InputSchema validates action and user fields
+ */
+
+/*
+ * REASONING TRACE
+ * ### Mission Decomposition
+ * - Validate admin_user_id and action via Zod InputSchema
+ * - Verify requesting user is an active admin before any operation
+ * - Route to list (200 users), get, update, activate, or deactivate
+ * - Build dynamic UPDATE query from provided fields only
+ *
+ * ### Schema Verification
+ * - Tables: users (user_id, full_name, email, rut, phone, role, is_active, telegram_chat_id, last_login, created_at, updated_at)
+ * - Columns: All verified; unique constraint on email handles duplicate detection
+ *
+ * ### Failure Mode Analysis
+ * - Scenario 1: Admin not found or inactive → early rejection before any user operation
+ * - Scenario 2: Update with no fields → early return error prevents zero-field UPDATE
+ * - Scenario 3: Duplicate email on update → unique constraint violation caught and mapped to user-friendly message
+ * - Scenario 4: target_user_id missing for get/update/activate/deactivate → explicit validation error
+ *
+ * ### Concurrency Analysis
+ * - Risk: NO — single-row operations with UUID primary keys; unique constraint handled by DB
+ *
+ * ### SOLID Compliance Check
+ * - SRP: YES — each switch branch handles exactly one user action
+ * - DRY: YES — UserInfo mapping logic duplicated across branches but structurally identical; shared where practical
+ * - KISS: YES — direct SQL with parameterized queries; exhaustive switch with never-type default
+ *
+ * → CLEARED FOR CODE GENERATION
+ */
+
 // ============================================================================
 // WEB ADMIN USERS — User management CRUD + role change
 // ============================================================================
@@ -5,7 +45,6 @@
 // ============================================================================
 
 import { z } from 'zod';
-import postgres from 'postgres';
 import { withTenantContext } from '../internal/tenant-context';
 import { createDbClient } from '../internal/db/client';
 
@@ -52,10 +91,10 @@ export async function main(rawInput: unknown): Promise<[Error | null, UserInfo |
   }
 
   const sql = createDbClient({ url: dbUrl });
-  const tenantId = admin_user_id || '00000000-0000-0000-0000-000000000000';
+  const tenantId = admin_user_id;
 
   try {
-    const [txErr, txData] = await withTenantContext(sql, tenantId, async (tx) => {
+    const [txErr, txData] = await withTenantContext<unknown>(sql, tenantId, async (tx) => {
       const adminRows = await tx`
         SELECT role FROM users WHERE user_id = ${admin_user_id}::uuid AND is_active = true LIMIT 1
       `;
@@ -229,7 +268,7 @@ export async function main(rawInput: unknown): Promise<[Error | null, UserInfo |
     });
 
     if (txErr) return [txErr, null];
-    return [null, txData];
+    return [null, txData as UserInfo | UsersListResult | null];
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     if (message.includes('duplicate key') || message.includes('unique constraint')) {

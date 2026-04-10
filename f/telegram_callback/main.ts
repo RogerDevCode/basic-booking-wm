@@ -1,3 +1,45 @@
+/*
+ * PRE-FLIGHT CHECKLIST
+ * Mission         : Handle Telegram inline keyboard button actions (confirm, cancel, reschedule)
+ * DB Tables Used  : bookings, booking_audit, providers, clients, services
+ * Concurrency Risk: YES — booking state transitions with SELECT FOR UPDATE
+ * GCal Calls      : NO — marks bookings for GCal sync update
+ * Idempotency Key : N/A — callback actions are inherently non-idempotent
+ * RLS Tenant ID   : YES — withTenantContext wraps all DB ops
+ * Zod Schemas     : YES — InputSchema validates callback_data format
+ */
+
+/*
+ * REASONING TRACE
+ * ### Mission Decomposition
+ * - Validate callback query input (callback_query_id, callback_data, chat_id)
+ * - Parse callback_data format "act:BID" into action code and booking_id
+ * - Route to appropriate handler: confirm, cancel, reschedule, activate/deactivate reminders, acknowledge
+ * - For DB mutations: update booking status, insert audit log, update reminder preferences
+ * - Respond to Telegram with inline answer and optional follow-up message
+ *
+ * ### Schema Verification
+ * - Tables: bookings, booking_audit, clients
+ * - Columns: bookings (booking_id, status, client_id, start_time, end_time, cancelled_by, updated_at), booking_audit (booking_id, from_status, to_status, changed_by, actor_id, reason), clients (metadata for reminder_preferences) — booking_audit columns inferred from code
+ *
+ * ### Failure Mode Analysis
+ * - Scenario 1: Invalid callback_data format → answerCallbackQuery with error, no DB interaction
+ * - Scenario 2: Booking already in terminal state → SELECT filters it out, returns "not found" error
+ * - Scenario 3: Client mismatch on booking → unauthorized error returned, no state change
+ * - Scenario 4: Telegram API call fails → logged to stderr, does not prevent DB operation success
+ *
+ * ### Concurrency Analysis
+ * - Risk: YES — same booking could receive concurrent callback actions (e.g., confirm + cancel)
+ * - Lock strategy: Status checks use WHERE status NOT IN terminal states; GIST exclusion and state machine transitions prevent double-state changes
+ *
+ * ### SOLID Compliance Check
+ * - SRP: YES — confirmBooking, updateBookingStatus, updateReminderPreferences each handle one mutation
+ * - DRY: YES — answerCallbackQuery and sendFollowUpMessage share similar fetch patterns but differ in payload
+ * - KISS: YES — switch-based action routing with dedicated helper functions is the simplest correct approach
+ *
+ * → CLEARED FOR CODE GENERATION
+ */
+
 // ============================================================================
 // TELEGRAM CALLBACK HANDLER — Inline Button Action Processor
 // ============================================================================
@@ -99,7 +141,7 @@ async function sendFollowUpMessage(
 }
 
 async function updateBookingStatus(
-  tx: postgres.TransactionSql,
+  tx: postgres.Sql,
   bookingId: string,
   newStatus: string,
   clientId: string | undefined,
@@ -141,7 +183,7 @@ async function updateBookingStatus(
 }
 
 async function updateReminderPreferences(
-  tx: postgres.TransactionSql,
+  tx: postgres.Sql,
   clientId: string,
   activate: boolean
 ): Promise<[Error | null, boolean]> {
@@ -164,7 +206,7 @@ async function updateReminderPreferences(
 }
 
 async function confirmBooking(
-  tx: postgres.TransactionSql,
+  tx: postgres.Sql,
   bookingId: string,
   clientId: string | undefined
 ): Promise<[Error | null, boolean]> {
@@ -220,7 +262,12 @@ export async function main(rawInput: unknown): Promise<[Error | null, Record<str
   }
 
   const { action, booking_id } = parsedCallback;
-  const tenantId = input.client_id || input.user_id || '00000000-0000-0000-0000-000000000000';
+  // FAIL FAST: require explicit tenant context. No fallback to null UUID.
+  const tenantId = input.client_id ?? input.user_id;
+  if (!tenantId) {
+    await answerCallbackQuery(botToken, input.callback_query_id, '⚠️ Error: no se pudo identificar tu cuenta. Contacta a soporte.');
+    return [new Error('tenant_id could not be determined from callback context'), null];
+  }
 
   let responseText = '';
   let followUpText: string | null = null;
@@ -247,8 +294,7 @@ export async function main(rawInput: unknown): Promise<[Error | null, Record<str
         followUpText = 'Tu cita ha sido cancelada exitosamente. Si deseas reagendar, escribe "quiero agendar una cita".';
       } else {
         responseText = '❌ No se pudo cancelar';
-        const errorMsg = txErr?.message?.replace(/([_*[()~`>#+=|{}.!\\])/g, '\\$1') ?? 'Desconocido';
-        followUpText = `No pudimos cancelar tu cita. Motivo: ${errorMsg}. Contacta a soporte si necesitas ayuda.`;
+        followUpText = 'No pudimos cancelar tu cita. La cita no existe o ya fue modificada. Contacta a soporte.';
       }
       break;
     }
@@ -274,8 +320,7 @@ export async function main(rawInput: unknown): Promise<[Error | null, Record<str
         followUpText = 'Tu cita ha sido confirmada. ¡Te esperamos!';
       } else {
         responseText = '❌ No se pudo confirmar';
-        const errorMsg = txErr?.message?.replace(/([_*[()~`>#+=|{}.!\\])/g, '\\$1') ?? 'Desconocido';
-        followUpText = `No pudimos confirmar tu cita. Motivo: ${errorMsg}. Contacta a soporte si necesitas ayuda.`;
+        followUpText = 'No pudimos confirmar tu cita. La cita no existe o ya fue modificada. Contacta a soporte.';
       }
       break;
     }
@@ -299,7 +344,7 @@ export async function main(rawInput: unknown): Promise<[Error | null, Record<str
         return [new Error('PATIENT_ID not available'), null];
       }
 
-      const activeTenantId = tenantId !== '00000000-0000-0000-0000-000000000000' ? tenantId : effectiveClientId;
+      const activeTenantId = tenantId;
 
       const sql = createDbClient({ url: dbUrl });
       const [txErr, success] = await withTenantContext(sql, activeTenantId, async (tx) => {
@@ -333,7 +378,7 @@ export async function main(rawInput: unknown): Promise<[Error | null, Record<str
         return [new Error('PATIENT_ID not available'), null];
       }
 
-      const activeTenantId = tenantId !== '00000000-0000-0000-0000-000000000000' ? tenantId : effectiveClientId;
+      const activeTenantId = tenantId;
 
       const sql = createDbClient({ url: dbUrl });
       const [txErr, success] = await withTenantContext(sql, activeTenantId, async (tx) => {

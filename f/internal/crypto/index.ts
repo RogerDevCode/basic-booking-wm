@@ -47,7 +47,7 @@ export async function verifyPassword(plain: string, hash: string): Promise<boole
 
 const READABLE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // No I, O, 0, 1
 
-export function generateReadablePassword(length: number = 4): string {
+export function generateReadablePassword(length = 4): string {
   const bytes = randomBytes(length);
   let result = '';
   for (let i = 0; i < length; i++) {
@@ -76,7 +76,8 @@ export function validatePasswordPolicy(plain: string): PasswordPolicyResult {
   if (!/[A-Z]/.test(plain)) errors.push('At least one uppercase letter');
   if (!/[a-z]/.test(plain)) errors.push('At least one lowercase letter');
   if (!/[0-9]/.test(plain)) errors.push('At least one digit');
-  if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(plain)) errors.push('At least one special character');
+  // no-useless-escape: \[ is required inside char class for literal ]
+  if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(plain)) errors.push('At least one special character');
 
   // Check for common weak patterns
   if (/^(.)\1+$/.test(plain)) errors.push('Password cannot be all same character');

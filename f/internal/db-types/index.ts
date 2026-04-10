@@ -238,9 +238,11 @@ export function validateBookingRow(row: Readonly<Record<string, unknown>>): Book
 
   const gcalSyncStatus = isGCalSyncStatus(row['gcal_sync_status']) ? row['gcal_sync_status'] : 'pending';
 
-  const reminderPrefs = typeof row['reminder_preferences'] === 'object' && row['reminder_preferences'] !== null
-    ? row['reminder_preferences']
-    : null;
+  const reminderPrefsRaw = row['reminder_preferences'];
+  const reminderPrefs: Readonly<Record<string, unknown>> | null =
+    typeof reminderPrefsRaw === 'object' && reminderPrefsRaw !== null && !Array.isArray(reminderPrefsRaw)
+      ? reminderPrefsRaw as Readonly<Record<string, unknown>>
+      : null;
 
   return {
     booking_id: bookingUuid,

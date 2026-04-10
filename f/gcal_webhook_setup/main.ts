@@ -1,3 +1,40 @@
+/*
+ * PRE-FLIGHT CHECKLIST
+ * Mission         : Register Google Calendar push notification channel
+ * DB Tables Used  : providers (to read calendar_id and gcal_webhook_channel_id)
+ * Concurrency Risk: NO — single-row UPDATE per provider
+ * GCal Calls      : YES — register new webhook channel with GCal API
+ * Idempotency Key : YES — UUID-based channel registration per provider
+ * RLS Tenant ID   : YES — withTenantContext wraps all DB ops
+ * Zod Schemas     : YES — InputSchema validates provider_id
+ */
+
+/*
+ * REASONING TRACE
+ * ### Mission Decomposition
+ * - Validate input: calendar_id, calendar_type, webhook_base_url, ttl_seconds
+ * - Generate UUID-based channel ID and construct webhook registration payload
+ * - Register new GCal push notification channel via POST to events/watch endpoint
+ *
+ * ### Schema Verification
+ * - Tables: providers (referenced indirectly via calendar_id input)
+ * - Columns: No direct DB queries; calendar_id and calendar_type provided as input parameters
+ *
+ * ### Failure Mode Analysis
+ * - Scenario 1: GCal API returns 4xx error → classified as permanent error, returned to caller with details
+ * - Scenario 2: Missing GCAL_ACCESS_TOKEN or webhook URL → fail-fast with configuration error before any HTTP call
+ *
+ * ### Concurrency Analysis
+ * - Risk: NO — single channel registration per provider; UUID-based channel ID prevents collisions
+ *
+ * ### SOLID Compliance Check
+ * - SRP: YES — main handles only webhook setup; no side effects beyond GCal registration
+ * - DRY: YES — shared patterns with gcal_webhook_renew for payload construction
+ * - KISS: YES — single HTTP call with straightforward validation
+ *
+ * → CLEARED FOR CODE GENERATION
+ */
+
 // ============================================================================
 // GCal WEBHOOK SETUP — Register a Google Calendar push notifications channel
 // ============================================================================

@@ -1,3 +1,40 @@
+/*
+ * PRE-FLIGHT CHECKLIST
+ * Mission         : Process incoming Google Calendar push notifications
+ * DB Tables Used  : bookings, providers, clients
+ * Concurrency Risk: YES — webhook events may arrive concurrently
+ * GCal Calls      : YES — fetch changed events from GCal API
+ * Idempotency Key : YES — GCal sync by booking_id is idempotent
+ * RLS Tenant ID   : YES — withTenantContext wraps all DB ops
+ * Zod Schemas     : YES — InputSchema validates webhook payload structure
+ */
+
+/*
+ * REASONING TRACE
+ * ### Mission Decomposition
+ * - Validate incoming GCal webhook POST payload and extract channel ID from headers
+ * - Match channel ID to provider's gcal_calendar_id to identify target calendar
+ * - Fetch changed events from GCal API and reconcile with DB bookings by parsing booking IDs from event descriptions
+ *
+ * ### Schema Verification
+ * - Tables: bookings, providers, system_config
+ * - Columns: providers(provider_id, gcal_calendar_id); bookings (matched via description parsing); system_config(config_key, config_value, updated_at) for storing sync tokens — system_config columns verified from query usage
+ *
+ * ### Failure Mode Analysis
+ * - Scenario 1: Unknown channel ID → acknowledged response with 'Unknown channel' reason; no error thrown
+ * - Scenario 2: GCal API returns 410 (gone) due to expired sync token → recursive retry with null syncToken to perform full sync
+ *
+ * ### Concurrency Analysis
+ * - Risk: YES — webhook events may arrive concurrently for same calendar; mitigated by idempotent event processing (matching by booking_id) and UPSERT on system_config sync token
+ *
+ * ### SOLID Compliance Check
+ * - SRP: YES — fetchCalendarEvents handles only GCal HTTP fetch; main handles validation, routing, and reconciliation
+ * - DRY: YES — single isGCalEventsResponse type guard; shared GCAL_BASE constant
+ * - KISS: YES — linear processing pipeline; no over-engineered event routing
+ *
+ * → CLEARED FOR CODE GENERATION
+ */
+
 // ============================================================================
 // GCal WEBHOOK RECEIVER — Process incoming Google Calendar push notifications
 // ============================================================================
@@ -7,7 +44,6 @@
 // ============================================================================
 
 import { z } from 'zod';
-import postgres from 'postgres';
 import { withTenantContext } from '../internal/tenant-context';
 import { createDbClient } from '../internal/db/client';
 
@@ -113,7 +149,7 @@ export async function main(rawInput: unknown): Promise<[Error | null, WebhookRes
       return [new Error('Missing X-Goog-Channel-Id header'), null];
     }
 
-    const tenantId = channelId || '00000000-0000-0000-0000-000000000000';
+    const tenantId = channelId;
 
     const [txErr, txData] = await withTenantContext(sql, tenantId, async (tx) => {
       const providerRows = await tx.values<[string, string | null][]>`
@@ -137,17 +173,18 @@ export async function main(rawInput: unknown): Promise<[Error | null, WebhookRes
       if (calendarId == null) {
         return [null, { acknowledged: true, reason: 'No calendar configured' }];
       }
-      const result = await fetchCalendarEvents(calendarId, accessToken, null);
-      if (result.error !== null) {
-        return [new Error('GCal fetch error: ' + result.error), null];
+      const fetchResult = await fetchCalendarEvents(calendarId, accessToken, null);
+      if (fetchResult.error !== null) {
+        return [new Error('GCal fetch error: ' + fetchResult.error), null];
       }
 
       const changes: { booking_id: string | null; event_id: string; status: string; action: string }[] = [];
+      const events = fetchResult.events ?? [];
 
-      for (const event of result.events) {
+      for (const event of events) {
         const eventId = typeof event.id === 'string' ? event.id : '';
         const status = typeof event.status === 'string' ? event.status : 'confirmed';
-        const description = typeof event.description === 'string' ? event.description : '';
+        const description = typeof (event as Record<string, unknown>)['description'] === 'string' ? (event as Record<string, unknown>)['description'] as string : '';
 
         const match = /ID de cita:\s*`?([0-9a-f-]+)`?/i.exec(description);
         const bookingId: string | null = match?.[1] ?? null;
@@ -159,17 +196,17 @@ export async function main(rawInput: unknown): Promise<[Error | null, WebhookRes
         }
       }
 
-      if (result.nextSyncToken !== null) {
+      if (fetchResult.nextSyncToken !== null && fetchResult.nextSyncToken !== undefined) {
         const configKey = 'gcal_sync_token_' + channelId;
         await tx`
           INSERT INTO system_config (config_key, config_value)
-          VALUES (${configKey}, ${JSON.stringify({ token: result.nextSyncToken, updated_at: new Date().toISOString() })}::jsonb)
+          VALUES (${configKey}, ${JSON.stringify({ token: fetchResult.nextSyncToken, updated_at: new Date().toISOString() })}::jsonb)
           ON CONFLICT (config_key) DO UPDATE SET config_value = EXCLUDED.config_value, updated_at = NOW()
         `;
       }
 
-      const result: WebhookResult = { acknowledged: true, changes_count: changes.length, changes };
-      return [null, result];
+      const webhookResult: WebhookResult = { acknowledged: true, changes_count: changes.length, changes };
+      return [null, webhookResult];
     });
 
     if (txErr !== null) return [txErr, null];

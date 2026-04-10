@@ -214,25 +214,78 @@ function detectContext(text: string, entities: EntityMap): AvailabilityContext {
 // ============================================================================
 
 function suggestResponseType(intent: IntentType, context: AvailabilityContext, entities: EntityMap): string {
-  if (intent === INTENT.URGENT_CARE) return 'urgent_options';
-  if (intent === INTENT.RESCHEDULE) return 'reschedule_flow';
-  if (intent === INTENT.CHECK_AVAILABILITY) {
+  if (intent === INTENT.URGENCIA) return 'urgent_options';
+  if (intent === INTENT.REAGENDAR) return 'reschedule_flow';
+  if (intent === INTENT.CONSULTAR_DISPONIBILIDAD) {
     if (context.is_today) return 'no_availability_today';
     if (context.is_specific_date && context.day_preference != null) return 'filtered_search';
     if (context.is_specific_date) return 'availability_list';
     if (context.is_flexible) return 'general_search';
     return 'filtered_search';
   }
-  if (intent === INTENT.CREATE_APPOINTMENT) {
+  if (intent === INTENT.CREAR_CITA) {
     if (context.is_flexible) return 'general_search';
     if (entities.date == null || entities.time == null) return 'clarifying_question';
     return 'booking_confirmation';
   }
-  if (intent === INTENT.ACTIVATE_REMINDERS) return 'activate_reminders_response';
-  if (intent === INTENT.DEACTIVATE_REMINDERS) return 'deactivate_reminders_response';
-  if (intent === INTENT.REMINDER_PREFERENCES) return 'reminder_preferences_response';
-  if (intent === INTENT.GET_MY_BOOKINGS) return 'my_bookings_response';
+  if (intent === INTENT.ACTIVAR_RECORDATORIOS) return 'activate_reminders_response';
+  if (intent === INTENT.DESACTIVAR_RECORDATORIOS) return 'deactivate_reminders_response';
+  if (intent === INTENT.PREFERENCIAS_RECORDATORIO) return 'reminder_preferences_response';
+  if (intent === INTENT.VER_MIS_CITAS) return 'my_bookings_response';
   return 'standard_response';
+}
+
+// ── Dialogue Act & UI Component Mapping (ISO 22446) ──────────────────────
+
+function mapToDialogueAndUI(
+  suggestedType: string,
+  intent: IntentType,
+): { readonly dialogue_act: IntentResult['dialogue_act']; readonly ui_component: IntentResult['ui_component'] } {
+  switch (suggestedType) {
+    case 'urgent_options':
+      return { dialogue_act: "offer", ui_component: "warning_card" };
+    case 'reschedule_flow':
+      return { dialogue_act: "request_action", ui_component: "form_card" };
+    case 'no_availability_today':
+      return { dialogue_act: "inform", ui_component: "text_message" };
+    case 'availability_list':
+    case 'my_bookings_response':
+      return { dialogue_act: "inform", ui_component: "list_card" };
+    case 'general_search':
+    case 'filtered_search':
+      return { dialogue_act: "offer", ui_component: "quick_replies" };
+    case 'clarifying_question':
+      return { dialogue_act: "question", ui_component: "text_message" };
+    case 'booking_confirmation':
+      return { dialogue_act: "confirm", ui_component: "confirmation_card" };
+    case 'activate_reminders_response':
+    case 'deactivate_reminders_response':
+      return { dialogue_act: "confirm", ui_component: "text_message" };
+    case 'reminder_preferences_response':
+      return { dialogue_act: "question", ui_component: "quick_replies" };
+    default:
+      if (intent === INTENT.DESPEDIDA) return { dialogue_act: "close", ui_component: "text_message" };
+      if (intent === INTENT.SALUDO) return { dialogue_act: "acknowledge", ui_component: "text_message" };
+      return { dialogue_act: "inform", ui_component: "text_message" };
+  }
+}
+
+// ── Escalation Level (thresholds explícitos) ─────────────────────────────
+
+function determineEscalationLevel(
+  intent: IntentType,
+  text: string,
+  confidence: number,
+): IntentResult['escalation_level'] {
+  const lower = text.toLowerCase();
+  if (intent === INTENT.URGENCIA && confidence >= 0.8) {
+    if (/muerte|morir|no respiro|infarto|desmay|sangr|convul|paro|dolor.*pecho|dificultad.*respir|no puedo.*respir/.test(lower)) {
+      return 'medical_emergency';
+    }
+  }
+  if (intent === INTENT.URGENCIA && confidence < 0.6) return 'priority_queue';
+  if (confidence < 0.4 && intent !== INTENT.SALUDO && intent !== INTENT.DESPEDIDA && intent !== INTENT.AGRADECIMIENTO) return 'human_handoff';
+  return 'none';
 }
 
 function generateAIResponse(
@@ -245,7 +298,7 @@ function generateAIResponse(
   
   const welcome = userProfile?.is_first_time ? "¡Bienvenido! " : "Hola de nuevo. ";
 
-  if (intent === INTENT.GREETING) {
+  if (intent === INTENT.SALUDO) {
     if (userProfile?.is_first_time) {
       return {
         aiResponse: "👋 ¡Bienvenido! Es tu primera vez aquí. Soy tu asistente médico. ¿En qué puedo ayudarte?",
@@ -267,7 +320,7 @@ function generateAIResponse(
     };
   }
 
-  if (intent === INTENT.URGENT_CARE) {
+  if (intent === INTENT.URGENCIA) {
     return {
       aiResponse: "🚨 Entiendo que es una situación urgente. He localizado 2 espacios prioritarios para hoy mismo. Lista de espera activada.",
       needsMoreInfo: false,
@@ -275,7 +328,7 @@ function generateAIResponse(
     };
   }
 
-  if (intent === INTENT.RESCHEDULE) {
+  if (intent === INTENT.REAGENDAR) {
     return {
       aiResponse: "Puedo ayudarte a cambiar tu cita. Consultaré el sistema para ver las opciones de reagendamiento.",
       needsMoreInfo: true,
@@ -372,28 +425,28 @@ function detectIntentRules(text: string): { readonly intent: IntentType; readonl
   const hasMedicalUrgency = medicalUrgencyPatterns.some(w => lower.includes(w));
   // Exclude non-medical contexts
   const hasNonMedicalContext = lower.includes('emergencia familiar') || lower.includes('emergencia laboral');
-  if (hasMedicalUrgency && !hasNonMedicalContext) return { intent: INTENT.URGENT_CARE, confidence: 0.9 };
+  if (hasMedicalUrgency && !hasNonMedicalContext) return { intent: INTENT.URGENCIA, confidence: 0.9 };
   
   // Reminder intents — check before general keywords (multi-word phrases first)
   const reminderLower = lower.trim();
-  const activateKw = INTENT_KEYWORDS[INTENT.ACTIVATE_REMINDERS]?.keywords ?? [];
-  const deactivateKw = INTENT_KEYWORDS[INTENT.DEACTIVATE_REMINDERS]?.keywords ?? [];
-  const prefKw = INTENT_KEYWORDS[INTENT.REMINDER_PREFERENCES]?.keywords ?? [];
+  const activateKw = INTENT_KEYWORDS[INTENT.ACTIVAR_RECORDATORIOS]?.keywords ?? [];
+  const deactivateKw = INTENT_KEYWORDS[INTENT.DESACTIVAR_RECORDATORIOS]?.keywords ?? [];
+  const prefKw = INTENT_KEYWORDS[INTENT.PREFERENCIAS_RECORDATORIO]?.keywords ?? [];
   // Check deactivate FIRST (desactiva contains activa)
   if (deactivateKw.some(k => reminderLower.includes(k))) {
-    return { intent: INTENT.DEACTIVATE_REMINDERS, confidence: 0.85 };
+    return { intent: INTENT.DESACTIVAR_RECORDATORIOS, confidence: 0.85 };
   }
   if (activateKw.some(k => reminderLower.includes(k))) {
-    return { intent: INTENT.ACTIVATE_REMINDERS, confidence: 0.85 };
+    return { intent: INTENT.ACTIVAR_RECORDATORIOS, confidence: 0.85 };
   }
   if (prefKw.some(k => reminderLower.includes(k))) {
-    return { intent: INTENT.REMINDER_PREFERENCES, confidence: 0.85 };
+    return { intent: INTENT.PREFERENCIAS_RECORDATORIO, confidence: 0.85 };
   }
 
   // Reschedule check — but only when NOT explicitly creating new appointment
   // "Quiero agendar para otro día" → create (new appointment for another day)
   // "Quiero cambiar mi cita" → reschedule (modify existing)
-  const rescheduleKw = INTENT_KEYWORDS[INTENT.RESCHEDULE]?.keywords ?? [];
+  const rescheduleKw = INTENT_KEYWORDS[INTENT.REAGENDAR]?.keywords ?? [];
   // Core create keywords (not "cita" which appears everywhere)
   const coreCreateKw = ['agendar', 'reservar', 'ajendar', 'sacar', 'pedir hora', 'necesito hora', 'consulta', 'visita', 'ver al doctor', 'konsulta', 'cosulta', 'resevar', 'truno', 'sita', 'agenda'];
   const hasRescheduleKeyword = rescheduleKw.some(k => lower.includes(k));
@@ -402,26 +455,26 @@ function detectIntentRules(text: string): { readonly intent: IntentType; readonl
   // If user says "agendar"/"reservar", it's create (even with "otro día")
   // Otherwise if reschedule keywords match, use reschedule
   if (hasRescheduleKeyword && !hasCreateKeyword) {
-    return { intent: INTENT.RESCHEDULE, confidence: 0.8 };
+    return { intent: INTENT.REAGENDAR, confidence: 0.8 };
   }
 
   // Check availability when asking for "hora" with a day preference
   const hasDayPref = Object.keys(DAY_NAMES).some(d => lower.includes(d));
   const hasRelDate = RELATIVE_DATES.some(r => lower.includes(r));
   if ((hasDayPref || hasRelDate) && lower.includes('hora')) {
-    return { intent: INTENT.CHECK_AVAILABILITY, confidence: 0.7 };
+    return { intent: INTENT.CONSULTAR_DISPONIBILIDAD, confidence: 0.7 };
   }
 
   // Cancel check before create (cancelar/anular + cita/turno = cancel)
-  const cancelKw = INTENT_KEYWORDS[INTENT.CANCEL_APPOINTMENT]?.keywords ?? [];
+  const cancelKw = INTENT_KEYWORDS[INTENT.CANCELAR_CITA]?.keywords ?? [];
   if (cancelKw.some(k => lower.includes(k))) {
-    return { intent: INTENT.CANCEL_APPOINTMENT, confidence: 0.8 };
+    return { intent: INTENT.CANCELAR_CITA, confidence: 0.8 };
   }
 
   for (const [intent, config] of Object.entries(INTENT_KEYWORDS)) {
     const typedIntent = intent as IntentType;
     // Skip reschedule if user explicitly says "agendar"/"reservar"
-    if (typedIntent === INTENT.RESCHEDULE && hasCreateKeyword) continue;
+    if (typedIntent === INTENT.REAGENDAR && hasCreateKeyword) continue;
     const keywords = config.keywords;
     const matchCount = keywords.filter((k: string) => lower.includes(k)).length;
     if (matchCount > 0) {
@@ -432,7 +485,7 @@ function detectIntentRules(text: string): { readonly intent: IntentType; readonl
     }
   }
 
-  return { intent: INTENT.UNKNOWN, confidence: 0.1 };
+  return { intent: INTENT.DESCONOCIDO, confidence: 0.1 };
 }
 
 // ============================================================================
@@ -448,7 +501,7 @@ export async function main(rawInput: unknown): Promise<{ readonly success: boole
   }
 
   const input = inputResult.data;
-  const { text, chat_id, provider_id } = input;
+  const { text, chat_id, provider_id: _provider_id } = input;
 
   // Step 1: Input guardrails
   const inputGuard = validateInput(text);
@@ -457,7 +510,7 @@ export async function main(rawInput: unknown): Promise<{ readonly success: boole
   }
 
   // Step 2: Intent detection
-  let intent: IntentType = INTENT.UNKNOWN;
+  let intent: IntentType = INTENT.DESCONOCIDO;
   let confidence = 0.0;
   let provider: "groq" | "openai" | "fallback" | "fast-path" = "fallback";
   let cot_reasoning = "Fallback to rules-based detection";
@@ -494,8 +547,8 @@ export async function main(rawInput: unknown): Promise<{ readonly success: boole
     if (!skipLLM) {
       // RAG: Build context from knowledge base for general questions
       let ragContext: string | undefined;
-      if (intent === INTENT.GENERAL_QUESTION || intent === INTENT.UNKNOWN) {
-        const ragResult = await buildRAGContext(text, provider_id ?? null, 3);
+      if (intent === INTENT.PREGUNTA_GENERAL || intent === INTENT.DESCONOCIDO) {
+        const ragResult = await buildRAGContext(_provider_id ?? null, text, 3);
         ragContext = ragResult.context;
         if (ragResult.count > 0) {
           const scope = ragResult.hasProviderSpecific ? 'provider-specific + public' : 'public only';
@@ -530,27 +583,33 @@ export async function main(rawInput: unknown): Promise<{ readonly success: boole
   const entities = extractEntities(text);
   const context = detectContext(text, entities);
   const suggested_response_type = suggestResponseType(intent, context, entities);
-  
+  const { dialogue_act, ui_component } = mapToDialogueAndUI(suggested_response_type, intent);
+
   const { aiResponse, needsMoreInfo, followUpQuestion } = generateAIResponse(
-    intent, 
-    entities, 
-    context, 
-    suggested_response_type, 
+    intent,
+    entities,
+    context,
+    suggested_response_type,
     input.user_profile
   );
+
+  const escalation_level = determineEscalationLevel(intent, text, confidence);
 
   const result: IntentResult = {
     intent,
     confidence,
     entities,
     context,
-    suggested_response_type,
-    ai_response: aiResponse,
+    subtype: null,
+    dialogue_act,
+    ui_component,
     needs_more_info: needsMoreInfo,
-    follow_up_question: followUpQuestion,
+    follow_up: followUpQuestion,
+    ai_response: aiResponse,
+    escalation_level,
     cot_reasoning,
     validation_passed: true,
-    validation_errors: []
+    validation_errors: [],
   };
 
   const verifiedResult = verifyUrgency(result, text);
@@ -575,22 +634,22 @@ function detectSocial(text: string): { readonly intent: IntentType; readonly con
   // If the text contains actionable keywords, don't match as social
   // This prevents "Buenos días, necesito reprogramar" from being classified as greeting
   const hasActionableKeywords =
-    INTENT_KEYWORDS[INTENT.CANCEL_APPOINTMENT]?.keywords.some(k => lower.includes(k)) ||
-    INTENT_KEYWORDS[INTENT.RESCHEDULE]?.keywords.some(k => lower.includes(k)) ||
-    INTENT_KEYWORDS[INTENT.CHECK_AVAILABILITY]?.keywords.some(k => lower.includes(k)) ||
-    INTENT_KEYWORDS[INTENT.CREATE_APPOINTMENT]?.keywords.some(k => lower.includes(k)) ||
-    INTENT_KEYWORDS[INTENT.GET_MY_BOOKINGS]?.keywords.some(k => lower.includes(k)) ||
-    INTENT_KEYWORDS[INTENT.ACTIVATE_REMINDERS]?.keywords.some(k => lower.includes(k)) ||
-    INTENT_KEYWORDS[INTENT.DEACTIVATE_REMINDERS]?.keywords.some(k => lower.includes(k));
+    INTENT_KEYWORDS[INTENT.CANCELAR_CITA]?.keywords.some(k => lower.includes(k)) ||
+    INTENT_KEYWORDS[INTENT.REAGENDAR]?.keywords.some(k => lower.includes(k)) ||
+    INTENT_KEYWORDS[INTENT.CONSULTAR_DISPONIBILIDAD]?.keywords.some(k => lower.includes(k)) ||
+    INTENT_KEYWORDS[INTENT.CREAR_CITA]?.keywords.some(k => lower.includes(k)) ||
+    INTENT_KEYWORDS[INTENT.VER_MIS_CITAS]?.keywords.some(k => lower.includes(k)) ||
+    INTENT_KEYWORDS[INTENT.ACTIVAR_RECORDATORIOS]?.keywords.some(k => lower.includes(k)) ||
+    INTENT_KEYWORDS[INTENT.DESACTIVAR_RECORDATORIOS]?.keywords.some(k => lower.includes(k));
 
   if (hasActionableKeywords && text.length > 30) return null;
 
-  if (GREETINGS.some(g => lower === g)) return { intent: INTENT.GREETING, confidence: 0.95 };
-  if (GREETING_PHRASES.some(p => lower.includes(p))) return { intent: INTENT.GREETING, confidence: 0.9 };
-  if (FAREWELLS.some(f => lower === f)) return { intent: INTENT.FAREWELL, confidence: 0.95 };
-  if (FAREWELL_PHRASES.some(p => lower.includes(p))) return { intent: INTENT.FAREWELL, confidence: 0.9 };
-  if (THANK_YOU_WORDS.some(t => lower.includes(t)) && text.length < 20) return { intent: INTENT.THANK_YOU, confidence: 0.95 };
-  if (OFF_TOPIC_PATTERNS.some(p => lower.includes(p))) return { intent: INTENT.GENERAL_QUESTION, confidence: 0.85 };
+  if (GREETINGS.some(g => lower === g)) return { intent: INTENT.SALUDO, confidence: 0.95 };
+  if (GREETING_PHRASES.some(p => lower.includes(p))) return { intent: INTENT.SALUDO, confidence: 0.9 };
+  if (FAREWELLS.some(f => lower === f)) return { intent: INTENT.DESPEDIDA, confidence: 0.95 };
+  if (FAREWELL_PHRASES.some(p => lower.includes(p))) return { intent: INTENT.DESPEDIDA, confidence: 0.9 };
+  if (THANK_YOU_WORDS.some(t => lower.includes(t)) && text.length < 20) return { intent: INTENT.AGRADECIMIENTO, confidence: 0.95 };
+  if (OFF_TOPIC_PATTERNS.some(p => lower.includes(p))) return { intent: INTENT.PREGUNTA_GENERAL, confidence: 0.85 };
   return null;
 }
 
@@ -603,7 +662,10 @@ interface LLMInquiryResult {
 
 async function runLLMInquiryWithPrompt(systemPrompt: string, userMsg: string): Promise<[Error | null, LLMInquiryResult | null]> {
   try {
-    const response = await callLLM(systemPrompt, userMsg);
+    const [callErr, response] = await callLLM(systemPrompt, userMsg);
+    if (callErr != null || response == null) {
+      return [callErr ?? new Error("LLM returned null response"), null];
+    }
 
     const cleaned = sanitizeJSONResponse(response.content);
     const parsed = JSON.parse(cleaned) as Record<string, unknown>;

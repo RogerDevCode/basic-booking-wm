@@ -1,3 +1,43 @@
+/*
+ * PRE-FLIGHT CHECKLIST
+ * Mission         : Clinical notes CRUD with AES-256-GCM encryption at rest
+ * DB Tables Used  : service_notes, providers, services
+ * Concurrency Risk: NO — single-row CRUD operations per note
+ * GCal Calls      : NO
+ * Idempotency Key : N/A — note CRUD is inherently non-idempotent
+ * RLS Tenant ID   : YES — withTenantContext wraps all DB ops
+ * Zod Schemas     : YES — InputSchema validates action and note fields
+ */
+
+/*
+ * REASONING TRACE
+ * ### Mission Decomposition
+ * - Validate action (create/read/update/delete/list) and note fields via Zod
+ * - Encrypt content with AES-256-GCM before insert, decrypt after read
+ * - Route to action-specific handler, each enforcing provider_id ownership check
+ * - Manage tags via note_tags join table (assign on create, replace on update, fetch on read/list)
+ *
+ * ### Schema Verification
+ * - Tables: service_notes, note_tags, tags
+ * - Columns: service_notes (note_id, provider_id, booking_id, client_id, content_encrypted, encryption_version, created_at, updated_at), note_tags (note_id, tag_id), tags (tag_id, name, color)
+ *
+ * ### Failure Mode Analysis
+ * - Scenario 1: Decryption failure → returns placeholder "[ERROR: Unable to decrypt note]" instead of crashing
+ * - Scenario 2: Note not found or wrong provider → ownership WHERE clause returns empty, mapped to access denied
+ * - Scenario 3: Missing required params for action → early return with specific field requirement error
+ *
+ * ### Concurrency Analysis
+ * - Risk: NO — single-row CRUD operations per note, tag operations use ON CONFLICT DO NOTHING
+ *
+ * ### SOLID Compliance Check
+ * - SRP: YES — each action handler (createNote, readNote, updateNote, deleteNote, listNotes) does one thing; tag helpers extracted
+ * - DRY: YES — encryptContent/decryptContent shared across handlers, getNoteTags reused by all read paths
+ * - KISS: YES — straightforward action dispatch via if-chain, tag grouping via Map in listNotes is minimal necessary complexity
+ *
+ * → CLEARED FOR CODE GENERATION
+ */
+
+import { withTenantContext } from '../internal/tenant-context';
 // ============================================================================
 // WEB PROVIDER NOTES — Clinical notes CRUD with AES-256-GCM encryption
 // ============================================================================
@@ -9,8 +49,9 @@
 import { z } from 'zod';
 import postgres from 'postgres';
 import { encryptData, decryptData } from '../internal/crypto';
-import { withTenantContext } from '../internal/tenant-context';
+
 import { createDbClient } from '../internal/db/client';
+import type { Result } from '../internal/result';
 
 const InputSchema = z.object({
   provider_id: z.uuid(),
@@ -35,13 +76,11 @@ interface NoteRow {
   readonly tags: readonly { readonly tag_id: string; readonly name: string; readonly color: string }[];
 }
 
-type Result<T> = [Error | null, T | null];
-
 // ============================================================================
 // TAG HELPERS
 // ============================================================================
 
-async function assignTags(tx: postgres.TransactionSql, noteId: string, tagIds: readonly string[]): Promise<Result<true>> {
+async function assignTags(tx: postgres.Sql, noteId: string, tagIds: readonly string[]): Promise<Result<true>> {
   for (const tagId of tagIds) {
     await tx`
       INSERT INTO note_tags (note_id, tag_id)
@@ -52,7 +91,7 @@ async function assignTags(tx: postgres.TransactionSql, noteId: string, tagIds: r
   return [null, true];
 }
 
-async function getNoteTags(tx: postgres.TransactionSql, noteId: string): Promise<Result<{ tag_id: string; name: string; color: string }[]>> {
+async function getNoteTags(tx: postgres.Sql, noteId: string): Promise<Result<{ tag_id: string; name: string; color: string }[]>> {
   const rows = await tx.values<[string, string, string][]>`
     SELECT t.tag_id, t.name, t.color
     FROM note_tags nt
@@ -90,7 +129,7 @@ function decryptContent(encrypted: string | null): string {
 // ============================================================================
 
 async function createNote(
-  tx: postgres.TransactionSql,
+  tx: postgres.Sql,
   providerId: string,
   bookingId: string,
   clientId: string,
@@ -114,7 +153,7 @@ async function createNote(
   }
 
   // Get tags for response
-  const [tagErr, tags] = await getNoteTags(tx, row[0]);
+  const [_tagErr, tags] = await getNoteTags(tx, row[0]);
 
   return [null, {
     note_id: row[0],
@@ -134,7 +173,7 @@ async function createNote(
 // READ note (decrypt content)
 // ============================================================================
 
-async function readNote(tx: postgres.TransactionSql, providerId: string, noteId: string): Promise<Result<NoteRow>> {
+async function readNote(tx: postgres.Sql, providerId: string, noteId: string): Promise<Result<NoteRow>> {
   const rows = await tx.values<[string, string, string, string, string | null, number, string, string][]>`
     SELECT note_id, booking_id, client_id, provider_id, content_encrypted, encryption_version, created_at, updated_at
     FROM service_notes
@@ -145,7 +184,7 @@ async function readNote(tx: postgres.TransactionSql, providerId: string, noteId:
 
   if (row === undefined) return [new Error('Note not found or access denied'), null];
 
-  const [tagErr, tags] = await getNoteTags(tx, row[0]);
+  const [_tagErr, tags] = await getNoteTags(tx, row[0]);
 
   return [null, {
     note_id: row[0],
@@ -166,7 +205,7 @@ async function readNote(tx: postgres.TransactionSql, providerId: string, noteId:
 // ============================================================================
 
 async function updateNote(
-  tx: postgres.TransactionSql,
+  tx: postgres.Sql,
   providerId: string,
   noteId: string,
   content: string,
@@ -190,7 +229,7 @@ async function updateNote(
     await assignTags(tx, noteId, tagIds);
   }
 
-  const [tagErr, tags] = await getNoteTags(tx, noteId);
+  const [_tagErr, tags] = await getNoteTags(tx, noteId);
 
   return [null, {
     note_id: row[0],
@@ -210,7 +249,7 @@ async function updateNote(
 // DELETE note
 // ============================================================================
 
-async function deleteNote(tx: postgres.TransactionSql, providerId: string, noteId: string): Promise<Result<{ readonly deleted: boolean }>> {
+async function deleteNote(tx: postgres.Sql, providerId: string, noteId: string): Promise<Result<{ readonly deleted: boolean }>> {
   await tx`DELETE FROM service_notes WHERE note_id = ${noteId}::uuid AND provider_id = ${providerId}::uuid`;
   return [null, { deleted: true }];
 }
@@ -220,7 +259,7 @@ async function deleteNote(tx: postgres.TransactionSql, providerId: string, noteI
 // ============================================================================
 
 async function listNotes(
-  tx: postgres.TransactionSql,
+  tx: postgres.Sql,
   providerId: string,
   bookingId?: string
 ): Promise<Result<NoteRow[]>> {
@@ -252,8 +291,20 @@ async function listNotes(
     `;
   }
 
-  // Group by note_id
-  const noteMap = new Map<string, NoteRow>();
+  // Group by note_id using mutable intermediate
+  interface MutableNote {
+    note_id: string;
+    booking_id: string;
+    client_id: string;
+    provider_id: string;
+    content_encrypted: string | null;
+    encryption_version: number;
+    created_at: string;
+    updated_at: string;
+    content: string;
+    tags: { tag_id: string; name: string; color: string }[];
+  }
+  const noteMap = new Map<string, MutableNote>();
   for (const row of rows) {
     const noteId = row[0];
     if (!noteMap.has(noteId)) {
@@ -271,12 +322,25 @@ async function listNotes(
       });
     }
     const note = noteMap.get(noteId);
-    if (note != null && row[8] !== null) {
-      note.tags = [...note.tags, { tag_id: row[8], name: row[9], color: row[10] }];
+    if (note != null && row[8] !== null && row[9] !== null && row[10] !== null) {
+      note.tags.push({ tag_id: row[8], name: row[9], color: row[10] });
     }
   }
 
-  return [null, Array.from(noteMap.values())];
+  // Convert to immutable NoteRow[]
+  const notes: NoteRow[] = Array.from(noteMap.values()).map(n => ({
+    note_id: n.note_id,
+    booking_id: n.booking_id,
+    client_id: n.client_id,
+    provider_id: n.provider_id,
+    content_encrypted: n.content_encrypted,
+    encryption_version: n.encryption_version,
+    created_at: n.created_at,
+    updated_at: n.updated_at,
+    content: n.content,
+    tags: n.tags,
+  }));
+  return [null, notes];
 }
 
 // ============================================================================
@@ -297,10 +361,10 @@ export async function main(rawInput: unknown): Promise<[Error | null, unknown | 
 
   const sql = createDbClient({ url: dbUrl });
 
-  const tenantId = input.provider_id ?? '00000000-0000-0000-0000-000000000000';
+  const tenantId = input.provider_id;
 
   try {
-    const [txErr, txResult] = await withTenantContext(sql, tenantId, async (tx) => {
+    const [txErr, txResult] = await withTenantContext<unknown>(sql, tenantId, async (tx) => {
       if (input.action === 'create') {
         const bookingId = input.booking_id;
         const clientId = input.client_id;

@@ -58,14 +58,14 @@ describe('DB Integration Tests', () => {
     test('Debe crear un booking con idempotencia', async () => {
       const provider = await db`SELECT provider_id FROM providers LIMIT 1`;
       const service = await db`SELECT service_id FROM services LIMIT 1`;
-      const patient = await db`SELECT patient_id FROM patients LIMIT 1`;
+      const patient = await db`SELECT client_id FROM clients LIMIT 1`;
 
       const startTime = new Date('2026-05-01T10:00:00Z');
       const endTime = new Date('2026-05-01T10:30:00Z');
 
       const rows = await db`
-        INSERT INTO bookings (provider_id, patient_id, service_id, start_time, end_time, idempotency_key)
-        VALUES (${provider[0].provider_id}, ${patient[0].patient_id}, ${service[0].service_id},
+        INSERT INTO bookings (provider_id, client_id, service_id, start_time, end_time, idempotency_key)
+        VALUES (${provider[0].provider_id}, ${patient[0].client_id}, ${service[0].service_id},
                 ${startTime.toISOString()}, ${endTime.toISOString()}, 'idem-test-001')
         RETURNING booking_id, status
       `;
@@ -75,8 +75,8 @@ describe('DB Integration Tests', () => {
 
       // Idempotent insert should fail (unique constraint)
       await expect(db`
-        INSERT INTO bookings (provider_id, patient_id, service_id, start_time, end_time, idempotency_key)
-        VALUES (${provider[0].provider_id}, ${patient[0].patient_id}, ${service[0].service_id},
+        INSERT INTO bookings (provider_id, client_id, service_id, start_time, end_time, idempotency_key)
+        VALUES (${provider[0].provider_id}, ${patient[0].client_id}, ${service[0].service_id},
                 ${startTime.toISOString()}, ${endTime.toISOString()}, 'idem-test-001')
       `).rejects.toThrow();
     });
@@ -84,15 +84,15 @@ describe('DB Integration Tests', () => {
     test('Debe prevenir double-booking con exclusion constraint', async () => {
       const provider = await db`SELECT provider_id FROM providers LIMIT 1`;
       const service = await db`SELECT service_id FROM services LIMIT 1`;
-      const patient = await db`SELECT patient_id FROM patients LIMIT 1`;
+      const patient = await db`SELECT client_id FROM clients LIMIT 1`;
 
       const startTime = new Date('2026-05-01T11:00:00Z');
       const endTime = new Date('2026-05-01T11:30:00Z');
 
       // First booking should succeed
       await db`
-        INSERT INTO bookings (provider_id, patient_id, service_id, start_time, end_time, idempotency_key)
-        VALUES (${provider[0].provider_id}, ${patient[0].patient_id}, ${service[0].service_id},
+        INSERT INTO bookings (provider_id, client_id, service_id, start_time, end_time, idempotency_key)
+        VALUES (${provider[0].provider_id}, ${patient[0].client_id}, ${service[0].service_id},
                 ${startTime.toISOString()}, ${endTime.toISOString()}, 'idem-test-002')
       `;
 
@@ -101,8 +101,8 @@ describe('DB Integration Tests', () => {
       const overlapEnd = new Date('2026-05-01T11:45:00Z');
 
       await expect(db`
-        INSERT INTO bookings (provider_id, patient_id, service_id, start_time, end_time, idempotency_key)
-        VALUES (${provider[0].provider_id}, ${patient[0].patient_id}, ${service[0].service_id},
+        INSERT INTO bookings (provider_id, client_id, service_id, start_time, end_time, idempotency_key)
+        VALUES (${provider[0].provider_id}, ${patient[0].client_id}, ${service[0].service_id},
                 ${overlapStart.toISOString()}, ${overlapEnd.toISOString()}, 'idem-test-003')
       `).rejects.toThrow();
     });
@@ -110,14 +110,14 @@ describe('DB Integration Tests', () => {
     test('Debe permitir booking no-overlapping para el mismo provider', async () => {
       const provider = await db`SELECT provider_id FROM providers LIMIT 1`;
       const service = await db`SELECT service_id FROM services LIMIT 1`;
-      const patient = await db`SELECT patient_id FROM patients LIMIT 1`;
+      const patient = await db`SELECT client_id FROM clients LIMIT 1`;
 
       const startTime = new Date('2026-05-01T14:00:00Z');
       const endTime = new Date('2026-05-01T14:30:00Z');
 
       const rows = await db`
-        INSERT INTO bookings (provider_id, patient_id, service_id, start_time, end_time, idempotency_key)
-        VALUES (${provider[0].provider_id}, ${patient[0].patient_id}, ${service[0].service_id},
+        INSERT INTO bookings (provider_id, client_id, service_id, start_time, end_time, idempotency_key)
+        VALUES (${provider[0].provider_id}, ${patient[0].client_id}, ${service[0].service_id},
                 ${startTime.toISOString()}, ${endTime.toISOString()}, 'idem-test-004')
         RETURNING booking_id
       `;
@@ -128,15 +128,15 @@ describe('DB Integration Tests', () => {
     test('Debe permitir booking overlapping si el primero está cancelled', async () => {
       const provider = await db`SELECT provider_id FROM providers LIMIT 1`;
       const service = await db`SELECT service_id FROM services LIMIT 1`;
-      const patient = await db`SELECT patient_id FROM patients LIMIT 1`;
+      const patient = await db`SELECT client_id FROM clients LIMIT 1`;
 
       const startTime = new Date('2026-05-02T10:00:00Z');
       const endTime = new Date('2026-05-02T10:30:00Z');
 
       // Create and cancel first booking
       const [first] = await db`
-        INSERT INTO bookings (provider_id, patient_id, service_id, start_time, end_time, idempotency_key, status)
-        VALUES (${provider[0].provider_id}, ${patient[0].patient_id}, ${service[0].service_id},
+        INSERT INTO bookings (provider_id, client_id, service_id, start_time, end_time, idempotency_key, status)
+        VALUES (${provider[0].provider_id}, ${patient[0].client_id}, ${service[0].service_id},
                 ${startTime.toISOString()}, ${endTime.toISOString()}, 'idem-test-005', 'cancelled')
         RETURNING booking_id
       `;
@@ -148,8 +148,8 @@ describe('DB Integration Tests', () => {
       const overlapEnd = new Date('2026-05-02T10:45:00Z');
 
       const rows = await db`
-        INSERT INTO bookings (provider_id, patient_id, service_id, start_time, end_time, idempotency_key)
-        VALUES (${provider[0].provider_id}, ${patient[0].patient_id}, ${service[0].service_id},
+        INSERT INTO bookings (provider_id, client_id, service_id, start_time, end_time, idempotency_key)
+        VALUES (${provider[0].provider_id}, ${patient[0].client_id}, ${service[0].service_id},
                 ${overlapStart.toISOString()}, ${overlapEnd.toISOString()}, 'idem-test-006')
         RETURNING booking_id
       `;
@@ -160,14 +160,14 @@ describe('DB Integration Tests', () => {
     test('Debe actualizar status de booking', async () => {
       const provider = await db`SELECT provider_id FROM providers LIMIT 1`;
       const service = await db`SELECT service_id FROM services LIMIT 1`;
-      const patient = await db`SELECT patient_id FROM patients LIMIT 1`;
+      const patient = await db`SELECT client_id FROM clients LIMIT 1`;
 
       const startTime = new Date('2026-05-03T10:00:00Z');
       const endTime = new Date('2026-05-03T10:30:00Z');
 
       const [booking] = await db`
-        INSERT INTO bookings (provider_id, patient_id, service_id, start_time, end_time, idempotency_key)
-        VALUES (${provider[0].provider_id}, ${patient[0].patient_id}, ${service[0].service_id},
+        INSERT INTO bookings (provider_id, client_id, service_id, start_time, end_time, idempotency_key)
+        VALUES (${provider[0].provider_id}, ${patient[0].client_id}, ${service[0].service_id},
                 ${startTime.toISOString()}, ${endTime.toISOString()}, 'idem-test-007')
         RETURNING booking_id
       `;
@@ -211,14 +211,14 @@ describe('DB Integration Tests', () => {
     test('Debe registrar cambios de status', async () => {
       const provider = await db`SELECT provider_id FROM providers LIMIT 1`;
       const service = await db`SELECT service_id FROM services LIMIT 1`;
-      const patient = await db`SELECT patient_id FROM patients LIMIT 1`;
+      const patient = await db`SELECT client_id FROM clients LIMIT 1`;
 
       const startTime = new Date('2026-05-04T10:00:00Z');
       const endTime = new Date('2026-05-04T10:30:00Z');
 
       const [booking] = await db`
-        INSERT INTO bookings (provider_id, patient_id, service_id, start_time, end_time, idempotency_key)
-        VALUES (${provider[0].provider_id}, ${patient[0].patient_id}, ${service[0].service_id},
+        INSERT INTO bookings (provider_id, client_id, service_id, start_time, end_time, idempotency_key)
+        VALUES (${provider[0].provider_id}, ${patient[0].client_id}, ${service[0].service_id},
                 ${startTime.toISOString()}, ${endTime.toISOString()}, 'idem-test-008')
         RETURNING booking_id
       `;
@@ -260,29 +260,29 @@ describe('DB Integration Tests', () => {
 
   describe('Patients with JSONB metadata', () => {
     test('Debe guardar y consultar metadata JSONB', async () => {
-      const patient = await db`SELECT patient_id FROM patients LIMIT 1`;
+      const patient = await db`SELECT client_id FROM clients LIMIT 1`;
 
       await db`
-        UPDATE patients SET metadata = '{"reminder_preferences": {"telegram_24h": true, "gmail_24h": false}}'::jsonb
-        WHERE patient_id = ${patient[0].patient_id}
+        UPDATE clients SET metadata = '{"reminder_preferences": {"telegram_24h": true, "gmail_24h": false}}'::jsonb
+        WHERE client_id = ${patient[0].client_id}
       `;
 
-      const [row] = await db`SELECT metadata FROM patients WHERE patient_id = ${patient[0].patient_id}`;
+      const [row] = await db`SELECT metadata FROM clients WHERE client_id = ${patient[0].client_id}`;
       expect(row.metadata).toBeDefined();
       const prefs = row.metadata as Record<string, unknown>;
       expect(prefs['reminder_preferences']).toBeDefined();
     });
 
     test('Debe consultar pacientes con JSONB operator @>', async () => {
-      const patient = await db`SELECT patient_id FROM patients LIMIT 1`;
+      const patient = await db`SELECT client_id FROM clients LIMIT 1`;
 
       await db`
-        UPDATE patients SET metadata = '{"tier": "premium"}'::jsonb
-        WHERE patient_id = ${patient[0].patient_id}
+        UPDATE clients SET metadata = '{"tier": "premium"}'::jsonb
+        WHERE client_id = ${patient[0].client_id}
       `;
 
       const rows = await db`
-        SELECT patient_id, name FROM patients
+        SELECT client_id, name FROM clients
         WHERE metadata @> '{"tier": "premium"}'::jsonb
       `;
 
@@ -299,11 +299,11 @@ describe('DB Integration Tests', () => {
         await db.begin(async (tx) => {
           const provider = await tx.unsafe('SELECT provider_id FROM providers LIMIT 1');
           const service = await tx.unsafe('SELECT service_id FROM services LIMIT 1');
-          const patient = await tx.unsafe('SELECT patient_id FROM patients LIMIT 1');
+          const patient = await tx.unsafe('SELECT client_id FROM clients LIMIT 1');
 
           await tx.unsafe(
-            `INSERT INTO bookings (provider_id, patient_id, service_id, start_time, end_time, idempotency_key)
-             VALUES ('${provider[0].provider_id}', '${patient[0].patient_id}', '${service[0].service_id}',
+            `INSERT INTO bookings (provider_id, client_id, service_id, start_time, end_time, idempotency_key)
+             VALUES ('${provider[0].provider_id}', '${patient[0].client_id}', '${service[0].service_id}',
                      '2026-06-01T10:00:00Z', '2026-06-01T10:30:00Z', 'idem-tx-test')`
           );
 
@@ -358,12 +358,12 @@ describe('DB Integration Tests', () => {
 
   describe('Waitlist', () => {
     test('Debe agregar paciente a waitlist', async () => {
-      const patient = await db`SELECT patient_id FROM patients LIMIT 1`;
+      const patient = await db`SELECT client_id FROM clients LIMIT 1`;
       const service = await db`SELECT service_id FROM services LIMIT 1`;
 
       const [entry] = await db`
-        INSERT INTO waitlist (patient_id, service_id, status, position)
-        VALUES (${patient[0].patient_id}, ${service[0].service_id}, 'waiting', 1)
+        INSERT INTO waitlist (client_id, service_id, status, position)
+        VALUES (${patient[0].client_id}, ${service[0].service_id}, 'waiting', 1)
         RETURNING waitlist_id, status
       `;
 

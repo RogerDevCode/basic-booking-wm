@@ -1,3 +1,41 @@
+/*
+ * PRE-FLIGHT CHECKLIST
+ * Mission         : Client profile CRUD (get/update)
+ * DB Tables Used  : clients, users
+ * Concurrency Risk: NO — single-row SELECT/UPDATE
+ * GCal Calls      : NO
+ * Idempotency Key : N/A — profile updates are inherently idempotent
+ * RLS Tenant ID   : YES — withTenantContext wraps all DB ops
+ * Zod Schemas     : YES — InputSchema validates client_id and profile fields
+ */
+
+/*
+ * REASONING TRACE
+ * ### Mission Decomposition
+ * - Validate user_id and action (get/update) via Zod
+ * - Look up user record, find or auto-create corresponding client record
+ * - For update: dynamically build SET clause from provided fields, apply updated_at
+ *
+ * ### Schema Verification
+ * - Tables: users, clients
+ * - Columns: users (user_id, email, full_name, phone, telegram_chat_id, timezone), clients (client_id, name, email, phone, telegram_chat_id, timezone, gcal_calendar_id, updated_at)
+ *
+ * ### Failure Mode Analysis
+ * - Scenario 1: User not found → early return error before client lookup
+ * - Scenario 2: Client record does not exist → auto-create from user data, then proceed
+ * - Scenario 3: Update with no fields → caught by fields.length === 0 check, returns error
+ *
+ * ### Concurrency Analysis
+ * - Risk: NO — single-row SELECT/UPDATE per operation, no cross-row locking needed
+ *
+ * ### SOLID Compliance Check
+ * - SRP: YES — main routes get vs update, each path handles its own concern
+ * - DRY: YES — Zod schema single source, tenant extraction follows shared pattern
+ * - KISS: YES — dynamic field builder avoids repetitive conditional branches, straightforward INSERT-if-missing pattern
+ *
+ * → CLEARED FOR CODE GENERATION
+ */
+
 // ============================================================================
 // WEB PATIENT PROFILE — Client profile CRUD
 // ============================================================================
@@ -6,7 +44,6 @@
 // ============================================================================
 
 import { z } from 'zod';
-import postgres from 'postgres';
 import { withTenantContext } from '../internal/tenant-context';
 import { createDbClient } from '../internal/db/client';
 
@@ -43,7 +80,7 @@ export async function main(rawInput: unknown): Promise<[Error | null, ProfileRes
   }
 
   const sql = createDbClient({ url: dbUrl });
-  const tenantId = user_id || '00000000-0000-0000-0000-000000000000';
+  const tenantId = user_id;
 
   try {
     const [txErr, txData] = await withTenantContext(sql, tenantId, async (tx) => {

@@ -1,3 +1,47 @@
+/*
+ * PRE-FLIGHT CHECKLIST
+ * Mission         : Complete profile for Telegram-registered user via web
+ * DB Tables Used  : clients, users
+ * Concurrency Risk: NO — single-row UPDATE
+ * GCal Calls      : NO
+ * Idempotency Key : N/A — profile completion is inherently non-idempotent
+ * RLS Tenant ID   : YES — withTenantContext wraps all DB ops
+ * Zod Schemas     : YES — InputSchema validates RUT, email, password strength
+ */
+
+/*
+ * REASONING TRACE
+ * ### Mission Decomposition
+ * - Validate all inputs via Zod: RUT format, email, address, phone, password match and strength
+ * - Validate Chilean RUT checksum using modulo 11 algorithm
+ * - Validate password strength (length, uppercase, digit, special character)
+ * - Look up user by telegram chat_id, check email/RUT uniqueness against other users
+ * - UPDATE users with rut, email, address, phone, password_hash, timezone
+ *
+ * ### Schema Verification
+ * - Tables: users (user_id, full_name, telegram_chat_id, rut, email, address, phone, password_hash, timezone, role, updated_at)
+ * - Columns: All verified; email and rut have unique constraints checked before UPDATE
+ *
+ * ### Failure Mode Analysis
+ * - Scenario 1: Passwords do not match → early rejection before any DB call
+ * - Scenario 2: Weak password → validatePasswordStrength returns message, rejected
+ * - Scenario 3: Invalid RUT checksum → validateRut returns false, rejected
+ * - Scenario 4: No Telegram user found → user must interact with bot first, explicit error
+ * - Scenario 5: Email or RUT already used by another account → uniqueness check before UPDATE
+ * - Scenario 6: Unique constraint violation at DB level → caught in catch block, mapped to user-friendly message
+ *
+ * ### Concurrency Analysis
+ * - Risk: NO — single-row UPDATE by telegram_chat_id; uniqueness constraints prevent race conditions at DB level
+ *
+ * ### SOLID Compliance Check
+ * - SRP: YES — validateRut, validatePasswordStrength, hashPasswordSync each have single responsibility
+ * - DRY: YES — validation functions extracted; no duplicated check logic
+ * - KISS: YES — sequential validation then single UPDATE; scrypt-based hashing without external dependency
+ *
+ * → CLEARED FOR CODE GENERATION
+ */
+
+import { DEFAULT_TIMEZONE, NULL_TENANT_UUID } from '../internal/config';
 // ============================================================================
 // WEB AUTH COMPLETE PROFILE — Complete profile for Telegram user
 // ============================================================================
@@ -7,7 +51,6 @@
 // ============================================================================
 
 import { z } from 'zod';
-import postgres from 'postgres';
 import crypto from 'crypto';
 import { withTenantContext } from '../internal/tenant-context';
 import { createDbClient } from '../internal/db/client';
@@ -20,7 +63,7 @@ const InputSchema = z.object({
   phone: z.string().min(1).max(50),
   password: z.string().min(8).max(128),
   password_confirm: z.string().min(8).max(128),
-  timezone: z.string().default('America/Santiago'),
+  timezone: z.string().default(DEFAULT_TIMEZONE),
 });
 
 interface CompleteProfileResult {
@@ -100,7 +143,7 @@ export async function main(rawInput: unknown): Promise<[Error | null, CompletePr
   const passwordHash = hashPasswordSync(password);
 
   const sql = createDbClient({ url: dbUrl });
-  const tenantId = '00000000-0000-0000-0000-000000000000';
+  const tenantId = NULL_TENANT_UUID;
 
   try {
     const [txErr, txData] = await withTenantContext(sql, tenantId, async (tx) => {
@@ -164,7 +207,7 @@ export async function main(rawInput: unknown): Promise<[Error | null, CompletePr
     const message = e instanceof Error ? e.message : String(e);
     let errorMsg = message;
     if (message.startsWith('transaction_failed: ')) {
-      errorMsg = message.substring(20);
+      errorMsg = message.slice(20);
     }
     if (errorMsg.includes('duplicate key') || errorMsg.includes('unique constraint')) {
       return [new Error('This email or RUT is already in use by another account'), null];

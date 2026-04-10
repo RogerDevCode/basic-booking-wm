@@ -12,7 +12,7 @@ import { INTENT } from './constants';
 // ============================================================================
 
 const CORPUS: Record<string, readonly string[]> = {
-  [INTENT.CREATE_APPOINTMENT]: [
+  [INTENT.CREAR_CITA]: [
     'quiero agendar una cita para mañana',
     'necesito hora con el doctor el lunes',
     'kiero una ora pal viernes a las diez',
@@ -24,7 +24,7 @@ const CORPUS: Record<string, readonly string[]> = {
     'weon kiero orita al tiro una sita po',
     'hola quiero agendar para manana a las 10',
   ],
-  [INTENT.CANCEL_APPOINTMENT]: [
+  [INTENT.CANCELAR_CITA]: [
     'quiero cancelar mi cita del martes',
     'no podre ir kanselame la hora',
     'anular turno programado para manana',
@@ -33,14 +33,14 @@ const CORPUS: Record<string, readonly string[]> = {
     'no podre ir kanselame',
     'cancelar la hora que tengo',
   ],
-  [INTENT.RESCHEDULE]: [
+  [INTENT.REAGENDAR]: [
     'necesito cambiar mi cita del viernes al jueves',
     'reprogramar turno para la otra semana',
     'mejor para el miercoles a las once',
     'mover mi hora de manana para pasado',
     'kiero kambiar la cita pa otro dia',
   ],
-  [INTENT.CHECK_AVAILABILITY]: [
+  [INTENT.CONSULTAR_DISPONIBILIDAD]: [
     'tienen disponibilidad para el lunes',
     'esta libre el doctor el martes por la manana',
     'hay hueco para hoy a las tres',
@@ -49,7 +49,7 @@ const CORPUS: Record<string, readonly string[]> = {
     'tiene libre el lune',
     'hay hora para esta semana',
   ],
-  [INTENT.GET_MY_BOOKINGS]: [
+  [INTENT.VER_MIS_CITAS]: [
     'tengo alguna cita agendada',
     'cuando es mi hora',
     'mis citas proximas',
@@ -58,7 +58,7 @@ const CORPUS: Record<string, readonly string[]> = {
     'tengo cita para manana',
     'revisar mis reservas',
   ],
-  [INTENT.GREETING]: [
+  [INTENT.SALUDO]: [
     'hola buenos dias',
     'buenas tardes doctor',
     'ola como esta',
@@ -66,21 +66,21 @@ const CORPUS: Record<string, readonly string[]> = {
     'buenas noches',
     'ola',
   ],
-  [INTENT.FAREWELL]: [
+  [INTENT.DESPEDIDA]: [
     'chau gracias',
     'adios que tenga buen dia',
     'hasta luego',
     'nos vemos gracias por todo',
     'chao',
   ],
-  [INTENT.THANK_YOU]: [
+  [INTENT.AGRADECIMIENTO]: [
     'muchas gracias',
     'gracias po',
     'te agradezco mucho',
     'gracias doctor',
     'mil gracias',
   ],
-  [INTENT.URGENT_CARE]: [
+  [INTENT.URGENCIA]: [
     'me duele mucho la muela necesito atencion urgente',
     'emergencia medica ya mismo',
     'tengo un dolor insoportable no puedo esperar',
@@ -89,7 +89,7 @@ const CORPUS: Record<string, readonly string[]> = {
     'me duele mucho necesito atencion ya',
     'dolor fuerte no puedo esperar',
   ],
-  [INTENT.GENERAL_QUESTION]: [
+  [INTENT.PREGUNTA_GENERAL]: [
     'a que hora cierran los sabados',
     'aceptan seguro medico',
     'donde esta ubicado el consultorio',
@@ -98,19 +98,19 @@ const CORPUS: Record<string, readonly string[]> = {
     'trabajan con isapre o fonasa',
     'aceptan convenios',
   ],
-  [INTENT.ACTIVATE_REMINDERS]: [
+  [INTENT.ACTIVAR_RECORDATORIOS]: [
     'activa mis recordatorios de citas',
     'quiero recibir avisos antes de mis citas',
     'activar notificaciones por telegram',
     'activa alerta de recordatorio',
   ],
-  [INTENT.DEACTIVATE_REMINDERS]: [
+  [INTENT.DESACTIVAR_RECORDATORIOS]: [
     'no quiero recordatorios',
     'desactiva mis avisos de citas',
     'quita los recordatorios',
     'silenciar notificaciones',
   ],
-  [INTENT.REMINDER_PREFERENCES]: [
+  [INTENT.PREFERENCIAS_RECORDATORIO]: [
     'como configuro mis recordatorios',
     'prefiero avisos por email no telegram',
     'cambiar preferencia de notificacion',
@@ -118,7 +118,7 @@ const CORPUS: Record<string, readonly string[]> = {
     'como activo los avisos',
     'donde cambio mis preferencias',
   ],
-  [INTENT.SHOW_MAIN_MENU]: [
+  [INTENT.MOSTRAR_MENU_PRINCIPAL]: [
     'menu principal',
     'mostrar opciones',
     'volver al inicio',
@@ -126,7 +126,7 @@ const CORPUS: Record<string, readonly string[]> = {
     'ayuda menu',
     'menu',
   ],
-  [INTENT.WIZARD_STEP]: [
+  [INTENT.PASO_WIZARD]: [
     'siguiente paso',
     'continuar con la reserva',
     'adelante confirmar',
@@ -182,13 +182,9 @@ function normalize(text: string): string[] {
 // TF-IDF CALCULATION
 // ============================================================================
 
-interface TermFrequency {
-  readonly [term: string]: number;
-}
+type TermFrequency = Readonly<Record<string, number>>;
 
-interface DocumentFrequencies {
-  readonly [term: string]: number;
-}
+type DocumentFrequencies = Readonly<Record<string, number>>;
 
 function computeTF(tokens: readonly string[]): TermFrequency {
   const tf: Record<string, number> = {};
@@ -204,7 +200,7 @@ function computeTF(tokens: readonly string[]): TermFrequency {
   return tf;
 }
 
-function computeIDF(documents: ReadonlyArray<ReadonlyArray<string>>): DocumentFrequencies {
+function computeIDF(documents: readonly (readonly string[])[]): DocumentFrequencies {
   const idf: Record<string, number> = {};
   const n = documents.length;
   for (const doc of documents) {
@@ -249,13 +245,13 @@ function cosineSimilarity(a: TermFrequency, b: TermFrequency, idf: DocumentFrequ
 
 interface TfIdfModel {
   readonly idf: DocumentFrequencies;
-  readonly intentDocs: ReadonlyArray<ReadonlyArray<string>>;
-  readonly intents: ReadonlyArray<string>;
+  readonly intentDocs: readonly (readonly string[])[];
+  readonly intents: readonly string[];
 }
 
 function buildModel(): TfIdfModel {
   const intents = Object.keys(CORPUS);
-  const intentDocsArr: Array<ReadonlyArray<string>> = [];
+  const intentDocsArr: (readonly string[])[] = [];
   for (const intent of intents) {
     const docs = CORPUS[intent];
     if (docs != null) {
@@ -285,20 +281,20 @@ function getModel(): TfIdfModel {
 export interface TfIdfResult {
   readonly intent: string;
   readonly confidence: number;
-  readonly scores: ReadonlyArray<{ readonly intent: string; readonly score: number }>;
+  readonly scores: readonly { readonly intent: string; readonly score: number }[];
 }
 
 export function classifyIntent(text: string): TfIdfResult {
   const m = getModel();
   const queryTokens = normalize(text);
   if (queryTokens.length === 0) {
-    return { intent: INTENT.UNKNOWN, confidence: 0, scores: [] };
+    return { intent: INTENT.DESCONOCIDO, confidence: 0, scores: [] };
   }
 
   const queryTF = computeTF(queryTokens);
 
   // Score against each intent's documents, take max
-  const scores: Array<{ intent: string; score: number }> = [];
+  const scores: { intent: string; score: number }[] = [];
 
   for (let i = 0; i < m.intents.length; i++) {
     const intent = m.intents[i];
@@ -327,7 +323,7 @@ export function classifyIntent(text: string): TfIdfResult {
   const confidence = Math.min(0.5 + gap * 3 + topScore * 2, 0.95);
 
   return {
-    intent: scores[0]?.intent ?? INTENT.UNKNOWN,
+    intent: scores[0]?.intent ?? INTENT.DESCONOCIDO,
     confidence,
     scores: scores.slice(0, 3),
   };

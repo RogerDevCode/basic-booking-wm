@@ -11,6 +11,7 @@
 // ============================================================================
 
 import postgres from 'postgres';
+import type { Result } from '../result';
 
 // ─── Domain Types ───────────────────────────────────────────────────────────
 
@@ -75,10 +76,6 @@ export interface AffectedBooking {
   readonly start_time: string;
   readonly client_name: string;
 }
-
-// ─── Result Type ────────────────────────────────────────────────────────────
-
-type Result<T> = [Error | null, T | null];
 
 // ─── Public API ─────────────────────────────────────────────────────────────
 

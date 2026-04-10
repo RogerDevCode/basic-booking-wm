@@ -4,22 +4,22 @@
 // ============================================================================
 
 export const INTENT = {
-  CREATE_APPOINTMENT: 'create_appointment',
-  CANCEL_APPOINTMENT: 'cancel_appointment',
-  RESCHEDULE: 'reschedule',
-  CHECK_AVAILABILITY: 'check_availability',
-  URGENT_CARE: 'urgent_care',
-  GENERAL_QUESTION: 'general_question',
-  GREETING: 'greeting',
-  FAREWELL: 'farewell',
-  THANK_YOU: 'thank_you',
-  ACTIVATE_REMINDERS: 'activate_reminders',
-  DEACTIVATE_REMINDERS: 'deactivate_reminders',
-  REMINDER_PREFERENCES: 'reminder_preferences',
-  SHOW_MAIN_MENU: 'show_main_menu',
-  WIZARD_STEP: 'wizard_step',
-  GET_MY_BOOKINGS: 'get_my_bookings',
-  UNKNOWN: 'unknown',
+  CREAR_CITA: 'crear_cita',
+  CANCELAR_CITA: 'cancelar_cita',
+  REAGENDAR: 'reagendar',
+  CONSULTAR_DISPONIBILIDAD: 'consultar_disponibilidad',
+  URGENCIA: 'urgencia',
+  PREGUNTA_GENERAL: 'pregunta_general',
+  SALUDO: 'saludo',
+  DESPEDIDA: 'despedida',
+  AGRADECIMIENTO: 'agradecimiento',
+  ACTIVAR_RECORDATORIOS: 'activar_recordatorios',
+  DESACTIVAR_RECORDATORIOS: 'desactivar_recordatorios',
+  PREFERENCIAS_RECORDATORIO: 'preferencias_recordatorio',
+  MOSTRAR_MENU_PRINCIPAL: 'mostrar_menu_principal',
+  PASO_WIZARD: 'paso_wizard',
+  VER_MIS_CITAS: 'ver_mis_citas',
+  DESCONOCIDO: 'desconocido',
 } as const;
 
 export type IntentType = (typeof INTENT)[keyof typeof INTENT];
@@ -30,22 +30,22 @@ export type IntentType = (typeof INTENT)[keyof typeof INTENT];
 // ============================================================================
 
 export const CONFIDENCE_THRESHOLDS: Record<IntentType, number> = {
-  [INTENT.URGENT_CARE]: 0.5,
-  [INTENT.CANCEL_APPOINTMENT]: 0.5,
-  [INTENT.RESCHEDULE]: 0.5,
-  [INTENT.CREATE_APPOINTMENT]: 0.3,
-  [INTENT.CHECK_AVAILABILITY]: 0.3,
-  [INTENT.GREETING]: 0.5,
-  [INTENT.FAREWELL]: 0.5,
-  [INTENT.THANK_YOU]: 0.5,
-  [INTENT.GENERAL_QUESTION]: 0.5,
-  [INTENT.ACTIVATE_REMINDERS]: 0.5,
-  [INTENT.DEACTIVATE_REMINDERS]: 0.5,
-  [INTENT.REMINDER_PREFERENCES]: 0.5,
-  [INTENT.SHOW_MAIN_MENU]: 0.5,
-  [INTENT.WIZARD_STEP]: 0.5,
-  [INTENT.GET_MY_BOOKINGS]: 0.5,
-  [INTENT.UNKNOWN]: 0.0,
+  [INTENT.URGENCIA]: 0.5,
+  [INTENT.CANCELAR_CITA]: 0.5,
+  [INTENT.REAGENDAR]: 0.5,
+  [INTENT.CREAR_CITA]: 0.3,
+  [INTENT.CONSULTAR_DISPONIBILIDAD]: 0.3,
+  [INTENT.SALUDO]: 0.5,
+  [INTENT.DESPEDIDA]: 0.5,
+  [INTENT.AGRADECIMIENTO]: 0.5,
+  [INTENT.PREGUNTA_GENERAL]: 0.5,
+  [INTENT.ACTIVAR_RECORDATORIOS]: 0.5,
+  [INTENT.DESACTIVAR_RECORDATORIOS]: 0.5,
+  [INTENT.PREFERENCIAS_RECORDATORIO]: 0.5,
+  [INTENT.MOSTRAR_MENU_PRINCIPAL]: 0.5,
+  [INTENT.PASO_WIZARD]: 0.5,
+  [INTENT.VER_MIS_CITAS]: 0.5,
+  [INTENT.DESCONOCIDO]: 0.0,
 };
 
 // ============================================================================
@@ -53,55 +53,55 @@ export const CONFIDENCE_THRESHOLDS: Record<IntentType, number> = {
 // ============================================================================
 
 export const INTENT_KEYWORDS: Record<string, { readonly keywords: readonly string[]; readonly weight: number }> = {
-  [INTENT.URGENT_CARE]: {
+  [INTENT.URGENCIA]: {
     keywords: ['urgente', 'emergencia', 'urgencia', 'ya mismo', 'ahora mismo', 'inmediato', 'dolor', 'sangrando', 'no puedo esperar', 'urjente', 'urgnete', 'urjencia', 'nececito atencion', 'necesito atencion', 'necesito atencion ya', 'atencion urgente', 'atencion de emergencia'],
     weight: 10,
   },
-  [INTENT.CANCEL_APPOINTMENT]: {
+  [INTENT.CANCELAR_CITA]: {
     keywords: ['cancelar', 'anular', 'eliminar', 'borrar', 'dar de baja', 'no necesito', 'kanselar', 'cancelsr', 'anualr', 'no voy a poder', 'no voy a ir', 'ya no voy', 'cambié de opinión', 'cancela todo', 'no iré'],
     weight: 4,
   },
-  [INTENT.RESCHEDULE]: {
+  [INTENT.REAGENDAR]: {
     keywords: ['reprogramar', 'reagendar', 'cambiar', 'mover', 'trasladar', 'pasar', 'modificar', 'reporgramar', 'mejor para', 'me equivoqué de hora', 'otro día', 'para otro'],
     weight: 4,
   },
-  [INTENT.CHECK_AVAILABILITY]: {
+  [INTENT.CONSULTAR_DISPONIBILIDAD]: {
     keywords: ['disponibilidad', 'disponible', 'hueco', 'espacio', 'libre', 'tienen', 'lugar', 'horario', 'busco', 'atiende los', 'atiende los sábados'],
     weight: 3,
   },
-  [INTENT.CREATE_APPOINTMENT]: {
+  [INTENT.CREAR_CITA]: {
     keywords: ['reservar', 'agendar', 'cita', 'turno', 'sacar', 'pedir hora', 'necesito hora', 'consulta', 'visita', 'ver al doctor', 'ajendar', 'konsulta', 'cosulta', 'resevar', 'reserba', 'truno', 'sita', 'chequeo general', 'sacarme la muela', 'dolor de guata', 'la hora con el doctor', 'que me den la hora', 'pasado mañana', 'próximo bisiesto', 'medianoche', 'estaba agendando', 'agenda'],
     weight: 3,
   },
-  [INTENT.GET_MY_BOOKINGS]: {
+  [INTENT.VER_MIS_CITAS]: {
     keywords: ['confirmame la cita', 'mis citas', 'mi cita', 'confirmación', 'no me llegó', 'no fui a mi cita', 'ya completé', 'certificado', 'pendiente', 'atendido', 'me cobraron', 'reprogramada automáticamente', 'tengo alguna cita', 'tengo cita', 'mi hora', 'tengo turno', 'cuando es mi hora', 'ver mis citas', 'revisar mis citas'],
     weight: 4,
   },
-  [INTENT.FAREWELL]: {
+  [INTENT.DESPEDIDA]: {
     keywords: ['mejor no quiero', 'gracias', 'adiós', 'chao', 'chau', 'hasta luego', 'nos vemos'],
     weight: 4,
   },
-  [INTENT.GENERAL_QUESTION]: {
+  [INTENT.PREGUNTA_GENERAL]: {
     keywords: ['déjame pensarlo', 'espera', 'pregunta', 'saber si', 'me puedes decir', 'aceptan', 'seguro', 'isapre', 'fonasa', 'convenio', 'precio', 'costo', 'valor', 'donde', 'ubicado', 'hora', 'cierran', 'abren', 'documentos'],
     weight: 3,
   },
-  [INTENT.ACTIVATE_REMINDERS]: {
+  [INTENT.ACTIVAR_RECORDATORIOS]: {
     keywords: ['activar recordatorio', 'activar recordatorios', 'activar notificación', 'activar notificaciones', 'quiero recordatorio', 'activar aviso', 'activar alerta', 'activa recordatorio', 'activa mis recordatorios', 'activa mis recordatorio', 'activa notificacion', 'activa notificaciones', 'quiero que me avisen', 'activa aviso', 'activa alerta'],
     weight: 4,
   },
-  [INTENT.DEACTIVATE_REMINDERS]: {
+  [INTENT.DESACTIVAR_RECORDATORIOS]: {
     keywords: ['desactivar recordatorio', 'desactivar recordatorios', 'desactivar notificación', 'desactivar notificaciones', 'no quiero recordatorio', 'quitar recordatorio', 'no me avisen', 'silenciar recordatorio', 'desactiva recordatorio', 'desactiva mis recordatorios', 'desactiva notificacion', 'desactiva notificaciones', 'no quiero avisos', 'desactiva aviso', 'quitar aviso', 'silenciar aviso'],
     weight: 4,
   },
-  [INTENT.REMINDER_PREFERENCES]: {
+  [INTENT.PREFERENCIAS_RECORDATORIO]: {
     keywords: ['preferencia de recordatorio', 'configurar recordatorio', 'preferencias de notificación', 'cómo configuro recordatorios', 'ajustes de recordatorio', 'personalizar recordatorio', 'preferencias de recordatorio', 'configurar notificacion', 'cambiar mis preferencias de aviso', 'ajustes de aviso', 'configurar aviso', 'como configuro', 'como activo', 'donde cambio'],
     weight: 4,
   },
-  [INTENT.SHOW_MAIN_MENU]: {
+  [INTENT.MOSTRAR_MENU_PRINCIPAL]: {
     keywords: ['menu principal', 'menu', 'inicio', 'opciones', 'volver al inicio', 'volver al menu', 'mostrar menu', 'que puedo hacer', 'ayuda'],
     weight: 4,
   },
-  [INTENT.WIZARD_STEP]: {
+  [INTENT.PASO_WIZARD]: {
     keywords: ['siguiente', 'continuar', 'adelante', 'confirmar cita', 'si confirmar', 'elegir otro', 'otro horario', 'otro dia', 'volver', 'atras', 'cancelar wizard', 'siguiente paso', 'confirmo', 'si quiero'],
     weight: 4,
   },
@@ -188,7 +188,7 @@ export const THANK_YOU_WORDS = ['gracias', 'agradezco', 'te agradezco', 'mil gra
 // URGENCY WORDS (para cross-check post-LLM)
 // ============================================================================
 
-export const URGENCY_WORDS = ['urgente', 'emergencia', 'urgencia', 'ya mismo', 'ahora mismo', 'inmediato', 'dolor', 'sangrando', 'no puedo esperar'];
+export const URGENCY_WORDS = ['urgente', 'emergencia', 'urgencia', 'ya mismo', 'ahora mismo', 'inmediato', 'dolor', 'sangrando', 'duele', 'no puedo esperar'];
 
 // ============================================================================
 // FLEXIBILITY KEYWORDS

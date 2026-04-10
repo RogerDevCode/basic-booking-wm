@@ -1,3 +1,40 @@
+/*
+ * PRE-FLIGHT CHECKLIST
+ * Mission         : Display main menu with persistent reply keyboard
+ * DB Tables Used  : NONE — pure menu routing handler
+ * Concurrency Risk: NO — stateless menu display
+ * GCal Calls      : NO
+ * Idempotency Key : N/A — menu display is idempotent
+ * RLS Tenant ID   : NO — stateless utility, no DB queries
+ * Zod Schemas     : YES — InputSchema validates chat_id and user_id
+ */
+
+/*
+ * REASONING TRACE
+ * ### Mission Decomposition
+ * - Parse validated input action (show/select_option/start)
+ * - Map user text selections to internal routing keys via OPTION_MAP
+ * - Return structured menu payload with keyboard, inline buttons, or force_reply
+ *
+ * ### Schema Verification
+ * - Tables: NONE — this is a stateless utility with no DB access
+ * - Columns: N/A
+ *
+ * ### Failure Mode Analysis
+ * - Scenario 1: Unrecognized user_input → fallback to main menu with warning message
+ * - Scenario 2: Invalid rawInput → Zod safeParse catches and returns structured error
+ *
+ * ### Concurrency Analysis
+ * - Risk: NO — pure function with no shared state or side effects
+ *
+ * ### SOLID Compliance Check
+ * - SRP: YES — single responsibility: menu display and option routing
+ * - DRY: YES — OPTION_MAP centralizes all text-to-route mappings
+ * - KISS: YES — straightforward switch/case with no unnecessary abstraction
+ *
+ * → CLEARED FOR CODE GENERATION
+ */
+
 // ============================================================================
 // TELEGRAM MENU — Main Menu Handler
 // ============================================================================

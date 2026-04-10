@@ -1,3 +1,4 @@
+import { DEFAULT_TIMEZONE } from '../config';
 // ============================================================================
 // GCAL UTILS — Shared Google Calendar utilities
 // ============================================================================
@@ -57,8 +58,8 @@ export function buildGCalEvent(
   return {
     summary: title,
     description,
-    start: { dateTime: booking.start_time, timeZone: 'America/Argentina/Buenos_Aires' },
-    end: { dateTime: booking.end_time, timeZone: 'America/Argentina/Buenos_Aires' },
+    start: { dateTime: booking.start_time, timeZone: DEFAULT_TIMEZONE },
+    end: { dateTime: booking.end_time, timeZone: DEFAULT_TIMEZONE },
     status: booking.status === 'cancelled' ? 'cancelled' : 'confirmed',
     reminders: {
       useDefault: false,

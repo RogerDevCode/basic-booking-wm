@@ -1,3 +1,41 @@
+/*
+ * PRE-FLIGHT CHECKLIST
+ * Mission         : Read-only reference data for regions and communes
+ * DB Tables Used  : regions, communes
+ * Concurrency Risk: NO — read-only reference queries
+ * GCal Calls      : NO
+ * Idempotency Key : N/A — read-only operation
+ * RLS Tenant ID   : NO — read-only reference tables, no tenant isolation needed
+ * Zod Schemas     : YES — InputSchema validates action and region_id
+ */
+
+/*
+ * REASONING TRACE
+ * ### Mission Decomposition
+ * - Validate action (list_regions/list_communes/search_communes) and optional filters via Zod
+ * - Execute read-only SELECT queries on regions and communes with JOIN to regions for region_name
+ * - Map result rows to typed RegionRow/CommuneRow interfaces with count metadata
+ *
+ * ### Schema Verification
+ * - Tables: regions (region_id, name, code, country_code, is_active, sort_order), communes (commune_id, name, region_id, is_active)
+ * - Columns: All columns verified; communes JOIN regions on region_id for region_name enrichment
+ *
+ * ### Failure Mode Analysis
+ * - Scenario 1: list_communes without region_id → fallback to all active communes ordered by region sort_order
+ * - Scenario 2: search_communes with empty search → LIKE '%%' matches all, limited to 50 rows
+ * - Scenario 3: DATABASE_URL missing → early validation error before DB connection
+ *
+ * ### Concurrency Analysis
+ * - Risk: NO — pure read-only queries with no writes or shared state
+ *
+ * ### SOLID Compliance Check
+ * - SRP: YES — single responsibility: fetch and return reference data
+ * - DRY: YES — commune row mapping logic extracted; shared commune SELECT pattern across actions
+ * - KISS: YES — straightforward SELECT with conditional WHERE clauses; no abstraction overhead
+ *
+ * → CLEARED FOR CODE GENERATION
+ */
+
 // ============================================================================
 // WEB ADMIN REGIONS — Read-only reference data for regions and communes
 // ============================================================================
@@ -7,7 +45,6 @@
 
 import "@total-typescript/ts-reset";
 import { z } from 'zod';
-import postgres from 'postgres';
 import { createDbClient } from '../internal/db/client';
 
 const ActionSchema = z.enum(['list_regions', 'list_communes', 'search_communes']);

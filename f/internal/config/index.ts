@@ -8,7 +8,8 @@
 // AGENTS.md §5.3: Retry policy = 500ms * 2^attempt (not 1000ms * 3^attempt).
 // ============================================================================
 
-import { Result } from './result';
+import type { Result } from '../result';
+export type { Result } from '../result';
 
 // ─── Retry Configuration — AGENTS.md §5.3 compliant ───────────────────────
 // Base: 500ms, multiplier: 2 → 500ms, 1000ms, 2000ms, 4000ms, ...
@@ -94,16 +95,16 @@ export const CHANNEL = {
   API: 'api',
 } as const;
 
-// ─── Intent Constants ──────────────────────────────────────────────────────
+// ─── Intent Constants — Spanish vocabulary per AGENTS.md §5.1 ──────────────
 export const INTENT = {
-  CREATE_BOOKING: 'create_booking',
-  CANCEL_BOOKING: 'cancel_booking',
-  RESCHEDULE: 'reschedule',
-  LIST_AVAILABLE: 'list_available',
-  GET_MY_BOOKINGS: 'get_my_bookings',
-  GENERAL_QUESTION: 'general_question',
-  GREETING: 'greeting',
-  UNKNOWN: 'unknown',
+  CREAR_CITA: 'crear_cita',
+  CANCELAR_CITA: 'cancelar_cita',
+  REAGENDAR_CITA: 'reagendar_cita',
+  VER_DISPONIBILIDAD: 'ver_disponibilidad',
+  MIS_CITAS: 'mis_citas',
+  DUDA_GENERAL: 'duda_general',
+  FUERA_DE_CONTEXTO: 'fuera_de_contexto',
+  DESCONOCIDO: 'desconocido',
 } as const;
 
 // ─── Fail-Fast Configuration Validation — AGENTS.md §1.A.3 compliant ──────
@@ -147,3 +148,16 @@ export function requireGmailCredentials(): Result<{ readonly user: string; reado
 export function getOptionalEnv(name: string, defaultValue?: string): string | undefined {
   return process.env[name] ?? defaultValue;
 }
+
+// ─── Default Values — AGENTS.md §2.1: No hardcoded magic values ───────────
+export const NULL_TENANT_UUID = '00000000-0000-0000-0000-000000000000';
+export const DEFAULT_TIMEZONE = 'America/Mexico_City';
+export const DEFAULT_SPECIALTY_PROVIDER = 'Medicina General';
+export const DEFAULT_TAG_COLOR = '#808080';
+export const DEFAULT_SORT_ORDER = 99;
+export const DEFAULT_PASSWORD_LENGTH = 4;
+export const DEFAULT_LIMIT = 100;
+export const LIMIT_50 = 50;
+export const LIMIT_200 = 200;
+export const TELEGRAM_PARSE_MODE = 'Markdown';
+export const DEFAULT_CATEGORY = 'Medicina';
