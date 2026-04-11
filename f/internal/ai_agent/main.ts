@@ -218,8 +218,8 @@ function detectContext(text: string, entities: EntityMap): AvailabilityContext {
 
 function suggestResponseType(intent: IntentType, context: AvailabilityContext, entities: EntityMap): string {
   if (intent === INTENT.URGENCIA) return 'urgent_options';
-  if (intent === INTENT.REAGENDAR) return 'reschedule_flow';
-  if (intent === INTENT.CONSULTAR_DISPONIBILIDAD) {
+  if (intent === INTENT.REAGENDAR_CITA) return 'reschedule_flow';
+  if (intent === INTENT.VER_DISPONIBILIDAD) {
     if (context.is_today) return 'no_availability_today';
     if (context.is_specific_date && context.day_preference != null) return 'filtered_search';
     if (context.is_specific_date) return 'availability_list';
@@ -331,7 +331,7 @@ function generateAIResponse(
     };
   }
 
-  if (intent === INTENT.REAGENDAR) {
+  if (intent === INTENT.REAGENDAR_CITA) {
     return {
       aiResponse: "Puedo ayudarte a cambiar tu cita. Consultaré el sistema para ver las opciones de reagendamiento.",
       needsMoreInfo: true,
@@ -449,7 +449,7 @@ function detectIntentRules(text: string): { readonly intent: IntentType; readonl
   // Reschedule check — but only when NOT explicitly creating new appointment
   // "Quiero agendar para otro día" → create (new appointment for another day)
   // "Quiero cambiar mi cita" → reschedule (modify existing)
-  const rescheduleKw = INTENT_KEYWORDS[INTENT.REAGENDAR]?.keywords ?? [];
+  const rescheduleKw = INTENT_KEYWORDS[INTENT.REAGENDAR_CITA]?.keywords ?? [];
   // Core create keywords (not "cita" which appears everywhere)
   const coreCreateKw = ['agendar', 'reservar', 'ajendar', 'sacar', 'pedir hora', 'necesito hora', 'consulta', 'visita', 'ver al doctor', 'konsulta', 'cosulta', 'resevar', 'truno', 'sita', 'agenda'];
   const hasRescheduleKeyword = rescheduleKw.some(k => lower.includes(k));
@@ -458,14 +458,14 @@ function detectIntentRules(text: string): { readonly intent: IntentType; readonl
   // If user says "agendar"/"reservar", it's create (even with "otro día")
   // Otherwise if reschedule keywords match, use reschedule
   if (hasRescheduleKeyword && !hasCreateKeyword) {
-    return { intent: INTENT.REAGENDAR, confidence: RULE_CONFIDENCE_VALUES.reschedule_rule };
+    return { intent: INTENT.REAGENDAR_CITA, confidence: RULE_CONFIDENCE_VALUES.reschedule_rule };
   }
 
   // Check availability when asking for "hora" with a day preference
   const hasDayPref = Object.keys(DAY_NAMES).some(d => lower.includes(d));
   const hasRelDate = RELATIVE_DATES.some(r => lower.includes(r));
   if ((hasDayPref || hasRelDate) && lower.includes('hora')) {
-    return { intent: INTENT.CONSULTAR_DISPONIBILIDAD, confidence: RULE_CONFIDENCE_VALUES.availability_rule };
+    return { intent: INTENT.VER_DISPONIBILIDAD, confidence: RULE_CONFIDENCE_VALUES.availability_rule };
   }
 
   // Cancel check before create (cancelar/anular + cita/turno = cancel)
@@ -477,7 +477,7 @@ function detectIntentRules(text: string): { readonly intent: IntentType; readonl
   for (const [intent, config] of Object.entries(INTENT_KEYWORDS)) {
     const typedIntent = intent as IntentType;
     // Skip reschedule if user explicitly says "agendar"/"reservar"
-    if (typedIntent === INTENT.REAGENDAR && hasCreateKeyword) continue;
+    if (typedIntent === INTENT.REAGENDAR_CITA && hasCreateKeyword) continue;
     const keywords = config.keywords;
     const matchCount = keywords.filter((k: string) => lower.includes(k)).length;
     if (matchCount > 0) {
@@ -515,7 +515,7 @@ export async function main(rawInput: unknown): Promise<{ readonly success: boole
   // Step 2: Intent detection
   let intent: IntentType = INTENT.DESCONOCIDO;
   let confidence = 0.0;
-  let provider: "groq" | "openai" | "fallback" | "fast-path" = "fallback";
+  let provider: "groq" | "openai" | "openrouter" | "fallback" | "fast-path" = "fallback";
   let cot_reasoning = "Fallback to rules-based detection";
 
   // Fast path: greetings/thanks
@@ -609,6 +609,7 @@ export async function main(rawInput: unknown): Promise<{ readonly success: boole
     needs_more_info: needsMoreInfo,
     follow_up: followUpQuestion,
     ai_response: aiResponse,
+    requires_human: escalation_level !== 'none',
     escalation_level,
     cot_reasoning,
     validation_passed: true,
@@ -638,8 +639,8 @@ function detectSocial(text: string): { readonly intent: IntentType; readonly con
   // This prevents "Buenos días, necesito reprogramar" from being classified as greeting
   const hasActionableKeywords =
     INTENT_KEYWORDS[INTENT.CANCELAR_CITA]?.keywords.some(k => lower.includes(k)) ||
-    INTENT_KEYWORDS[INTENT.REAGENDAR]?.keywords.some(k => lower.includes(k)) ||
-    INTENT_KEYWORDS[INTENT.CONSULTAR_DISPONIBILIDAD]?.keywords.some(k => lower.includes(k)) ||
+    INTENT_KEYWORDS[INTENT.REAGENDAR_CITA]?.keywords.some(k => lower.includes(k)) ||
+    INTENT_KEYWORDS[INTENT.VER_DISPONIBILIDAD]?.keywords.some(k => lower.includes(k)) ||
     INTENT_KEYWORDS[INTENT.CREAR_CITA]?.keywords.some(k => lower.includes(k)) ||
     INTENT_KEYWORDS[INTENT.VER_MIS_CITAS]?.keywords.some(k => lower.includes(k)) ||
     INTENT_KEYWORDS[INTENT.ACTIVAR_RECORDATORIOS]?.keywords.some(k => lower.includes(k)) ||
@@ -659,7 +660,7 @@ function detectSocial(text: string): { readonly intent: IntentType; readonly con
 interface LLMInquiryResult {
   readonly intent: IntentType;
   readonly confidence: number;
-  readonly provider: "groq" | "openai";
+  readonly provider: "groq" | "openai" | "openrouter";
   readonly cot_reasoning: string;
 }
 

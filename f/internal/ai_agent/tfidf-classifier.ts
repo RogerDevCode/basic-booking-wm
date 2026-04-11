@@ -33,14 +33,14 @@ const CORPUS: Record<string, readonly string[]> = {
     'no podre ir kanselame',
     'cancelar la hora que tengo',
   ],
-  [INTENT.REAGENDAR]: [
+  [INTENT.REAGENDAR_CITA]: [
     'necesito cambiar mi cita del viernes al jueves',
     'reprogramar turno para la otra semana',
     'mejor para el miercoles a las once',
     'mover mi hora de manana para pasado',
     'kiero kambiar la cita pa otro dia',
   ],
-  [INTENT.CONSULTAR_DISPONIBILIDAD]: [
+  [INTENT.VER_DISPONIBILIDAD]: [
     'tienen disponibilidad para el lunes',
     'esta libre el doctor el martes por la manana',
     'hay hueco para hoy a las tres',

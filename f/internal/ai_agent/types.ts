@@ -10,7 +10,7 @@
 // ============================================================================
 
 import { z } from "zod";
-import { INTENT } from "./constants";
+import { INTENT, CONFIDENCE_BOUNDARIES } from "./constants";
 
 // ============================================================================
 // ZOD SCHEMAS — Single Source of Truth
@@ -162,6 +162,7 @@ const BaseIntentResultSchema = z.object({
   needs_more_info: z.boolean().default(false),
   follow_up:      z.string().nullable().catch(null),
   ai_response:    z.string().min(1),
+  requires_human: z.boolean().default(false),
   escalation_level: EscalationLevelSchema.default("none"),
   cot_reasoning:  z.string().min(1),
   validation_passed: z.boolean(),
@@ -231,19 +232,19 @@ export function isValidConfidence(value: number): boolean {
   return typeof value === "number" && value >= 0 && value <= 1;
 }
 
-/** Confidence ≥ 0.85 — safe for fast-path without LLM validation */
+/** Confidence ≥ CONFIDENCE_BOUNDARIES.HIGH_MIN — safe for fast-path without LLM validation */
 export function isHighConfidence(confidence: number): boolean {
-  return confidence >= 0.85;
+  return confidence >= CONFIDENCE_BOUNDARIES.HIGH_MIN;
 }
 
-/** Confidence 0.60-0.84 — moderate, LLM validation recommended */
+/** Confidence CONFIDENCE_BOUNDARIES.MODERATE_MIN to MODERATE_MAX — moderate, LLM validation recommended */
 export function isModerateConfidence(confidence: number): boolean {
-  return confidence >= 0.60 && confidence < 0.85;
+  return confidence >= CONFIDENCE_BOUNDARIES.MODERATE_MIN && confidence < CONFIDENCE_BOUNDARIES.MODERATE_MAX;
 }
 
-/** Confidence < 0.60 — low, fallback to rule-based + human review */
+/** Confidence < CONFIDENCE_BOUNDARIES.LOW_MAX — low, fallback to rule-based + human review */
 export function isLowConfidence(confidence: number): boolean {
-  return confidence < 0.60;
+  return confidence < CONFIDENCE_BOUNDARIES.LOW_MAX;
 }
 
 export function isUrgentIntent(intent: IntentType): boolean {
@@ -254,8 +255,8 @@ export function isBookingIntent(intent: IntentType): boolean {
   return [
     INTENT.CREAR_CITA,
     INTENT.CANCELAR_CITA,
-    INTENT.REAGENDAR,
-    INTENT.CONSULTAR_DISPONIBILIDAD,
+    INTENT.REAGENDAR_CITA,
+    INTENT.VER_DISPONIBILIDAD,
   ].includes(intent);
 }
 

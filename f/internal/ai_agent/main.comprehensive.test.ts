@@ -227,70 +227,70 @@ const TEST_QUERIES: TestQuery[] = [
     id: 26,
     category: 'reschedule',
     input: 'Quiero cambiar mi cita',
-    expectedIntent: INTENT.REAGENDAR,
+    expectedIntent: INTENT.REAGENDAR_CITA,
     minConfidence: 0.5
   },
   {
     id: 27,
     category: 'reschedule',
     input: 'Necesito reprogramar mi turno',
-    expectedIntent: INTENT.REAGENDAR,
+    expectedIntent: INTENT.REAGENDAR_CITA,
     minConfidence: 0.5
   },
   {
     id: 28,
     category: 'reschedule',
     input: 'Mover la cita para otro día',
-    expectedIntent: INTENT.REAGENDAR,
+    expectedIntent: INTENT.REAGENDAR_CITA,
     minConfidence: 0.5
   },
   {
     id: 29,// LLM detects "cita" as create - known limitation
     category: 'reschedule',
     input: 'Reagendar mi cita',
-    expectedIntent: INTENT.REAGENDAR,
+    expectedIntent: INTENT.REAGENDAR_CITA,
     minConfidence: 0.5
   },
   {
     id: 30,
     category: 'reschedule',
     input: 'Cambiar la hora de mi cita',
-    expectedIntent: INTENT.REAGENDAR,
+    expectedIntent: INTENT.REAGENDAR_CITA,
     minConfidence: 0.5
   },
   {
     id: 31,
     category: 'reschedule',
     input: 'Pasar mi turno para la semana que viene',
-    expectedIntent: INTENT.REAGENDAR,
+    expectedIntent: INTENT.REAGENDAR_CITA,
     minConfidence: 0.5
   },
   {
     id: 32,
     category: 'reschedule',
     input: 'Modificar la fecha de mi cita',
-    expectedIntent: INTENT.REAGENDAR,
+    expectedIntent: INTENT.REAGENDAR_CITA,
     minConfidence: 0.5
   },
   {
     id: 33,
     category: 'reschedule',
     input: 'Cambiar cita del lunes al miércoles',
-    expectedIntent: INTENT.REAGENDAR,
+    expectedIntent: INTENT.REAGENDAR_CITA,
     minConfidence: 0.5
   },
   {
     id: 34,
     category: 'reschedule',
     input: 'Reprogramar para otro horario',
-    expectedIntent: INTENT.REAGENDAR,
+    expectedIntent: INTENT.REAGENDAR_CITA,
     minConfidence: 0.5
   },
   {
     id: 35,
     category: 'reschedule',
     input: 'Trasladar mi turno',
-    expectedIntent: INTENT.REAGENDAR,
+    expectedIntent: INTENT.REAGENDAR_CITA,
     minConfidence: 0.5
   },
 
@@ -301,14 +301,14 @@ const TEST_QUERIES: TestQuery[] = [
     id: 36,
     category: 'check_availability',
     input: '¿Qué horas tienen disponibles?',
-    expectedIntent: INTENT.CONSULTAR_DISPONIBILIDAD,
+    expectedIntent: INTENT.VER_DISPONIBILIDAD,
     minConfidence: 0.3
   },
   {
     id: 37,
     category: 'check_availability',
     input: '¿Tienen disponibilidad para hoy?',
-    expectedIntent: INTENT.CONSULTAR_DISPONIBILIDAD,
+    expectedIntent: INTENT.VER_DISPONIBILIDAD,
     expectedContext: { is_today: true },
     minConfidence: 0.3
   },
@@ -316,56 +316,56 @@ const TEST_QUERIES: TestQuery[] = [
     id: 38,
     category: 'check_availability',
     input: '¿Qué días tienen libre?',
-    expectedIntent: INTENT.CONSULTAR_DISPONIBILIDAD,
+    expectedIntent: INTENT.VER_DISPONIBILIDAD,
     minConfidence: 0.3
   },
   {
     id: 39,
     category: 'check_availability',
     input: '¿Me pueden decir si tienen hora?',
-    expectedIntent: INTENT.CONSULTAR_DISPONIBILIDAD,
+    expectedIntent: INTENT.VER_DISPONIBILIDAD,
     minConfidence: 0.3
   },
   {
     id: 40,
     category: 'check_availability',
     input: '¿Hay disponibilidad esta semana?',
-    expectedIntent: INTENT.CONSULTAR_DISPONIBILIDAD,
+    expectedIntent: INTENT.VER_DISPONIBILIDAD,
     minConfidence: 0.3
   },
   {
     id: 41,
     category: 'check_availability',
     input: '¿Qué horarios tienen?',
-    expectedIntent: INTENT.CONSULTAR_DISPONIBILIDAD,
+    expectedIntent: INTENT.VER_DISPONIBILIDAD,
     minConfidence: 0.3
   },
   {
     id: 42,
     category: 'check_availability',
     input: '¿Tienen turno disponible?',
-    expectedIntent: INTENT.CONSULTAR_DISPONIBILIDAD,
+    expectedIntent: INTENT.VER_DISPONIBILIDAD,
     minConfidence: 0.3
   },
   {
     id: 43,
     category: 'check_availability',
     input: '¿Me dicen si tienen lugar?',
-    expectedIntent: INTENT.CONSULTAR_DISPONIBILIDAD,
+    expectedIntent: INTENT.VER_DISPONIBILIDAD,
     minConfidence: 0.3
   },
   {
     id: 44,
     category: 'check_availability',
     input: '¿Qué días están disponibles?',
-    expectedIntent: INTENT.CONSULTAR_DISPONIBILIDAD,
+    expectedIntent: INTENT.VER_DISPONIBILIDAD,
     minConfidence: 0.3
   },
   {
     id: 45,
     category: 'check_availability',
     input: '¿Tienen huecos libres?',
-    expectedIntent: INTENT.CONSULTAR_DISPONIBILIDAD,
+    expectedIntent: INTENT.VER_DISPONIBILIDAD,
     minConfidence: 0.3
   },
 
@@ -481,14 +481,14 @@ const TEST_QUERIES: TestQuery[] = [
     id: 59,
     category: 'spelling_errors',
     input: 'Reprogramar mi turno para otro dia',
-    expectedIntent: INTENT.REAGENDAR,
+    expectedIntent: INTENT.REAGENDAR_CITA,
     minConfidence: 0.5
   },
   {
     id: 60,
     category: 'spelling_errors',
     input: 'Tienen disponibilidaz?',
-    expectedIntent: INTENT.CONSULTAR_DISPONIBILIDAD,
+    expectedIntent: INTENT.VER_DISPONIBILIDAD,
     minConfidence: 0.3
   },
   {
@@ -516,14 +516,14 @@ const TEST_QUERIES: TestQuery[] = [
     id: 64,
     category: 'spelling_errors',
     input: 'Cambiar la ora de mi cita',
-    expectedIntent: INTENT.REAGENDAR,
+    expectedIntent: INTENT.REAGENDAR_CITA,
     minConfidence: 0.5
   },
   {
     id: 65,
     category: 'spelling_errors',
     input: 'Tienen lugar disponsible?',
-    expectedIntent: INTENT.CONSULTAR_DISPONIBILIDAD,
+    expectedIntent: INTENT.VER_DISPONIBILIDAD,
     minConfidence: 0.3
   },
 
@@ -555,14 +555,14 @@ const TEST_QUERIES: TestQuery[] = [
     id: 69,// LLM detects "truno" as create - known limitation
     category: 'dyslexia',
     input: 'Reporgramar mi truno',
-    expectedIntent: INTENT.REAGENDAR,
+    expectedIntent: INTENT.REAGENDAR_CITA,
     minConfidence: 0.5
   },
   {
     id: 70,
     category: 'dyslexia',
     input: 'Tienen disponiblidad?',
-    expectedIntent: INTENT.CONSULTAR_DISPONIBILIDAD,
+    expectedIntent: INTENT.VER_DISPONIBILIDAD,
     minConfidence: 0.3
   },
   {
@@ -590,14 +590,14 @@ const TEST_QUERIES: TestQuery[] = [
     id: 74,
     category: 'dyslexia',
     input: 'Cambiar la hor de mi cita',
-    expectedIntent: INTENT.REAGENDAR,
+    expectedIntent: INTENT.REAGENDAR_CITA,
     minConfidence: 0.5
   },
   {
     id: 75,
     category: 'dyslexia',
     input: 'Tienen lugr disponible?',
-    expectedIntent: INTENT.CONSULTAR_DISPONIBILIDAD,
+    expectedIntent: INTENT.VER_DISPONIBILIDAD,
     minConfidence: 0.3
   },
 
@@ -622,7 +622,7 @@ const TEST_QUERIES: TestQuery[] = [
     id: 78,
     category: 'profanity',
     input: 'Reprogramar mi turno, mierda',
-    expectedIntent: INTENT.REAGENDAR,
+    expectedIntent: INTENT.REAGENDAR_CITA,
     minConfidence: 0.5
   },
   {
@@ -637,7 +637,7 @@ const TEST_QUERIES: TestQuery[] = [
     id: 80,
     category: 'profanity',
     input: 'Tienen disponibilidad o qué, carajo?',
-    expectedIntent: INTENT.CONSULTAR_DISPONIBILIDAD,
+    expectedIntent: INTENT.VER_DISPONIBILIDAD,
     minConfidence: 0.3
   },
 

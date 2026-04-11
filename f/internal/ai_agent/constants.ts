@@ -6,8 +6,8 @@
 export const INTENT = {
   CREAR_CITA: 'crear_cita',
   CANCELAR_CITA: 'cancelar_cita',
-  REAGENDAR: 'reagendar',
-  CONSULTAR_DISPONIBILIDAD: 'consultar_disponibilidad',
+  REAGENDAR_CITA: 'reagendar_cita',
+  VER_DISPONIBILIDAD: 'ver_disponibilidad',
   URGENCIA: 'urgencia',
   PREGUNTA_GENERAL: 'pregunta_general',
   SALUDO: 'saludo',
@@ -32,9 +32,9 @@ export type IntentType = (typeof INTENT)[keyof typeof INTENT];
 export const CONFIDENCE_THRESHOLDS: Record<IntentType, number> = {
   [INTENT.URGENCIA]: 0.5,
   [INTENT.CANCELAR_CITA]: 0.5,
-  [INTENT.REAGENDAR]: 0.5,
+  [INTENT.REAGENDAR_CITA]: 0.5,
   [INTENT.CREAR_CITA]: 0.3,
-  [INTENT.CONSULTAR_DISPONIBILIDAD]: 0.3,
+  [INTENT.VER_DISPONIBILIDAD]: 0.3,
   [INTENT.SALUDO]: 0.5,
   [INTENT.DESPEDIDA]: 0.5,
   [INTENT.AGRADECIMIENTO]: 0.5,
@@ -61,11 +61,11 @@ export const INTENT_KEYWORDS: Record<string, { readonly keywords: readonly strin
     keywords: ['cancelar', 'anular', 'eliminar', 'borrar', 'dar de baja', 'no necesito', 'kanselar', 'cancelsr', 'anualr', 'no voy a poder', 'no voy a ir', 'ya no voy', 'cambié de opinión', 'cancela todo', 'no iré'],
     weight: 4,
   },
-  [INTENT.REAGENDAR]: {
+  [INTENT.REAGENDAR_CITA]: {
     keywords: ['reprogramar', 'reagendar', 'cambiar', 'mover', 'trasladar', 'pasar', 'modificar', 'reporgramar', 'mejor para', 'me equivoqué de hora', 'otro día', 'para otro'],
     weight: 4,
   },
-  [INTENT.CONSULTAR_DISPONIBILIDAD]: {
+  [INTENT.VER_DISPONIBILIDAD]: {
     keywords: ['disponibilidad', 'disponible', 'hueco', 'espacio', 'libre', 'tienen', 'lugar', 'horario', 'busco', 'atiende los', 'atiende los sábados'],
     weight: 3,
   },
@@ -259,3 +259,23 @@ export const SOCIAL_CONFIDENCE_VALUES = Object.freeze({
   thank_you: 0.95,
   off_topic: 0.85,
 });
+
+// ============================================================================
+// CONFIDENCE BOUNDARIES — AGENTS.md §5.1 system invariants
+// Single source for routing decision thresholds.
+// types.ts functions MUST reference these — never hardcode inline.
+// ============================================================================
+
+export const CONFIDENCE_BOUNDARIES = Object.freeze({
+  HIGH_MIN: 0.85,
+  MODERATE_MIN: 0.60,
+  MODERATE_MAX: 0.85,
+  LOW_MAX: 0.60,
+});
+
+// ============================================================================
+// NULL TENANT SENTINEL — Security constant for tenant isolation
+// Used only for rejection guards — never as a fallback tenant ID.
+// ============================================================================
+
+export const NULL_TENANT_SENTINEL = '00000000-0000-0000-0000-000000000000';

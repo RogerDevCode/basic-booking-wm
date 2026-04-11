@@ -55,9 +55,9 @@ describe('AI Agent — Full Pipeline', () => {
       // Core booking intents
       { intent: INTENT.SALUDO, text: 'Hola', minConfidence: 0.8 },
       { intent: INTENT.CREAR_CITA, text: 'Quiero agendar una cita', minConfidence: 0.8 },
-      { intent: INTENT.CONSULTAR_DISPONIBILIDAD, text: 'tiene libre el lune?', minConfidence: 0.3 },
+      { intent: INTENT.VER_DISPONIBILIDAD, text: 'tiene libre el lune?', minConfidence: 0.3 },
       { intent: INTENT.CANCELAR_CITA, text: 'Cancelar mi cita', minConfidence: 0.8 },
-      { intent: INTENT.REAGENDAR, text: 'Cambiar mi cita del martes', minConfidence: 0.8 },
+      { intent: INTENT.REAGENDAR_CITA, text: 'Cambiar mi cita del martes', minConfidence: 0.8 },
       { intent: INTENT.CREAR_CITA, text: 'Ver mis citas', minConfidence: 0.3 },
 
       // Social intents

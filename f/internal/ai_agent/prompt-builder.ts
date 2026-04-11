@@ -41,21 +41,21 @@ const INTENT_DEFINITIONS = `<INTENT_DEFINITIONS>
 
 ${INTENT.CREAR_CITA}: El usuario quiere agendar/reservar una cita NUEVA.
   ✅ SÍ: "Quiero una cita", "Necesito turno", "Agendar para el lunes", "Una cita para mañana", "kiero una ora"
-  ❌ NO: "¿Tienen hora?" (eso es ${INTENT.CONSULTAR_DISPONIBILIDAD})
+  ❌ NO: "¿Tienen hora?" (eso es ${INTENT.VER_DISPONIBILIDAD})
   ❌ NO: "Cancelar mi cita" (eso es ${INTENT.CANCELAR_CITA})
-  ❌ NO: "Cambiar mi cita" (eso es ${INTENT.REAGENDAR})
+  ❌ NO: "Cambiar mi cita" (eso es ${INTENT.REAGENDAR_CITA})
 
 ${INTENT.CANCELAR_CITA}: El usuario quiere ANULAR una cita existente.
   ✅ SÍ: "Cancelar cita", "Ya no voy", "Anular turno", "Eliminar mi reserva", "No necesito la cita", "kanselame"
-  ❌ NO: "Cambiar de hora" (eso es ${INTENT.REAGENDAR})
+  ❌ NO: "Cambiar de hora" (eso es ${INTENT.REAGENDAR_CITA})
   ❌ NO: "Quiero una cita nueva" (eso es ${INTENT.CREAR_CITA})
 
-${INTENT.REAGENDAR}: El usuario quiere CAMBIAR una cita existente a otro día/hora.
+${INTENT.REAGENDAR_CITA}: El usuario quiere CAMBIAR una cita existente a otro día/hora.
   ✅ SÍ: "Cambiar mi cita del martes", "Reprogramar", "Mover para la tarde", "Reagendar", "kambiar la hora"
   ❌ NO: "Quiero una cita nueva" (eso es ${INTENT.CREAR_CITA})
   ❌ NO: "Cancelar" (eso es ${INTENT.CANCELAR_CITA})
 
-${INTENT.CONSULTAR_DISPONIBILIDAD}: El usuario pregunta por horarios/disponibilidad SIN confirmar reserva.
+${INTENT.VER_DISPONIBILIDAD}: El usuario pregunta por horarios/disponibilidad SIN confirmar reserva.
   ✅ SÍ: "¿Tienen hora mañana?", "¿Qué días hay libre?", "¿A qué hora atienden?", "tiene libre el lune?"
   ❌ NO: "Quiero agendar para mañana" (eso es ${INTENT.CREAR_CITA})
 
@@ -122,9 +122,9 @@ REGLAS DE DESEMPATE (aplicar en orden, de mayor a menor prioridad):
 1. URGENCIA MÉDICA real (dolor físico, sangrado, emergencia) → ${INTENT.URGENCIA}
    NO confundir con urgencia administrativa ("necesito cita urgente")
 2. Si hay saludo + acción ("Hola, quiero agendar") → clasificar por la acción, NO ${INTENT.SALUDO}
-3. "¿Tienen hora/disponibilidad/lugar?" sin verbo de reserva → ${INTENT.CONSULTAR_DISPONIBILIDAD}
+3. "¿Tienen hora/disponibilidad/lugar?" sin verbo de reserva → ${INTENT.VER_DISPONIBILIDAD}
 4. "Quiero/Necesito" + cita/turno/reserva → ${INTENT.CREAR_CITA}
-5. Verbo de cambio (cambiar, mover, reprogramar, reagendar, trasladar) + cita existente → ${INTENT.REAGENDAR}
+5. Verbo de cambio (cambiar, mover, reprogramar, reagendar, trasladar) + cita existente → ${INTENT.REAGENDAR_CITA}
 6. Verbo de anulación (cancelar, anular, eliminar, dar de baja, ya no voy) + cita existente → ${INTENT.CANCELAR_CITA}
 7. Si el mensaje menciona "mi cita", "la reserva", "el turno del viernes" → NO es ${INTENT.CREAR_CITA}
 8. "mi cita", "mis citas", "tengo hora", "confirmame" → ${INTENT.VER_MIS_CITAS}
@@ -190,16 +190,16 @@ User: "Hola, quiero agendar para mañana a las 10"
 → {"intent":"${INTENT.CREAR_CITA}","confidence":0.95,"entities":{"date":"mañana","time":"10:00"},"needs_more":false,"follow_up":null}
 
 User: "tiene hora disponible para el lunes?"
-→ {"intent":"${INTENT.CONSULTAR_DISPONIBILIDAD}","confidence":0.90,"entities":{"date":"lunes"},"needs_more":false,"follow_up":null}
+→ {"intent":"${INTENT.VER_DISPONIBILIDAD}","confidence":0.90,"entities":{"date":"lunes"},"needs_more":false,"follow_up":null}
 
 User: "¿Tienen disponibilidad esta semana?"
-→ {"intent":"${INTENT.CONSULTAR_DISPONIBILIDAD}","confidence":0.90,"entities":{"date":"esta semana"},"needs_more":false,"follow_up":null}
+→ {"intent":"${INTENT.VER_DISPONIBILIDAD}","confidence":0.90,"entities":{"date":"esta semana"},"needs_more":false,"follow_up":null}
 
 User: "tiene libre el lune?"
-→ {"intent":"${INTENT.CONSULTAR_DISPONIBILIDAD}","confidence":0.85,"entities":{"date":"lunes"},"needs_more":false,"follow_up":null}
+→ {"intent":"${INTENT.VER_DISPONIBILIDAD}","confidence":0.85,"entities":{"date":"lunes"},"needs_more":false,"follow_up":null}
 
 User: "tine ora hoy a las 10?"
-→ {"intent":"${INTENT.CONSULTAR_DISPONIBILIDAD}","confidence":0.85,"entities":{"date":"hoy","time":"10:00"},"needs_more":false,"follow_up":null}
+→ {"intent":"${INTENT.VER_DISPONIBILIDAD}","confidence":0.85,"entities":{"date":"hoy","time":"10:00"},"needs_more":false,"follow_up":null}
 
 User: "Necesito cancelar mi cita del jueves"
 → {"intent":"${INTENT.CANCELAR_CITA}","confidence":0.95,"entities":{"date":"jueves"},"needs_more":false,"follow_up":null}
@@ -217,13 +217,13 @@ User: "Ya no necesito la cita, gracias"
 → {"intent":"${INTENT.CANCELAR_CITA}","confidence":0.85,"entities":{},"needs_more":false,"follow_up":null}
 
 User: "Necesito cambiar mi cita del viernes para el martes"
-→ {"intent":"${INTENT.REAGENDAR}","confidence":0.95,"entities":{"date":"martes"},"needs_more":false,"follow_up":null}
+→ {"intent":"${INTENT.REAGENDAR_CITA}","confidence":0.95,"entities":{"date":"martes"},"needs_more":false,"follow_up":null}
 
 User: "Puedo reprogramar mi hora para la tarde?"
-→ {"intent":"${INTENT.REAGENDAR}","confidence":0.90,"entities":{},"needs_more":true,"follow_up":"¿Para qué día y hora de la tarde te gustaría?"}
+→ {"intent":"${INTENT.REAGENDAR_CITA}","confidence":0.90,"entities":{},"needs_more":true,"follow_up":"¿Para qué día y hora de la tarde te gustaría?"}
 
 User: "kiero kambiar la del bieres pal jueves"
-→ {"intent":"${INTENT.REAGENDAR}","confidence":0.90,"entities":{"date":"jueves"},"needs_more":false,"follow_up":null}
+→ {"intent":"${INTENT.REAGENDAR_CITA}","confidence":0.90,"entities":{"date":"jueves"},"needs_more":false,"follow_up":null}
 
 User: "Me duele mucho la muela, necesito atención urgente"
 → {"intent":"${INTENT.URGENCIA}","confidence":0.95,"entities":{},"needs_more":false,"follow_up":null}

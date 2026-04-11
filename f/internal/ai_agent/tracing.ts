@@ -9,7 +9,7 @@ export interface TraceData {
   readonly chat_id: string;
   readonly intent: IntentType;
   readonly confidence: number;
-  readonly provider: "groq" | "openai" | "fallback" | "fast-path";
+  readonly provider: "groq" | "openai" | "openrouter" | "fallback" | "fast-path";
   readonly latency_ms: number;
   readonly tokens_in?: number;
   readonly tokens_out?: number;

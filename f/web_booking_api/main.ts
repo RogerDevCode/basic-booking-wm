@@ -59,7 +59,7 @@ import { withTenantContext } from '../internal/tenant-context';
 import { createDbClient } from '../internal/db/client';
 
 const InputSchema = z.object({
-  action: z.enum(['create', 'cancel', 'reschedule']),
+  action: z.enum(['crear', 'cancelar', 'reagendar']),
   user_id: z.string().uuid(),
   booking_id: z.string().uuid().optional(),
   provider_id: z.string().uuid().optional(),
@@ -122,21 +122,21 @@ export async function main(rawInput: unknown): Promise<[Error | null, BookingRes
   try {
     // ── Determine tenantId ────────────────────────────────────────────────
     // RULE: tenantId MUST ALWAYS be provider_id — NEVER user_id.
-    // For 'create': provider_id is a required input field.
-    // For 'cancel'/'reschedule': resolve provider_id from the booking row
+    // For 'crear': provider_id is a required input field.
+    // For 'cancelar'/'reagendar': resolve provider_id from the booking row
     //   via a non-RLS query before opening withTenantContext.
 
     let tenantId: string;
 
-    if (action === 'create') {
+    if (action === 'crear') {
       if (provider_id === undefined) {
-        return [new Error('provider_id is required for create'), null];
+        return [new Error('provider_id is required for crear'), null];
       }
       tenantId = provider_id;
     } else {
       // cancel or reschedule — must have booking_id
       if (booking_id === undefined) {
-        return [new Error('booking_id is required for cancel/reschedule'), null];
+        return [new Error('booking_id is required for cancelar/reagendar'), null];
       }
       const [resolveErr, resolvedProviderId] = await resolveProviderIdForBooking(sql, booking_id);
       if (resolveErr !== null || resolvedProviderId === null) {
@@ -180,7 +180,7 @@ export async function main(rawInput: unknown): Promise<[Error | null, BookingRes
       }
 
       switch (action) {
-        case 'create': {
+        case 'crear': {
           // provider_id is guaranteed non-undefined here (validated above)
           if (service_id === undefined || start_time === undefined) {
             return [new Error('service_id and start_time are required for create'), null];
@@ -258,7 +258,7 @@ export async function main(rawInput: unknown): Promise<[Error | null, BookingRes
           }];
         }
 
-        case 'cancel': {
+        case 'cancelar': {
           // booking_id is guaranteed non-undefined here (validated above)
           const bId = booking_id as string;
 
@@ -302,7 +302,7 @@ export async function main(rawInput: unknown): Promise<[Error | null, BookingRes
           }];
         }
 
-        case 'reschedule': {
+        case 'reagendar': {
           // booking_id and start_time both required — validated above for reschedule path
           if (start_time === undefined) {
             return [new Error('start_time is required for reschedule'), null];

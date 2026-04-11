@@ -52,7 +52,7 @@ describe('AI Agent — Classifier Accuracy', () => {
     test('reschedule: "Cambiar mi cita del martes"', async () => {
       const result = await main({ chat_id: 't', text: 'Cambiar mi cita del martes' });
       expect(result.success).toBe(true);
-      expect(result.data?.intent).toBe(INTENT.REAGENDAR);
+      expect(result.data?.intent).toBe(INTENT.REAGENDAR_CITA);
       expect(result.data?.confidence).toBeGreaterThanOrEqual(0.3);
     });
 

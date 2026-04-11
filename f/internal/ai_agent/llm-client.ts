@@ -1,16 +1,17 @@
 // ============================================================================
-// LLM CLIENT — Configurable Provider Chain (v5.0)
+// LLM CLIENT — Configurable Provider Chain (v6.0)
 // Temperature 0.0, max_tokens 512, timeout 15s, 2 retries
 // Structured Outputs (json_schema strict) for OpenAI, json_object for Groq
 // Pattern: Precision Architecture, No 'any', Errors as Values
 //
 // CONFIGURABLE PROVIDER CHAIN — Set via LLM_PROVIDER_ORDER env var
-//   Default: "groq,groq2,openai" → gpt-oss-20b → llama-3.3-70b → gpt-4o-mini
+//   Default: "openai,groq,groq2,openrouter" → gpt-4o-mini → gpt-oss-20b →
+//     llama-3.3-70b → openrouter/auto:free (free fallback)
 //   Examples:
 //     "groq"                    → Only Groq (fastest, cheapest)
 //     "groq,openai"             → Groq first, OpenAI fallback
 //     "openai,groq"             → OpenAI first, Groq fallback
-//     "groq,groq2,openai"       → Groq1 → Groq2 → OpenAI (default)
+//     "openai,groq,groq2,openrouter" → Full chain with free fallback (default v6)
 // ============================================================================
 
 declare const wmill: { readonly env: Readonly<Record<string, string>> };
@@ -21,11 +22,13 @@ declare const wmill: { readonly env: Readonly<Record<string, string>> };
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
+const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
 const DEFAULT_GROQ_MODEL = 'openai/gpt-oss-20b';
 const DEFAULT_GROQ_MODEL_2 = 'llama-3.3-70b-versatile';
 const DEFAULT_OPENAI_MODEL = 'gpt-4o-mini';
-const DEFAULT_PROVIDER_ORDER = 'groq,groq2,openai';
+const DEFAULT_OPENROUTER_MODEL = 'openrouter/auto:free';
+const DEFAULT_PROVIDER_ORDER = 'openai,groq,groq2,openrouter';
 
 function getEnv(key: string, fallback: string): string {
   try { if (wmill?.env[key] != null) return wmill.env[key]; } catch { /* wmill not available */ }
@@ -49,6 +52,7 @@ const CONFIG = {
   groqModel: getEnv('GROQ_MODEL', DEFAULT_GROQ_MODEL),
   groqModel2: getEnv('GROQ_MODEL_2', DEFAULT_GROQ_MODEL_2),
   openaiModel: getEnv('OPENAI_MODEL', DEFAULT_OPENAI_MODEL),
+  openrouterModel: getEnv('OPENROUTER_MODEL', DEFAULT_OPENROUTER_MODEL),
   providerOrder: getEnv('LLM_PROVIDER_ORDER', DEFAULT_PROVIDER_ORDER),
   timeoutMs: (() => {
     const envVal = getEnvOptional('GROQ_LLM_TIMEOUT_MS');
@@ -119,7 +123,7 @@ interface ChatMessage {
 
 export interface LLMResponse {
   readonly content: string;
-  readonly provider: 'groq' | 'openai';
+  readonly provider: 'groq' | 'openai' | 'openrouter';
   readonly tokens_in: number;
   readonly tokens_out: number;
   readonly latency_ms: number;
@@ -139,6 +143,7 @@ interface ProviderInternalResult {
 function getGroqKey(): string | null { return getEnvOptional('GROQ_API_KEY'); }
 function getGroqKey2(): string | null { return getEnvOptional('GROQ_API_KEY_2'); }
 function getOpenAIKey(): string | null { return getEnvOptional('OPENAI_API_KEY'); }
+function getOpenRouterKey(): string | null { return getEnvOptional('OPENROUTER_API_KEY'); }
 
 // ============================================================================
 // HTTP UTILS
@@ -167,6 +172,7 @@ async function callProvider(
   model: string,
   messages: readonly ChatMessage[],
   useStructuredOutput: boolean,
+  providerName: 'groq' | 'openai' | 'openrouter' = 'groq',
 ): Promise<[Error | null, ProviderInternalResult | null]> {
   const responseFormat = useStructuredOutput
     ? {
@@ -179,12 +185,20 @@ async function callProvider(
       }
     : { type: 'json_object' as const };
 
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${apiKey}`,
+  };
+
+  // OpenRouter requires attribution headers for free tier tracking
+  if (providerName === 'openrouter') {
+    headers['HTTP-Referer'] = 'https://localhost';
+    headers['X-Title'] = 'Windmill Medical Booking System';
+  }
+
   const [err, response] = await fetchWithTimeout(url, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
+    headers,
     body: JSON.stringify({
       model,
       messages,
@@ -230,14 +244,14 @@ async function callWithRetry(
   apiKey: string,
   model: string,
   messages: readonly ChatMessage[],
-  provider: 'groq' | 'openai',
+  provider: 'groq' | 'openai' | 'openrouter',
   useStructuredOutput: boolean,
 ): Promise<[Error | null, LLMResponse | null]> {
   let lastError: Error | null = null;
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     const start = Date.now();
-    const [err, result] = await callProvider(url, apiKey, model, messages, useStructuredOutput);
+    const [err, result] = await callProvider(url, apiKey, model, messages, useStructuredOutput, provider);
     
     if (err == null && result != null) {
       return [null, {
@@ -315,12 +329,12 @@ export async function callLLM(
   ];
 
   // ─── Build provider chain from LLM_PROVIDER_ORDER env var ──────────────
-  // Supported tokens: groq, groq2, openai
-  // Example: "groq,groq2,openai" → Groq primary → Groq secondary → OpenAI
+  // Supported tokens: groq, groq2, openai, openrouter
+  // Example: "openai,groq,groq2,openrouter" → OpenAI → Groq → Groq2 → OpenRouter (free)
   const providerOrder = CONFIG.providerOrder.split(',').map(s => s.trim().toLowerCase());
 
   const providerMap: Record<string, {
-    readonly name: 'openai' | 'groq';
+    readonly name: 'openai' | 'groq' | 'openrouter';
     readonly url: string;
     readonly key: string | null;
     readonly model: string;
@@ -346,6 +360,13 @@ export async function callLLM(
       key: getOpenAIKey(),
       model: CONFIG.openaiModel,
       structured: true,
+    },
+    openrouter: {
+      name: 'openrouter' as const,
+      url: OPENROUTER_API_URL,
+      key: getOpenRouterKey(),
+      model: CONFIG.openrouterModel,
+      structured: false,
     },
   };
 
@@ -375,5 +396,5 @@ export async function callLLM(
     }
   }
 
-  return [new Error('No LLM provider configured (set OPENAI_API_KEY or GROQ_API_KEY)'), null];
+  return [new Error('All LLM providers failed (set GROQ_API_KEY, OPENAI_API_KEY, or OPENROUTER_API_KEY)'), null];
 }
