@@ -147,7 +147,7 @@ export function applyTransition(
           return { ok: false, nextState: selectingTimeState(currentState.specialtyId, currentState.doctorId, currentState.doctorName, timeItems, 'Opción inválida.'), responseText: buildSlotsPrompt(currentState.doctorName, timeItems, '⚠️ Opción inválida.'), advance: false };
         }
         const slot = timeItems[idx];
-        const newDraft: DraftBooking = { ...draft, specialty_id: currentState.specialtyId, doctor_id: currentState.doctorId, start_time: slot.start_time, time_label: slot.label };
+        const newDraft: DraftBooking = { ...draft, specialty_id: currentState.specialtyId, specialty_name: draft.specialty_name, doctor_id: currentState.doctorId, doctor_name: currentState.doctorName, start_time: slot.start_time, time_label: slot.label };
         return { ok: true, nextState: confirmingState(currentState.specialtyId, currentState.doctorId, currentState.doctorName, slot.label, newDraft), responseText: buildConfirmationPrompt(slot.label, currentState.doctorName), advance: true };
       }
       return { ok: false, nextState: currentState, responseText: buildSlotsPrompt(currentState.doctorName, (items ?? []) as Array<{ id: string; label: string; start_time: string }>), advance: false };

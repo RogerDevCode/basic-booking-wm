@@ -1,30 +1,27 @@
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : Deterministic Telegram router — match menu/callback/command, fallback to AI Agent
- * DB Tables Used  : None (pure routing logic, no DB calls)
- * Concurrency Risk: NO — pure function, no side effects
+ * DB Tables Used  : None in base route; services/providers/bookings when FSM wizard is active
+ * Concurrency Risk: NO — read-only data queries in wizard mode
  * GCal Calls      : NO
  * Idempotency Key : NO — read-only routing
- * RLS Tenant ID   : NO — no DB access
+ * RLS Tenant ID   : YES — wizard mode requires SQL client in tenant context
  * Zod Schemas     : YES — input validated before use
  */
 
 // ============================================================================
 // TELEGRAM ROUTER — Deterministic message routing
 // ============================================================================
-// Receives parsed Telegram input, matches against known patterns.
-// Returns route type + response text (for deterministic routes) or
-// signals the flow to forward to the AI Agent (for free text).
-//
-// Route priority:
-//   1. Callback data  (cnf:, cxl:, res:, act:, dea:)
-//   2. Slash commands (/start, /admin, /provider)
-//   3. Menu options   ("Agendar cita", "Mis citas", "1", "2", ...)
-//   4. Submenu options (reminders, my_bookings)
-//   5. Fallback → AI Agent
-// ============================================================================
 
+import type postgres from 'postgres';
 import { z } from 'zod';
+import {
+  type BookingState,
+  type DraftBooking,
+  emptyDraft,
+
+} from '../booking_fsm';
+import { handleBookingWizard } from './booking-wizard';
 
 // ============================================================================
 // Types
@@ -32,15 +29,18 @@ import { z } from 'zod';
 
 type Result<T> = [Error | null, T | null];
 
-type RouteType = 'callback' | 'command' | 'menu' | 'submenu' | 'ai_agent';
+type RouteType = 'callback' | 'command' | 'menu' | 'submenu' | 'wizard' | 'ai_agent';
 
 interface RouteResult {
   readonly route: RouteType;
   readonly forward_to_ai: boolean;
   readonly response_text: string;
-  readonly callback_action: string | null;   // "cnf", "cxl", "res", "act", "dea"
+  readonly callback_action: string | null;
   readonly callback_booking_id: string | null;
-  readonly menu_action: string | null;       // "book_appointment", "my_bookings", ...
+  readonly menu_action: string | null;
+  readonly nextState: BookingState | null;
+  readonly nextDraft: DraftBooking | null;
+  readonly nextFlowStep: number;
 }
 
 // ============================================================================
@@ -55,6 +55,12 @@ const InputSchema = z.object({
 });
 
 type RouterInput = z.infer<typeof InputSchema>;
+
+interface RouterStateInput {
+  readonly bookingState: BookingState | null;
+  readonly bookingDraft: DraftBooking | null;
+  readonly sql: postgres.Sql | null;
+}
 
 // ============================================================================
 // Route matchers
@@ -88,10 +94,6 @@ const SUBMENU_OPTIONS: Readonly<Record<string, string>> = {
   'historial': 'booking_history',
   'volver': 'back_to_main',
 } as const;
-
-// ============================================================================
-// Response templates
-// ============================================================================
 
 const CALLBACK_RESPONSES: Readonly<Record<string, string>> = {
   'cnf': '✅ Cita confirmada correctamente.',
@@ -127,12 +129,12 @@ const SUBMENU_RESPONSES: Readonly<Record<string, string>> = {
 // Router logic
 // ============================================================================
 
-function matchCallback(data: string | null): Pick<RouteResult, 'route' | 'forward_to_ai' | 'response_text' | 'callback_action' | 'callback_booking_id' | 'menu_action'> | null {
+function matchCallback(data: string | null): Pick<RouteResult, 'route' | 'forward_to_ai' | 'response_text' | 'callback_action' | 'callback_booking_id' | 'menu_action' | 'nextState' | 'nextDraft' | 'nextFlowStep'> | null {
   if (data === null) return null;
 
   for (const prefix of CALLBACK_PREFIXES) {
     if (data.startsWith(prefix)) {
-      const action = prefix.slice(0, -1); // "cnf:" → "cnf"
+      const action = prefix.slice(0, -1);
       const bookingId = data.slice(prefix.length) || null;
       const response = CALLBACK_RESPONSES[action] ?? 'Acción procesada.';
       return {
@@ -142,13 +144,16 @@ function matchCallback(data: string | null): Pick<RouteResult, 'route' | 'forwar
         callback_action: action,
         callback_booking_id: bookingId,
         menu_action: null,
+        nextState: null,
+        nextDraft: null,
+        nextFlowStep: 0,
       };
     }
   }
   return null;
 }
 
-function matchCommand(text: string | null): Pick<RouteResult, 'route' | 'forward_to_ai' | 'response_text' | 'callback_action' | 'callback_booking_id' | 'menu_action'> | null {
+function matchCommand(text: string | null): Pick<RouteResult, 'route' | 'forward_to_ai' | 'response_text' | 'callback_action' | 'callback_booking_id' | 'menu_action' | 'nextState' | 'nextDraft' | 'nextFlowStep'> | null {
   if (text === null) return null;
   const lower = text.trim().toLowerCase();
 
@@ -161,16 +166,18 @@ function matchCommand(text: string | null): Pick<RouteResult, 'route' | 'forward
       callback_action: null,
       callback_booking_id: null,
       menu_action: commandKey,
+      nextState: null,
+      nextDraft: null,
+      nextFlowStep: 0,
     };
   }
   return null;
 }
 
-function matchMenu(text: string | null): Pick<RouteResult, 'route' | 'forward_to_ai' | 'response_text' | 'callback_action' | 'callback_booking_id' | 'menu_action'> | null {
+function matchMenu(text: string | null): Pick<RouteResult, 'route' | 'forward_to_ai' | 'response_text' | 'callback_action' | 'callback_booking_id' | 'menu_action' | 'nextState' | 'nextDraft' | 'nextFlowStep'> | null {
   if (text === null) return null;
   const lower = text.trim().toLowerCase();
 
-  // Main menu options
   const menuKey = MENU_OPTIONS[lower];
   if (menuKey !== undefined) {
     return {
@@ -180,10 +187,12 @@ function matchMenu(text: string | null): Pick<RouteResult, 'route' | 'forward_to
       callback_action: null,
       callback_booking_id: null,
       menu_action: menuKey,
+      nextState: null,
+      nextDraft: null,
+      nextFlowStep: 0,
     };
   }
 
-  // Submenu options
   const subKey = SUBMENU_OPTIONS[lower];
   if (subKey !== undefined) {
     return {
@@ -193,6 +202,9 @@ function matchMenu(text: string | null): Pick<RouteResult, 'route' | 'forward_to
       callback_action: null,
       callback_booking_id: null,
       menu_action: subKey,
+      nextState: null,
+      nextDraft: null,
+      nextFlowStep: 0,
     };
   }
 
@@ -200,7 +212,7 @@ function matchMenu(text: string | null): Pick<RouteResult, 'route' | 'forward_to
 }
 
 // ============================================================================
-// Main entry point
+// Main entry point — simple (no state)
 // ============================================================================
 
 export async function main(rawInput: unknown): Promise<Result<RouteResult>> {
@@ -211,15 +223,79 @@ export async function main(rawInput: unknown): Promise<Result<RouteResult>> {
 
   const input: RouterInput = parsed.data;
 
-  // Priority 1: Callback data (inline keyboard button press)
   const callbackMatch = matchCallback(input.callback_data);
   if (callbackMatch !== null) return [null, callbackMatch];
 
-  // Priority 2: Slash commands
   const commandMatch = matchCommand(input.text);
   if (commandMatch !== null) return [null, commandMatch];
 
-  // Priority 3: Menu & submenu options
+  const menuMatch = matchMenu(input.text);
+  if (menuMatch !== null) return [null, menuMatch];
+
+  return [null, {
+    route: 'ai_agent',
+    forward_to_ai: true,
+    response_text: '',
+    callback_action: null,
+    callback_booking_id: null,
+    menu_action: null,
+    nextState: null,
+    nextDraft: null,
+    nextFlowStep: 0,
+  }];
+}
+
+// ============================================================================
+// Main entry point — with conversation state (FSM wizard support)
+// ============================================================================
+
+export async function mainWithState(
+  rawInput: unknown,
+  stateInput: RouterStateInput,
+): Promise<Result<RouteResult>> {
+  const parsed = InputSchema.safeParse(rawInput);
+  if (!parsed.success) {
+    return [new Error(`Invalid input: ${parsed.error.message}`), null];
+  }
+
+  const input: RouterInput = parsed.data;
+  const { bookingState, bookingDraft, sql } = stateInput;
+
+  // Priority 1: Callback data (always direct)
+  const callbackMatch = matchCallback(input.callback_data);
+  if (callbackMatch !== null) return [null, callbackMatch];
+
+  // Priority 2: Slash commands (always direct, even in wizard)
+  const commandMatch = matchCommand(input.text);
+  if (commandMatch !== null) return [null, commandMatch];
+
+  // Priority 3: If in booking wizard, delegate to FSM
+  if (bookingState !== null && bookingState.name !== 'idle' && sql !== null) {
+    const [wizardErr, wizardResult] = await handleBookingWizard({
+      text: input.text ?? '',
+      currentState: bookingState,
+      draft: bookingDraft ?? emptyDraft(),
+      sql,
+    });
+
+    if (wizardErr !== null || wizardResult === null) {
+      return [wizardErr ?? new Error('Wizard returned null'), null];
+    }
+
+    return [null, {
+      route: 'wizard',
+      forward_to_ai: false,
+      response_text: wizardResult.response_text,
+      callback_action: null,
+      callback_booking_id: null,
+      menu_action: null,
+      nextState: wizardResult.nextState,
+      nextDraft: wizardResult.nextDraft,
+      nextFlowStep: wizardResult.nextFlowStep,
+    }];
+  }
+
+  // Priority 4: Menu & submenu options (only if not in wizard)
   const menuMatch = matchMenu(input.text);
   if (menuMatch !== null) return [null, menuMatch];
 
@@ -231,5 +307,8 @@ export async function main(rawInput: unknown): Promise<Result<RouteResult>> {
     callback_action: null,
     callback_booking_id: null,
     menu_action: null,
+    nextState: null,
+    nextDraft: null,
+    nextFlowStep: 0,
   }];
 }

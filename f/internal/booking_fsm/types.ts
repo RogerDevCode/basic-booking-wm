@@ -68,8 +68,8 @@ export const ConfirmingSchema = z.object({
   doctorName: z.string(),
   timeSlot: z.string(),
   draft: z.object({
-    specialty_id: z.string().nullable(),
-    doctor_id: z.string().nullable(),
+    specialty_id: z.string().nullable(), specialty_name: z.string().nullable(),
+    doctor_id: z.string().nullable(), doctor_name: z.string().nullable(),
     start_time: z.string().nullable(),
     time_label: z.string().nullable(),
     client_id: z.string().nullable().default(null),
