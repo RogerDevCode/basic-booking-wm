@@ -2,28 +2,15 @@
  * PRE-FLIGHT CHECKLIST
  * Mission         : Redis-backed conversation state machine for AI Agent turn memory
  * DB Tables Used  : None — Redis only (TTL: 30 minutes)
- * Concurrency Risk: LOW — Redis single-key operations are atomic; concurrent
- *                   writes to same chat_id are idempotent (last write wins, acceptable
- *                   for conversation state which is eventually consistent)
+ * Concurrency Risk: LOW — Redis single-key operations are atomic
  * GCal Calls      : NO
- * Idempotency Key : N/A — conversation state is ephemeral, not a booking mutation
- * RLS Tenant ID   : N/A — Redis is per-chat, not per-provider
+ * Idempotency Key : N/A
+ * RLS Tenant ID   : N/A
  * Zod Schemas     : YES — ConversationStateSchema validates all stored/retrieved state
  */
 
 // ============================================================================
 // CONVERSATION STATE — Redis-backed turn memory for AI Agent
-// ============================================================================
-// Stores accumulated intent + entities across turns for a single chat_id.
-// TTL: 30 minutes (configurable via CONV_STATE_TTL_SECONDS env var).
-// Cleared automatically on booking completion or farewell.
-//
-// AGENTS.md §1.A.3: No throw. All paths return Result<T>.
-// AGENTS.md §2.2 KISS: Simple Redis GET/SET/DEL. No complex state graphs.
-// AGENTS.md §2.3 SRP: Only manages conversation memory — zero domain logic.
-//
-// Graceful degradation: if Redis is unavailable, returns [null, null] and
-// the caller treats each turn as stateless. No error surfaced to user.
 // ============================================================================
 
 import { Redis } from 'ioredis';
@@ -46,16 +33,6 @@ const CONV_PREFIX = 'conv:';
 
 // ── SCHEMA ────────────────────────────────────────────────────────────────────
 
-/**
- * ConversationStateSchema — persisted as JSON in Redis.
- * Unified with f/internal/ai_agent/types.ts ConversationStateSchema.
- *
- * active_flow: current multi-turn flow (e.g., "booking_wizard", "selecting_specialty")
- * flow_step: which step in the flow the user is on (0 = start, 1 = next, etc.)
- * pending_data: partial data collected across turns (specialty_id, date, time, etc.)
- * previous_intent: the intent from the previous turn (for context)
- * last_user_utterance: what the user said last turn (for disambiguation)
- */
 const ConversationStateSchema = z.object({
   chat_id:              z.string().min(1),
   previous_intent:      z.string().nullable().catch(null),
@@ -69,10 +46,6 @@ const ConversationStateSchema = z.object({
 
 export type ConversationState = z.infer<typeof ConversationStateSchema>;
 
-/**
- * Legacy-compatible fields for backward compatibility.
- * Maps the new schema to the old pending_intent/accumulated_entities shape.
- */
 export function toLegacyFormat(state: ConversationState): { pending_intent: string | null; accumulated_entities: Record<string, string | null> } {
   return {
     pending_intent: state.previous_intent,
@@ -80,9 +53,6 @@ export function toLegacyFormat(state: ConversationState): { pending_intent: stri
   };
 }
 
-/**
- * Creates a ConversationState from legacy format (for migration).
- */
 export function fromLegacyFormat(
   chatId: string,
   pendingIntent: string | null,
@@ -102,11 +72,6 @@ export function fromLegacyFormat(
 
 // ── REDIS CLIENT FACTORY ──────────────────────────────────────────────────────
 
-/**
- * createConversationRedis — Creates an ioredis client from REDIS_URL env var.
- * Returns null if REDIS_URL is not configured (graceful degradation mode).
- * Caller is responsible for calling .quit() when done.
- */
 export function createConversationRedis(): Redis | null {
   const redisUrl = process.env['REDIS_URL'];
   if (redisUrl == null || redisUrl === '') return null;
@@ -121,36 +86,28 @@ export function createConversationRedis(): Redis | null {
 
 // ── CORE OPERATIONS ──────────────────────────────────────────────────────────
 
-/**
- * getConversationState — Retrieves current state for a chat session.
- * Returns [null, null] if no state exists (new conversation) or Redis unavailable.
- * Never throws — Redis failure = graceful stateless fallback.
- */
 export async function getConversationState(
   redis: Redis,
   chatId: string,
 ): Promise<Result<ConversationState | null>> {
   try {
     const raw = await redis.get(`${CONV_PREFIX}${chatId}`);
-    if (raw === null) return [null, null]; // No prior state — new conversation
+    if (raw === null) return [null, null];
 
     let parsed: unknown;
     try {
       parsed = JSON.parse(raw);
     } catch {
-      // Corrupted state — treat as new conversation; will be overwritten on next update
       return [null, null];
     }
 
     const result = ConversationStateSchema.safeParse(parsed);
     if (!result.success) {
-      // Schema mismatch (state from older version) — safe to reset
       return [null, null];
     }
 
     return [null, result.data];
   } catch (e) {
-    // Redis unavailable — graceful degradation; caller treats turn as stateless
     const msg = e instanceof Error ? e.message : String(e);
     console.log(`[CONV_STATE] Redis unavailable: ${msg}. Falling back to stateless mode.`);
     return [null, null];
@@ -158,9 +115,8 @@ export async function getConversationState(
 }
 
 /**
- * updateConversationState — Persists accumulated intent + entities for a chat.
- * Merges incoming entities with existing state (new values overwrite nulls only).
- * Resets TTL on every call.
+ * updateConversationState — Persists intent + entities for a chat.
+ * If flowStepOverride is provided, uses it instead of auto-calculating flow_step.
  */
 export async function updateConversationState(
   redis: Redis,
@@ -168,10 +124,9 @@ export async function updateConversationState(
   intent: string,
   entities: Readonly<Record<string, string | null>>,
   existingState: ConversationState | null,
+  flowStepOverride?: number,
 ): Promise<Result<ConversationState>> {
   try {
-    // Merge strategy: incoming non-null values overwrite stored nulls.
-    // Once an entity is set it persists until conversation is cleared.
     const existingData = existingState?.pending_data ?? {};
     const mergedData: Record<string, string | null> = { ...existingData };
 
@@ -183,26 +138,32 @@ export async function updateConversationState(
       }
     }
 
-    // Determine active flow based on intent
-    let activeFlow = existingState?.active_flow ?? 'none';
-    let flowStep = (existingState?.flow_step ?? 0) + 1;
+    // Use override if provided, otherwise auto-calculate
+    let flowStep: number;
+    let activeFlow: 'booking_wizard' | 'reschedule_flow' | 'cancellation_flow' | 'reminder_flow' | 'selecting_specialty' | 'selecting_datetime' | 'none';
 
-    // Flow transition logic
-    if (intent === 'booking_wizard' || intent === 'crear_cita') {
-      activeFlow = 'booking_wizard';
-      flowStep = 1;
-    } else if (intent === 'reagendar_cita') {
-      activeFlow = 'reschedule_flow';
-      flowStep = 1;
-    } else if (intent === 'cancelar_cita') {
-      activeFlow = 'cancellation_flow';
-      flowStep = 1;
-    } else if (intent === 'duda_general' && (existingState?.active_flow ?? 'none') !== 'none') {
-      // Keep current flow on generic responses within a flow
-      flowStep = existingState?.flow_step ?? 0;
-    } else if (['completada', 'cancelada', 'reagendada'].includes(intent)) {
-      activeFlow = 'none';
-      flowStep = 0;
+    if (flowStepOverride !== undefined) {
+      flowStep = flowStepOverride;
+      activeFlow = flowStep > 0 ? ('booking_wizard' as const) : ('none' as const);
+    } else {
+      activeFlow = existingState?.active_flow ?? 'none';
+      flowStep = (existingState?.flow_step ?? 0) + 1;
+
+      if (intent === 'booking_wizard' || intent === 'crear_cita') {
+        activeFlow = 'booking_wizard';
+        flowStep = 1;
+      } else if (intent === 'reagendar_cita') {
+        activeFlow = 'reschedule_flow';
+        flowStep = 1;
+      } else if (intent === 'cancelar_cita') {
+        activeFlow = 'cancellation_flow';
+        flowStep = 1;
+      } else if (intent === 'duda_general' && (existingState?.active_flow ?? 'none') !== 'none') {
+        flowStep = existingState?.flow_step ?? 0;
+      } else if (['completada', 'cancelada', 'reagendada'].includes(intent)) {
+        activeFlow = 'none';
+        flowStep = 0;
+      }
     }
 
     const newState: ConversationState = {
@@ -225,11 +186,6 @@ export async function updateConversationState(
   }
 }
 
-/**
- * clearConversationState — Deletes conversation state from Redis.
- * Called when: booking completed, farewell intent, explicit reset.
- * Safe to call even if no state exists.
- */
 export async function clearConversationState(
   redis: Redis,
   chatId: string,

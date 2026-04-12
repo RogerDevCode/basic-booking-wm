@@ -2,7 +2,7 @@
  * PRE-FLIGHT CHECKLIST
  * Mission         : Persist conversation state to Redis after AI Agent classification
  * DB Tables Used  : None — Redis only
- * Concurrency Risk: LOW — single-key SET, last-write-wins (acceptable)
+ * Concurrency Risk: LOW — single-key SET, last-write-wins
  * GCal Calls      : NO
  * Idempotency Key : NO
  * RLS Tenant ID   : NO
@@ -11,10 +11,6 @@
 
 // ============================================================================
 // CONVERSATION STATE UPDATE — Persist per-chat state to Redis
-// ============================================================================
-// Called after the AI Agent classifies intent. Stores the intent and extracted
-// entities so the next user turn can be context-aware.
-// Graceful degradation: silently ignores errors if Redis is unavailable.
 // ============================================================================
 
 import { z } from 'zod';
@@ -28,6 +24,7 @@ const InputSchema = z.object({
   chat_id: z.string().min(1),
   intent: z.string(),
   entities: z.record(z.string(), z.unknown()).default({}),
+  flow_step: z.number().int().min(0).optional(),
 }).readonly();
 
 interface UpdateOutput {
@@ -42,7 +39,7 @@ export async function main(rawInput: unknown): Promise<UpdateOutput> {
     return { success: false, data: { updated: false }, error_message: parsed.error.message };
   }
 
-  const { chat_id, intent, entities } = parsed.data;
+  const { chat_id, intent, entities, flow_step } = parsed.data;
 
   const redis = createConversationRedis();
   if (redis === null) {
@@ -55,7 +52,7 @@ export async function main(rawInput: unknown): Promise<UpdateOutput> {
     for (const [k, v] of Object.entries(entities)) {
       entitiesFlat[k] = v !== null && v !== undefined ? String(v) : null;
     }
-    const [err] = await updateConversationState(redis, chat_id, intent, entitiesFlat, getErr === null ? existingState : null);
+    const [err] = await updateConversationState(redis, chat_id, intent, entitiesFlat, getErr === null ? existingState : null, flow_step);
     if (err !== null) {
       return { success: false, data: { updated: false }, error_message: err.message };
     }
