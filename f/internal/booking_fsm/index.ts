@@ -53,3 +53,22 @@ export {
   buildNoDoctorsAvailable,
   buildNoSlotsAvailable,
 } from './responses';
+
+// Data Queries
+export {
+  fetchSpecialties,
+  type ServiceRow,
+  type FetchSpecialtiesResult,
+} from './data-specialties';
+
+export {
+  fetchDoctors,
+  type ProviderRow,
+  type FetchDoctorsResult,
+} from './data-doctors';
+
+export {
+  fetchSlots,
+  type TimeSlot,
+  type FetchSlotsResult,
+} from './data-slots';
