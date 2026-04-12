@@ -61,7 +61,8 @@ describe('GCal Reconcile Cron', () => {
     // but the validation should pass — the error should be about DB connection
     if (result[0] !== null) {
       // Expected: can't connect to DB in test environment
-      expect(result[0]?.message).toBeDefined();
+      expect(typeof result[0]?.message).toBe('string');
+      expect(result[0]?.message.length).toBeGreaterThan(0);
     } else {
       const data = assertOk<Record<string, unknown>>(result);
       expect(data['processed']).toBeGreaterThanOrEqual(0);
@@ -76,7 +77,8 @@ describe('GCal Reconcile Cron', () => {
     // Will fail on DB connection in test env — that's expected
     if (result[0] !== null) {
       // DB connection error is expected in test env
-      expect(result[0]?.message).toBeDefined();
+      expect(typeof result[0]?.message).toBe('string');
+      expect(result[0]?.message.length).toBeGreaterThan(0);
     }
   });
 });

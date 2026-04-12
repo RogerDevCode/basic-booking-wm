@@ -124,7 +124,8 @@ describe('Booking Wizard', () => {
       wizard_state: { step: '3', client_id: 'p1', chat_id: '123', selected_date: '2026-04-15', selected_time: '10:00' },
     });
     if (result[0] !== null) {
-      expect(result[0]?.message).toBeDefined();
+      expect(typeof result[0]?.message).toBe('string');
+      expect(result[0]?.message.length).toBeGreaterThan(0);
     } else {
       expect(String((result[1] as Record<string, unknown>)['message'] ?? '').length).toBeGreaterThan(0);
     }

@@ -36,6 +36,7 @@ import { buildRAGContext } from './rag-context';
 import {
   AIAgentInputSchema,
   type AIAgentInput,
+  type ConversationState,
   type EntityMap,
   type AvailabilityContext,
   type IntentResult,
@@ -45,6 +46,82 @@ import {
 // Type guard for intent validation
 function isIntentType(value: string): value is IntentType {
   return Object.values(INTENT).includes(value as IntentType);
+}
+
+// ============================================================================
+// CONTEXT-AWARE INTENT ADJUSTMENT
+// ============================================================================
+// When the user is in an active multi-turn flow, their input should be
+// interpreted in the context of that flow — not as a fresh intent classification.
+//
+// Example:
+//   Bot: "Especialidades: 1. Cardiología. Escribe el número..."
+//   User: "1"
+//   Without context: intent = duda_general → shows menu again (BUG)
+//   With context: active_flow = "selecting_specialty" → intent = crear_cita, specialty = "1"
+// ============================================================================
+
+interface ContextAdjustment {
+  readonly adjusted: boolean;
+  readonly intent: IntentType;
+  readonly confidence: number;
+  readonly reason: string;
+}
+
+function adjustIntentWithContext(
+  text: string,
+  currentIntent: IntentType,
+  currentConfidence: number,
+  state: ConversationState | null,
+): ContextAdjustment {
+  if (state === null) {
+    return { adjusted: false, intent: currentIntent, confidence: currentConfidence, reason: '' };
+  }
+
+  const lower = text.trim().toLowerCase();
+
+  // Case 1: User is selecting a specialty (number input in booking_wizard flow)
+  if ((state.active_flow === 'selecting_specialty' || state.active_flow === 'booking_wizard') && /^\d+$/.test(lower)) {
+    return {
+      adjusted: true,
+      intent: INTENT.CREAR_CITA,
+      confidence: 0.95,
+      reason: `Context: user selected specialty #${lower} in ${state.active_flow} flow (step ${state.flow_step})`,
+    };
+  }
+
+  // Case 2: User is selecting date/time (number or date-like input in datetime flow)
+  if (state.active_flow === 'selecting_datetime' && /^\d/.test(lower)) {
+    return {
+      adjusted: true,
+      intent: INTENT.CREAR_CITA,
+      confidence: 0.90,
+      reason: `Context: user provided date/time in datetime selection flow (step ${state.flow_step})`,
+    };
+  }
+
+  // Case 3: User says "no" or "volver" while in a flow → go back to main menu
+  if (state.active_flow !== 'none' && ['no', 'volver', 'menu', 'menú', 'inicio'].includes(lower)) {
+    return {
+      adjusted: true,
+      intent: INTENT.PREGUNTA_GENERAL,
+      confidence: 0.85,
+      reason: `Context: user wants to exit current flow (${state.active_flow})`,
+    };
+  }
+
+  // Case 4: User confirms while in booking_wizard flow
+  if (state.active_flow === 'booking_wizard' && ['si', 'sí', 'confirmar', 'confirmo', 'yes'].includes(lower)) {
+    return {
+      adjusted: true,
+      intent: INTENT.CREAR_CITA,
+      confidence: 0.95,
+      reason: `Context: user confirmed booking in wizard flow (step ${state.flow_step})`,
+    };
+  }
+
+  // No context adjustment needed — use original intent
+  return { adjusted: false, intent: currentIntent, confidence: currentConfidence, reason: '' };
 }
 
 // ============================================================================
@@ -504,7 +581,7 @@ export async function main(rawInput: unknown): Promise<{ readonly success: boole
   }
 
   const input = inputResult.data;
-  const { text, chat_id, provider_id: _provider_id } = input;
+  const { text, chat_id, provider_id: _provider_id, conversation_state } = input;
 
   // Step 1: Input guardrails
   const inputGuard = validateInput(text);
@@ -580,6 +657,15 @@ export async function main(rawInput: unknown): Promise<{ readonly success: boole
       intent = rules.intent;
       confidence = rules.confidence;
     }
+  }
+
+  // Step 2.5: Context-aware intent adjustment
+  // If the user is in an active flow, adjust intent based on conversation context
+  const contextResult = adjustIntentWithContext(text, intent, confidence, conversation_state ?? null);
+  if (contextResult.adjusted) {
+    intent = contextResult.intent;
+    confidence = contextResult.confidence;
+    cot_reasoning = contextResult.reason;
   }
 
   // Step 3: Entities & Context
@@ -672,10 +758,16 @@ async function runLLMInquiryWithPrompt(systemPrompt: string, userMsg: string): P
     }
 
     const cleaned = sanitizeJSONResponse(response.content);
-    const parsed = JSON.parse(cleaned) as Record<string, unknown>;
+    const raw: unknown = JSON.parse(cleaned);
 
-    const intent = parsed["intent"] as IntentType;
-    const confidence = typeof parsed["confidence"] === "number" ? parsed["confidence"] : 0.5;
+    if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+      return [new Error('LLM response is not a valid JSON object'), null];
+    }
+    const parsed = raw as Readonly<Record<string, unknown>>;
+
+    const rawIntent = parsed['intent'];
+    const intent = typeof rawIntent === 'string' && isIntentType(rawIntent) ? rawIntent : INTENT.DESCONOCIDO;
+    const confidence = typeof parsed['confidence'] === 'number' ? parsed['confidence'] : 0.5;
 
     return [null, {
       intent,

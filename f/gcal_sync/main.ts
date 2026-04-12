@@ -95,6 +95,11 @@ function isGCalEventResponse(data: Readonly<Record<string, unknown>>): boolean {
   return typeof data['id'] === 'string' && data['id'].length > 0;
 }
 
+function extractGCalEventId(data: Readonly<Record<string, unknown>>): string | null {
+  const id = data['id'];
+  return typeof id === 'string' ? id : null;
+}
+
 function isRecord(data: unknown): data is Readonly<Record<string, unknown>> {
   return typeof data === 'object' && data !== null && !Array.isArray(data);
 }
@@ -309,7 +314,7 @@ export async function main(
         );
 
         if (providerResult.ok && providerResult.data !== undefined && isGCalEventResponse(providerResult.data)) {
-          providerEventId = (providerResult.data as Record<string, unknown>)['id'] as string | null ?? null;
+          providerEventId = extractGCalEventId(providerResult.data);
         } else {
           errors.push(`Provider event failed: ${providerResult.error ?? 'Unknown error'}`);
         }
@@ -339,7 +344,7 @@ export async function main(
         );
 
         if (clientResult.ok && clientResult.data !== undefined && isGCalEventResponse(clientResult.data)) {
-          clientEventId = (clientResult.data as Record<string, unknown>)['id'] as string | null ?? null;
+          clientEventId = extractGCalEventId(clientResult.data);
         } else {
           errors.push(`Client event failed: ${clientResult.error ?? 'Unknown error'}`);
         }

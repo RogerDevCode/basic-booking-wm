@@ -1,0 +1,2 @@
+language: bun
+skip_if: 'results.webhook_trigger.callback_data !== null && results.webhook_trigger.callback_data !== ""'

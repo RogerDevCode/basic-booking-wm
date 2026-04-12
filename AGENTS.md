@@ -740,7 +740,49 @@ rm -f "$LOCKFILE"
 
 Before starting, verify no other lock exists for the same target files.
 
-**THESE RULES ARE NOT SUGGESTIONS. THEY ARE SCARS. FOLLOW THEM OR REPEAT THE FAILURE.**
+### §11.8 — VERIFY IMPORTS BEFORE BATCH RENAMING
+
+Before running `sed` or bulk replace on a constant name across files, verify **every** target file imports that constant. Changing a reference in a file without the import causes `ReferenceError` at runtime.
+
+```bash
+# Before: sed -i 's/OLD/NEW/g' f/**/*.ts
+# First: grep -rn "import.*INTENT\|from.*constants" f/**/*.ts
+# Only then: apply sed to files that have the import
+```
+
+### §11.9 — CONTRACT CHANGE REQUIRES ALL CONSUMERS UPDATE
+
+When adding a field to a shared type (`LLMResponse`, `LLMInquiryResult`, `TraceData`), update **every** location that references it:
+1. The type definition itself
+2. `LLMInquiryResult.provider` in `f/internal/ai_agent/main.ts`
+3. `TraceData.provider` in `f/internal/ai_agent/tracing.ts`
+4. The local `provider` variable type in `main()`
+
+### §11.10 — AUDIT REPORTS ARE APPEND-ONLY
+
+Never delete, overwrite, or modify files in `audits/`. If a prior audit report is missing, restore it from git history:
+```bash
+git show <commit>:audits/<filename> > audits/<filename>
+```
+Deletion of audit evidence is a CRITICAL violation.
+
+### §11.11 — CONFIDENCE THRESHOLDS BELONG IN constants.ts
+
+Never hardcode `0.85`, `0.60`, or similar threshold values inline. Define them once in `constants.ts` (e.g., `CONFIDENCE_BOUNDARIES`) and reference from all call sites. Inline values drift silently when the spec changes.
+
+### §11.12 — INTENT NAMES ARE SACRED
+
+All intent identifiers MUST match §5.1 `AutorizadoIntent` exactly. `reagendar_cita` ≠ `reagendar`. `ver_disponibilidad` ≠ `consultar_disponibilidad`. Any mismatch is SCHEMA DRIFT.
+
+### §11.13 — NEW LLM PROVIDER CHECKLIST
+
+When adding a provider to the LLM chain, update ALL of:
+1. `LLMResponse.provider` union type in `llm-client.ts`
+2. `LLMInquiryResult.provider` in `main.ts`
+3. `TraceData.provider` in `tracing.ts`
+4. Local `provider` variable type in `main()`
+5. Provider map entry (url, key, model, structured flag)
+6. OpenRouter requires `HTTP-Referer` and `X-Title` headers
 
 ---
 

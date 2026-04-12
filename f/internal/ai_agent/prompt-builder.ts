@@ -10,7 +10,7 @@
 // See: docs/future-semantic-sampling.md
 // ============================================================================
 
-import { INTENT } from './constants';
+import { INTENT, CONFIDENCE_BOUNDARIES } from './constants';
 
 const ALL_INTENTS = Object.values(INTENT).join(', ');
 
@@ -169,7 +169,7 @@ User: "Hola, buenas tardes"
 → {"intent":"${INTENT.SALUDO}","confidence":0.90,"entities":{},"needs_more":true,"follow_up":"¿En qué puedo ayudarte?"}
 
 User: "ola"
-→ {"intent":"${INTENT.SALUDO}","confidence":0.85,"entities":{},"needs_more":true,"follow_up":"¿En qué puedo ayudarte?"}
+→ {"intent":"${INTENT.SALUDO}","confidence":${CONFIDENCE_BOUNDARIES.HIGH_MIN},"entities":{},"needs_more":true,"follow_up":"¿En qué puedo ayudarte?"}
 
 User: "Quiero agendar una cita para mañana"
 → {"intent":"${INTENT.CREAR_CITA}","confidence":0.95,"entities":{"date":"mañana"},"needs_more":false,"follow_up":null}
@@ -184,7 +184,7 @@ User: "kiero una ora pal bieres"
 → {"intent":"${INTENT.CREAR_CITA}","confidence":0.90,"entities":{"date":"viernes"},"needs_more":false,"follow_up":null}
 
 User: "necesito resevar un truno"
-→ {"intent":"${INTENT.CREAR_CITA}","confidence":0.85,"entities":{},"needs_more":true,"follow_up":"¿Para qué día y hora necesitas tu cita?"}
+→ {"intent":"${INTENT.CREAR_CITA}","confidence":${CONFIDENCE_BOUNDARIES.HIGH_MIN},"entities":{},"needs_more":true,"follow_up":"¿Para qué día y hora necesitas tu cita?"}
 
 User: "Hola, quiero agendar para mañana a las 10"
 → {"intent":"${INTENT.CREAR_CITA}","confidence":0.95,"entities":{"date":"mañana","time":"10:00"},"needs_more":false,"follow_up":null}
@@ -196,10 +196,10 @@ User: "¿Tienen disponibilidad esta semana?"
 → {"intent":"${INTENT.VER_DISPONIBILIDAD}","confidence":0.90,"entities":{"date":"esta semana"},"needs_more":false,"follow_up":null}
 
 User: "tiene libre el lune?"
-→ {"intent":"${INTENT.VER_DISPONIBILIDAD}","confidence":0.85,"entities":{"date":"lunes"},"needs_more":false,"follow_up":null}
+→ {"intent":"${INTENT.VER_DISPONIBILIDAD}","confidence":${CONFIDENCE_BOUNDARIES.HIGH_MIN},"entities":{"date":"lunes"},"needs_more":false,"follow_up":null}
 
 User: "tine ora hoy a las 10?"
-→ {"intent":"${INTENT.VER_DISPONIBILIDAD}","confidence":0.85,"entities":{"date":"hoy","time":"10:00"},"needs_more":false,"follow_up":null}
+→ {"intent":"${INTENT.VER_DISPONIBILIDAD}","confidence":${CONFIDENCE_BOUNDARIES.HIGH_MIN},"entities":{"date":"hoy","time":"10:00"},"needs_more":false,"follow_up":null}
 
 User: "Necesito cancelar mi cita del jueves"
 → {"intent":"${INTENT.CANCELAR_CITA}","confidence":0.95,"entities":{"date":"jueves"},"needs_more":false,"follow_up":null}
@@ -211,10 +211,10 @@ User: "no podre ir manana, kanselame"
 → {"intent":"${INTENT.CANCELAR_CITA}","confidence":0.90,"entities":{"date":"mañana"},"needs_more":false,"follow_up":null}
 
 User: "borrame la hora del martes por favor"
-→ {"intent":"${INTENT.CANCELAR_CITA}","confidence":0.85,"entities":{"date":"martes"},"needs_more":false,"follow_up":null}
+→ {"intent":"${INTENT.CANCELAR_CITA}","confidence":${CONFIDENCE_BOUNDARIES.HIGH_MIN},"entities":{"date":"martes"},"needs_more":false,"follow_up":null}
 
 User: "Ya no necesito la cita, gracias"
-→ {"intent":"${INTENT.CANCELAR_CITA}","confidence":0.85,"entities":{},"needs_more":false,"follow_up":null}
+→ {"intent":"${INTENT.CANCELAR_CITA}","confidence":${CONFIDENCE_BOUNDARIES.HIGH_MIN},"entities":{},"needs_more":false,"follow_up":null}
 
 User: "Necesito cambiar mi cita del viernes para el martes"
 → {"intent":"${INTENT.REAGENDAR_CITA}","confidence":0.95,"entities":{"date":"martes"},"needs_more":false,"follow_up":null}
@@ -289,13 +289,13 @@ User: "¿Cuándo es mi próxima cita?"
 → {"intent":"${INTENT.VER_MIS_CITAS}","confidence":0.90,"entities":{},"needs_more":false,"follow_up":null}
 
 User: "Confírmame la cita que tengo esta semana"
-→ {"intent":"${INTENT.VER_MIS_CITAS}","confidence":0.85,"entities":{"date":"esta semana"},"needs_more":false,"follow_up":null}
+→ {"intent":"${INTENT.VER_MIS_CITAS}","confidence":${CONFIDENCE_BOUNDARIES.HIGH_MIN},"entities":{"date":"esta semana"},"needs_more":false,"follow_up":null}
 
 User: "Menú principal"
 → {"intent":"${INTENT.MOSTRAR_MENU_PRINCIPAL}","confidence":0.95,"entities":{},"needs_more":false,"follow_up":null}
 
 User: "¿Qué opciones hay?"
-→ {"intent":"${INTENT.MOSTRAR_MENU_PRINCIPAL}","confidence":0.85,"entities":{},"needs_more":false,"follow_up":null}
+→ {"intent":"${INTENT.MOSTRAR_MENU_PRINCIPAL}","confidence":${CONFIDENCE_BOUNDARIES.HIGH_MIN},"entities":{},"needs_more":false,"follow_up":null}
 
 User: "Siguiente"
 → {"intent":"${INTENT.PASO_WIZARD}","confidence":0.90,"entities":{},"needs_more":false,"follow_up":null}

@@ -347,7 +347,7 @@ describe('AI Agent v2.0 - Enhanced Availability Context', () => {
       const result = await main(input);
 
       expect(result.data?.needs_more_info).toBe(true);
-      expect(result.data?.follow_up).toBeDefined();
+      expect(typeof result.data?.follow_up).toBe('string');
       expect(result.data?.follow_up?.length).toBeGreaterThan(10);
     });
 

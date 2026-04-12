@@ -20,7 +20,7 @@ import { INTENT, CONFIDENCE_BOUNDARIES } from "./constants";
 
 export const ConversationStateSchema = z.object({
   previous_intent: z.string().nullable().catch(null),
-  active_flow:     z.enum(["booking_wizard", "reschedule_flow", "cancellation_flow", "reminder_flow", "none"]).default("none"),
+  active_flow:     z.enum(["booking_wizard", "reschedule_flow", "cancellation_flow", "reminder_flow", "selecting_specialty", "selecting_datetime", "none"]).default("none"),
   flow_step:       z.number().int().min(0).default(0),
   pending_data:    z.record(z.string(), z.unknown()).default({}),
   last_user_utterance: z.string().nullable().catch(null),

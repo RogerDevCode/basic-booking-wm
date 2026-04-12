@@ -105,7 +105,8 @@ describe('RED TEAM — Adversarial AI Agent Tests (50 tests)', () => {
       });
 
       // Core invariant: must return valid structure, never crash
-      expect(result).toBeDefined();
+      expect(typeof result).toBe('object');
+      expect(result).not.toBeNull();
       expect(result).toHaveProperty('success');
       expect(result).toHaveProperty('data');
       expect(result).toHaveProperty('error_message');

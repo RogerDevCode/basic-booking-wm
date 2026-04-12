@@ -1,20 +1,18 @@
-summary: Telegram Webhook - Single Provider (v5.0)
+summary: Telegram Webhook - Single Provider (v6.3)
 description: |
-  Flow simplificado para sistema single-provider.
-  Recibe webhooks de Telegram, parsea el mensaje, detecta intención con AI,
-  y ejecuta acciones de booking.
+  Flow con estado conversacional Redis + router determinista + AI Agent.
   
-  CAMBIOS v5.0:
-  - NO extrae provider_id ni service_id (hay uno solo)
-  - Los IDs se auto-inyectan desde system_config
-  - Mensajes de confirmación simplificados (sin nombre de proveedor)
+  CAMBIOS v6.3:
+  - Estado conversacional se obtiene de Redis ANTES del AI Agent
+  - El AI Agent usa el estado para clasificación contextual
+  - El estado se actualiza DESPUÉS de cada turno
+  - Callbacks y menús se resuelven sin LLM (0ms)
 
   Flujo:
-  1. Webhook HTTP recibe mensaje de Telegram
-  2. Parsea el mensaje (extrae chat_id, texto)
-  3. AI Agent detecta la intención
-  4. Ejecuta acción (crear/cancelar/reservar) - auto-inyecta provider/service
-  5. Envía respuesta por Telegram
+  1. Webhook recibe mensaje
+  2. Router determinista — ¿callback/menú/comando? → respuesta directa
+  3. ¿Texto libre? → obtener estado Redis → AI Agent con contexto → actualizar estado
+  4. Envía respuesta
 value:
   modules:
     - id: webhook_trigger
@@ -25,11 +23,47 @@ value:
         language: bun
         input_transforms:
           event:
-            expr: |
-              // Windmill pasa el body del webhook como 'event'
-              flow_input
+            expr: flow_input
             type: javascript
       summary: Telegram Webhook Trigger
+    - id: telegram_router
+      value:
+        path: f/internal/telegram_router
+        type: script
+        input_transforms:
+          text:
+            expr: results.webhook_trigger.text
+            type: javascript
+          chat_id:
+            expr: results.webhook_trigger.chat_id
+            type: javascript
+          callback_data:
+            expr: results.webhook_trigger.callback_data
+            type: javascript
+          username:
+            expr: results.webhook_trigger.username
+            type: javascript
+      summary: Router determinista
+    - id: gate_skip_if_router_matched
+      value:
+        lock: "!inline skip_if_router_matched.lock"
+        type: rawscript
+        content: "!inline skip_if_router_matched.ts"
+        language: bun
+        input_transforms: {}
+      skip_if:
+        expr: |
+          !results.telegram_router.data?.forward_to_ai
+      summary: Gate — si el router manejó, salta todo
+    - id: get_conversation_state
+      value:
+        path: f/internal/conversation_get
+        type: script
+        input_transforms:
+          chat_id:
+            expr: results.webhook_trigger.chat_id
+            type: javascript
+      summary: Obtener estado conversacional de Redis
     - id: parse_message
       value:
         path: f/internal/message_parser
@@ -41,7 +75,7 @@ value:
           chat_id:
             expr: results.webhook_trigger.chat_id
             type: javascript
-      summary: Parsear mensaje de Telegram
+      summary: Parsear mensaje
     - id: gate_parser_error
       value:
         lock: "!inline check_parser_error.lock"
@@ -64,14 +98,43 @@ value:
           chat_id:
             expr: results.parse_message.data.chat_id
             type: javascript
-      summary: AI Agent - Detectar intención (v5.0 - NO extrae provider/service)
+          conversation_state:
+            expr: results.get_conversation_state.data || null
+            type: javascript
+      summary: AI Agent con contexto conversacional
+    - id: update_conversation_state
+      value:
+        path: f/internal/conversation_update
+        type: script
+        input_transforms:
+          chat_id:
+            expr: results.parse_message.data.chat_id
+            type: javascript
+          intent:
+            expr: results.ai_agent.data?.intent || 'desconocido'
+            type: javascript
+          entities:
+            expr: results.ai_agent.data?.entities || {}
+            type: javascript
+      summary: Actualizar estado conversacional en Redis
+    - id: gate_execute_action
+      value:
+        lock: "!inline skip_if_router_handled.lock"
+        type: rawscript
+        content: "!inline skip_if_router_handled.ts"
+        language: bun
+        input_transforms: {}
+      skip_if:
+        expr: |
+          results.telegram_router.data?.forward_to_ai !== true
+      summary: Gate — solo ejecuta orchestrator si vino del AI Agent
     - id: execute_action
       value:
         path: f/flows/booking_orchestrator__flow
         type: script
         input_transforms:
           chat_id:
-            expr: results.ai_agent.data?.chat_id || results.parse_message.data.chat_id
+            expr: results.parse_message.data.chat_id
             type: javascript
           user_name:
             expr: results.webhook_trigger.username
@@ -79,7 +142,6 @@ value:
           service_id:
             type: static
             value: 1
-            # NOTA: El valor real se obtiene de system_config en el backend
           start_time:
             expr: |
               const entities = results.ai_agent.data?.entities || {};
@@ -93,8 +155,7 @@ value:
           provider_id:
             type: static
             value: 1
-            # NOTA: El valor real se obtiene de system_config en el backend
-      summary: Ejecutar acción de booking (auto-inyecta provider/service)
+      summary: Ejecutar acción de booking
     - id: send_telegram_response
       value:
         path: f/telegram_send
@@ -102,18 +163,20 @@ value:
         input_transforms:
           text:
             expr: >
+              const router = results.telegram_router.data;
+              if (router && router.response_text && router.response_text.length > 0) {
+                return router.response_text;
+              }
               const booking = results.execute_action.data;
-
               if (booking?.id) {
                 return `✅ *Reserva Confirmada*\n\nID: \`${booking.id}\`\nFecha: ${booking.start_time}`;
               }
-
               return results.ai_agent.data?.ai_response || 'Procesado';
             type: javascript
           chat_id:
-            expr: results.execute_action.data?.chat_id || results.ai_agent.data?.chat_id
+            expr: results.webhook_trigger.chat_id
             type: javascript
-      summary: Enviar respuesta por Telegram (sin nombre de proveedor)
+      summary: Enviar respuesta por Telegram
 schema:
   type: object
   properties:

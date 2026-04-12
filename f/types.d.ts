@@ -16,16 +16,16 @@ declare module 'postgres' {
   // This augmentation keeps that convention and returns T directly.
   // ============================================================================
   interface Sql<TTypes extends Record<string, unknown> = {}> {
-    values<T extends readonly any[]>(template: TemplateStringsArray, ...parameters: any[]): Promise<T>;
-    values<T extends readonly any[]>(query: string, parameters?: any[]): Promise<T>;
+    values<T extends readonly unknown[]>(template: TemplateStringsArray, ...parameters: readonly unknown[]): Promise<T>;
+    values<T extends readonly unknown[]>(query: string, parameters?: readonly unknown[]): Promise<T>;
   }
   interface ReservedSql<TTypes extends Record<string, unknown> = {}> {
-    values<T extends readonly any[]>(template: TemplateStringsArray, ...parameters: any[]): Promise<T>;
-    values<T extends readonly any[]>(query: string, parameters?: any[]): Promise<T>;
+    values<T extends readonly unknown[]>(template: TemplateStringsArray, ...parameters: readonly unknown[]): Promise<T>;
+    values<T extends readonly unknown[]>(query: string, parameters?: readonly unknown[]): Promise<T>;
   }
   interface TransactionSql<TTypes extends Record<string, unknown> = {}> {
-    <T extends readonly (object | undefined)[] = Row[]>(template: TemplateStringsArray, ...parameters: readonly any[]): PendingQuery<T>;
-    values<T extends readonly any[]>(template: TemplateStringsArray, ...parameters: any[]): Promise<T>;
-    values<T extends readonly any[]>(query: string, parameters?: any[]): Promise<T>;
+    <T extends readonly (object | undefined)[] = Row[]>(template: TemplateStringsArray, ...parameters: readonly unknown[]): PendingQuery<T>;
+    values<T extends readonly unknown[]>(template: TemplateStringsArray, ...parameters: readonly unknown[]): Promise<T>;
+    values<T extends readonly unknown[]>(query: string, parameters?: readonly unknown[]): Promise<T>;
   }
 }
