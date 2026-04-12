@@ -5,7 +5,7 @@
  * Concurrency Risk: NO — read-only data queries + stateless FSM transitions
  * GCal Calls      : NO
  * Idempotency Key : NO — read-only state machine transition
- * RLS Tenant ID   : YES — caller must provide SQL client within withTenantContext
+ * RLS Tenant ID   : NO — wizard creates its own connection (no RLS needed for read-only)
  * Zod Schemas     : YES — FSM state/action schemas validate all inputs
  */
 
@@ -13,7 +13,6 @@
 // TELEGRAM ROUTER — Booking Wizard Handler
 // ============================================================================
 
-import type postgres from 'postgres';
 import {
   type BookingState,
   type TransitionResult,
@@ -30,6 +29,7 @@ import {
   fetchDoctors,
   fetchSlots,
 } from '../booking_fsm';
+import { createDbClient } from '../db/client';
 
 // ============================================================================
 // Wizard handler input/output
@@ -39,7 +39,6 @@ interface WizardInput {
   readonly text: string;
   readonly currentState: BookingState | null;
   readonly draft: DraftBooking;
-  readonly sql: postgres.Sql;
 }
 
 export interface WizardOutput {
@@ -57,29 +56,40 @@ export interface WizardOutput {
 // ============================================================================
 
 export async function handleBookingWizard(input: WizardInput): Promise<[Error | null, WizardOutput | null]> {
-  const { text, currentState, draft, sql } = input;
+  const { text, currentState, draft } = input;
 
   const state: BookingState = currentState ?? { name: 'idle' };
   const currentDraft: DraftBooking = draft ?? emptyDraft();
   const action = parseAction(text);
   const transition = applyTransition(state, action, currentDraft);
 
-  // Fetch data if needed for the new state
-  const result = await fetchDataForState(transition, sql);
-
-  if (result !== null) {
-    return [null, result];
+  // Create DB connection for data fetching
+  const dbUrl = process.env['DATABASE_URL'];
+  if (dbUrl === undefined || dbUrl === '') {
+    return [new Error('DATABASE_URL not configured'), null];
   }
 
-  return [null, {
-    route: 'wizard',
-    forward_to_ai: false,
-    response_text: transition.responseText,
-    nextState: transition.nextState,
-    nextDraft: currentDraft,
-    nextFlowStep: flowStepFromState(transition.nextState),
-    advance: transition.advance,
-  }];
+  const sql = createDbClient({ url: dbUrl });
+
+  try {
+    const result = await fetchDataForState(transition, sql);
+
+    if (result !== null) {
+      return [null, result];
+    }
+
+    return [null, {
+      route: 'wizard',
+      forward_to_ai: false,
+      response_text: transition.responseText,
+      nextState: transition.nextState,
+      nextDraft: currentDraft,
+      nextFlowStep: flowStepFromState(transition.nextState),
+      advance: transition.advance,
+    }];
+  } finally {
+    await sql.end().catch(() => { /* ignore */ });
+  }
 }
 
 // ============================================================================
@@ -88,7 +98,7 @@ export async function handleBookingWizard(input: WizardInput): Promise<[Error | 
 
 async function fetchDataForState(
   transition: TransitionResult,
-  sql: postgres.Sql,
+  sql: ReturnType<typeof createDbClient>,
 ): Promise<WizardOutput | null> {
   const nextState = transition.nextState;
 
@@ -216,7 +226,15 @@ async function fetchDataForState(
         forward_to_ai: false,
         response_text: buildConfirmationPrompt(nextState.timeSlot, nextState.doctorName),
         nextState,
-        nextDraft: { specialty_id: nextState.specialtyId, specialty_name: null, doctor_id: nextState.doctorId, doctor_name: nextState.doctorName, start_time: null, time_label: nextState.timeSlot, client_id: null },
+        nextDraft: {
+          specialty_id: nextState.specialtyId,
+          specialty_name: null,
+          doctor_id: nextState.doctorId,
+          doctor_name: nextState.doctorName,
+          start_time: null,
+          time_label: nextState.timeSlot,
+          client_id: null,
+        },
         nextFlowStep: flowStepFromState(nextState),
         advance: transition.advance,
       };

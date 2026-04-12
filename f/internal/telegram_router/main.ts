@@ -1,11 +1,11 @@
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : Deterministic Telegram router — match menu/callback/command, fallback to AI Agent
- * DB Tables Used  : None in base route; services/providers/bookings when FSM wizard is active
+ * DB Tables Used  : None in base route; services/providers/bookings when FSM wizard is active (internal connection)
  * Concurrency Risk: NO — read-only data queries in wizard mode
  * GCal Calls      : NO
  * Idempotency Key : NO — read-only routing
- * RLS Tenant ID   : YES — wizard mode requires SQL client in tenant context
+ * RLS Tenant ID   : NO — wizard creates its own connection
  * Zod Schemas     : YES — input validated before use
  */
 
@@ -13,13 +13,11 @@
 // TELEGRAM ROUTER — Deterministic message routing
 // ============================================================================
 
-import type postgres from 'postgres';
 import { z } from 'zod';
 import {
   type BookingState,
   type DraftBooking,
   emptyDraft,
-
 } from '../booking_fsm';
 import { handleBookingWizard } from './booking-wizard';
 
@@ -44,7 +42,7 @@ interface RouteResult {
 }
 
 // ============================================================================
-// Zod Input Schema
+// Zod Input Schema — includes optional booking state from Redis
 // ============================================================================
 
 const InputSchema = z.object({
@@ -52,15 +50,11 @@ const InputSchema = z.object({
   chat_id: z.string().min(1),
   callback_data: z.string().nullable().default(null),
   username: z.string().nullable().default(null),
+  booking_state: z.unknown().nullable().default(null),
+  booking_draft: z.unknown().nullable().default(null),
 });
 
 type RouterInput = z.infer<typeof InputSchema>;
-
-interface RouterStateInput {
-  readonly bookingState: BookingState | null;
-  readonly bookingDraft: DraftBooking | null;
-  readonly sql: postgres.Sql | null;
-}
 
 // ============================================================================
 // Route matchers
@@ -129,7 +123,33 @@ const SUBMENU_RESPONSES: Readonly<Record<string, string>> = {
 // Router logic
 // ============================================================================
 
-function matchCallback(data: string | null): Pick<RouteResult, 'route' | 'forward_to_ai' | 'response_text' | 'callback_action' | 'callback_booking_id' | 'menu_action' | 'nextState' | 'nextDraft' | 'nextFlowStep'> | null {
+function buildRouteResult(
+  route: RouteType,
+  responseText: string,
+  opts: {
+    forwardToAi?: boolean;
+    callbackAction?: string | null;
+    callbackBookingId?: string | null;
+    menuAction?: string | null;
+    nextState?: BookingState | null;
+    nextDraft?: DraftBooking | null;
+    nextFlowStep?: number;
+  } = {},
+): RouteResult {
+  return {
+    route,
+    forward_to_ai: opts.forwardToAi ?? false,
+    response_text: responseText,
+    callback_action: opts.callbackAction ?? null,
+    callback_booking_id: opts.callbackBookingId ?? null,
+    menu_action: opts.menuAction ?? null,
+    nextState: opts.nextState ?? null,
+    nextDraft: opts.nextDraft ?? null,
+    nextFlowStep: opts.nextFlowStep ?? 0,
+  };
+}
+
+function matchCallback(data: string | null): RouteResult | null {
   if (data === null) return null;
 
   for (const prefix of CALLBACK_PREFIXES) {
@@ -137,82 +157,51 @@ function matchCallback(data: string | null): Pick<RouteResult, 'route' | 'forwar
       const action = prefix.slice(0, -1);
       const bookingId = data.slice(prefix.length) || null;
       const response = CALLBACK_RESPONSES[action] ?? 'Acción procesada.';
-      return {
-        route: 'callback' as const,
-        forward_to_ai: false,
-        response_text: response,
-        callback_action: action,
-        callback_booking_id: bookingId,
-        menu_action: null,
-        nextState: null,
-        nextDraft: null,
-        nextFlowStep: 0,
-      };
+      return buildRouteResult('callback', response, {
+        callbackAction: action,
+        callbackBookingId: bookingId,
+      });
     }
   }
   return null;
 }
 
-function matchCommand(text: string | null): Pick<RouteResult, 'route' | 'forward_to_ai' | 'response_text' | 'callback_action' | 'callback_booking_id' | 'menu_action' | 'nextState' | 'nextDraft' | 'nextFlowStep'> | null {
+function matchCommand(text: string | null): RouteResult | null {
   if (text === null) return null;
   const lower = text.trim().toLowerCase();
 
   const commandKey = COMMANDS[lower];
   if (commandKey !== undefined) {
-    return {
-      route: 'command' as const,
-      forward_to_ai: false,
-      response_text: COMMAND_RESPONSES[commandKey] ?? 'Comando procesado.',
-      callback_action: null,
-      callback_booking_id: null,
-      menu_action: commandKey,
-      nextState: null,
-      nextDraft: null,
-      nextFlowStep: 0,
-    };
+    return buildRouteResult('command', COMMAND_RESPONSES[commandKey] ?? 'Comando procesado.', {
+      menuAction: commandKey,
+    });
   }
   return null;
 }
 
-function matchMenu(text: string | null): Pick<RouteResult, 'route' | 'forward_to_ai' | 'response_text' | 'callback_action' | 'callback_booking_id' | 'menu_action' | 'nextState' | 'nextDraft' | 'nextFlowStep'> | null {
+function matchMenu(text: string | null): RouteResult | null {
   if (text === null) return null;
   const lower = text.trim().toLowerCase();
 
   const menuKey = MENU_OPTIONS[lower];
   if (menuKey !== undefined) {
-    return {
-      route: 'menu' as const,
-      forward_to_ai: false,
-      response_text: MENU_RESPONSES[menuKey] ?? 'Opción procesada.',
-      callback_action: null,
-      callback_booking_id: null,
-      menu_action: menuKey,
-      nextState: null,
-      nextDraft: null,
-      nextFlowStep: 0,
-    };
+    return buildRouteResult('menu', MENU_RESPONSES[menuKey] ?? 'Opción procesada.', {
+      menuAction: menuKey,
+    });
   }
 
   const subKey = SUBMENU_OPTIONS[lower];
   if (subKey !== undefined) {
-    return {
-      route: 'submenu' as const,
-      forward_to_ai: false,
-      response_text: SUBMENU_RESPONSES[subKey] ?? 'Opción procesada.',
-      callback_action: null,
-      callback_booking_id: null,
-      menu_action: subKey,
-      nextState: null,
-      nextDraft: null,
-      nextFlowStep: 0,
-    };
+    return buildRouteResult('submenu', SUBMENU_RESPONSES[subKey] ?? 'Opción procesada.', {
+      menuAction: subKey,
+    });
   }
 
   return null;
 }
 
 // ============================================================================
-// Main entry point — simple (no state)
+// Main entry point
 // ============================================================================
 
 export async function main(rawInput: unknown): Promise<Result<RouteResult>> {
@@ -223,92 +212,40 @@ export async function main(rawInput: unknown): Promise<Result<RouteResult>> {
 
   const input: RouterInput = parsed.data;
 
-  const callbackMatch = matchCallback(input.callback_data);
-  if (callbackMatch !== null) return [null, callbackMatch];
-
-  const commandMatch = matchCommand(input.text);
-  if (commandMatch !== null) return [null, commandMatch];
-
-  const menuMatch = matchMenu(input.text);
-  if (menuMatch !== null) return [null, menuMatch];
-
-  return [null, {
-    route: 'ai_agent',
-    forward_to_ai: true,
-    response_text: '',
-    callback_action: null,
-    callback_booking_id: null,
-    menu_action: null,
-    nextState: null,
-    nextDraft: null,
-    nextFlowStep: 0,
-  }];
-}
-
-// ============================================================================
-// Main entry point — with conversation state (FSM wizard support)
-// ============================================================================
-
-export async function mainWithState(
-  rawInput: unknown,
-  stateInput: RouterStateInput,
-): Promise<Result<RouteResult>> {
-  const parsed = InputSchema.safeParse(rawInput);
-  if (!parsed.success) {
-    return [new Error(`Invalid input: ${parsed.error.message}`), null];
-  }
-
-  const input: RouterInput = parsed.data;
-  const { bookingState, bookingDraft, sql } = stateInput;
-
   // Priority 1: Callback data (always direct)
   const callbackMatch = matchCallback(input.callback_data);
   if (callbackMatch !== null) return [null, callbackMatch];
 
-  // Priority 2: Slash commands (always direct, even in wizard)
+  // Priority 2: Slash commands (always direct)
   const commandMatch = matchCommand(input.text);
   if (commandMatch !== null) return [null, commandMatch];
 
   // Priority 3: If in booking wizard, delegate to FSM
-  if (bookingState !== null && bookingState.name !== 'idle' && sql !== null) {
+  const bookingState = input.booking_state as BookingState | null;
+  const bookingDraft = input.booking_draft as DraftBooking | null;
+
+  if (bookingState !== null && bookingState.name !== 'idle') {
     const [wizardErr, wizardResult] = await handleBookingWizard({
       text: input.text ?? '',
       currentState: bookingState,
       draft: bookingDraft ?? emptyDraft(),
-      sql,
     });
 
     if (wizardErr !== null || wizardResult === null) {
       return [wizardErr ?? new Error('Wizard returned null'), null];
     }
 
-    return [null, {
-      route: 'wizard',
-      forward_to_ai: false,
-      response_text: wizardResult.response_text,
-      callback_action: null,
-      callback_booking_id: null,
-      menu_action: null,
+    return [null, buildRouteResult('wizard', wizardResult.response_text, {
       nextState: wizardResult.nextState,
       nextDraft: wizardResult.nextDraft,
       nextFlowStep: wizardResult.nextFlowStep,
-    }];
+    })];
   }
 
-  // Priority 4: Menu & submenu options (only if not in wizard)
+  // Priority 4: Menu & submenu options
   const menuMatch = matchMenu(input.text);
   if (menuMatch !== null) return [null, menuMatch];
 
   // Fallback: forward to AI Agent
-  return [null, {
-    route: 'ai_agent',
-    forward_to_ai: true,
-    response_text: '',
-    callback_action: null,
-    callback_booking_id: null,
-    menu_action: null,
-    nextState: null,
-    nextDraft: null,
-    nextFlowStep: 0,
-  }];
+  return [null, buildRouteResult('ai_agent', '', { forwardToAi: true })];
 }

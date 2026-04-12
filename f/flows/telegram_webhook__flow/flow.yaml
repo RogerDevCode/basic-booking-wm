@@ -1,18 +1,21 @@
-summary: Telegram Webhook - Single Provider (v6.3)
+summary: Telegram Webhook - Single Provider (v7.0)
 description: |
-  Flow con estado conversacional Redis + router determinista + AI Agent.
+  Flow con FSM wizard + estado conversacional Redis + router determinista.
   
-  CAMBIOS v6.3:
-  - Estado conversacional se obtiene de Redis ANTES del AI Agent
-  - El AI Agent usa el estado para clasificación contextual
-  - El estado se actualiza DESPUÉS de cada turno
+  CAMBIOS v7.0:
+  - El router recibe el estado de booking desde Redis (booking_state, booking_draft)
+  - Si hay estado activo → delega al FSM wizard (specialty→doctor→time→confirm)
+  - El flow_step del router se pasa a update_conversation_state
+  - Respuesta determinista del wizard, sin LLM
   - Callbacks y menús se resuelven sin LLM (0ms)
 
   Flujo:
   1. Webhook recibe mensaje
-  2. Router determinista — ¿callback/menú/comando? → respuesta directa
-  3. ¿Texto libre? → obtener estado Redis → AI Agent con contexto → actualizar estado
-  4. Envía respuesta
+  2. Obtener estado de Redis (booking_state, booking_draft)
+  3. Router: ¿callback/comando/menú? → directo. ¿Estado activo? → FSM wizard. → AI Agent
+  4. Actualizar estado en Redis con flow_step del router
+  5. Ejecutar booking si viene del AI Agent
+  6. Enviar respuesta
 value:
   modules:
     - id: webhook_trigger
@@ -26,6 +29,15 @@ value:
             expr: flow_input
             type: javascript
       summary: Telegram Webhook Trigger
+    - id: get_conversation_state
+      value:
+        path: f/internal/conversation_get
+        type: script
+        input_transforms:
+          chat_id:
+            expr: results.webhook_trigger.chat_id
+            type: javascript
+      summary: Obtener estado conversacional de Redis
     - id: telegram_router
       value:
         path: f/internal/telegram_router
@@ -43,8 +55,32 @@ value:
           username:
             expr: results.webhook_trigger.username
             type: javascript
-      summary: Router determinista
-    - id: gate_skip_if_router_matched
+          booking_state:
+            expr: results.get_conversation_state.data?.state || null
+            type: javascript
+          booking_draft:
+            expr: null
+            type: javascript
+      summary: Router determinista + FSM wizard
+    - id: update_conversation_state
+      value:
+        path: f/internal/conversation_update
+        type: script
+        input_transforms:
+          chat_id:
+            expr: results.webhook_trigger.chat_id
+            type: javascript
+          intent:
+            expr: results.telegram_router.data?.route || 'desconocido'
+            type: javascript
+          entities:
+            expr: '{}'
+            type: javascript
+          flow_step:
+            expr: results.telegram_router.data?.nextFlowStep || 0
+            type: javascript
+      summary: Actualizar estado conversacional en Redis
+    - id: gate_skip_if_router_handled
       value:
         lock: "!inline skip_if_router_matched.lock"
         type: rawscript
@@ -54,16 +90,7 @@ value:
       skip_if:
         expr: |
           !results.telegram_router.data?.forward_to_ai
-      summary: Gate — si el router manejó, salta todo
-    - id: get_conversation_state
-      value:
-        path: f/internal/conversation_get
-        type: script
-        input_transforms:
-          chat_id:
-            expr: results.webhook_trigger.chat_id
-            type: javascript
-      summary: Obtener estado conversacional de Redis
+      summary: Gate — si el router manejó, saltar AI Agent y orchestrator
     - id: parse_message
       value:
         path: f/internal/message_parser
@@ -99,24 +126,9 @@ value:
             expr: results.parse_message.data.chat_id
             type: javascript
           conversation_state:
-            expr: results.get_conversation_state.data || null
+            expr: results.get_conversation_state.data?.state || null
             type: javascript
       summary: AI Agent con contexto conversacional
-    - id: update_conversation_state
-      value:
-        path: f/internal/conversation_update
-        type: script
-        input_transforms:
-          chat_id:
-            expr: results.parse_message.data.chat_id
-            type: javascript
-          intent:
-            expr: results.ai_agent.data?.intent || 'desconocido'
-            type: javascript
-          entities:
-            expr: results.ai_agent.data?.entities || {}
-            type: javascript
-      summary: Actualizar estado conversacional en Redis
     - id: gate_execute_action
       value:
         lock: "!inline skip_if_router_handled.lock"
