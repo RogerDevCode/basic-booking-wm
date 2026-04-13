@@ -1,21 +1,28 @@
-summary: Telegram Webhook - Single Provider (v7.0)
+summary: Telegram Webhook - Single Provider (v8.0)
 description: |
-  Flow con FSM wizard + estado conversacional Redis + router determinista.
+  Flow con InlineKeyboardMarkup + editMessageText + FSM wizard.
   
-  CAMBIOS v7.0:
-  - El router recibe el estado de booking desde Redis (booking_state, booking_draft)
-  - Si hay estado activo → delega al FSM wizard (specialty→doctor→time→confirm)
-  - El flow_step del router se pasa a update_conversation_state
-  - Respuesta determinista del wizard, sin LLM
-  - Callbacks y menús se resuelven sin LLM (0ms)
+  CAMBIOS v8.0:
+  - Soporte callback_query con answerCallbackQuery + editMessageText
+  - Router recibe callback_query_id y message_id del estado
+  - Wizard genera inline keyboards con callback_data
+  - editMessageText reemplaza el mensaje original (cero spam)
+  - answerCallbackQuery quita el "cargando" del botón
 
-  Flujo:
-  1. Webhook recibe mensaje
-  2. Obtener estado de Redis (booking_state, booking_draft)
-  3. Router: ¿callback/comando/menú? → directo. ¿Estado activo? → FSM wizard. → AI Agent
-  4. Actualizar estado en Redis con flow_step del router
-  5. Ejecutar booking si viene del AI Agent
-  6. Enviar respuesta
+  Flujo callback_query:
+  1. Webhook recibe callback_query
+  2. Obtener estado de Redis (booking_state, message_id)
+  3. Router: callback_data wizard pattern → FSM dispatch
+  4. answerCallbackQuery (quita cargando)
+  5. editMessageText (actualiza mensaje con nuevo texto + teclado)
+  6. Actualizar estado en Redis
+
+  Flujo mensaje de texto:
+  1. Webhook recibe message
+  2. Obtener estado de Redis
+  3. Router: ¿comando/menú? → directo. ¿Estado activo? → wizard. → AI Agent
+  4. Actualizar estado en Redis
+  5. Enviar respuesta
 value:
   modules:
     - id: webhook_trigger
@@ -52,6 +59,9 @@ value:
           callback_data:
             expr: results.webhook_trigger.callback_data
             type: javascript
+          callback_query_id:
+            expr: results.webhook_trigger.callback_query_id
+            type: javascript
           username:
             expr: results.webhook_trigger.username
             type: javascript
@@ -61,7 +71,10 @@ value:
           booking_draft:
             expr: null
             type: javascript
-      summary: Router determinista + FSM wizard
+          message_id:
+            expr: results.get_conversation_state.data?.state?.message_id || null
+            type: javascript
+      summary: Router con InlineKeyboard + FSM wizard
     - id: update_conversation_state
       value:
         path: f/internal/conversation_update
@@ -80,6 +93,79 @@ value:
             expr: results.telegram_router.data?.nextFlowStep || 0
             type: javascript
       summary: Actualizar estado conversacional en Redis
+    - id: answer_callback
+      value:
+        path: f/telegram_send
+        type: script
+        input_transforms:
+          mode:
+            expr: "'answer_callback'"
+            type: javascript
+          chat_id:
+            expr: results.webhook_trigger.chat_id
+            type: javascript
+          callback_query_id:
+            expr: results.webhook_trigger.callback_query_id || ''
+            type: javascript
+          callback_alert:
+            expr: "''"
+            type: javascript
+          text:
+            expr: "''"
+            type: javascript
+      skip_if:
+        expr: |
+          results.webhook_trigger.callback_query_id === null || results.webhook_trigger.callback_query_id === undefined
+      summary: AnswerCallbackQuery — quita el "cargando" del botón
+    - id: send_telegram_response
+      value:
+        path: f/telegram_send
+        type: script
+        input_transforms:
+          mode:
+            expr: >
+              const router = results.telegram_router.data;
+              if (router && router.should_edit && router.message_id) {
+                'edit_message';
+              } else {
+                'send_message';
+              }
+            type: javascript
+          text:
+            expr: >
+              const router = results.telegram_router.data;
+              if (router && router.response_text && router.response_text.length > 0) {
+                return router.response_text;
+              }
+              const booking = results.execute_action.data;
+              if (booking?.id) {
+                return `✅ *Reserva Confirmada*\n\nID: \`${booking.id}\`\nFecha: ${booking.start_time}`;
+              }
+              return results.ai_agent.data?.ai_response || 'Procesado';
+            type: javascript
+          chat_id:
+            expr: results.webhook_trigger.chat_id
+            type: javascript
+          message_id:
+            expr: >
+              const router = results.telegram_router.data;
+              if (router && router.should_edit) {
+                return router.message_id || results.get_conversation_state.data?.state?.message_id || null;
+              }
+              return null;
+            type: javascript
+          inline_buttons:
+            expr: >
+              const router = results.telegram_router.data;
+              if (router && router.inline_keyboard && router.inline_keyboard.length > 0) {
+                return router.inline_keyboard.flat();
+              }
+              return [];
+            type: javascript
+          parse_mode:
+            expr: "'Markdown'"
+            type: javascript
+      summary: Enviar respuesta (sendMessage o editMessageText)
     - id: gate_skip_if_router_handled
       value:
         lock: "!inline skip_if_router_matched.lock"
@@ -168,27 +254,6 @@ value:
             type: static
             value: 1
       summary: Ejecutar acción de booking
-    - id: send_telegram_response
-      value:
-        path: f/telegram_send
-        type: script
-        input_transforms:
-          text:
-            expr: >
-              const router = results.telegram_router.data;
-              if (router && router.response_text && router.response_text.length > 0) {
-                return router.response_text;
-              }
-              const booking = results.execute_action.data;
-              if (booking?.id) {
-                return `✅ *Reserva Confirmada*\n\nID: \`${booking.id}\`\nFecha: ${booking.start_time}`;
-              }
-              return results.ai_agent.data?.ai_response || 'Procesado';
-            type: javascript
-          chat_id:
-            expr: results.webhook_trigger.chat_id
-            type: javascript
-      summary: Enviar respuesta por Telegram
 schema:
   type: object
   properties:
