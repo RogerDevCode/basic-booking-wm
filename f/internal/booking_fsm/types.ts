@@ -156,3 +156,38 @@ export function emptyDraft(): DraftBooking {
     client_id: null,
   });
 }
+
+// ============================================================================
+// Type Guards — replace `as` casts with runtime validation
+// ============================================================================
+
+export function isNamedItem(item: unknown): item is { id: string; name: string } {
+  if (typeof item !== 'object' || item === null) return false;
+  const o = item as Record<string, unknown>;
+  return typeof o["id"] === 'string' && typeof o["name"] === 'string';
+}
+
+export function isTimeItem(item: unknown): item is { id: string; label: string; start_time: string } {
+  if (typeof item !== 'object' || item === null) return false;
+  const o = item as Record<string, unknown>;
+  return typeof o["id"] === 'string' && typeof o["label"] === 'string' && typeof o["start_time"] === 'string';
+}
+
+export function isNamedItemArray(items: unknown): items is Array<{ id: string; name: string }> {
+  if (!Array.isArray(items)) return false;
+  return items.every(isNamedItem);
+}
+
+export function isTimeItemArray(items: unknown): items is Array<{ id: string; label: string; start_time: string }> {
+  if (!Array.isArray(items)) return false;
+  return items.every(isTimeItem);
+}
+
+export function isGenericItemArray(items: unknown): items is Array<{ id: string; name?: string; label?: string; start_time?: string }> {
+  if (!Array.isArray(items)) return false;
+  return items.every(item => {
+    if (typeof item !== 'object' || item === null) return false;
+    const o = item as Record<string, unknown>;
+    return typeof o["id"] === 'string';
+  });
+}

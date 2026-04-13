@@ -15,6 +15,7 @@
 // Pure functions. No side effects. No DB calls. No LLM calls.
 // Given a current state + action → returns next state + response text.
 // All transitions validated against VALID_TRANSITIONS map.
+// Type guards used instead of `as` casts for type safety.
 // ============================================================================
 
 import {
@@ -23,6 +24,8 @@ import {
   type BookingAction,
   type TransitionResult,
   type DraftBooking,
+  isNamedItemArray,
+  isTimeItemArray,
 } from './types';
 import {
   buildSpecialtyPrompt,
@@ -32,6 +35,18 @@ import {
   buildLoadingDoctorsPrompt,
   buildLoadingSlotsPrompt,
 } from './responses';
+
+// ============================================================================
+// Type-narrowing helpers — use guards instead of `as` casts
+// ============================================================================
+
+function getNamedItems(items: unknown): Array<{ id: string; name: string }> {
+  return isNamedItemArray(items) ? items : [];
+}
+
+function getTimeItems(items: unknown): Array<{ id: string; label: string; start_time: string }> {
+  return isTimeItemArray(items) ? items : [];
+}
 
 // ============================================================================
 // Action parser — converts raw text into BookingAction
@@ -90,7 +105,7 @@ export function applyTransition(
   switch (currentState.name) {
     case BOOKING_STEP.IDLE: {
       if (action.type === 'select') {
-        const specialtyItems = (items ?? []) as Array<{ id: string; name: string }>;
+        const specialtyItems = getNamedItems(items);
         if (specialtyItems.length === 0) {
           return { ok: false, nextState: idleState(), responseText: 'No hay especialidades disponibles en este momento.', advance: false };
         }
@@ -117,11 +132,11 @@ export function applyTransition(
 
     case BOOKING_STEP.SELECTING_DOCTOR: {
       if (action.type === 'back' || action.type === 'cancel') {
-        const specialtyItems = (items ?? []) as Array<{ id: string; name: string }>;
+        const specialtyItems = getNamedItems(items);
         return { ok: true, nextState: selectingSpecialtyState(specialtyItems), responseText: buildSpecialtyPrompt(specialtyItems), advance: false };
       }
       if (action.type === 'select') {
-        const doctorItems = (items ?? currentState.items) as Array<{ id: string; name: string }>;
+        const doctorItems = isNamedItemArray(currentState.items) ? currentState.items : getNamedItems(items);
         const idx = parseInt(action.value, 10) - 1;
         if (isNaN(idx) || idx < 0 || idx >= doctorItems.length) {
           return { ok: false, nextState: selectingDoctorState(currentState.specialtyId, currentState.specialtyName, doctorItems, 'Opción inválida.'), responseText: buildDoctorsPrompt(currentState.specialtyName, doctorItems, '⚠️ Opción inválida.'), advance: false };
@@ -129,19 +144,19 @@ export function applyTransition(
         const doctor = doctorItems[idx];
         return { ok: true, nextState: selectingTimeState(currentState.specialtyId, doctor.id, doctor.name, []), responseText: buildLoadingSlotsPrompt(doctor.name), advance: true };
       }
-      return { ok: false, nextState: currentState, responseText: buildDoctorsPrompt(currentState.specialtyName, (items ?? []) as Array<{ id: string; name: string }>), advance: false };
+      return { ok: false, nextState: currentState, responseText: buildDoctorsPrompt(currentState.specialtyName, getNamedItems(items)), advance: false };
     }
 
     case BOOKING_STEP.SELECTING_TIME: {
       if (action.type === 'back') {
-        const doctorItems = (items ?? currentState.items) as Array<{ id: string; name: string }>;
+        const doctorItems = getNamedItems(items);
         return { ok: true, nextState: selectingDoctorState(currentState.specialtyId, currentState.doctorId, doctorItems), responseText: buildDoctorsPrompt('', doctorItems), advance: false };
       }
       if (action.type === 'cancel') {
         return { ok: true, nextState: idleState(), responseText: '📱 *Menú Principal*\n\n1️⃣ Agendar cita\n2️⃣ Mis citas\n3️⃣ Recordatorios\n4️⃣ Información', advance: false };
       }
       if (action.type === 'select') {
-        const timeItems = (items ?? currentState.items) as Array<{ id: string; label: string; start_time: string }>;
+        const timeItems = isTimeItemArray(currentState.items) ? currentState.items : getTimeItems(items);
         const idx = parseInt(action.value, 10) - 1;
         if (isNaN(idx) || idx < 0 || idx >= timeItems.length) {
           return { ok: false, nextState: selectingTimeState(currentState.specialtyId, currentState.doctorId, currentState.doctorName, timeItems, 'Opción inválida.'), responseText: buildSlotsPrompt(currentState.doctorName, timeItems, '⚠️ Opción inválida.'), advance: false };
@@ -150,7 +165,7 @@ export function applyTransition(
         const newDraft: DraftBooking = { ...draft, specialty_id: currentState.specialtyId, specialty_name: draft.specialty_name, doctor_id: currentState.doctorId, doctor_name: currentState.doctorName, start_time: slot.start_time, time_label: slot.label };
         return { ok: true, nextState: confirmingState(currentState.specialtyId, currentState.doctorId, currentState.doctorName, slot.label, newDraft), responseText: buildConfirmationPrompt(slot.label, currentState.doctorName), advance: true };
       }
-      return { ok: false, nextState: currentState, responseText: buildSlotsPrompt(currentState.doctorName, (items ?? []) as Array<{ id: string; label: string; start_time: string }>), advance: false };
+      return { ok: false, nextState: currentState, responseText: buildSlotsPrompt(currentState.doctorName, getTimeItems(items)), advance: false };
     }
 
     case BOOKING_STEP.CONFIRMING: {
@@ -158,7 +173,7 @@ export function applyTransition(
         return { ok: true, nextState: completedState('pending'), responseText: '✅ *Reserva Confirmada*\n\nTu cita ha sido agendada correctamente.\nRecibirás un recordatorio antes de tu cita.', advance: true };
       }
       if (action.type === 'confirm_no' || action.type === 'back') {
-        const timeItems = items as Array<{ id: string; label: string; start_time: string }>;
+        const timeItems = getTimeItems(items);
         return { ok: true, nextState: selectingTimeState(currentState.specialtyId, currentState.doctorId, currentState.doctorName, timeItems), responseText: buildSlotsPrompt(currentState.doctorName, timeItems), advance: false };
       }
       if (action.type === 'cancel') {
