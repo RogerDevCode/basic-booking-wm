@@ -1,103 +1,57 @@
 /*
  * PRE-FLIGHT CHECKLIST
- * Mission         : Send Telegram messages with keyboard support (inline/reply/force)
+ * Mission         : Send/edit/delete Telegram messages + answer callback queries
  * DB Tables Used  : NONE — pure Telegram API dispatcher
- * Concurrency Risk: NO — independent message dispatch
+ * Concurrency Risk: NO — independent API calls
  * GCal Calls      : NO
  * Idempotency Key : N/A — message sends are inherently non-idempotent
- * RLS Tenant ID   : NO — no DB queries, pure Telegram API
- * Zod Schemas     : YES — InputSchema validates chat_id, text, keyboard_mode
- */
-
-/*
- * REASONING TRACE
- * ### Mission Decomposition
- * - Build formatted message text from message_type and booking_details with MarkdownV2 sanitization
- * - Construct ReplyMarkup from inline_buttons, reply_keyboard, or force_reply options
- * - Dispatch to Telegram Bot API with 3-attempt exponential backoff retry
- *
- * ### Schema Verification
- * - Tables: NONE — this is a pure Telegram API dispatcher
- * - Columns: N/A
- *
- * ### Failure Mode Analysis
- * - Scenario 1: Telegram API returns 429 rate limit → extract retry_after parameter, wait capped at 30s
- * - Scenario 2: Network timeout or 5xx error → exponential backoff (3^attempt seconds), fail after 3 retries
- * - Scenario 3: 4xx client error (non-429) → permanent failure, return immediately without retry
- *
- * ### Concurrency Analysis
- * - Risk: NO — each invocation is independent; 50ms inter-request delay prevents rate limit collisions
- *
- * ### SOLID Compliance Check
- * - SRP: YES — buildMessage, buildReplyMarkup, sendWithRetry each have single responsibility
- * - DRY: YES — sanitizeForMarkdownV2 and safeString are shared helpers; message templates are centralized
- * - KISS: YES — linear switch/case for templates; iterative row-chunking for inline keyboard layout
- *
- * → CLEARED FOR CODE GENERATION
+ * RLS Tenant ID   : NO — no DB queries
+ * Zod Schemas     : YES — InputSchema validates all modes
  */
 
 // ============================================================================
-// TELEGRAM SEND — Notification Service with ReplyMarkup Support
+// TELEGRAM SEND — Notification + InlineKeyboard Service
 // ============================================================================
-// Sends Telegram messages with three keyboard modes:
-// 1. inline_keyboard — action buttons (confirm/cancel/reschedule)
-// 2. reply_keyboard — persistent menu bar (main navigation)
-// 3. force_reply — text input toggle (wizard step prompts)
-// Uses Telegram Bot API with retry (3 attempts, exponential backoff).
+// Modes:
+// 1. send_message — POST /sendMessage (new message with optional inline keyboard)
+// 2. edit_message — POST /editMessageText (replace existing message + keyboard)
+// 3. answer_callback — POST /answerCallbackQuery (acknowledge button press)
+// 4. delete_message — POST /deleteMessage (remove a message)
+// All modes use 3-attempt exponential backoff retry.
 // ============================================================================
 
 import { z } from 'zod';
 
-const InputSchema = z.object({
-  chat_id: z.string().min(1),
-  message_type: z.enum([
-    'booking_created',
-    'booking_confirmed',
-    'booking_cancelled',
-    'booking_rescheduled',
-    'reminder_24h',
-    'reminder_2h',
-    'reminder_30min',
-    'no_show',
-    'provider_schedule_change',
-    'main_menu',
-    'wizard_prompt',
-    'custom',
-  ]),
-  booking_details: z.record(z.string(), z.unknown()).optional().default({}),
-  inline_buttons: z.array(
-    z.object({
-      text: z.string(),
-      callback_data: z.string().max(64),
-    })
-  ).optional().default([]),
-  reply_keyboard: z.array(z.array(z.string())).optional(),
-  force_reply: z.boolean().optional().default(false),
-  reply_placeholder: z.string().optional().default('Escribe aquí...'),
-  remove_keyboard: z.boolean().optional().default(false),
-  parse_mode: z.enum(['MarkdownV2', 'HTML', 'None']).optional().default('MarkdownV2'),
+const InlineButtonSchema = z.object({
+  text: z.string(),
+  callback_data: z.string().max(64),
 });
 
-type BookingDetails = Readonly<Record<string, unknown>>;
+const InputSchema = z.object({
+  chat_id: z.string().min(1),
+  // ── Mode selector ──────────────────────────────────────────────
+  mode: z.enum(['send_message', 'edit_message', 'answer_callback', 'delete_message'])
+    .optional().default('send_message'),
+  // ── For send_message / edit_message ────────────────────────────
+  text: z.string().optional().default(''),
+  message_id: z.number().int().optional(),
+  inline_buttons: z.array(InlineButtonSchema).optional().default([]),
+  parse_mode: z.enum(['Markdown', 'HTML']).nullable().optional().default(null),
+  // ── For answer_callback ────────────────────────────────────────
+  callback_query_id: z.string().optional(),
+  callback_alert: z.string().optional(),
+  // ── Legacy fields (backward compatibility) ─────────────────────
+  message_type: z.string().optional(),
+  booking_details: z.record(z.string(), z.unknown()).optional().default({}),
+});
 
-interface InlineButton {
-  readonly text: string;
-  readonly callback_data: string;
-}
-
-type ReplyMarkup =
-  | { readonly remove_keyboard: true }
-  | { readonly keyboard: readonly { readonly text: string }[][]; readonly resize_keyboard: true; readonly one_time_keyboard: boolean }
-  | { readonly force_reply: true; readonly input_field_placeholder: string }
-  | { readonly inline_keyboard: readonly InlineButton[][] }
-  | undefined;
+type InlineButton = z.infer<typeof InlineButtonSchema>;
 
 interface TelegramApiResponse {
   readonly ok: boolean;
   readonly result?: { readonly message_id?: number };
   readonly description?: string;
   readonly error_code?: number;
-  readonly parameters?: { readonly retry_after?: number };
 }
 
 interface TelegramSendResult {
@@ -110,155 +64,102 @@ interface TelegramSendData {
   readonly sent: boolean;
   readonly message_id: number | null;
   readonly chat_id: string;
-  readonly message_type: string;
+  readonly mode: string;
 }
 
-function sanitizeForMarkdownV2(text: string): string {
-  return text.replace(/([_*[\]()~`>#+\-=|{}.!\\])/g, '\\$1');
+
+// ── Keyboard builder ─────────────────────────────────────────────────
+
+function buildInlineKeyboard(buttons: InlineButton[]): readonly { text: string; callback_data: string }[][] {
+  if (buttons.length === 0) return [];
+  const rows: { text: string; callback_data: string }[][] = [];
+  for (let i = 0; i < buttons.length; i += 2) {
+    rows.push(buttons.slice(i, i + 2));
+  }
+  return rows;
 }
 
-// Type-safe string extractor - prevents [object Object] issues
-function safeString(value: unknown, fallback = ''): string {
-  if (value === null || value === undefined) return fallback;
-  if (typeof value === 'string') return value;
-  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
-  return fallback; // Objects/Arrays fall back to default
-}
+// ── API dispatchers ──────────────────────────────────────────────────
 
-function buildMessage(
-  messageType: string,
-  details: BookingDetails,
-  parseMode: string
-): string {
-  const isMd = parseMode === 'MarkdownV2';
-  const esc = isMd ? sanitizeForMarkdownV2 : (s: string) => s;
-
-  const date = safeString(details['date'], 'Por confirmar');
-  const time = safeString(details['time'], 'Por confirmar');
-  const providerName = safeString(details['provider_name'], 'Tu doctor');
-  const service = safeString(details['service'], 'Consulta');
-  const bookingId = safeString(details['booking_id'], '');
-  const cancellationReason = safeString(details['cancellation_reason'], '');
-  const customMessage = safeString(details['message'], '');
-  const promptText = safeString(details['prompt'], '¿Qué deseas hacer?');
-
-  switch (messageType) {
-    case 'booking_created':
-      return `✅ *Cita Agendada*\n\n📅 Fecha: ${esc(date)}\n🕐 Hora: ${esc(time)}\n👨‍⚕️ Doctor: ${esc(providerName)}\n📋 Servicio: ${esc(service)}${bookingId ? `\n\nID de cita: \`${bookingId}\`` : ''}`;
-
-    case 'booking_confirmed':
-      return `✅ *Cita Confirmada*\n\nTu cita ha sido confirmada:\n📅 ${esc(date)} a las 🕐 ${esc(time)}\n👨‍⚕️ ${esc(providerName)}\n📋 ${esc(service)}${bookingId ? `\n\nID: \`${bookingId}\`` : ''}`;
-
-    case 'booking_cancelled':
-      return `❌ *Cita Cancelada*\n\nTu cita ha sido cancelada:\n📅 ${esc(date)} a las 🕐 ${esc(time)}\n👨‍⚕️ ${esc(providerName)}${cancellationReason ? `\n\nMotivo: ${esc(cancellationReason)}` : ''}`;
-
-    case 'booking_rescheduled':
-      return `🔄 *Cita Reprogramada*\n\nTu cita ha sido reprogramada:\n📅 Nueva fecha: ${esc(date)}\n🕐 Nueva hora: ${esc(time)}\n👨‍⚕️ ${esc(providerName)}\n📋 ${esc(service)}${bookingId ? `\n\nID: \`${bookingId}\`` : ''}`;
-
-    case 'reminder_24h':
-      return `⏰ *Recordatorio de Cita*\n\nTu cita es *mañana*:\n📅 ${esc(date)} a las 🕐 ${esc(time)}\n👨‍⚕️ ${esc(providerName)}\n📋 ${esc(service)}${bookingId ? `\n\nID: \`${bookingId}\`` : ''}\n\nPara cancelar, responde: /cancelar ${bookingId}`;
-
-    case 'reminder_2h':
-      return `⏰ *Tu cita es pronto*\n\nTu cita es en *2 horas*:\n📅 ${esc(date)} a las 🕐 ${esc(time)}\n👨‍⚕️ ${esc(providerName)}\n\n¡No olvides llegar 10 minutos antes!`;
-
-    case 'reminder_30min':
-      return `🚨 *Tu cita es en 30 minutos*\n\n📅 ${esc(date)} a las 🕐 ${esc(time)}\n👨‍⚕️ ${esc(providerName)}\n\n¡Es hora de salir!`;
-
-    case 'no_show':
-      return `⚠️ *Política de Inasistencia*\n\nNo asististe a tu cita del ${esc(date)} a las ${esc(time)}.\n\nRecuerda: Las cancelaciones deben hacerse con al menos 24 horas de anticipación.`;
-
-    case 'provider_schedule_change':
-      return `📢 *Cambio de Horario*\n\nEl horario de ${esc(providerName)} ha cambiado.\nSi tienes citas próximas, te contactaremos para reprogramar.`;
-
-    case 'main_menu':
-      return `📋 *Menú Principal*\n\nElige una opción:\n\n📅 *Agendar cita* — Reserva tu próxima consulta\n📋 *Mis citas* — Ver citas próximas\n🔔 *Recordatorios* — Configurar avisos\n❓ *Información* — Datos del consultorio\n\nToca un botón o escribe el número de la opción.`;
-
-    case 'wizard_prompt':
-      return promptText;
-
-    case 'custom':
-      return customMessage;
-
-    default: {
-      const detailsStr = JSON.stringify(details);
-      return `📋 Notificación: ${esc(detailsStr)}`;
-    }
-  }
-}
-
-function buildReplyMarkup(options: {
-  inline_buttons?: InlineButton[];
-  reply_keyboard?: string[][];
-  force_reply?: boolean;
-  reply_placeholder?: string;
-  remove_keyboard?: boolean;
-}): ReplyMarkup {
-  const { inline_buttons = [], reply_keyboard, force_reply = false, reply_placeholder = 'Escribe aquí...', remove_keyboard = false } = options;
-
-  if (remove_keyboard) {
-    return { remove_keyboard: true };
-  }
-
-  if (reply_keyboard && reply_keyboard.length > 0) {
-    return {
-      keyboard: reply_keyboard.map(row => row.map(text => ({ text }))),
-      resize_keyboard: true,
-      one_time_keyboard: force_reply,
-    };
-  }
-
-  if (force_reply) {
-    return {
-      force_reply: true,
-      input_field_placeholder: reply_placeholder,
-    };
-  }
-
-  if (inline_buttons.length > 0) {
-    const rows: InlineButton[][] = [];
-    for (let i = 0; i < inline_buttons.length; i += 2) {
-      rows.push(inline_buttons.slice(i, i + 2));
-    }
-    return {
-      inline_keyboard: rows.map(row =>
-        row.map(btn => ({ text: btn.text, callback_data: btn.callback_data }))
-      ),
-    };
-  }
-
-  return undefined;
-}
-
-async function sendWithRetry(
+async function sendTextMessage(
   botToken: string,
   chatId: string,
-  message: string,
-  replyMarkup: ReplyMarkup,
-  parseMode: string
+  text: string,
+  buttons: InlineButton[],
+  parseMode: string | null,
 ): Promise<TelegramSendResult> {
-  const maxRetries = 3;
+  const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
+  const body: Record<string, unknown> = {
+    chat_id: chatId,
+    text,
+    ...(parseMode ? { parse_mode: parseMode } : {}),
+  };
+  if (buttons.length > 0) {
+    body['reply_markup'] = { inline_keyboard: buildInlineKeyboard(buttons) };
+  }
+  return await apiCallWithRetry(url, body);
+}
+
+async function editMessage(
+  botToken: string,
+  chatId: string,
+  messageId: number,
+  text: string,
+  buttons: InlineButton[],
+  parseMode: string | null,
+): Promise<TelegramSendResult> {
+  const url = `https://api.telegram.org/bot${botToken}/editMessageText`;
+  const body: Record<string, unknown> = {
+    chat_id: chatId,
+    message_id: messageId,
+    text,
+    ...(parseMode ? { parse_mode: parseMode } : {}),
+  };
+  if (buttons.length > 0) {
+    body['reply_markup'] = { inline_keyboard: buildInlineKeyboard(buttons) };
+  }
+  return await apiCallWithRetry(url, body);
+}
+
+async function answerCallback(
+  botToken: string,
+  callbackQueryId: string,
+  alert?: string,
+): Promise<TelegramSendResult> {
+  const url = `https://api.telegram.org/bot${botToken}/answerCallbackQuery`;
+  const body: Record<string, unknown> = {
+    callback_query_id: callbackQueryId,
+    ...(alert ? { text: alert, show_alert: false } : {}),
+  };
+  return await apiCallWithRetry(url, body);
+}
+
+async function deleteMessage(
+  botToken: string,
+  chatId: string,
+  messageId: number,
+): Promise<TelegramSendResult> {
+  const url = `https://api.telegram.org/bot${botToken}/deleteMessage`;
+  const body: Record<string, unknown> = {
+    chat_id: chatId,
+    message_id: messageId,
+  };
+  return await apiCallWithRetry(url, body);
+}
+
+// ── Retry logic ──────────────────────────────────────────────────────
+
+async function apiCallWithRetry(
+  url: string,
+  body: Record<string, unknown>,
+  maxRetries = 3,
+): Promise<TelegramSendResult> {
   let lastError: string | null = null;
 
-  const apiUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
-
   for (let attempt = 0; attempt < maxRetries; attempt++) {
-    // Rate limiting: Telegram limit is 30 msg/s per bot
-    // Add 50ms delay between sends to stay well under limit
-    if (attempt > 0) {
-      await new Promise(resolve => setTimeout(resolve, 50 * attempt));
-    }
+    if (attempt > 0) await new Promise(r => setTimeout(r, 50 * attempt));
     try {
-      const body: Record<string, unknown> = {
-        chat_id: chatId,
-        text: message,
-        parse_mode: parseMode === 'None' ? undefined : parseMode,
-      };
-
-      if (replyMarkup) {
-        body['reply_markup'] = JSON.stringify(replyMarkup);
-      }
-
-      const response = await fetch(apiUrl, {
+      const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -267,77 +168,70 @@ async function sendWithRetry(
 
       const data = (await response.json()) as TelegramApiResponse;
 
-      if (response.ok && data.result != null) {
-        return {
-          sent: true,
-          message_id: typeof data.result.message_id === 'number' ? data.result.message_id : null,
-          error: null,
-        };
+      if (response.ok && data.ok) {
+        const msgId = typeof data.result?.message_id === 'number' ? data.result.message_id : null;
+        return { sent: true, message_id: msgId, error: null };
       }
 
-      const errorDesc = typeof data.description === 'string' ? data.description : 'Unknown error';
-      const errorCode = typeof data.error_code === 'number' ? data.error_code : 0;
+      const errDesc = typeof data.description === 'string' ? data.description : 'Unknown';
+      const errCode = typeof data.error_code === 'number' ? data.error_code : 0;
 
-      if (errorCode >= 400 && errorCode < 500 && errorCode !== 429) {
-        return { sent: false, message_id: null, error: `Permanent error (${String(errorCode)}): ${errorDesc}` };
+      if (errCode >= 400 && errCode < 500 && errCode !== 429) {
+        return { sent: false, message_id: null, error: `Permanent (${errCode}): ${errDesc}` };
       }
 
-      if (errorCode === 429) {
-        const retryAfter = typeof data.parameters?.retry_after === 'number' ? data.parameters.retry_after : 1;
-        const waitMs = Math.min(retryAfter * 1000, 30000);
-        await new Promise(resolve => setTimeout(resolve, waitMs));
-      }
-
-      lastError = `${String(errorCode)}: ${errorDesc}`;
+      lastError = `${errCode}: ${errDesc}`;
     } catch (e) {
       lastError = e instanceof Error ? e.message : String(e);
     }
 
     if (attempt < maxRetries - 1) {
-      const backoff = 3 ** attempt * 1000;
-      await new Promise(resolve => setTimeout(resolve, backoff));
+      await new Promise(r => setTimeout(r, 3 ** attempt * 1000));
     }
   }
 
-  return { sent: false, message_id: null, error: `Failed after ${String(maxRetries)} retries: ${lastError ?? 'Unknown error'}` };
+  return { sent: false, message_id: null, error: `Failed after ${maxRetries} retries: ${lastError ?? 'Unknown'}` };
 }
 
+// ── Main entry point ─────────────────────────────────────────────────
+
 export async function main(rawInput: unknown): Promise<[Error | null, TelegramSendData | null]> {
-  try {
-    const parsed = InputSchema.safeParse(rawInput);
-    if (!parsed.success) {
-      return [new Error(`Invalid input: ${parsed.error.message}`), null];
-    }
-
-    const { chat_id, message_type, booking_details, inline_buttons, reply_keyboard, force_reply, reply_placeholder, remove_keyboard, parse_mode } = parsed.data;
-
-    const botToken = process.env['TELEGRAM_BOT_TOKEN'];
-    if (!botToken) {
-      return [new Error('TELEGRAM_BOT_TOKEN not configured'), null];
-    }
-
-    const message = buildMessage(message_type, booking_details, parse_mode);
-    const replyMarkup = buildReplyMarkup({
-      inline_buttons,
-      ...(reply_keyboard !== undefined ? { reply_keyboard } : {}),
-      force_reply,
-      reply_placeholder,
-      remove_keyboard,
-    });
-
-    const result = await sendWithRetry(botToken, chat_id, message, replyMarkup, parse_mode);
-
-    if (!result.sent) {
-      return [new Error(result.error ?? 'Failed to send message'), null];
-    }
-    return [null, {
-        sent: result.sent,
-        message_id: result.message_id,
-        chat_id,
-        message_type,
-      }];
-  } catch (e) {
-    const error = e instanceof Error ? e : new Error(String(e));
-    return [new Error(error.message), null];
+  const parsed = InputSchema.safeParse(rawInput);
+  if (!parsed.success) {
+    return [new Error(`Invalid input: ${parsed.error.message}`), null];
   }
+
+  const { mode, chat_id, text, message_id, inline_buttons, parse_mode, callback_query_id, callback_alert } = parsed.data;
+
+  const botToken = process.env['TELEGRAM_BOT_TOKEN'];
+  if (!botToken) return [new Error('TELEGRAM_BOT_TOKEN not configured'), null];
+
+  let result: TelegramSendResult;
+
+  switch (mode) {
+    case 'send_message':
+      result = await sendTextMessage(botToken, chat_id, text || '', inline_buttons, parse_mode);
+      break;
+
+    case 'edit_message':
+      if (message_id === undefined) return [new Error('edit_message requires message_id'), null];
+      result = await editMessage(botToken, chat_id, message_id, text || '', inline_buttons, parse_mode);
+      break;
+
+    case 'answer_callback':
+      if (!callback_query_id) return [new Error('answer_callback requires callback_query_id'), null];
+      result = await answerCallback(botToken, callback_query_id, callback_alert);
+      break;
+
+    case 'delete_message':
+      if (message_id === undefined) return [new Error('delete_message requires message_id'), null];
+      result = await deleteMessage(botToken, chat_id, message_id);
+      break;
+  }
+
+  if (!result.sent) {
+    return [new Error(result.error ?? 'Failed to execute Telegram API call'), null];
+  }
+
+  return [null, { sent: result.sent, message_id: result.message_id, chat_id, mode }];
 }

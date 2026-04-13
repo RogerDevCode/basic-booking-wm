@@ -29,7 +29,7 @@ function isTelegramEvent(raw: unknown): raw is TelegramEvent {
   );
 }
 
-export async function main(rawInput: unknown): Promise<[Error | null, { chat_id: string, text: string, username: string, callback_data: string | null, raw_event: TelegramEvent } | null]> {
+export async function main(rawInput: unknown): Promise<[Error | null, { chat_id: string, text: string, username: string, callback_data: string | null, callback_query_id: string | null, raw_event: TelegramEvent } | null]> {
   if (!isTelegramEvent(rawInput)) {
     return [new Error('Invalid Telegram event payload'), null];
   }
@@ -46,6 +46,7 @@ export async function main(rawInput: unknown): Promise<[Error | null, { chat_id:
     text,
     username: String(message?.from?.first_name ?? callback?.from?.id ?? 'User'),
     callback_data: callback?.data ?? null,
+    callback_query_id: callback?.id ?? null,
     raw_event: event,
   }];
 }
