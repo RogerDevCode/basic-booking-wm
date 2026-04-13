@@ -12,14 +12,12 @@ services:
     command: >
       redis-server
       --appendonly yes
-      --requirepass ${REDIS_PASSWORD}
       --maxmemory 512mb
       --maxmemory-policy allkeys-lru
     ports:
       - "127.0.0.1:6379:6379"
     volumes:
       - redis-data:/data
-      - ./redis.conf:/usr/local/etc/redis/redis.conf
     environment:
       - REDIS_PASSWORD=${REDIS_PASSWORD}
     restart: unless-stopped
