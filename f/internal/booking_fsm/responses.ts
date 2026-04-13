@@ -59,3 +59,59 @@ export function buildNoDoctorsAvailable(specialtyName: string): string {
 export function buildNoSlotsAvailable(doctorName: string): string {
   return `No hay horarios disponibles con *${doctorName}*. ¿Deseas elegir otro doctor?`;
 }
+
+// ============================================================================
+// INLINE KEYBOARD BUILDERS — callback_data ≤ 64 bytes each
+// ============================================================================
+
+interface InlineButton {
+  readonly text: string;
+  readonly callback_data: string;
+}
+
+function makeButton(text: string, data: string): InlineButton {
+  return { text, callback_data: data };
+}
+
+export function buildSpecialtyKeyboard(items: ReadonlyArray<{ id: string; name: string }>): InlineButton[][] {
+  const buttons = items.map((it, i) => makeButton(it.name, `spec:${i + 1}`));
+  buttons.push(makeButton('❌ Cancelar', 'cancel'));
+  return chunkButtons(buttons);
+}
+
+export function buildDoctorKeyboard(items: ReadonlyArray<{ id: string; name: string }>): InlineButton[][] {
+  const buttons = items.map((it, i) => makeButton(it.name, `doc:${i + 1}`));
+  buttons.push(makeButton('⬅️ Volver', 'back'));
+  buttons.push(makeButton('❌ Cancelar', 'cancel'));
+  return chunkButtons(buttons);
+}
+
+export function buildTimeSlotKeyboard(items: ReadonlyArray<{ id: string; label: string; start_time: string }>): InlineButton[][] {
+  const buttons = items.map((it, i) => makeButton(it.label, `time:${i + 1}`));
+  buttons.push(makeButton('⬅️ Volver', 'back'));
+  buttons.push(makeButton('❌ Cancelar', 'cancel'));
+  return chunkButtons(buttons);
+}
+
+export function buildConfirmationKeyboard(): InlineButton[][] {
+  return [
+    [makeButton('✅ Sí, confirmar', 'cfm:yes'), makeButton('❌ No, volver', 'cfm:no')],
+  ];
+}
+
+export function buildMainMenuKeyboard(): InlineButton[][] {
+  return [
+    [makeButton('📅 Agendar cita', 'menu:book')],
+    [makeButton('📋 Mis citas', 'menu:mybookings'), makeButton('🔔 Recordatorios', 'menu:reminders')],
+    [makeButton('ℹ️ Información', 'menu:info')],
+  ];
+}
+
+function chunkButtons(buttons: InlineButton[]): InlineButton[][] {
+  if (buttons.length === 0) return [];
+  const rows: InlineButton[][] = [];
+  for (let i = 0; i < buttons.length; i += 2) {
+    rows.push(buttons.slice(i, i + 2));
+  }
+  return rows;
+}

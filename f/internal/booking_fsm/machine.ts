@@ -208,3 +208,21 @@ export const STEP_TO_FLOW_STEP: Readonly<Record<string, number>> = {
 export function flowStepFromState(state: BookingState): number {
   return STEP_TO_FLOW_STEP[state.name] ?? 0;
 }
+
+// ============================================================================
+// Callback data parser — converts Telegram callback_data into BookingAction
+// ============================================================================
+
+export function parseCallbackData(data: string): BookingAction | null {
+  // Navigation
+  if (data === 'back') return { type: 'back' };
+  if (data === 'cancel') return { type: 'cancel' };
+  if (data === 'cfm:yes') return { type: 'confirm_yes' };
+  if (data === 'cfm:no') return { type: 'confirm_no' };
+
+  // Selection patterns: spec:1, doc:2, time:3
+  const match = data.match(/^(spec|doc|time):(\d+)$/);
+  if (match !== null) return { type: 'select', value: match[2] };
+
+  return null;
+}

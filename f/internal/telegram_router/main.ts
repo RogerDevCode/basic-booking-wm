@@ -1,6 +1,6 @@
 /*
  * PRE-FLIGHT CHECKLIST
- * Mission         : Deterministic Telegram router — match menu/callback/command, fallback to AI Agent
+ * Mission         : Deterministic Telegram router with InlineKeyboard callback support
  * DB Tables Used  : None in base route; services/providers/bookings when FSM wizard is active (internal connection)
  * Concurrency Risk: NO — read-only data queries in wizard mode
  * GCal Calls      : NO
@@ -10,7 +10,14 @@
  */
 
 // ============================================================================
-// TELEGRAM ROUTER — Deterministic message routing
+// TELEGRAM ROUTER — Deterministic message routing with InlineKeyboard support
+// ============================================================================
+// Route priority:
+//   1. Callback data — wizard patterns (spec:*, doc:*, time:*, cfm:*) → FSM dispatch
+//   2. Callback data — system patterns (cnf:, cxl:, res:, act:, dea:) → legacy
+//   3. Slash commands (/start, /admin, /provider) → direct
+//   4. Menu text (Agendar cita, 1, 2...) → direct (only if no active wizard)
+//   5. Fallback → AI Agent
 // ============================================================================
 
 import { z } from 'zod';
@@ -18,6 +25,8 @@ import {
   type BookingState,
   type DraftBooking,
   emptyDraft,
+  BookingStateSchema,
+
 } from '../booking_fsm';
 import { handleBookingWizard } from './booking-wizard';
 
@@ -29,29 +38,39 @@ type Result<T> = [Error | null, T | null];
 
 type RouteType = 'callback' | 'command' | 'menu' | 'submenu' | 'wizard' | 'ai_agent';
 
+interface InlineButton {
+  readonly text: string;
+  readonly callback_data: string;
+}
+
 interface RouteResult {
   readonly route: RouteType;
   readonly forward_to_ai: boolean;
   readonly response_text: string;
+  readonly inline_keyboard: InlineButton[][];
   readonly callback_action: string | null;
   readonly callback_booking_id: string | null;
   readonly menu_action: string | null;
   readonly nextState: BookingState | null;
   readonly nextDraft: DraftBooking | null;
   readonly nextFlowStep: number;
+  readonly should_edit: boolean;
+  readonly message_id: number | null;
 }
 
 // ============================================================================
-// Zod Input Schema — includes optional booking state from Redis
+// Zod Input Schema
 // ============================================================================
 
 const InputSchema = z.object({
   text: z.string().nullable().default(null),
   chat_id: z.string().min(1),
   callback_data: z.string().nullable().default(null),
+  callback_query_id: z.string().nullable().default(null),
   username: z.string().nullable().default(null),
   booking_state: z.unknown().nullable().default(null),
   booking_draft: z.unknown().nullable().default(null),
+  message_id: z.number().int().nullable().default(null),
 });
 
 type RouterInput = z.infer<typeof InputSchema>;
@@ -120,6 +139,15 @@ const SUBMENU_RESPONSES: Readonly<Record<string, string>> = {
 } as const;
 
 // ============================================================================
+// Helper: check if callback_data is a wizard pattern
+// ============================================================================
+
+function isWizardCallback(data: string | null): boolean {
+  if (data === null) return false;
+  return /^(spec|doc|time|cfm|menu|back|cancel):/.test(data) || data === 'back' || data === 'cancel';
+}
+
+// ============================================================================
 // Router logic
 // ============================================================================
 
@@ -128,24 +156,30 @@ function buildRouteResult(
   responseText: string,
   opts: {
     forwardToAi?: boolean;
+    inlineKeyboard?: InlineButton[][];
     callbackAction?: string | null;
     callbackBookingId?: string | null;
     menuAction?: string | null;
     nextState?: BookingState | null;
     nextDraft?: DraftBooking | null;
     nextFlowStep?: number;
+    shouldEdit?: boolean;
+    messageId?: number | null;
   } = {},
 ): RouteResult {
   return {
     route,
     forward_to_ai: opts.forwardToAi ?? false,
     response_text: responseText,
+    inline_keyboard: opts.inlineKeyboard ?? [],
     callback_action: opts.callbackAction ?? null,
     callback_booking_id: opts.callbackBookingId ?? null,
     menu_action: opts.menuAction ?? null,
     nextState: opts.nextState ?? null,
     nextDraft: opts.nextDraft ?? null,
     nextFlowStep: opts.nextFlowStep ?? 0,
+    should_edit: opts.shouldEdit ?? false,
+    message_id: opts.messageId ?? null,
   };
 }
 
@@ -211,40 +245,82 @@ export async function main(rawInput: unknown): Promise<Result<RouteResult>> {
   }
 
   const input: RouterInput = parsed.data;
+  const { text, callback_data, booking_state, booking_draft, message_id } = input;
 
-  // Priority 1: Callback data (always direct)
-  const callbackMatch = matchCallback(input.callback_data);
-  if (callbackMatch !== null) return [null, callbackMatch];
+  // Parse booking state from raw input
+  let parsedState: BookingState | null = null;
+  if (booking_state !== null && booking_state !== undefined) {
+    const parseResult = BookingStateSchema.safeParse(booking_state);
+    if (parseResult.success) parsedState = parseResult.data;
+  }
+  const parsedDraft: DraftBooking | null = (booking_draft !== null && booking_draft !== undefined && typeof booking_draft === 'object')
+    ? booking_draft as DraftBooking
+    : null;
 
-  // Priority 2: Slash commands (always direct)
-  const commandMatch = matchCommand(input.text);
-  if (commandMatch !== null) return [null, commandMatch];
-
-  // Priority 3: If in booking wizard, delegate to FSM
-  const bookingState = input.booking_state as BookingState | null;
-  const bookingDraft = input.booking_draft as DraftBooking | null;
-
-  if (bookingState !== null && bookingState.name !== 'idle') {
+  // Priority 1: Callback data — wizard patterns
+  if (callback_data !== null && isWizardCallback(callback_data) && parsedState !== null && parsedState.name !== 'idle') {
     const [wizardErr, wizardResult] = await handleBookingWizard({
-      text: input.text ?? '',
-      currentState: bookingState,
-      draft: bookingDraft ?? emptyDraft(),
+      text: text ?? '',
+      callbackData: callback_data,
+      currentState: parsedState,
+      draft: parsedDraft ?? emptyDraft(),
     });
 
     if (wizardErr !== null || wizardResult === null) {
       return [wizardErr ?? new Error('Wizard returned null'), null];
     }
 
+    // If this was a callback_query, we should_edit; otherwise sendMessage
+    const shouldEdit = wizardResult.should_edit && message_id !== null;
+
     return [null, buildRouteResult('wizard', wizardResult.response_text, {
+      inlineKeyboard: wizardResult.inline_keyboard as InlineButton[][],
       nextState: wizardResult.nextState,
       nextDraft: wizardResult.nextDraft,
       nextFlowStep: wizardResult.nextFlowStep,
+      shouldEdit,
+      messageId: message_id,
     })];
   }
 
-  // Priority 4: Menu & submenu options
-  const menuMatch = matchMenu(input.text);
-  if (menuMatch !== null) return [null, menuMatch];
+  // Priority 1b: Text input when active booking state (text-based wizard fallback)
+  if (callback_data === null && parsedState !== null && parsedState.name !== 'idle' && text !== null) {
+    const [wizardErr, wizardResult] = await handleBookingWizard({
+      text,
+      callbackData: null,
+      currentState: parsedState,
+      draft: parsedDraft ?? emptyDraft(),
+    });
+
+    if (wizardErr !== null || wizardResult === null) {
+      return [wizardErr ?? new Error('Wizard returned null'), null];
+    }
+
+    const shouldEdit = wizardResult.should_edit && message_id !== null;
+
+    return [null, buildRouteResult('wizard', wizardResult.response_text, {
+      inlineKeyboard: wizardResult.inline_keyboard as InlineButton[][],
+      nextState: wizardResult.nextState,
+      nextDraft: wizardResult.nextDraft,
+      nextFlowStep: wizardResult.nextFlowStep,
+      shouldEdit,
+      messageId: message_id,
+    })];
+  }
+
+  // Priority 2: Callback data — system patterns (cnf:, cxl:, etc.)
+  const callbackMatch = matchCallback(callback_data);
+  if (callbackMatch !== null) return [null, callbackMatch];
+
+  // Priority 3: Slash commands
+  const commandMatch = matchCommand(text);
+  if (commandMatch !== null) return [null, commandMatch];
+
+  // Priority 4: Menu & submenu (only if not in active wizard)
+  if (parsedState === null || parsedState.name === 'idle') {
+    const menuMatch = matchMenu(text);
+    if (menuMatch !== null) return [null, menuMatch];
+  }
 
   // Fallback: forward to AI Agent
   return [null, buildRouteResult('ai_agent', '', { forwardToAi: true })];

@@ -42,6 +42,7 @@ const ConversationStateSchema = z.object({
   last_user_utterance:  z.string().nullable().catch(null),
   last_updated:         z.string().datetime(),
   completed:            z.boolean().default(false),
+  message_id:           z.number().int().nullable().catch(null),
 }).readonly();
 
 export type ConversationState = z.infer<typeof ConversationStateSchema>;
@@ -67,6 +68,7 @@ export function fromLegacyFormat(
     last_user_utterance: null,
     last_updated: new Date().toISOString(),
     completed: false,
+    message_id: null,
   };
 }
 
@@ -175,6 +177,7 @@ export async function updateConversationState(
       last_user_utterance:  Object.values(entities)[0] ?? null,
       last_updated:         new Date().toISOString(),
       completed:            false,
+      message_id:           null,
     };
 
     const ttl = getConvTTL();
