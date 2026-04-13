@@ -121,7 +121,7 @@ export function applyTransition(
         return { ok: true, nextState: selectingSpecialtyState(specialtyItems), responseText: buildSpecialtyPrompt(specialtyItems), advance: false };
       }
       if (action.type === 'select') {
-        const doctorItems = (items ?? []) as Array<{ id: string; name: string }>;
+        const doctorItems = (items ?? currentState.items) as Array<{ id: string; name: string }>;
         const idx = parseInt(action.value, 10) - 1;
         if (isNaN(idx) || idx < 0 || idx >= doctorItems.length) {
           return { ok: false, nextState: selectingDoctorState(currentState.specialtyId, currentState.specialtyName, doctorItems, 'Opción inválida.'), responseText: buildDoctorsPrompt(currentState.specialtyName, doctorItems, '⚠️ Opción inválida.'), advance: false };
@@ -134,14 +134,14 @@ export function applyTransition(
 
     case BOOKING_STEP.SELECTING_TIME: {
       if (action.type === 'back') {
-        const doctorItems = (items ?? []) as Array<{ id: string; name: string }>;
+        const doctorItems = (items ?? currentState.items) as Array<{ id: string; name: string }>;
         return { ok: true, nextState: selectingDoctorState(currentState.specialtyId, currentState.doctorId, doctorItems), responseText: buildDoctorsPrompt('', doctorItems), advance: false };
       }
       if (action.type === 'cancel') {
         return { ok: true, nextState: idleState(), responseText: '📱 *Menú Principal*\n\n1️⃣ Agendar cita\n2️⃣ Mis citas\n3️⃣ Recordatorios\n4️⃣ Información', advance: false };
       }
       if (action.type === 'select') {
-        const timeItems = (items ?? []) as Array<{ id: string; label: string; start_time: string }>;
+        const timeItems = (items ?? currentState.items) as Array<{ id: string; label: string; start_time: string }>;
         const idx = parseInt(action.value, 10) - 1;
         if (isNaN(idx) || idx < 0 || idx >= timeItems.length) {
           return { ok: false, nextState: selectingTimeState(currentState.specialtyId, currentState.doctorId, currentState.doctorName, timeItems, 'Opción inválida.'), responseText: buildSlotsPrompt(currentState.doctorName, timeItems, '⚠️ Opción inválida.'), advance: false };
@@ -158,7 +158,7 @@ export function applyTransition(
         return { ok: true, nextState: completedState('pending'), responseText: '✅ *Reserva Confirmada*\n\nTu cita ha sido agendada correctamente.\nRecibirás un recordatorio antes de tu cita.', advance: true };
       }
       if (action.type === 'confirm_no' || action.type === 'back') {
-        const timeItems = (items ?? []) as Array<{ id: string; label: string; start_time: string }>;
+        const timeItems = items as Array<{ id: string; label: string; start_time: string }>;
         return { ok: true, nextState: selectingTimeState(currentState.specialtyId, currentState.doctorId, currentState.doctorName, timeItems), responseText: buildSlotsPrompt(currentState.doctorName, timeItems), advance: false };
       }
       if (action.type === 'cancel') {

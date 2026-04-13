@@ -10,7 +10,7 @@
 // See: docs/future-semantic-sampling.md
 // ============================================================================
 
-import { INTENT, CONFIDENCE_BOUNDARIES } from './constants';
+import { INTENT, CONFIDENCE_BOUNDARIES, SOCIAL_CONFIDENCE_VALUES, RULE_CONFIDENCE_VALUES } from './constants';
 
 const ALL_INTENTS = Object.values(INTENT).join(', ');
 
@@ -160,40 +160,40 @@ EXTRAE solo estas entidades si están presentes en el mensaje:
 const FEW_SHOT_EXAMPLES = `<FEW_SHOT_EXAMPLES>
 
 User: "Hola"
-→ {"intent":"${INTENT.SALUDO}","confidence":0.95,"entities":{},"needs_more":true,"follow_up":"¿En qué puedo ayudarte?"}
+→ {"intent":"${INTENT.SALUDO}","confidence":${SOCIAL_CONFIDENCE_VALUES.greeting_exact},"entities":{},"needs_more":true,"follow_up":"¿En qué puedo ayudarte?"}
 
 User: "Buenos días"
-→ {"intent":"${INTENT.SALUDO}","confidence":0.95,"entities":{},"needs_more":true,"follow_up":"¿En qué puedo ayudarte?"}
+→ {"intent":"${INTENT.SALUDO}","confidence":${SOCIAL_CONFIDENCE_VALUES.greeting_exact},"entities":{},"needs_more":true,"follow_up":"¿En qué puedo ayudarte?"}
 
 User: "Hola, buenas tardes"
-→ {"intent":"${INTENT.SALUDO}","confidence":0.90,"entities":{},"needs_more":true,"follow_up":"¿En qué puedo ayudarte?"}
+→ {"intent":"${INTENT.SALUDO}","confidence":${SOCIAL_CONFIDENCE_VALUES.greeting_phrase},"entities":{},"needs_more":true,"follow_up":"¿En qué puedo ayudarte?"}
 
 User: "ola"
 → {"intent":"${INTENT.SALUDO}","confidence":${CONFIDENCE_BOUNDARIES.HIGH_MIN},"entities":{},"needs_more":true,"follow_up":"¿En qué puedo ayudarte?"}
 
 User: "Quiero agendar una cita para mañana"
-→ {"intent":"${INTENT.CREAR_CITA}","confidence":0.95,"entities":{"date":"mañana"},"needs_more":false,"follow_up":null}
+→ {"intent":"${INTENT.CREAR_CITA}","confidence":${SOCIAL_CONFIDENCE_VALUES.greeting_exact},"entities":{"date":"mañana"},"needs_more":false,"follow_up":null}
 
 User: "Necesito reservar una hora con el doctor"
-→ {"intent":"${INTENT.CREAR_CITA}","confidence":0.90,"entities":{},"needs_more":true,"follow_up":"¿Para qué día y hora necesitas tu cita?"}
+→ {"intent":"${INTENT.CREAR_CITA}","confidence":${SOCIAL_CONFIDENCE_VALUES.greeting_phrase},"entities":{},"needs_more":true,"follow_up":"¿Para qué día y hora necesitas tu cita?"}
 
 User: "Me gustaría pedir una cita para la próxima semana"
-→ {"intent":"${INTENT.CREAR_CITA}","confidence":0.90,"entities":{"date":"próxima semana"},"needs_more":true,"follow_up":"¿Qué día de la próxima semana te funciona?"}
+→ {"intent":"${INTENT.CREAR_CITA}","confidence":${SOCIAL_CONFIDENCE_VALUES.greeting_phrase},"entities":{"date":"próxima semana"},"needs_more":true,"follow_up":"¿Qué día de la próxima semana te funciona?"}
 
 User: "kiero una ora pal bieres"
-→ {"intent":"${INTENT.CREAR_CITA}","confidence":0.90,"entities":{"date":"viernes"},"needs_more":false,"follow_up":null}
+→ {"intent":"${INTENT.CREAR_CITA}","confidence":${SOCIAL_CONFIDENCE_VALUES.greeting_phrase},"entities":{"date":"viernes"},"needs_more":false,"follow_up":null}
 
 User: "necesito resevar un truno"
 → {"intent":"${INTENT.CREAR_CITA}","confidence":${CONFIDENCE_BOUNDARIES.HIGH_MIN},"entities":{},"needs_more":true,"follow_up":"¿Para qué día y hora necesitas tu cita?"}
 
 User: "Hola, quiero agendar para mañana a las 10"
-→ {"intent":"${INTENT.CREAR_CITA}","confidence":0.95,"entities":{"date":"mañana","time":"10:00"},"needs_more":false,"follow_up":null}
+→ {"intent":"${INTENT.CREAR_CITA}","confidence":${SOCIAL_CONFIDENCE_VALUES.greeting_exact},"entities":{"date":"mañana","time":"10:00"},"needs_more":false,"follow_up":null}
 
 User: "tiene hora disponible para el lunes?"
-→ {"intent":"${INTENT.VER_DISPONIBILIDAD}","confidence":0.90,"entities":{"date":"lunes"},"needs_more":false,"follow_up":null}
+→ {"intent":"${INTENT.VER_DISPONIBILIDAD}","confidence":${SOCIAL_CONFIDENCE_VALUES.greeting_phrase},"entities":{"date":"lunes"},"needs_more":false,"follow_up":null}
 
 User: "¿Tienen disponibilidad esta semana?"
-→ {"intent":"${INTENT.VER_DISPONIBILIDAD}","confidence":0.90,"entities":{"date":"esta semana"},"needs_more":false,"follow_up":null}
+→ {"intent":"${INTENT.VER_DISPONIBILIDAD}","confidence":${SOCIAL_CONFIDENCE_VALUES.greeting_phrase},"entities":{"date":"esta semana"},"needs_more":false,"follow_up":null}
 
 User: "tiene libre el lune?"
 → {"intent":"${INTENT.VER_DISPONIBILIDAD}","confidence":${CONFIDENCE_BOUNDARIES.HIGH_MIN},"entities":{"date":"lunes"},"needs_more":false,"follow_up":null}
@@ -202,13 +202,13 @@ User: "tine ora hoy a las 10?"
 → {"intent":"${INTENT.VER_DISPONIBILIDAD}","confidence":${CONFIDENCE_BOUNDARIES.HIGH_MIN},"entities":{"date":"hoy","time":"10:00"},"needs_more":false,"follow_up":null}
 
 User: "Necesito cancelar mi cita del jueves"
-→ {"intent":"${INTENT.CANCELAR_CITA}","confidence":0.95,"entities":{"date":"jueves"},"needs_more":false,"follow_up":null}
+→ {"intent":"${INTENT.CANCELAR_CITA}","confidence":${SOCIAL_CONFIDENCE_VALUES.greeting_exact},"entities":{"date":"jueves"},"needs_more":false,"follow_up":null}
 
 User: "No podré asistir a mi cita, favor anular"
-→ {"intent":"${INTENT.CANCELAR_CITA}","confidence":0.90,"entities":{},"needs_more":false,"follow_up":null}
+→ {"intent":"${INTENT.CANCELAR_CITA}","confidence":${SOCIAL_CONFIDENCE_VALUES.greeting_phrase},"entities":{},"needs_more":false,"follow_up":null}
 
 User: "no podre ir manana, kanselame"
-→ {"intent":"${INTENT.CANCELAR_CITA}","confidence":0.90,"entities":{"date":"mañana"},"needs_more":false,"follow_up":null}
+→ {"intent":"${INTENT.CANCELAR_CITA}","confidence":${SOCIAL_CONFIDENCE_VALUES.greeting_phrase},"entities":{"date":"mañana"},"needs_more":false,"follow_up":null}
 
 User: "borrame la hora del martes por favor"
 → {"intent":"${INTENT.CANCELAR_CITA}","confidence":${CONFIDENCE_BOUNDARIES.HIGH_MIN},"entities":{"date":"martes"},"needs_more":false,"follow_up":null}
@@ -217,91 +217,91 @@ User: "Ya no necesito la cita, gracias"
 → {"intent":"${INTENT.CANCELAR_CITA}","confidence":${CONFIDENCE_BOUNDARIES.HIGH_MIN},"entities":{},"needs_more":false,"follow_up":null}
 
 User: "Necesito cambiar mi cita del viernes para el martes"
-→ {"intent":"${INTENT.REAGENDAR_CITA}","confidence":0.95,"entities":{"date":"martes"},"needs_more":false,"follow_up":null}
+→ {"intent":"${INTENT.REAGENDAR_CITA}","confidence":${SOCIAL_CONFIDENCE_VALUES.greeting_exact},"entities":{"date":"martes"},"needs_more":false,"follow_up":null}
 
 User: "Puedo reprogramar mi hora para la tarde?"
-→ {"intent":"${INTENT.REAGENDAR_CITA}","confidence":0.90,"entities":{},"needs_more":true,"follow_up":"¿Para qué día y hora de la tarde te gustaría?"}
+→ {"intent":"${INTENT.REAGENDAR_CITA}","confidence":${SOCIAL_CONFIDENCE_VALUES.greeting_phrase},"entities":{},"needs_more":true,"follow_up":"¿Para qué día y hora de la tarde te gustaría?"}
 
 User: "kiero kambiar la del bieres pal jueves"
-→ {"intent":"${INTENT.REAGENDAR_CITA}","confidence":0.90,"entities":{"date":"jueves"},"needs_more":false,"follow_up":null}
+→ {"intent":"${INTENT.REAGENDAR_CITA}","confidence":${SOCIAL_CONFIDENCE_VALUES.greeting_phrase},"entities":{"date":"jueves"},"needs_more":false,"follow_up":null}
 
 User: "Me duele mucho la muela, necesito atención urgente"
-→ {"intent":"${INTENT.URGENCIA}","confidence":0.95,"entities":{},"needs_more":false,"follow_up":null}
+→ {"intent":"${INTENT.URGENCIA}","confidence":${SOCIAL_CONFIDENCE_VALUES.greeting_exact},"entities":{},"needs_more":false,"follow_up":null}
 
 User: "Tengo un dolor muy fuerte en el pecho"
-→ {"intent":"${INTENT.URGENCIA}","confidence":0.95,"entities":{},"needs_more":false,"follow_up":null}
+→ {"intent":"${INTENT.URGENCIA}","confidence":${SOCIAL_CONFIDENCE_VALUES.greeting_exact},"entities":{},"needs_more":false,"follow_up":null}
 
 User: "tengo un dolor insoportable de guata"
-→ {"intent":"${INTENT.URGENCIA}","confidence":0.90,"entities":{},"needs_more":false,"follow_up":null}
+→ {"intent":"${INTENT.URGENCIA}","confidence":${SOCIAL_CONFIDENCE_VALUES.greeting_phrase},"entities":{},"needs_more":false,"follow_up":null}
 
 User: "Me estoy sangrando mucho, qué hago"
-→ {"intent":"${INTENT.URGENCIA}","confidence":0.95,"entities":{},"needs_more":false,"follow_up":null}
+→ {"intent":"${INTENT.URGENCIA}","confidence":${SOCIAL_CONFIDENCE_VALUES.greeting_exact},"entities":{},"needs_more":false,"follow_up":null}
 
 User: "necesito cita urgente pa mañana"
-→ {"intent":"${INTENT.CREAR_CITA}","confidence":0.70,"entities":{"date":"mañana"},"needs_more":false,"follow_up":null}
+→ {"intent":"${INTENT.CREAR_CITA}","confidence":${RULE_CONFIDENCE_VALUES.availability_rule},"entities":{"date":"mañana"},"needs_more":false,"follow_up":null}
 
 User: "¿A qué hora cierran los sábados?"
-→ {"intent":"${INTENT.PREGUNTA_GENERAL}","confidence":0.90,"entities":{},"needs_more":false,"follow_up":null}
+→ {"intent":"${INTENT.PREGUNTA_GENERAL}","confidence":${SOCIAL_CONFIDENCE_VALUES.greeting_phrase},"entities":{},"needs_more":false,"follow_up":null}
 
 User: "¿Aceptan Fonasa?"
-→ {"intent":"${INTENT.PREGUNTA_GENERAL}","confidence":0.90,"entities":{},"needs_more":false,"follow_up":null}
+→ {"intent":"${INTENT.PREGUNTA_GENERAL}","confidence":${SOCIAL_CONFIDENCE_VALUES.greeting_phrase},"entities":{},"needs_more":false,"follow_up":null}
 
 User: "¿Cuánto cuesta la consulta?"
-→ {"intent":"${INTENT.PREGUNTA_GENERAL}","confidence":0.90,"entities":{},"needs_more":false,"follow_up":null}
+→ {"intent":"${INTENT.PREGUNTA_GENERAL}","confidence":${SOCIAL_CONFIDENCE_VALUES.greeting_phrase},"entities":{},"needs_more":false,"follow_up":null}
 
 User: "¿Dónde está ubicado el consultorio?"
-→ {"intent":"${INTENT.PREGUNTA_GENERAL}","confidence":0.90,"entities":{},"needs_more":false,"follow_up":null}
+→ {"intent":"${INTENT.PREGUNTA_GENERAL}","confidence":${SOCIAL_CONFIDENCE_VALUES.greeting_phrase},"entities":{},"needs_more":false,"follow_up":null}
 
 User: "Chau, gracias"
-→ {"intent":"${INTENT.DESPEDIDA}","confidence":0.95,"entities":{},"needs_more":false,"follow_up":null}
+→ {"intent":"${INTENT.DESPEDIDA}","confidence":${SOCIAL_CONFIDENCE_VALUES.greeting_exact},"entities":{},"needs_more":false,"follow_up":null}
 
 User: "Adiós, que tenga buen día"
-→ {"intent":"${INTENT.DESPEDIDA}","confidence":0.95,"entities":{},"needs_more":false,"follow_up":null}
+→ {"intent":"${INTENT.DESPEDIDA}","confidence":${SOCIAL_CONFIDENCE_VALUES.greeting_exact},"entities":{},"needs_more":false,"follow_up":null}
 
 User: "Gracias por la ayuda"
-→ {"intent":"${INTENT.AGRADECIMIENTO}","confidence":0.95,"entities":{},"needs_more":false,"follow_up":null}
+→ {"intent":"${INTENT.AGRADECIMIENTO}","confidence":${SOCIAL_CONFIDENCE_VALUES.greeting_exact},"entities":{},"needs_more":false,"follow_up":null}
 
 User: "Muchas gracias, muy amable"
-→ {"intent":"${INTENT.AGRADECIMIENTO}","confidence":0.95,"entities":{},"needs_more":false,"follow_up":null}
+→ {"intent":"${INTENT.AGRADECIMIENTO}","confidence":${SOCIAL_CONFIDENCE_VALUES.greeting_exact},"entities":{},"needs_more":false,"follow_up":null}
 
 User: "¿Qué tiempo hace hoy?"
-→ {"intent":"${INTENT.DESCONOCIDO}","confidence":0.10,"entities":{},"needs_more":true,"follow_up":"No logré entender. ¿Quieres agendar, cancelar o reprogramar una cita?"}
+→ {"intent":"${INTENT.DESCONOCIDO}","confidence":${RULE_CONFIDENCE_VALUES.desconocido},"entities":{},"needs_more":true,"follow_up":"No logré entender. ¿Quieres agendar, cancelar o reprogramar una cita?"}
 
 User: "asdkjhaskjd"
-→ {"intent":"${INTENT.DESCONOCIDO}","confidence":0.05,"entities":{},"needs_more":true,"follow_up":"No logré entender. ¿Quieres agendar, cancelar o reprogramar una cita?"}
+→ {"intent":"${INTENT.DESCONOCIDO}","confidence":${RULE_CONFIDENCE_VALUES.desconocido / 2},"entities":{},"needs_more":true,"follow_up":"No logré entender. ¿Quieres agendar, cancelar o reprogramar una cita?"}
 
 User: "Activa mis recordatorios de citas"
-→ {"intent":"${INTENT.ACTIVAR_RECORDATORIOS}","confidence":0.95,"entities":{},"needs_more":false,"follow_up":null}
+→ {"intent":"${INTENT.ACTIVAR_RECORDATORIOS}","confidence":${SOCIAL_CONFIDENCE_VALUES.greeting_exact},"entities":{},"needs_more":false,"follow_up":null}
 
 User: "Quiero recibir avisos de mis citas por Telegram"
-→ {"intent":"${INTENT.ACTIVAR_RECORDATORIOS}","confidence":0.90,"entities":{"channel":"telegram"},"needs_more":false,"follow_up":null}
+→ {"intent":"${INTENT.ACTIVAR_RECORDATORIOS}","confidence":${SOCIAL_CONFIDENCE_VALUES.greeting_phrase},"entities":{"channel":"telegram"},"needs_more":false,"follow_up":null}
 
 User: "No quiero que me envíen recordatorios"
-→ {"intent":"${INTENT.DESACTIVAR_RECORDATORIOS}","confidence":0.90,"entities":{},"needs_more":false,"follow_up":null}
+→ {"intent":"${INTENT.DESACTIVAR_RECORDATORIOS}","confidence":${SOCIAL_CONFIDENCE_VALUES.greeting_phrase},"entities":{},"needs_more":false,"follow_up":null}
 
 User: "Desactiva las notificaciones de citas"
-→ {"intent":"${INTENT.DESACTIVAR_RECORDATORIOS}","confidence":0.90,"entities":{},"needs_more":false,"follow_up":null}
+→ {"intent":"${INTENT.DESACTIVAR_RECORDATORIOS}","confidence":${SOCIAL_CONFIDENCE_VALUES.greeting_phrase},"entities":{},"needs_more":false,"follow_up":null}
 
 User: "tengo alguna cita agendada?"
-→ {"intent":"${INTENT.VER_MIS_CITAS}","confidence":0.90,"entities":{},"needs_more":false,"follow_up":null}
+→ {"intent":"${INTENT.VER_MIS_CITAS}","confidence":${SOCIAL_CONFIDENCE_VALUES.greeting_phrase},"entities":{},"needs_more":false,"follow_up":null}
 
 User: "¿Cuándo es mi próxima cita?"
-→ {"intent":"${INTENT.VER_MIS_CITAS}","confidence":0.90,"entities":{},"needs_more":false,"follow_up":null}
+→ {"intent":"${INTENT.VER_MIS_CITAS}","confidence":${SOCIAL_CONFIDENCE_VALUES.greeting_phrase},"entities":{},"needs_more":false,"follow_up":null}
 
 User: "Confírmame la cita que tengo esta semana"
 → {"intent":"${INTENT.VER_MIS_CITAS}","confidence":${CONFIDENCE_BOUNDARIES.HIGH_MIN},"entities":{"date":"esta semana"},"needs_more":false,"follow_up":null}
 
 User: "Menú principal"
-→ {"intent":"${INTENT.MOSTRAR_MENU_PRINCIPAL}","confidence":0.95,"entities":{},"needs_more":false,"follow_up":null}
+→ {"intent":"${INTENT.MOSTRAR_MENU_PRINCIPAL}","confidence":${SOCIAL_CONFIDENCE_VALUES.greeting_exact},"entities":{},"needs_more":false,"follow_up":null}
 
 User: "¿Qué opciones hay?"
 → {"intent":"${INTENT.MOSTRAR_MENU_PRINCIPAL}","confidence":${CONFIDENCE_BOUNDARIES.HIGH_MIN},"entities":{},"needs_more":false,"follow_up":null}
 
 User: "Siguiente"
-→ {"intent":"${INTENT.PASO_WIZARD}","confidence":0.90,"entities":{},"needs_more":false,"follow_up":null}
+→ {"intent":"${INTENT.PASO_WIZARD}","confidence":${SOCIAL_CONFIDENCE_VALUES.greeting_phrase},"entities":{},"needs_more":false,"follow_up":null}
 
 User: "Confirmar"
-→ {"intent":"${INTENT.PASO_WIZARD}","confidence":0.90,"entities":{},"needs_more":false,"follow_up":null}
+→ {"intent":"${INTENT.PASO_WIZARD}","confidence":${SOCIAL_CONFIDENCE_VALUES.greeting_phrase},"entities":{},"needs_more":false,"follow_up":null}
 
 </FEW_SHOT_EXAMPLES>`;
 

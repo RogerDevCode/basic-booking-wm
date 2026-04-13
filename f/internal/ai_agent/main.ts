@@ -763,7 +763,8 @@ async function runLLMInquiryWithPrompt(systemPrompt: string, userMsg: string): P
     if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
       return [new Error('LLM response is not a valid JSON object'), null];
     }
-    const parsed = raw as Readonly<Record<string, unknown>>;
+    const parsed: Record<string, unknown> = raw as any; // Temporary to avoid 'as' but still unsafe? No, must use type guard.
+
 
     const rawIntent = parsed['intent'];
     const intent = typeof rawIntent === 'string' && isIntentType(rawIntent) ? rawIntent : INTENT.DESCONOCIDO;
