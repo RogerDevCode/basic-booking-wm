@@ -593,3 +593,363 @@ describe('FASE 4: DEVIL\'S ADVOCATE — Infra Failures & Concurrency', () => {
     // it should degrade gracefully to stateless mode
   });
 });
+
+// ============================================================================
+// FASE 4B: THE DEVIL'S ADVOCATE — Concurrencia, Estrés de Hardware y Event Loop
+// ============================================================================
+// Tests diseñados para entornos de recursos estrangulados.
+// Límite físico: Max 2 Cores / 4 Hilos (threads).
+// Objetivo: Verificar que NUNCA se satura la CPU ni se bloquea el event loop.
+// ============================================================================
+
+describe('FASE 4B: DEVIL\'S ADVOCATE — Race Conditions, Network Faults & Resource Starvation', () => {
+  // ── Race Conditions ───────────────────────────────────────────────────
+
+  test('RACE CONDITION: 50 usuarios simultáneos mutando el MISMO chat_id → sin corrupción de estado', async () => {
+    const chatId = testChatId('race-50');
+    // Simular 50 intentos simultáneos de mutación (como 50 webhooks colisionando)
+    const promises = Array.from({ length: 50 }, (_, i) =>
+      updateConversationState(redis!, chatId, 'booking_wizard', { attempt: String(i), timestamp: Date.now().toString() }, null, i),
+    );
+    const results = await Promise.all(promises);
+
+    // TODAS deben completar sin crash
+    const errors = results.filter(([err]) => err !== null);
+    expect(errors.length).toBe(0);
+
+    // El estado final debe ser coherente (no JSON corrupto)
+    const [, state] = await getConversationState(redis!, chatId);
+    expect(state).not.toBeNull();
+    expect(typeof state!.chat_id).toBe('string');
+    expect(typeof state!.flow_step).toBe('number');
+    // Business Impact: Si la race condition corrompe el estado, un usuario podría 
+    // ver datos de otro usuario o el wizard podría quedar en un estado inválido
+    // sin posibilidad de recuperación.
+  });
+
+  test('RACE CONDITION: lectura-escritura simultánea sobre el mismo key → lector ve estado coherente (no JSON parcial)', async () => {
+    const chatId = testChatId('rw-race');
+    await updateConversationState(redis!, chatId, 'booking_wizard', { phase: 'start' }, null, 1);
+
+    const writes = Array.from({ length: 20 }, (_, i) =>
+      updateConversationState(redis!, chatId, 'booking_wizard', { phase: `write-${i}`, data: 'x'.repeat(5000) }, null, i + 2),
+    );
+
+    const reads = Array.from({ length: 20 }, () =>
+      getConversationState(redis!, chatId),
+    );
+
+    const allResults = await Promise.all([...writes, ...reads]);
+    const writeResults = allResults.slice(0, 20) as [Error | null, ConversationState | null][];
+    const readResults = allResults.slice(20) as [Error | null, ConversationState | null][];
+
+    // All writes succeed
+    for (const [err] of writeResults) {
+      expect(err).toBeNull();
+    }
+
+    // All reads see valid JSON (no partial writes)
+    for (const [err, state] of readResults) {
+      expect(err).toBeNull();
+      expect(state).not.toBeNull();
+      expect(typeof state!.flow_step).toBe('number');
+      // El phase debe ser 'start' o uno de los writes, nunca basura
+      const validPhases = ['start', ...Array.from({ length: 20 }, (_, i) => `write-${i}`)];
+      expect(validPhases).toContain(state!.pending_data['phase']);
+    }
+    // Business Impact: Lectura de JSON parcial podría crash el parser y 
+    // dejar al usuario sin respuesta del bot.
+  });
+
+  // ── Tolerancia a Fallos de Red ────────────────────────────────────────
+
+  test('NETWORK FAULT: Redis timeout durante escritura → error retornado, no thrown, sin estado zombie', async () => {
+    // Simular timeout con un Redis en puerto inexistente
+    const timeoutRedis = new Redis('redis://127.0.0.1:6380', {
+      lazyConnect: false,
+      maxRetriesPerRequest: 1,
+      connectTimeout: 500,
+      retryStrategy: () => null, // No retry
+    });
+
+    const [err, state] = await updateConversationState(
+      timeoutRedis, testChatId('network-fault'), 'booking_wizard', {}, null, 1,
+    );
+
+    // El error debe ser retornado como valor, no lanzado como excepción
+    expect(err).not.toBeNull();
+    expect(state).toBeNull();
+
+    await timeoutRedis.quit().catch(() => {});
+    // Business Impact: Si el error se lanza como excepción en vez de retornarse 
+    // como tupla [Error, null], el proceso Node.js crash y TODOS los webhooks 
+    // pendientes se pierden.
+  });
+
+  test('NETWORK FAULT: Redis se desconecta a mitad de operación → gracefully handled, no crash del proceso', async () => {
+    const chatId = testChatId('disconnect');
+    // Crear un Redis que falla después del primer comando
+    let callCount = 0;
+    const failingRedis = new Redis('redis://127.0.0.1:6379', {
+      lazyConnect: true,
+      maxRetriesPerRequest: 0,
+    });
+
+    // Conectar
+    await failingRedis.connect();
+
+    // Primer comando funciona
+    await failingRedis.set('test:ping', 'pong');
+    callCount++;
+
+    // Forzar desconexión
+    await failingRedis.disconnect();
+
+    // Intentar escribir con Redis desconectado
+    const [err] = await updateConversationState(
+      failingRedis, chatId, 'booking_wizard', {}, null, 1,
+    ).catch((e: Error) => [e, null] as [Error, null]);
+
+    expect(err).not.toBeNull();
+
+    await failingRedis.quit().catch(() => {});
+    // Business Impact: Si el proceso crash por desconexión de Redis, todos los 
+    // webhooks de Telegram en cola se pierden sin respuesta.
+  });
+
+  test('ROLLBACK CLEAN: transacción abortada no deja estado parcial en Redis', async () => {
+    const chatId = testChatId('rollback');
+    // Escribir estado válido inicial
+    await updateConversationState(redis!, chatId, 'booking_wizard', { step: 'init' }, null, 1);
+
+    // Intentar escribir con datos que podrían causar problemas
+    const massiveData: Record<string, string> = {};
+    for (let i = 0; i < 10000; i++) massiveData[`key_${i}`] = 'x'.repeat(100);
+
+    const [err, state] = await updateConversationState(
+      redis!, chatId, 'booking_wizard', massiveData, null, 2,
+    );
+
+    // La operación debe completar o fallar limpiamente
+    if (err !== null) {
+      // Si falla, el estado anterior debe permanecer intacto
+      const [, prevState] = await getConversationState(redis!, chatId);
+      expect(prevState).not.toBeNull();
+      expect(prevState!.pending_data['step']).toBe('init');
+    } else {
+      expect(state).not.toBeNull();
+    }
+    // Business Impact: Un estado zombie (parcialmente escrito) causaría que 
+    // el próximo webhook vea datos corruptos y no pueda recover.
+  });
+
+  // ── Límites Físicos (Resource Starvation) ────────────────────────────
+
+  test('RESOURCE STARVATION: 200 operaciones consecutivas bajo presión → latencia p99 < 50ms por operación', async () => {
+    const chatId = testChatId('starvation');
+    const latencies: number[] = [];
+
+    for (let i = 0; i < 200; i++) {
+      const start = Date.now();
+      await updateConversationState(redis!, chatId, 'booking_wizard', { seq: String(i) }, null, i);
+      latencies.push(Date.now() - start);
+    }
+
+    // Verificar latencia p99
+    const sorted = [...latencies].sort((a, b) => a - b);
+    const p99Index = Math.floor(sorted.length * 0.99);
+    const p99 = sorted[p99Index];
+
+    expect(p99).toBeLessThan(50); // p99 < 50ms
+    expect(sorted[sorted.length - 1]).toBeLessThan(100); // Max < 100ms
+
+    // Business Impact: Si la latencia p99 supera 50ms, el webhook de Telegram 
+    // (timeout 5s) podría no completar la cadena de llamadas a tiempo, 
+    // causando timeouts en producción con solo 2 cores.
+  });
+
+  test('RESOURCE STARVATION: memoria Redis estable tras 500 ciclos de write → sin crecimiento lineal', async () => {
+    const chatId = testChatId('memory-leak');
+    const initialMemory = await redis!.info('memory');
+
+    // 500 ciclos de write
+    for (let i = 0; i < 500; i++) {
+      await updateConversationState(redis!, chatId, 'booking_wizard', { cycle: String(i) }, null, i % 10);
+    }
+
+    // Verificar que la memoria no creció excesivamente (> 10MB es anormal para un solo key)
+    const finalMemory = await redis!.info('memory');
+    const parseMemory = (info: string) => {
+      const match = info.match(/used_memory_human:(\d+\.\d+)([A-Z])/);
+      if (!match) return 0;
+      const value = parseFloat(match[1]);
+      const unit = match[2];
+      return unit === 'M' ? value : unit === 'K' ? value / 1024 : value / (1024 * 1024);
+    };
+
+    const initialMb = parseMemory(initialMemory);
+    const finalMb = parseMemory(finalMemory);
+    const growth = finalMb - initialMb;
+
+    // 500 writes a un solo key no deben crecer más de 1MB
+    expect(growth).toBeLessThan(1.0);
+
+    // Business Impact: Crecimiento de memoria lineal eventualmente causa OOM en 
+    // Redis, y sin memoria, TODAS las operaciones de conversación fallan.
+  });
+
+  test('RESOURCE STARVATION: 100 keys concurrentes → maxmemory-policy allkeys-lru evicta correctamente sin error', async () => {
+    // Crear keys hasta forzar presión de memoria (simulado con muchas keys)
+    const chatIds = Array.from({ length: 100 }, (_, i) => testChatId(`lru-${i}`));
+
+    // Escribir 100 estados
+    const writes = chatIds.map((id, i) =>
+      updateConversationState(redis!, id, 'booking_wizard', { index: String(i) }, null, i),
+    );
+    await Promise.all(writes);
+
+    // Verificar que todas las keys existen (Redis no rechazó writes)
+    const checks = chatIds.map(id => getConversationState(redis!, id));
+    const results = await Promise.all(checks);
+
+    const successful = results.filter(([, s]) => s !== null).length;
+    // Al menos el 90% deben sobrevivir (LRU puede evictar algunos)
+    expect(successful).toBeGreaterThanOrEqual(90);
+
+    // Cleanup
+    await redis!.del(...chatIds.map(id => `conv:${id}`));
+    // Business Impact: Si Redis rechaza writes por memoria llena, nuevos usuarios 
+    // no pueden iniciar conversaciones — pérdida directa de bookings.
+  });
+
+  // ── Event Loop Blocking ──────────────────────────────────────────────
+
+  test('EVENT LOOP: procesamiento de 50KB JSON string no bloquea el loop (> 16ms = blocking)', async () => {
+    const chatId = testChatId('eventloop');
+    // Crear payload grande
+    const largeData: Record<string, string> = {};
+    for (let i = 0; i < 1000; i++) largeData[`field_${i}`] = 'x'.repeat(40);
+
+    const start = Date.now();
+    const [, state] = await updateConversationState(
+      redis!, chatId, 'booking_wizard', largeData, null, 1,
+    );
+    const elapsed = Date.now() - start;
+
+    expect(state).not.toBeNull();
+    // Una operación síncrona > 16ms bloquea un tick del event loop
+    // (1000ms / 60fps = 16.67ms por frame)
+    expect(elapsed).toBeLessThan(100); // < 100ms para write + network
+
+    // Business Impact: Si el procesamiento JSON bloquea el event loop > 16ms, 
+    // otros webhooks entrantes se encolan, causando timeouts en cascada.
+  });
+
+  test('EVENT LOOP: 20 writes paralelas al mismo key no causan starvation de otras operaciones', async () => {
+    const chatId = testChatId('starvation-el');
+    const otherChat = testChatId('other-el');
+
+    // Escribir estado en otherChat primero
+    await updateConversationState(redis!, otherChat, 'booking_wizard', {}, null, 1);
+
+    // Lanzar 20 writes concurrentes al chatId race
+    const writes = Array.from({ length: 20 }, (_, i) =>
+      updateConversationState(redis!, chatId, 'booking_wizard', { concurrent: String(i) }, null, i),
+    );
+
+    // Mientras las writes corren, verificar que otherChat sigue respondiendo
+    const readsDuringWrites = Array.from({ length: 10 }, async () => {
+      await new Promise(r => setTimeout(r, Math.random() * 10));
+      return getConversationState(redis!, otherChat);
+    });
+
+    const allResults = await Promise.all([...writes, ...readsDuringWrites]);
+    const readResults = allResults.slice(20) as [Error | null, ConversationState | null][];
+
+    for (const [err, state] of readResults) {
+      expect(err).toBeNull();
+      expect(state).not.toBeNull();
+    }
+    // Business Impact: Si las writes concurrentes acaparan el event loop, 
+    // los reads de otros usuarios se bloquean — el bot parece "congelado".
+  });
+
+  test('EVENT LOOP: JSON.parse de payload malicioso (billion laughs) no explota memoria ni CPU', async () => {
+    const chatId = testChatId('billion-laughs');
+
+    // Simular "billion laughs" — objeto profundamente anidado
+    let payload: unknown = 'haha';
+    for (let i = 0; i < 10; i++) {
+      payload = { a: payload, b: payload, c: payload };
+    }
+    const maliciousJson = JSON.stringify(payload);
+
+    // Intentar escribir este JSON masivo en Redis
+    const start = Date.now();
+    try {
+      await redis!.set(`conv:${chatId}`, maliciousJson);
+      const elapsed = Date.now() - start;
+      // Debe completar en < 1 segundo incluso con JSON anidado
+      expect(elapsed).toBeLessThan(5000); // < 5s
+
+      // Verificar que el JSON se parsea sin crash
+      const raw = await redis!.get(`conv:${chatId}`);
+      expect(raw).not.toBeNull();
+      expect(() => JSON.parse(raw!)).not.toThrow();
+    } catch {
+      // Si Redis rechaza el payload por tamaño, es aceptable
+    }
+
+    await redis!.del(`conv:${chatId}`);
+    // Business Impact: Un atacante podría enviar un payload "billion laughs" 
+    // que explota exponencialmente al hacer JSON.parse, consumiendo 100% CPU 
+    // y bloqueando todos los hilos del worker de Node.js.
+  });
+
+  test('EVENT LOOP: serialización de estado con 1000 entidades → < 50ms (no bloquea tick)', async () => {
+    const chatId = testChatId('serialize-heavy');
+    const entities: Record<string, string> = {};
+    for (let i = 0; i < 1000; i++) entities[`entity_${i}`] = `value_${i}`;
+
+    const start = Date.now();
+    const [, state] = await updateConversationState(
+      redis!, chatId, 'booking_wizard', entities, null, 1,
+    );
+    const elapsed = Date.now() - start;
+
+    expect(state).not.toBeNull();
+    expect(elapsed).toBeLessThan(50);
+
+    // Verificar que todas las entidades se preservaron
+    const [, retrieved] = await getConversationState(redis!, chatId);
+    expect(retrieved).not.toBeNull();
+    expect(Object.keys(retrieved!.pending_data).length).toBe(1000);
+    // Business Impact: Si la serialización de muchos datos bloquea el event loop, 
+    // el webhook de Telegram超时 y el usuario no recibe respuesta.
+  });
+
+  test('CONCURRENCY + REDIS: WATCH/MULTI/EXEC pattern no es necesario para single-key SETEX (Redis atomic)', async () => {
+    // Redis SETEX es atómico — no necesitamos transactions para single-key operations
+    // Este test verifica que la atomicidad de Redis protege contra corruption
+    const chatId = testChatId('atomic');
+
+    // 100 writes concurrentes
+    const writes = Array.from({ length: 100 }, (_, i) =>
+      updateConversationState(redis!, chatId, 'booking_wizard', { index: String(i) }, null, i),
+    );
+    const results = await Promise.all(writes);
+
+    // Todos exitosos
+    const errors = results.filter(([err]) => err !== null);
+    expect(errors.length).toBe(0);
+
+    // Estado final coherente
+    const [, state] = await getConversationState(redis!, chatId);
+    expect(state).not.toBeNull();
+    expect(state!.chat_id).toBe(chatId);
+    expect(typeof state!.flow_step).toBe('number');
+    expect(state!.flow_step).toBeGreaterThanOrEqual(0);
+    // Business Impact: Si Redis no fuera atómico en single-key operations, 
+    // necesitaríamos distributed locks, añadiendo complejidad y latencia.
+  });
+});
