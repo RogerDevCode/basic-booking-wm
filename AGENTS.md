@@ -701,8 +701,8 @@ If you change the return type, parameter signature, or error handling pattern of
 Before declaring a phase "complete", run these commands and verify zero unwanted matches:
 
 ```bash
-# Type safety
-npx tsc --noEmit
+# Type safety — BOTH configs must pass
+npx tsc --noEmit && npx tsc --noEmit --project tsconfig.strict.json
 npx eslint 'f/**/*.ts'
 
 # AGENTS.md §1 compliance
