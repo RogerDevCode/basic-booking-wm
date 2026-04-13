@@ -26,7 +26,7 @@ import {
   type DraftBooking,
   emptyDraft,
   BookingStateSchema,
-
+  buildMainMenuKeyboard,
 } from '../booking_fsm';
 import { handleBookingWizard } from './booking-wizard';
 
@@ -206,6 +206,13 @@ function matchCommand(text: string | null): RouteResult | null {
 
   const commandKey = COMMANDS[lower];
   if (commandKey !== undefined) {
+    // /start or /menu → main menu with inline keyboard
+    if (commandKey === 'welcome') {
+      return buildRouteResult('command', COMMAND_RESPONSES[commandKey] ?? 'Comando procesado.', {
+        menuAction: commandKey,
+        inlineKeyboard: buildMainMenuKeyboard(),
+      });
+    }
     return buildRouteResult('command', COMMAND_RESPONSES[commandKey] ?? 'Comando procesado.', {
       menuAction: commandKey,
     });
@@ -219,6 +226,41 @@ function matchMenu(text: string | null): RouteResult | null {
 
   const menuKey = MENU_OPTIONS[lower];
   if (menuKey !== undefined) {
+    // menu:book → start wizard, menu:mybookings → my bookings, etc.
+    if (menuKey === 'book_appointment') {
+      return buildRouteResult('menu', MENU_RESPONSES[menuKey] ?? 'Opción procesada.', {
+        menuAction: menuKey,
+        // Wizard will be triggered by the next step, no keyboard here
+        // The user needs to type or we need a separate flow
+      });
+    }
+    if (menuKey === 'my_bookings') {
+      return buildRouteResult('menu', MENU_RESPONSES[menuKey] ?? 'Opción procesada.', {
+        menuAction: menuKey,
+        inlineKeyboard: [
+          [{ text: '📅 Ver próximas', callback_data: 'menu:upcoming' }, { text: '📋 Historial', callback_data: 'menu:history' }],
+          [{ text: '« Volver al menú', callback_data: 'menu:back' }],
+        ],
+      });
+    }
+    if (menuKey === 'reminders') {
+      return buildRouteResult('menu', MENU_RESPONSES[menuKey] ?? 'Opción procesada.', {
+        menuAction: menuKey,
+        inlineKeyboard: [
+          [{ text: '⚙️ Configurar', callback_data: 'menu:reminder_prefs' }, { text: '✅ Activar todo', callback_data: 'menu:reminder_on' }],
+          [{ text: '🔕 Desactivar todo', callback_data: 'menu:reminder_off' }, { text: '« Volver', callback_data: 'menu:back' }],
+        ],
+      });
+    }
+    if (menuKey === 'info') {
+      return buildRouteResult('menu', MENU_RESPONSES[menuKey] ?? 'Opción procesada.', {
+        menuAction: menuKey,
+        inlineKeyboard: [
+          [{ text: '📅 Agendar cita', callback_data: 'menu:book' }],
+          [{ text: '« Volver al menú', callback_data: 'menu:back' }],
+        ],
+      });
+    }
     return buildRouteResult('menu', MENU_RESPONSES[menuKey] ?? 'Opción procesada.', {
       menuAction: menuKey,
     });
@@ -226,6 +268,58 @@ function matchMenu(text: string | null): RouteResult | null {
 
   const subKey = SUBMENU_OPTIONS[lower];
   if (subKey !== undefined) {
+    // Submenu responses with inline keyboards
+    if (subKey === 'back_to_main') {
+      return buildRouteResult('submenu', SUBMENU_RESPONSES[subKey] ?? 'Opción procesada.', {
+        menuAction: subKey,
+        inlineKeyboard: buildMainMenuKeyboard(),
+      });
+    }
+    if (subKey === 'reminder_prefs') {
+      return buildRouteResult('submenu', SUBMENU_RESPONSES[subKey] ?? 'Opción procesada.', {
+        menuAction: subKey,
+        inlineKeyboard: [
+          [{ text: '⏰ 24 horas', callback_data: 'menu:pref24h' }, { text: '⏰ 2 horas', callback_data: 'menu:pref2h' }],
+          [{ text: '⏰ 30 minutos', callback_data: 'menu:pref30m' }, { text: '« Volver', callback_data: 'menu:back' }],
+        ],
+      });
+    }
+    if (subKey === 'reminder_deactivate_all') {
+      return buildRouteResult('submenu', SUBMENU_RESPONSES[subKey] ?? 'Opción procesada.', {
+        menuAction: subKey,
+        inlineKeyboard: [
+          [{ text: '✅ Activar recordatorios', callback_data: 'menu:reminder_on' }],
+          [{ text: '« Volver al menú', callback_data: 'menu:back' }],
+        ],
+      });
+    }
+    if (subKey === 'reminder_activate_all') {
+      return buildRouteResult('submenu', SUBMENU_RESPONSES[subKey] ?? 'Opción procesada.', {
+        menuAction: subKey,
+        inlineKeyboard: [
+          [{ text: '🔕 Desactivar todo', callback_data: 'menu:reminder_off' }],
+          [{ text: '« Volver al menú', callback_data: 'menu:back' }],
+        ],
+      });
+    }
+    if (subKey === 'upcoming_bookings') {
+      return buildRouteResult('submenu', SUBMENU_RESPONSES[subKey] ?? 'Opción procesada.', {
+        menuAction: subKey,
+        inlineKeyboard: [
+          [{ text: '📋 Historial', callback_data: 'menu:history' }],
+          [{ text: '« Volver', callback_data: 'menu:back' }],
+        ],
+      });
+    }
+    if (subKey === 'booking_history') {
+      return buildRouteResult('submenu', SUBMENU_RESPONSES[subKey] ?? 'Opción procesada.', {
+        menuAction: subKey,
+        inlineKeyboard: [
+          [{ text: '📅 Ver próximas', callback_data: 'menu:upcoming' }],
+          [{ text: '« Volver al menú', callback_data: 'menu:back' }],
+        ],
+      });
+    }
     return buildRouteResult('submenu', SUBMENU_RESPONSES[subKey] ?? 'Opción procesada.', {
       menuAction: subKey,
     });
@@ -317,7 +411,34 @@ export async function main(rawInput: unknown): Promise<Result<RouteResult>> {
   if (commandMatch !== null) return [null, commandMatch];
 
   // Priority 4: Menu & submenu (only if not in active wizard)
+  // "1" or "agendar cita" when idle → start wizard with specialties
   if (parsedState === null || parsedState.name === 'idle') {
+    const lowerText = text?.trim().toLowerCase();
+    if (lowerText === '1' || lowerText === 'agendar cita') {
+      // Start wizard — fetch specialties and return inline keyboard
+      const [wizardErr, wizardResult] = await handleBookingWizard({
+        text: '1',
+        callbackData: null,
+        currentState: null, // Start from idle
+        draft: emptyDraft(),
+      });
+      if (wizardErr === null && wizardResult !== null) {
+        return [null, buildRouteResult('wizard', wizardResult.response_text, {
+          inlineKeyboard: wizardResult.inline_keyboard as InlineButton[][],
+          nextState: wizardResult.nextState,
+          nextDraft: wizardResult.nextDraft,
+          nextFlowStep: wizardResult.nextFlowStep,
+          shouldEdit: false,
+        })];
+      }
+    }
+    // Handle "menu:back" callback → return to main menu
+    if (callback_data === 'menu:back') {
+      return [null, buildRouteResult('command', COMMAND_RESPONSES['welcome'] ?? 'Comando procesado.', {
+        inlineKeyboard: buildMainMenuKeyboard(),
+        menuAction: 'welcome',
+      })];
+    }
     const menuMatch = matchMenu(text);
     if (menuMatch !== null) return [null, menuMatch];
   }

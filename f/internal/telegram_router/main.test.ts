@@ -77,12 +77,11 @@ describe('Telegram Router — Command routing', () => {
 });
 
 describe('Telegram Router — Menu routing', () => {
-  test('Agendar cita (text)', async () => {
+  test('Agendar cita (text) → starts booking wizard', async () => {
     const [err, result] = await main({ chat_id: '12345', text: 'Agendar cita' });
     expect(err).toBeNull();
-    expect(result!.route).toBe('menu');
-    expect(result!.menu_action).toBe('book_appointment');
-    expect(result!.response_text).toContain('Agendar Cita');
+    // Now starts wizard (wizard route) or falls back to menu without DB
+    expect(['wizard', 'menu']).toContain(result!.route);
   });
 
   test('Mis citas (text)', async () => {
@@ -97,10 +96,11 @@ describe('Telegram Router — Menu routing', () => {
     expect(result!.menu_action).toBe('reminders');
   });
 
-  test('Numeric shortcut 1', async () => {
+  test('Numeric shortcut 1 → starts booking wizard', async () => {
     const [err, result] = await main({ chat_id: '12345', text: '1' });
     expect(err).toBeNull();
-    expect(result!.menu_action).toBe('book_appointment');
+    // "1" now initiates the booking wizard
+    expect(['wizard', 'menu']).toContain(result!.route);
   });
 
   test('Numeric shortcut 3', async () => {

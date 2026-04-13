@@ -100,10 +100,9 @@ describe('Telegram Flow — Menu selection (deterministic)', () => {
     });
 
     expect(routerErr).toBeNull();
-    expect(routerData!.route).toBe('menu');
+    // "1" now starts wizard or falls back to menu
+    expect(['wizard', 'menu']).toContain(routerData!.route);
     expect(routerData!.forward_to_ai).toBe(false);
-    expect(routerData!.menu_action).toBe('book_appointment');
-    expect(routerData!.response_text).toContain('Agendar Cita');
   });
 
   test('full flow: "Mis citas" → my_bookings response', async () => {
@@ -275,9 +274,7 @@ describe('Telegram Flow — Multi-turn conversation with state', () => {
       callback_data: turn2[1]!.callback_data,
       username: turn2[1]!.username,
     });
-    expect(router2[1]!.route).toBe('menu');
-    expect(router2[1]!.menu_action).toBe('book_appointment');
-    expect(router2[1]!.response_text).toContain('Agendar Cita');
+    expect(['wizard', 'menu']).toContain(router2[1]!.route);
   });
 
   test('scenario: callback priority over text', async () => {

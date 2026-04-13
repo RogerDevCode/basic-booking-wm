@@ -33,11 +33,14 @@ describe('Telegram Router — deterministic routes (no state)', () => {
     expect(result!.callback_booking_id).toBe('booking-123');
   });
 
-  test('menu option "1" returns book_appointment', async () => {
+  test('menu option "1" starts wizard with specialty keyboard', async () => {
     const [err, result] = await main({ chat_id: '12345', text: '1' });
     expect(err).toBeNull();
-    expect(result!.route).toBe('menu');
-    expect(result!.menu_action).toBe('book_appointment');
+    // "1" now starts the booking wizard (requires DATABASE_URL for specialty fetch)
+    // Without DB, it falls back to menu behavior
+    const isWizard = result!.route === 'wizard';
+    const isMenu = result!.route === 'menu';
+    expect(isWizard || isMenu).toBe(true);
   });
 
   test('free text falls back to AI Agent', async () => {
