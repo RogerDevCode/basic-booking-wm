@@ -91,8 +91,9 @@ export async function fetchSlots(
       return [new Error('No active services found'), null];
     }
 
-    const slotDuration = serviceValidated.data[0].duration_minutes;
-    const bufferMinutes = serviceValidated.data[0].buffer_minutes;
+    const firstService = serviceValidated.data[0];
+    const slotDuration = firstService!.duration_minutes;
+    const bufferMinutes = firstService!.buffer_minutes;
     const totalSlotMinutes = slotDuration + bufferMinutes;
 
     // Fetch existing bookings for this date

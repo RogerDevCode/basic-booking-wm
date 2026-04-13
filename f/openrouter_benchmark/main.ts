@@ -250,7 +250,9 @@ function extractJSON(text: string): Record<string, unknown> | null {
   const fenceMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)```/);
   if (fenceMatch !== null) {
     try {
-      const obj: unknown = JSON.parse(fenceMatch[1].trim());
+      const content = fenceMatch[1];
+      if (content === undefined) return null;
+      const obj: unknown = JSON.parse(content.trim());
       if (typeof obj === 'object' && obj !== null) return obj as Record<string, unknown>;
     } catch { /* fall through */ }
   }

@@ -125,6 +125,7 @@ export function applyTransition(
           return { ok: false, nextState: selectingSpecialtyState(specialtyItems, 'Opción inválida. Elige un número de la lista.'), responseText: buildSpecialtyPrompt(specialtyItems, '⚠️ Opción inválida. Elige un número de la lista.'), advance: false };
         }
         const specialty = specialtyItems[idx];
+        if (specialty === undefined) return { ok: false, nextState: currentState, responseText: buildSpecialtyPrompt(specialtyItems), advance: false };
         return { ok: true, nextState: selectingDoctorState(specialty.id, specialty.name, []), responseText: buildLoadingDoctorsPrompt(specialty.name), advance: true };
       }
       return { ok: false, nextState: currentState, responseText: buildSpecialtyPrompt(currentState.items), advance: false };
@@ -142,6 +143,7 @@ export function applyTransition(
           return { ok: false, nextState: selectingDoctorState(currentState.specialtyId, currentState.specialtyName, doctorItems, 'Opción inválida.'), responseText: buildDoctorsPrompt(currentState.specialtyName, doctorItems, '⚠️ Opción inválida.'), advance: false };
         }
         const doctor = doctorItems[idx];
+        if (doctor === undefined) return { ok: false, nextState: currentState, responseText: buildDoctorsPrompt(currentState.specialtyName, doctorItems), advance: false };
         return { ok: true, nextState: selectingTimeState(currentState.specialtyId, doctor.id, doctor.name, []), responseText: buildLoadingSlotsPrompt(doctor.name), advance: true };
       }
       return { ok: false, nextState: currentState, responseText: buildDoctorsPrompt(currentState.specialtyName, getNamedItems(items)), advance: false };
@@ -162,6 +164,7 @@ export function applyTransition(
           return { ok: false, nextState: selectingTimeState(currentState.specialtyId, currentState.doctorId, currentState.doctorName, timeItems, 'Opción inválida.'), responseText: buildSlotsPrompt(currentState.doctorName, timeItems, '⚠️ Opción inválida.'), advance: false };
         }
         const slot = timeItems[idx];
+        if (slot === undefined) return { ok: false, nextState: currentState, responseText: buildSlotsPrompt(currentState.doctorName, timeItems), advance: false };
         const newDraft: DraftBooking = { ...draft, specialty_id: currentState.specialtyId, specialty_name: draft.specialty_name, doctor_id: currentState.doctorId, doctor_name: currentState.doctorName, start_time: slot.start_time, time_label: slot.label };
         return { ok: true, nextState: confirmingState(currentState.specialtyId, currentState.doctorId, currentState.doctorName, slot.label, newDraft), responseText: buildConfirmationPrompt(slot.label, currentState.doctorName), advance: true };
       }
@@ -222,7 +225,7 @@ export function parseCallbackData(data: string): BookingAction | null {
 
   // Selection patterns: spec:1, doc:2, time:3
   const match = data.match(/^(spec|doc|time):(\d+)$/);
-  if (match !== null) return { type: 'select', value: match[2] };
+  if (match !== null && match[2] !== undefined) return { type: 'select', value: match[2] };
 
   return null;
 }

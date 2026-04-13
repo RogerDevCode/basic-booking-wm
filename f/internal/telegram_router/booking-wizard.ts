@@ -182,7 +182,7 @@ async function fetchDataForState(
     case 'selecting_time': {
       const { doctorId, doctorName } = nextState;
       const today = new Date().toISOString().split('T')[0];
-      const [err, slotsResult] = await fetchSlots(sql, doctorId, today);
+      const [err, slotsResult] = await fetchSlots(sql, doctorId, today!);
       if (err !== null || slotsResult === null) {
         return {
           route: 'wizard', forward_to_ai: false, response_text: '⚠️ Error al cargar horarios. Intenta de nuevo.',

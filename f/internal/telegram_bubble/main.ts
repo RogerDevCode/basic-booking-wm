@@ -300,7 +300,9 @@ class TelegramBubble {
       const items = MOCK_DOCTORS[(draft as any)._lastState?.specialtyId] ?? [];
       const idx = parseInt(action.value, 10) - 1;
       if (idx >= 0 && idx < items.length) {
-        return { ...draft, doctor_id: items[idx].id, doctor_name: items[idx].name };
+        const item = items[idx];
+        if (item === undefined) return draft;
+        return { ...draft, doctor_id: item.id, doctor_name: item.name };
       }
     }
     return draft;
