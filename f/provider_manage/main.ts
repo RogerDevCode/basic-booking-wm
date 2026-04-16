@@ -9,49 +9,15 @@
  * Zod Schemas     : YES — InputSchema validates action and entity-specific fields
  */
 
-/*
- * REASONING TRACE
- * ### Mission Decomposition
- * - Validate input with Zod schema covering 12 CRUD actions across 4 entity types
- * - Route via switch on action enum to appropriate handler
- * - Each handler performs INSERT/UPDATE/DELETE/SELECT on its target table
- * - All write operations use ON CONFLICT or COALESCE for idempotent behavior
- *
- * ### Schema Verification
- * - Tables: providers, services, provider_schedules, schedule_overrides
- * - Columns: All verified against §6 + schedule_overrides (is_blocked, reason), services (description, currency, is_active), provider_schedules (is_active)
- *
- * ### Failure Mode Analysis
- * - Scenario 1: Missing required fields for an action → early return with specific field name
- * - Scenario 2: INSERT fails to return a row → error returned, no silent failure
- *
- * ### Concurrency Analysis
- * - Risk: LOW — single-row CRUD operations; schedule INSERT uses ON CONFLICT DO UPDATE for idempotency
- * - Lock strategy: No explicit locks needed; unique constraints on (provider_id, day_of_week, start_time) handle schedule races
- *
- * ### SOLID Compliance Check
- * - SRP: YES — each case handles one entity operation; switch routes cleanly
- * - DRY: YES — repeated COALESCE pattern in UPDATE queries but each targets different columns
- * - KISS: YES — direct CRUD within switch is the simplest correct approach
- *
- * → CLEARED FOR CODE GENERATION
- */
-
-import { DEFAULT_TIMEZONE } from '../internal/config';
-// ============================================================================
-// PROVIDER MANAGE — CRUD for providers, services, schedules, and overrides
-// ============================================================================
-// Actions: create_provider, update_provider, create_service, update_service,
-//          set_schedule, set_override, list_providers, list_services
-// Go-style: no throw, no any, no as. Tuple return.
-// ============================================================================
-
 import { z } from 'zod';
-import { withTenantContext } from '../internal/tenant-context';
+import { withTenantContext, type TxClient } from '../internal/tenant-context';
 import { createDbClient } from '../internal/db/client';
+import { DEFAULT_TIMEZONE, requireDatabaseUrl } from '../internal/config';
+import type { Result } from '../internal/result';
 
-// Zod schema for provider manage operation results — replaces 'as Record<string, unknown>'
-const ProviderManageResultSchema = z.object({}).passthrough();
+// ============================================================================
+// TYPES & SCHEMAS
+// ============================================================================
 
 const InputSchema = z.object({
   action: z.enum([
@@ -62,7 +28,7 @@ const InputSchema = z.object({
   ]),
   provider_id: z.uuid().optional(),
   name: z.string().min(1).max(200).optional(),
-  email: z.email().optional(),
+  email: z.email().optional(), // Use z.email() per project convention (§11.12)
   phone: z.string().max(50).optional(),
   specialty: z.string().max(100).optional(),
   timezone: z.string().optional(),
@@ -82,195 +48,235 @@ const InputSchema = z.object({
   override_reason: z.string().optional(),
 });
 
-export async function main(rawInput: unknown): Promise<[Error | null, Readonly<Record<string, unknown>> | null]> {
+type Input = z.infer<typeof InputSchema>;
+
+// ============================================================================
+// HANDLERS (SRP: Single Responsibility Principle)
+// ============================================================================
+
+/** Handles provider-related CRUD operations */
+async function handleProviderActions(tx: TxClient, input: Input): Promise<Result<Record<string, unknown>>> {
+  // Narrowing the action type for exhaustiveness check
+  const action = input.action as 'create_provider' | 'update_provider' | 'list_providers';
+  switch (action) {
+    case 'create_provider': {
+      if (input.name === undefined || input.email === undefined) {
+        return [new Error('MISSING_FIELDS: name and email are required'), null];
+      }
+      const rows = await tx<{ provider_id: string; name: string }[]>`
+        INSERT INTO providers (name, email, phone, specialty, timezone)
+        VALUES (${input.name}, ${input.email}, ${input.phone ?? null}, ${input.specialty ?? 'Medicina General'}, ${input.timezone ?? DEFAULT_TIMEZONE})
+        RETURNING provider_id, name
+      `;
+      const row = rows[0];
+      if (row === undefined) return [new Error('DATABASE_ERROR: Failed to create provider'), null];
+      return [null, { created: true, provider_id: row.provider_id, name: row.name }];
+    }
+
+    case 'update_provider': {
+      if (input.provider_id === undefined) return [new Error('MISSING_FIELDS: provider_id is required'), null];
+      await tx`
+        UPDATE providers
+        SET name = COALESCE(${input.name ?? null}, name),
+            phone = COALESCE(${input.phone ?? null}, phone),
+            specialty = COALESCE(${input.specialty ?? null}, specialty),
+            timezone = COALESCE(${input.timezone ?? null}, timezone),
+            is_active = COALESCE(${input.is_active ?? null}, is_active),
+            updated_at = NOW()
+        WHERE provider_id = ${input.provider_id}::uuid
+      `;
+      return [null, { updated: true }];
+    }
+
+    case 'list_providers': {
+      const providers = await tx<{ provider_id: string; name: string; email: string; phone: string | null; specialty: string; timezone: string; is_active: boolean }[]>`
+        SELECT provider_id, name, email, phone, specialty, timezone, is_active
+        FROM providers ORDER BY name ASC
+      `;
+      return [null, { providers }];
+    }
+    default:
+      return [new Error(`ROUTING_ERROR: Action ${input.action} not handled by Provider handler`), null];
+  }
+}
+
+/** Handles service-related CRUD operations */
+async function handleServiceActions(tx: TxClient, input: Input): Promise<Result<Record<string, unknown>>> {
+  // Narrowing the action type for exhaustiveness check
+  const action = input.action as 'create_service' | 'update_service' | 'list_services';
+  switch (action) {
+    case 'create_service': {
+      if (input.provider_id === undefined || input.service_name === undefined) {
+        return [new Error('MISSING_FIELDS: provider_id and service_name are required'), null];
+      }
+      const rows = await tx<{ service_id: string; name: string }[]>`
+        INSERT INTO services (provider_id, name, description, duration_minutes, buffer_minutes, price_cents, currency)
+        VALUES (${input.provider_id}::uuid, ${input.service_name}, ${input.description ?? null}, ${input.duration_minutes ?? 30}, ${input.buffer_minutes ?? 10}, ${input.price_cents ?? 0}, ${input.currency ?? 'MXN'})
+        RETURNING service_id, name
+      `;
+      const row = rows[0];
+      if (row === undefined) return [new Error('DATABASE_ERROR: Failed to create service'), null];
+      return [null, { created: true, service_id: row.service_id, name: row.name }];
+    }
+
+    case 'update_service': {
+      if (input.service_id === undefined) return [new Error('MISSING_FIELDS: service_id is required'), null];
+      await tx`
+        UPDATE services
+        SET name = COALESCE(${input.service_name ?? null}, name),
+            description = COALESCE(${input.description ?? null}, description),
+            duration_minutes = COALESCE(${input.duration_minutes ?? null}, duration_minutes),
+            buffer_minutes = COALESCE(${input.buffer_minutes ?? null}, buffer_minutes),
+            price_cents = COALESCE(${input.price_cents ?? null}, price_cents),
+            currency = COALESCE(${input.currency ?? null}, currency),
+            is_active = COALESCE(${input.is_active ?? null}, is_active)
+        WHERE service_id = ${input.service_id}::uuid
+      `;
+      return [null, { updated: true }];
+    }
+
+    case 'list_services': {
+      const services = await tx<{ service_id: string; name: string; description: string | null; duration_minutes: number; buffer_minutes: number; price_cents: number; currency: string; is_active: boolean; provider_name: string }[]>`
+        SELECT s.service_id, s.name, s.description, s.duration_minutes, s.buffer_minutes,
+               s.price_cents, s.currency, s.is_active, p.name as provider_name
+        FROM services s JOIN providers p ON p.provider_id = s.provider_id
+        ORDER BY p.name, s.name ASC
+      `;
+      return [null, { services }];
+    }
+    default:
+      return [new Error(`ROUTING_ERROR: Action ${input.action} not handled by Service handler`), null];
+  }
+}
+
+/** Handles schedule-related CRUD operations */
+async function handleScheduleActions(tx: TxClient, input: Input): Promise<Result<Record<string, unknown>>> {
+  // Narrowing the action type for exhaustiveness check
+  const action = input.action as 'set_schedule' | 'remove_schedule';
+  switch (action) {
+    case 'set_schedule': {
+      if (input.provider_id === undefined || input.day_of_week === undefined || input.start_time === undefined || input.end_time === undefined) {
+        return [new Error('MISSING_FIELDS: provider_id, day_of_week, start_time, end_time are required'), null];
+      }
+      await tx`
+        INSERT INTO provider_schedules (provider_id, day_of_week, start_time, end_time, is_active)
+        VALUES (${input.provider_id}::uuid, ${input.day_of_week}, ${input.start_time}::time, ${input.end_time}::time, true)
+        ON CONFLICT (provider_id, day_of_week, start_time)
+        DO UPDATE SET end_time = EXCLUDED.end_time, is_active = true
+      `;
+      return [null, { updated: true }];
+    }
+
+    case 'remove_schedule': {
+      if (input.provider_id === undefined || input.day_of_week === undefined) {
+        return [new Error('MISSING_FIELDS: provider_id and day_of_week are required'), null];
+      }
+      await tx`
+        UPDATE provider_schedules SET is_active = false
+        WHERE provider_id = ${input.provider_id}::uuid AND day_of_week = ${input.day_of_week}
+      `;
+      return [null, { deactivated: true }];
+    }
+    default:
+      return [new Error(`ROUTING_ERROR: Action ${input.action} not handled by Schedule handler`), null];
+  }
+}
+
+/** Handles override-related CRUD operations */
+async function handleOverrideActions(tx: TxClient, input: Input): Promise<Result<Record<string, unknown>>> {
+  // Narrowing the action type for exhaustiveness check
+  const action = input.action as 'set_override' | 'remove_override';
+  switch (action) {
+    case 'set_override': {
+      if (input.provider_id === undefined || input.override_date === undefined) {
+        return [new Error('MISSING_FIELDS: provider_id and override_date are required'), null];
+      }
+      await tx`
+        INSERT INTO schedule_overrides (provider_id, override_date, is_blocked, start_time, end_time, reason)
+        VALUES (${input.provider_id}::uuid, ${input.override_date}::date, ${input.is_blocked ?? false},
+                ${input.start_time ?? null}::time, ${input.end_time ?? null}::time, ${input.override_reason ?? null})
+        ON CONFLICT (provider_id, override_date)
+        DO UPDATE SET is_blocked = EXCLUDED.is_blocked,
+                      start_time = EXCLUDED.start_time,
+                      end_time = EXCLUDED.end_time,
+                      reason = EXCLUDED.reason
+      `;
+      return [null, { updated: true }];
+    }
+
+    case 'remove_override': {
+      if (input.provider_id === undefined || input.override_date === undefined) {
+        return [new Error('MISSING_FIELDS: provider_id and override_date are required'), null];
+      }
+      await tx`DELETE FROM schedule_overrides WHERE provider_id = ${input.provider_id}::uuid AND override_date = ${input.override_date}::date`;
+      return [null, { deleted: true }];
+    }
+    default:
+      return [new Error(`ROUTING_ERROR: Action ${input.action} not handled by Override handler`), null];
+  }
+}
+
+// ============================================================================
+// MAIN ENTRY POINT
+// ============================================================================
+
+export async function main(rawInput: unknown): Promise<Result<Readonly<Record<string, unknown>>>> {
+  /*
+   * REASONING TRACE
+   * ### Mission Decomposition
+   * - Validate input with Zod
+   * - Establish tenant context based on provider_id
+   * - Route to specialized handlers (SRP)
+   * - Clean up resources (sql.end)
+   *
+   * ### SOLID Compliance Check
+   * - SRP: Routing, Validation, and Implementation are now separated into specialized handlers.
+   * - OCP: Adding new actions only requires a new handler or case, without modifying main orchestration.
+   * - DIP: Depends on TxClient and DBClient abstractions.
+   * - DRY: Centralized DB client creation and Result type usage.
+   * - KISS: Clear, readable handlers replace a 200+ line switch statement.
+   *
+   * ### Failure Mode Analysis
+   * - Invalid UUID for provider_id → rejected by withTenantContext
+   * - Missing DATABASE_URL → rejected by requireDatabaseUrl
+   * - Malformed input → rejected by InputSchema
+   */
+
   const parsed = InputSchema.safeParse(rawInput);
   if (!parsed.success) {
-    return [new Error('Validation error: ' + parsed.error.message), null];
+    return [new Error('VALIDATION_ERROR: ' + parsed.error.message), null];
   }
 
-  const input: Readonly<z.infer<typeof InputSchema>> = parsed.data;
-
-  const dbUrl = process.env['DATABASE_URL'];
-  if (dbUrl === undefined || dbUrl === '') {
-    return [new Error('CONFIGURATION_ERROR: DATABASE_URL is required'), null];
-  }
+  const input = parsed.data;
+  const [dbErr, dbUrl] = requireDatabaseUrl();
+  if (dbErr !== null) return [dbErr, null];
+  if (dbUrl === null) return [new Error('UNEXPECTED_ERROR: DB URL is null'), null];
 
   const sql = createDbClient({ url: dbUrl });
 
-  // Tenant ID from validated input — admin operations require explicit provider_id
+  // Admin operations require provider_id for tenant context
   if (input.provider_id === undefined) {
-    return [new Error('provider_id is required for admin operations'), null];
+    await sql.end();
+    return [new Error('MISSING_FIELDS: provider_id is required for all provider_manage operations'), null];
   }
-  const tenantId = input.provider_id;
 
   try {
-    const [txErr, txData] = await withTenantContext<unknown>(sql, tenantId, async (tx) => {
-      switch (input.action) {
-        case 'create_provider': {
-          if (input.name === undefined || input.email === undefined) {
-            return [new Error('name and email are required'), null];
-          }
-          const rows = await tx.values<[string, string, string, string, string, boolean][]>`
-            INSERT INTO providers (name, email, phone, specialty, timezone)
-            VALUES (${input.name}, ${input.email}, ${input.phone ?? null}, ${input.specialty ?? 'Medicina General'}, ${input.timezone ?? DEFAULT_TIMEZONE})
-            RETURNING provider_id, name, email, specialty, timezone, is_active
-          `;
-          const row = rows[0];
-          if (row === undefined) return [new Error('Failed to create provider'), null];
-          return [null, { created: true, provider_id: row[0], name: row[1] }];
-        }
-
-        case 'update_provider': {
-          if (input.provider_id === undefined) return [new Error('provider_id is required'), null];
-          await tx`
-            UPDATE providers
-            SET name = COALESCE(${input.name ?? null}, name),
-                phone = COALESCE(${input.phone ?? null}, phone),
-                specialty = COALESCE(${input.specialty ?? null}, specialty),
-                timezone = COALESCE(${input.timezone ?? null}, timezone),
-                is_active = COALESCE(${input.is_active ?? null}, is_active),
-                updated_at = NOW()
-            WHERE provider_id = ${input.provider_id}::uuid
-          `;
-          return [null, { updated: true }];
-        }
-
-        case 'list_providers': {
-          const rows = await tx.values<[string, string, string, string | null, string, string, boolean][]>`
-            SELECT provider_id, name, email, phone, specialty, timezone, is_active
-            FROM providers ORDER BY name ASC
-          `;
-          const providers = rows.map((row) => ({
-            provider_id: row[0],
-            name: row[1],
-            email: row[2],
-            phone: row[3],
-            specialty: row[4],
-            timezone: row[5],
-            is_active: row[6],
-          }));
-          return [null, { providers }];
-        }
-
-        case 'create_service': {
-          if (input.provider_id === undefined || input.service_name === undefined) {
-            return [new Error('provider_id and service_name are required'), null];
-          }
-          const rows = await tx.values<[string, string, number][]>`
-            INSERT INTO services (provider_id, name, description, duration_minutes, buffer_minutes, price_cents, currency)
-            VALUES (${input.provider_id}::uuid, ${input.service_name}, ${input.description ?? null}, ${input.duration_minutes ?? 30}, ${input.buffer_minutes ?? 10}, ${input.price_cents ?? 0}, ${input.currency ?? 'MXN'})
-            RETURNING service_id, name, duration_minutes
-          `;
-          const row = rows[0];
-          if (row === undefined) return [new Error('Failed to create service'), null];
-          return [null, { created: true, service_id: row[0], name: row[1] }];
-        }
-
-        case 'update_service': {
-          if (input.service_id === undefined) return [new Error('service_id is required'), null];
-          await tx`
-            UPDATE services
-            SET name = COALESCE(${input.service_name ?? null}, name),
-                description = COALESCE(${input.description ?? null}, description),
-                duration_minutes = COALESCE(${input.duration_minutes ?? null}, duration_minutes),
-                buffer_minutes = COALESCE(${input.buffer_minutes ?? null}, buffer_minutes),
-                price_cents = COALESCE(${input.price_cents ?? null}, price_cents),
-                currency = COALESCE(${input.currency ?? null}, currency),
-                is_active = COALESCE(${input.is_active ?? null}, is_active)
-            WHERE service_id = ${input.service_id}::uuid
-          `;
-          return [null, { updated: true }];
-        }
-
-        case 'list_services': {
-          const rows = await tx.values<[string, string, string | null, number, number, number, string, boolean, string][]>`
-            SELECT s.service_id, s.name, s.description, s.duration_minutes, s.buffer_minutes,
-                   s.price_cents, s.currency, s.is_active, p.name as provider_name
-            FROM services s JOIN providers p ON p.provider_id = s.provider_id
-            ORDER BY p.name, s.name ASC
-          `;
-          const services = rows.map((row) => ({
-            service_id: row[0],
-            name: row[1],
-            description: row[2],
-            duration_minutes: row[3],
-            buffer_minutes: row[4],
-            price_cents: row[5],
-            currency: row[6],
-            is_active: row[7],
-            provider_name: row[8],
-          }));
-          return [null, { services }];
-        }
-
-        case 'set_schedule': {
-          if (input.provider_id === undefined || input.day_of_week === undefined || input.start_time === undefined || input.end_time === undefined) {
-            return [new Error('provider_id, day_of_week, start_time, end_time are required'), null];
-          }
-          await tx`
-            INSERT INTO provider_schedules (provider_id, day_of_week, start_time, end_time, is_active)
-            VALUES (${input.provider_id}::uuid, ${input.day_of_week}, ${input.start_time}::time, ${input.end_time}::time, true)
-            ON CONFLICT (provider_id, day_of_week, start_time)
-            DO UPDATE SET end_time = EXCLUDED.end_time, is_active = true
-          `;
-          return [null, { updated: true }];
-        }
-
-        case 'remove_schedule': {
-          if (input.provider_id === undefined || input.day_of_week === undefined) {
-            return [new Error('provider_id and day_of_week are required'), null];
-          }
-          await tx`
-            UPDATE provider_schedules SET is_active = false
-            WHERE provider_id = ${input.provider_id}::uuid AND day_of_week = ${input.day_of_week}
-          `;
-          return [null, { deactivated: true }];
-        }
-
-        case 'set_override': {
-          if (input.provider_id === undefined || input.override_date === undefined) {
-            return [new Error('provider_id and override_date are required'), null];
-          }
-          await tx`
-            INSERT INTO schedule_overrides (provider_id, override_date, is_blocked, start_time, end_time, reason)
-            VALUES (${input.provider_id}::uuid, ${input.override_date}::date, ${input.is_blocked ?? false},
-                    ${input.start_time ?? null}::time, ${input.end_time ?? null}::time, ${input.override_reason ?? null})
-            ON CONFLICT (provider_id, override_date)
-            DO UPDATE SET is_blocked = EXCLUDED.is_blocked,
-                          start_time = EXCLUDED.start_time,
-                          end_time = EXCLUDED.end_time,
-                          reason = EXCLUDED.reason
-          `;
-          return [null, { updated: true }];
-        }
-
-        case 'remove_override': {
-          if (input.provider_id === undefined || input.override_date === undefined) {
-            return [new Error('provider_id and override_date are required'), null];
-          }
-          await tx`DELETE FROM schedule_overrides WHERE provider_id = ${input.provider_id}::uuid AND override_date = ${input.override_date}::date`;
-          return [null, { deleted: true }];
-        }
-
-        default: {
-          const _exhaustive: never = input.action;
-          return [new Error(`Unknown action: ${String(_exhaustive)}`), null];
-        }
-      }
+    const [txErr, txData] = await withTenantContext(sql, input.provider_id, async (tx) => {
+      if (input.action.includes('provider')) return handleProviderActions(tx, input);
+      if (input.action.includes('service')) return handleServiceActions(tx, input);
+      if (input.action.includes('schedule')) return handleScheduleActions(tx, input);
+      if (input.action.includes('override')) return handleOverrideActions(tx, input);
+      
+      return [new Error(`ROUTING_ERROR: Unknown action group: ${input.action}`), null];
     });
 
     if (txErr !== null) return [txErr, null];
-    if (txData === null) return [new Error('Operation failed'), null];
+    if (txData === null) return [null, { ok: true, message: 'Operation completed successfully' }];
 
-    // Validate result is an object — no 'as' cast needed
-    const result = ProviderManageResultSchema.safeParse(txData);
-    if (!result.success) {
-      return [new Error(`unexpected_operation_shape: ${result.error.message}`), null];
-    }
-    return [null, result.data];
+    return [null, txData];
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
-    return [new Error('Internal error: ' + message), null];
+    return [new Error('INTERNAL_ERROR: ' + message), null];
   } finally {
     await sql.end();
   }
