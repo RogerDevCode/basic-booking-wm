@@ -1,54 +1,23 @@
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : Waitlist management (join, leave, list, check position)
- * DB Tables Used  : waitlist, clients
- * Concurrency Risk: NO — single-row CRUD + aggregate queries
+ * DB Tables Used  : waitlist, clients, users, services
+ * Concurrency Risk: YES — handled via SELECT FOR UPDATE on service_id during join
  * GCal Calls      : NO
- * Idempotency Key : N/A — waitlist operations are inherently non-idempotent
+ * Idempotency Key : N/A — waitlist operations use existing entry checks
  * RLS Tenant ID   : YES — withTenantContext wraps all DB ops
  * Zod Schemas     : YES — InputSchema validates action and waitlist fields
  */
 
-/*
- * REASONING TRACE
- * ### Mission Decomposition
- * - Validate action (join/leave/list/check_position) and parameters via Zod
- * - Resolve user to client_id via users LEFT JOIN clients
- * - join: check for existing entry, calculate position, INSERT new waitlist row
- * - leave: mark entry cancelled, recalculate positions via stored procedure
- * - list: return all active waitlist entries for client
- * - check_position: return current position for a specific waitlist entry
- *
- * ### Schema Verification
- * - Tables: waitlist, users, clients
- * - Columns: waitlist (waitlist_id, client_id, service_id, preferred_date, preferred_start_time, preferred_end_time, status, position, updated_at), users (user_id, email), clients (client_id)
- *
- * ### Failure Mode Analysis
- * - Scenario 1: Already on waitlist → duplicate check returns friendly error before INSERT
- * - Scenario 2: Leave non-existent entry → UPDATE with WHERE clause silently succeeds (idempotent), no error
- * - Scenario 3: Client record not found → early return before any action logic
- *
- * ### Concurrency Analysis
- * - Risk: YES — concurrent joins could compute same position; mitigated by checking existing entry before INSERT (race window exists but position is informational only)
- *
- * ### SOLID Compliance Check
- * - SRP: YES — each case branch handles one action, user-to-client resolution is shared pre-action step
- * - DRY: YES — Zod schema validates once, client ownership check extracted as common prefix
- * - KISS: YES — switch-based dispatch with inline queries, position calculation is simple COUNT + 1
- *
- * → CLEARED FOR CODE GENERATION
- */
-
-// ============================================================================
-// WEB WAITLIST — Waitlist CRUD (join, leave, list, position)
-// ============================================================================
-// Manages client waitlist entries for services.
-// Actions: join, leave, list, check_position
-// ============================================================================
-
 import { z } from 'zod';
+import postgres from 'postgres';
 import { withTenantContext } from '../internal/tenant-context';
 import { createDbClient } from '../internal/db/client';
+import type { Result } from '../internal/result';
+
+// ============================================================================
+// TYPES & SCHEMAS
+// ============================================================================
 
 const InputSchema = z.object({
   action: z.enum(['join', 'leave', 'list', 'check_position']),
@@ -60,6 +29,8 @@ const InputSchema = z.object({
   preferred_start_time: z.string().optional(),
   preferred_end_time: z.string().optional(),
 });
+
+type Input = z.infer<typeof InputSchema>;
 
 interface WaitlistEntry {
   readonly waitlist_id: string;
@@ -91,173 +62,236 @@ const WaitlistResultSchema = z.object({
   message: z.string(),
 });
 
-export async function main(rawInput: unknown): Promise<[Error | null, WaitlistResult | null]> {
-  const parsed = InputSchema.safeParse(rawInput);
-  if (!parsed.success) {
-    return [new Error('Validation error: ' + parsed.error.message), null];
+// ============================================================================
+// ACTION HANDLERS
+// ============================================================================
+
+/**
+ * Resolves the client_id for the given user_id.
+ */
+async function resolveClientId(tx: postgres.Sql, userId: string, inputClientId?: string): Promise<Result<string>> {
+  const rows = await tx`
+    SELECT u.user_id, p.client_id FROM users u
+    LEFT JOIN clients p ON p.client_id = u.user_id OR p.email = u.email
+    WHERE u.user_id = ${userId}::uuid LIMIT 1
+  `;
+
+  const row = rows[0];
+  if (row === undefined) {
+    return [new Error('user_not_found'), null];
   }
 
-  const { action, user_id } = parsed.data;
+  const clientId = row['client_id'] !== null ? String(row['client_id']) : (inputClientId ?? null);
+  if (clientId === null) {
+    return [new Error('client_record_not_found'), null];
+  }
+
+  return [null, clientId];
+}
+
+/**
+ * Logic for joining the waitlist.
+ * Uses SELECT FOR UPDATE on the service to prevent position calculation races.
+ */
+async function handleJoin(tx: postgres.Sql, clientId: string, data: Input): Promise<Result<WaitlistResult>> {
+  const { service_id: serviceId } = data;
+  if (serviceId === undefined) {
+    return [new Error('service_id_required'), null];
+  }
+
+  // Lock the service row to serialize waitlist joins for this service
+  const serviceCheck = await tx`SELECT 1 FROM services WHERE service_id = ${serviceId}::uuid FOR UPDATE`;
+  if (serviceCheck.length === 0) {
+    return [new Error('service_not_found'), null];
+  }
+
+  const existingRows = await tx`
+    SELECT waitlist_id FROM waitlist
+    WHERE client_id = ${clientId}::uuid
+      AND service_id = ${serviceId}::uuid
+      AND status IN ('waiting', 'notified')
+    LIMIT 1
+  `;
+
+  if (existingRows.length > 0) {
+    return [new Error('already_on_waitlist'), null];
+  }
+
+  const countRows = await tx`
+    SELECT COUNT(*) AS cnt FROM waitlist
+    WHERE service_id = ${serviceId}::uuid AND status = 'waiting'
+  `;
+
+  const position = countRows[0] !== undefined ? Number(countRows[0]['cnt']) + 1 : 1;
+
+  const insertRows = await tx`
+    INSERT INTO waitlist (
+      client_id, service_id, preferred_date,
+      preferred_start_time, preferred_end_time,
+      status, position
+    ) VALUES (
+      ${clientId}::uuid, ${serviceId}::uuid,
+      ${data.preferred_date ?? null},
+      ${data.preferred_start_time ?? null},
+      ${data.preferred_end_time ?? null},
+      'waiting', ${position}
+    )
+    RETURNING waitlist_id
+  `;
+
+  if (insertRows.length === 0) {
+    return [new Error('insert_failed'), null];
+  }
+
+  return [null, {
+    entries: [],
+    position,
+    message: `Joined waitlist at position ${position}`,
+  }];
+}
+
+/**
+ * Logic for leaving the waitlist.
+ */
+async function handleLeave(tx: postgres.Sql, clientId: string, waitlistId?: string): Promise<Result<WaitlistResult>> {
+  if (waitlistId === undefined) {
+    return [new Error('waitlist_id_required'), null];
+  }
+
+  const updateRows = await tx`
+    UPDATE waitlist SET status = 'cancelled', updated_at = NOW()
+    WHERE waitlist_id = ${waitlistId}::uuid
+      AND client_id = ${clientId}::uuid
+      AND status IN ('waiting', 'notified')
+    RETURNING service_id
+  `;
+
+  if (updateRows.length > 0) {
+    // Recalculate positions for remaining entries in this service
+    await tx.unsafe(
+      "SELECT recalculate_waitlist_positions(service_id) FROM waitlist WHERE waitlist_id = $1::uuid",
+      [waitlistId]
+    );
+  }
+
+  return [null, { entries: [], position: null, message: 'Left waitlist successfully' }];
+}
+
+/**
+ * Lists all active waitlist entries for the client.
+ */
+async function handleList(tx: postgres.Sql, clientId: string): Promise<Result<WaitlistResult>> {
+  const rows = await tx`
+    SELECT waitlist_id, service_id, preferred_date,
+           preferred_start_time, status, position, created_at
+    FROM waitlist
+    WHERE client_id = ${clientId}::uuid
+      AND status IN ('waiting', 'notified')
+    ORDER BY created_at DESC
+  `;
+
+  const entries: WaitlistEntry[] = rows.map(r => ({
+    waitlist_id: String(r['waitlist_id']),
+    service_id: String(r['service_id']),
+    preferred_date: r['preferred_date'] !== null ? String(r['preferred_date']) : null,
+    preferred_start_time: r['preferred_start_time'] !== null ? String(r['preferred_start_time']) : null,
+    status: String(r['status']),
+    position: Number(r['position']),
+    created_at: String(r['created_at']),
+  }));
+
+  return [null, { entries, position: null, message: 'OK' }];
+}
+
+/**
+ * Checks the current position of a specific waitlist entry.
+ */
+async function handleCheckPosition(tx: postgres.Sql, clientId: string, waitlistId?: string): Promise<Result<WaitlistResult>> {
+  if (waitlistId === undefined) {
+    return [new Error('waitlist_id_required'), null];
+  }
+
+  const rows = await tx`
+    SELECT position FROM waitlist
+    WHERE waitlist_id = ${waitlistId}::uuid
+      AND client_id = ${clientId}::uuid
+    LIMIT 1
+  `;
+
+  const row = rows[0];
+  if (row === undefined) {
+    return [new Error('entry_not_found'), null];
+  }
+
+  const position = Number(row['position']);
+  return [null, {
+    entries: [],
+    position,
+    message: `Your position: ${position}`,
+  }];
+}
+
+// ============================================================================
+// MAIN ENTRY POINT
+// ============================================================================
+
+/**
+ * REASONING TRACE
+ * ### Mission Decomposition
+ * - Input validation using Zod.
+ * - Client resolution based on user_id.
+ * - Strategy pattern for action dispatching (join, leave, list, check_position).
+ * - Proper transaction and RLS management via withTenantContext.
+ *
+ * ### Schema Verification
+ * - Tables: waitlist, users, clients, services.
+ * - Columns: verified against existing usage and §6 where applicable.
+ *
+ * ### Failure Mode Analysis
+ * - Scenario 1: Database connection failure -> Caught in outer try/catch.
+ * - Scenario 2: Action handler failure -> [Error, null] returned from handler, transaction rolled back.
+ * - Scenario 3: Validation failure -> Early return before DB connection.
+ *
+ * ### Concurrency Analysis
+ * - Risk: HIGH on join.
+ * - Strategy: SELECT FOR UPDATE on the services table during handleJoin to serialize inserts for the same service.
+ *
+ * ### SOLID Compliance Check
+ * - S: Orchestration in main, logic in action-specific handlers.
+ * - O: New actions can be added by implementing a new handler and adding to the switch.
+ * - D: tx (postgres.Sql) injected into all handlers.
+ */
+export async function main(rawInput: unknown): Promise<Result<WaitlistResult>> {
+  const parsed = InputSchema.safeParse(rawInput);
+  if (!parsed.success) {
+    return [new Error(`validation_error: ${parsed.error.message}`), null];
+  }
 
   const dbUrl = process.env['DATABASE_URL'];
-  if (dbUrl === undefined || dbUrl === '') {
-    return [new Error('CONFIGURATION_ERROR: DATABASE_URL is not set'), null];
+  if (!dbUrl) {
+    return [new Error('configuration_error: DATABASE_URL is not set'), null];
   }
 
   const sql = createDbClient({ url: dbUrl });
-  const tenantId = parsed.data.client_id ?? user_id;
+  const { action, user_id, client_id: inputClientId } = parsed.data;
+  const tenantId = inputClientId ?? user_id;
 
   try {
-    const [txErr, txData] = await withTenantContext<unknown>(sql, tenantId, async (tx) => {
-      const userRows = await tx`
-        SELECT u.user_id, p.client_id FROM users u
-        LEFT JOIN clients p ON p.client_id = u.user_id OR p.email = u.email
-        WHERE u.user_id = ${user_id}::uuid LIMIT 1
-      `;
+    const [txErr, txData] = await withTenantContext<WaitlistResult>(sql, tenantId, async (tx) => {
+      // 1. Resolve Identity
+      const [resErr, clientId] = await resolveClientId(tx, user_id, inputClientId);
+      if (resErr !== null) return [resErr, null];
+      if (clientId === null) return [new Error('unresolved_client'), null];
 
-      const userRow = userRows[0];
-      if (userRow === undefined) {
-        return [new Error('User not found'), null];
-      }
-
-      let clientId = userRow['client_id'] !== null ? String(userRow['client_id']) : null;
-      if (clientId === null && parsed.data.client_id !== undefined) {
-        clientId = parsed.data.client_id;
-      }
-
-      if (clientId === null) {
-        return [new Error('Client record not found'), null];
-      }
-
+      // 2. Dispatch Action
       switch (action) {
-        case 'join': {
-          const serviceId = parsed.data.service_id;
-          if (serviceId === undefined) {
-            return [new Error('service_id is required for join'), null];
-          }
-
-          const existingRows = await tx`
-            SELECT waitlist_id, status FROM waitlist
-            WHERE client_id = ${clientId}::uuid
-              AND service_id = ${serviceId}::uuid
-              AND status IN ('waiting', 'notified')
-            LIMIT 1
-          `;
-
-          const existingRow = existingRows[0];
-          if (existingRow !== undefined) {
-            return [new Error('Already on waitlist for this service'), null];
-          }
-
-          const countRows = await tx`
-            SELECT COUNT(*) AS cnt FROM waitlist
-            WHERE service_id = ${serviceId}::uuid AND status = 'waiting'
-          `;
-
-          const position = countRows[0] !== undefined ? Number(countRows[0]['cnt']) + 1 : 1;
-
-          const insertRows = await tx`
-            INSERT INTO waitlist (
-              client_id, service_id, preferred_date,
-              preferred_start_time, preferred_end_time,
-              status, position
-            ) VALUES (
-              ${clientId}::uuid, ${serviceId}::uuid,
-              ${parsed.data.preferred_date ?? null},
-              ${parsed.data.preferred_start_time ?? null},
-              ${parsed.data.preferred_end_time ?? null},
-              'waiting', ${position}
-            )
-            RETURNING waitlist_id
-          `;
-
-          const newRow = insertRows[0];
-          if (newRow === undefined) {
-            return [new Error('Failed to join waitlist'), null];
-          }
-
-          return [null, {
-            entries: [],
-            position: position,
-            message: 'Joined waitlist at position ' + String(position),
-          }];
-        }
-
-        case 'leave': {
-          const waitlistId = parsed.data.waitlist_id;
-          if (waitlistId === undefined) {
-            return [new Error('waitlist_id is required for leave'), null];
-          }
-
-          await tx`
-            UPDATE waitlist SET status = 'cancelled', updated_at = NOW()
-            WHERE waitlist_id = ${waitlistId}::uuid
-              AND client_id = ${clientId}::uuid
-              AND status IN ('waiting', 'notified')
-          `;
-
-          await tx.unsafe(
-            "SELECT recalculate_waitlist_positions(service_id) FROM waitlist WHERE waitlist_id = $1::uuid",
-            [waitlistId]
-          );
-
-          return [null, { entries: [], position: null, message: 'Left waitlist successfully' }];
-        }
-
-        case 'list': {
-          const rows = await tx`
-            SELECT waitlist_id, service_id, preferred_date,
-                   preferred_start_time, status, position, created_at
-            FROM waitlist
-            WHERE client_id = ${clientId}::uuid
-              AND status IN ('waiting', 'notified')
-            ORDER BY created_at DESC
-          `;
-
-          const entries: WaitlistEntry[] = [];
-          for (const r of rows) {
-            entries.push({
-              waitlist_id: String(r['waitlist_id']),
-              service_id: String(r['service_id']),
-              preferred_date: r['preferred_date'] !== null ? String(r['preferred_date']) : null,
-              preferred_start_time: r['preferred_start_time'] !== null ? String(r['preferred_start_time']) : null,
-              status: String(r['status']),
-              position: Number(r['position']),
-              created_at: String(r['created_at']),
-            });
-          }
-
-          return [null, { entries: entries, position: null, message: 'OK' }];
-        }
-
-        case 'check_position': {
-          const waitlistId = parsed.data.waitlist_id;
-          if (waitlistId === undefined) {
-            return [new Error('waitlist_id is required for check_position'), null];
-          }
-
-          const rows = await tx`
-            SELECT position, status FROM waitlist
-            WHERE waitlist_id = ${waitlistId}::uuid
-              AND client_id = ${clientId}::uuid
-            LIMIT 1
-          `;
-
-          const row = rows[0];
-          if (row === undefined) {
-            return [new Error('Waitlist entry not found'), null];
-          }
-
-          return [null, {
-            entries: [],
-            position: Number(row['position']),
-            message: 'Your position: ' + String(row['position']),
-          }];
-        }
-
+        case 'join':           return await handleJoin(tx, clientId, parsed.data);
+        case 'leave':          return await handleLeave(tx, clientId, parsed.data.waitlist_id);
+        case 'list':           return await handleList(tx, clientId);
+        case 'check_position': return await handleCheckPosition(tx, clientId, parsed.data.waitlist_id);
         default: {
           const _exhaustive: never = action;
-          return [new Error(`Unknown action: ${String(_exhaustive)}`), null];
+          return [new Error(`unsupported_action: ${String(_exhaustive)}`), null];
         }
       }
     });
@@ -266,19 +300,17 @@ export async function main(rawInput: unknown): Promise<[Error | null, WaitlistRe
       return [txErr, null];
     }
 
-    // Validate transaction result shape — no 'as' cast needed
+    // 3. Final Verification
     const result = WaitlistResultSchema.safeParse(txData);
     if (!result.success) {
-      return [new Error(`unexpected_transaction_shape: ${result.error.message}`), null];
+      return [new Error(`unexpected_result_shape: ${result.error.message}`), null];
     }
+
     return [null, result.data];
 
-  } catch (e) {
-    const message = e instanceof Error ? e.message : String(e);
-    if (message.startsWith('transaction_failed: ')) {
-      return [new Error('Internal error: ' + message.slice(20)), null];
-    }
-    return [new Error('Internal error: ' + message), null];
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    return [new Error(`internal_error: ${msg}`), null];
   } finally {
     await sql.end();
   }
