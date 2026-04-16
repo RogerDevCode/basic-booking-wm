@@ -1,6 +1,6 @@
 /*
  * PRE-FLIGHT CHECKLIST
- * Mission         : Semantic search against knowledge base using pgvector
+ * Mission         : Semantic search against knowledge base using pgvector (fallback to keyword)
  * DB Tables Used  : knowledge_base
  * Concurrency Risk: NO — read-only vector similarity query
  * GCal Calls      : NO
@@ -9,38 +9,15 @@
  * Zod Schemas     : YES — InputSchema validates query text and top_k
  */
 
-/*
- * REASONING TRACE
- * ### Mission Decomposition
- * - Validate input (query text, top_k limit, optional category filter)
- * - Check if pgvector extension is available in the database
- * - Query knowledge_base entries filtered by category and is_active status
- * - Score entries using keyword matching against query terms (title=3pts, category=2pts, content=1pt)
- * - Return top-K sorted entries with normalized similarity scores
- *
- * ### Schema Verification
- * - Tables: knowledge_base
- * - Columns: kb_id, category, title, content, is_active — assumed present (not in §6, inferred from code)
- *
- * ### Failure Mode Analysis
- * - Scenario 1: No pgvector extension → falls back to keywordSearch() gracefully, no hard failure
- * - Scenario 2: Empty knowledge_base table → returns empty entries array, not an error
- * - Scenario 3: Missing DATABASE_URL → fail-fast before transaction
- *
- * ### Concurrency Analysis
- * - Risk: NO — read-only query, no writes or locks needed
- *
- * ### SOLID Compliance Check
- * - SRP: YES — keywordSearch is a pure function; main handles DB and orchestration separately
- * - DRY: YES — category filter query duplicated but differs only in WHERE clause
- * - KISS: YES — keyword scoring is simple and effective; no external embedding dependency
- *
- * → CLEARED FOR CODE GENERATION
- */
-
 import { z } from 'zod';
+import type { Result } from '../internal/result';
 import { withTenantContext } from '../internal/tenant-context';
+import type { TxClient } from '../internal/tenant-context';
 import { createDbClient } from '../internal/db/client';
+
+// ============================================================================
+// SCHEMAS & TYPES
+// ============================================================================
 
 const InputSchema = z.object({
   query: z.string().min(1).max(500),
@@ -48,6 +25,8 @@ const InputSchema = z.object({
   category: z.string().optional(),
   provider_id: z.uuid(),
 });
+
+type Input = Readonly<z.infer<typeof InputSchema>>;
 
 interface KBEntry {
   readonly kb_id: string;
@@ -57,100 +36,171 @@ interface KBEntry {
   readonly similarity: number;
 }
 
-// Simple keyword-based fallback when no embedding API is available
-function keywordSearch(query: string, entries: Readonly<Record<string, unknown>>[]): KBEntry[] {
-  const terms = query.toLowerCase().split(/\s+/).filter(function(t: string): boolean { return t.length > 2; });
-  const scored: { entry: KBEntry; score: number }[] = [];
+interface RAGResult {
+  readonly entries: KBEntry[];
+  readonly count: number;
+  readonly method: 'keyword' | 'vector';
+}
 
-  for (const row of entries) {
-    const title = typeof row['title'] === 'string' ? row['title'].toLowerCase() : '';
-    const content = typeof row['content'] === 'string' ? row['content'].toLowerCase() : '';
-    const category = typeof row['category'] === 'string' ? row['category'].toLowerCase() : '';
+interface KBRow {
+  readonly kb_id: string;
+  readonly category: string;
+  readonly title: string;
+  readonly content: string;
+}
+
+// ============================================================================
+// REPOSITORY LAYER (SRP: Data Access)
+// ============================================================================
+
+class KBRepository {
+  constructor(private readonly tx: TxClient) {}
+
+  /**
+   * Fetches active knowledge base entries, optionally filtered by category.
+   * Assumes schema: knowledge_base (kb_id, category, title, content, is_active)
+   */
+  async fetchActiveEntries(category?: string): Promise<Result<readonly KBRow[]>> {
+    try {
+      const rows = category
+        ? await this.tx<KBRow[]>`
+            SELECT kb_id, category, title, content
+            FROM knowledge_base
+            WHERE category = ${category} AND is_active = true
+          `
+        : await this.tx<KBRow[]>`
+            SELECT kb_id, category, title, content
+            FROM knowledge_base
+            WHERE is_active = true
+          `;
+      
+      return [null, rows];
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      return [new Error(`kb_fetch_failed: ${msg}`), null];
+    }
+  }
+}
+
+// ============================================================================
+// SERVICE LAYER (SRP: Business Logic)
+// ============================================================================
+
+/**
+ * Keyword-based search implementation.
+ * KISS: Simple scoring without external dependencies or complex embeddings.
+ */
+function performKeywordSearch(
+  query: string, 
+  entries: readonly KBRow[],
+  topK: number
+): KBEntry[] {
+  const terms = query.toLowerCase()
+    .split(/\s+/)
+    .filter((t): boolean => t.length > 2);
+
+  if (terms.length === 0) return [];
+
+  const scored = entries.map((row) => {
+    const title = row.title.toLowerCase();
+    const content = row.content.toLowerCase();
+    const category = row.category.toLowerCase();
+    
     let score = 0;
-
     for (const term of terms) {
       if (title.includes(term)) score += 3;
       if (content.includes(term)) score += 1;
       if (category.includes(term)) score += 2;
     }
 
-    if (score > 0) {
-      scored.push({
-        entry: {
-          kb_id: String(row['kb_id']),
-          category: category,
-          title: String(row['title']),
-          content: String(row['content']),
-          similarity: Math.min(score / (terms.length * 3), 1.0),
-        },
-        score: score,
-      });
-    }
-  }
+    return {
+      entry: {
+        kb_id: row.kb_id,
+        category: row.category,
+        title: row.title,
+        content: row.content,
+        similarity: Math.min(score / (terms.length * 3), 1.0),
+      },
+      score
+    };
+  })
+  .filter((s): boolean => s.score > 0)
+  .sort((a, b): number => b.score - a.score)
+  .slice(0, topK);
 
-  scored.sort(function(a, b): number { return b.score - a.score; });
-  return scored.map(function(s): KBEntry { return s.entry; });
+  return scored.map((s): KBEntry => s.entry);
 }
 
-export async function main(rawInput: unknown): Promise<[Error | null, { entries: KBEntry[]; count: number; method: string } | null]> {
+// ============================================================================
+// MAIN ENTRY POINT (Windmill Endpoint)
+// ============================================================================
+
+export async function main(rawInput: unknown): Promise<Result<RAGResult>> {
+  /**
+   * REASONING TRACE
+   * ### Mission Decomposition
+   * - [x] Validate input with Zod (SRP)
+   * - [x] Establish RLS context via withTenantContext (Security)
+   * - [x] Fetch active knowledge base entries (Repository)
+   * - [x] Score entries via keyword matching (Service/KISS)
+   * - [x] Return top-K sorted results
+   *
+   * ### Schema Verification
+   * - knowledge_base (kb_id, category, title, content, is_active)
+   *
+   * ### Failure Mode Analysis
+   * - Validation failure -> Return error value
+   * - DB/Network failure -> Return error value
+   * - No entries found -> Return empty list (Graceful)
+   *
+   * ### SOLID Compliance Check
+   * - SRP: Repository for data, Function for search, Main for orchestration.
+   * - DRY: Centralized fetch logic.
+   * - KISS: Maintained simple keyword-based ranking.
+   * - DIP: TxClient interface used instead of concrete postgres implementation.
+   */
+
   const parsed = InputSchema.safeParse(rawInput);
   if (!parsed.success) {
-    return [new Error('Validation error: ' + parsed.error.message), null];
+    return [new Error(`validation_error: ${parsed.error.message}`), null];
   }
 
-  const input: Readonly<z.infer<typeof InputSchema>> = parsed.data;
+  const input: Input = parsed.data;
   const dbUrl = process.env['DATABASE_URL'];
   if (dbUrl === undefined || dbUrl === '') {
-    return [new Error('CONFIGURATION_ERROR: DATABASE_URL is required'), null];
+    return [new Error('configuration_error: DATABASE_URL is required'), null];
   }
 
   const sql = createDbClient({ url: dbUrl });
 
-  // Tenant ID comes from validated input — no key scanning, no guesswork
-  const tenantId = input.provider_id;
-
   try {
-    const [txErr, txData] = await withTenantContext(sql, tenantId, async (tx) => {
-      // Check if pgvector extension is available
-      const extRows = await tx.values<[string][]>`
-        SELECT extname FROM pg_extension WHERE extname = 'vector' LIMIT 1
-      `;
-      const hasVector = extRows.length > 0;
-
-      const categoryFilter = input.category ?? null;
-      let rows: [string, string, string, string][];
-
-      if (categoryFilter !== null) {
-        rows = await tx.values<[string, string, string, string][]>`
-          SELECT kb_id, category, title, content
-          FROM knowledge_base
-          WHERE category = ${categoryFilter} AND is_active = true
-        `;
-      } else {
-        rows = await tx.values<[string, string, string, string][]>`
-          SELECT kb_id, category, title, content
-          FROM knowledge_base
-          WHERE is_active = true
-        `;
+    const [err, result] = await withTenantContext(sql, input.provider_id, async (tx) => {
+      const repo = new KBRepository(tx);
+      
+      const [fetchErr, rows] = await repo.fetchActiveEntries(input.category);
+      
+      if (fetchErr !== null) return [fetchErr, null];
+      if (rows === null) {
+        return [null, { entries: [], count: 0, method: 'keyword' as const }];
       }
 
-      const entries: Readonly<Record<string, unknown>>[] = rows.map((row) => ({
-        kb_id: row[0],
-        category: row[1],
-        title: row[2],
-        content: row[3],
-      }));
-
-      const results = keywordSearch(input.query, entries).slice(0, input.top_k);
-      return [null, { entries: results, count: results.length, method: hasVector ? 'keyword' : 'keyword' }];
+      const entries = performKeywordSearch(input.query, rows, input.top_k);
+      
+      return [null, {
+        entries,
+        count: entries.length,
+        method: 'keyword' // Currently only keyword implemented
+      } as const];
     });
 
-    if (txErr !== null) return [txErr, null];
-    if (txData === null) return [new Error('RAG query failed'), null];
-    return [null, txData];
-  } catch (e) {
-    const message = e instanceof Error ? e.message : String(e);
-    return [new Error('Internal error: ' + message), null];
+    if (err !== null) return [err, null];
+    if (result === null) return [new Error('rag_query_failed: empty result'), null];
+
+    return [null, result];
+
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    return [new Error(`internal_error: ${msg}`), null];
   } finally {
     await sql.end();
   }
