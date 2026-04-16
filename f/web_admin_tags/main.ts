@@ -1,55 +1,41 @@
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : Admin CRUD for tag categories and tags
- * DB Tables Used  : tag_categories, tags
- * Concurrency Risk: NO — simple CRUD, no locks needed
+ * DB Tables Used  : tag_categories, tags, users
+ * Concurrency Risk: NO — simple CRUD on UUID rows
  * GCal Calls      : NO
- * Idempotency Key : N/A — admin operations
- * RLS Tenant ID   : YES — withTenantContext wraps all queries
- * Zod Schemas     : YES — all inputs validated
+ * Idempotency Key : N/A — admin write operations
+ * RLS Tenant ID   : YES — withTenantContext enforces isolation
+ * Zod Schemas     : YES — InputSchema validates all parameters
  */
 
-/*
+/**
  * REASONING TRACE
  * ### Mission Decomposition
- * - Validate admin_user_id, action, and tag/category fields via Zod InputSchema
- * - Verify admin role from users table before any operation
- * - Route to category CRUD (list/create/update/delete/activate/deactivate) or tag CRUD
- * - list_all action fetches both categories and tags in a single transaction
+ * - Separate concerns: input validation, access control, and database operations.
+ * - Refactor CRUD logic into a dedicated `TagRepository`.
+ * - Clean up dynamic SQL building for UPDATE operations.
+ * - Use idiomatic `postgres.js` typed results (tx<Row[]>) for better type safety.
  *
  * ### Schema Verification
- * - Tables: tag_categories (category_id, name, description, is_active, sort_order, created_at, updated_at), tags (tag_id, category_id, name, description, color, is_active, sort_order, created_at, updated_at), users (user_id, role, is_active)
- * - Columns: All verified; tags JOIN tag_categories for category_name enrichment
+ * - Tables: tag_categories, tags, users.
+ * - Columns: category_id, name, description, is_active, sort_order, tag_id, color, role.
  *
  * ### Failure Mode Analysis
- * - Scenario 1: Admin not found or non-admin role → early rejection before any CRUD operation
- * - Scenario 2: Delete category with existing tags → FK constraint violation, error propagated
- * - Scenario 3: Color validation fails → Zod regex check catches invalid hex before DB
- * - Scenario 4: Empty update fields → early return error prevents zero-field UPDATE query
+ * - Admin check failure: early return [Error, null] before any mutation.
+ * - Missing parameters: Zod InputSchema catches them before reaching DB.
+ * - Update without changes: Handled in update builders to avoid empty SET clauses.
  *
  * ### Concurrency Analysis
- * - Risk: NO — single-row CRUD with UUID primary keys; no concurrent write conflicts
+ * - Low risk; using `withTenantContext` ensures transactional integrity and RLS context.
  *
  * ### SOLID Compliance Check
- * - SRP: YES — each function handles exactly one entity operation (category or tag)
- * - DRY: YES — shared dynamic UPDATE builder pattern; toggle helper for activate/deactivate
- * - KISS: YES — direct SQL with typed value arrays; exhaustive switch ensures no unknown action slips through
+ * - SRP: Logic split into specialized functions (access check, repository, orchestration).
+ * - DRY: Common result pattern and row mapping handled consistently.
+ * - KISS: Readable SQL without complex abstractions.
  *
- * → CLEARED FOR CODE GENERATION
+ * → CLEARED FOR EXECUTION
  */
-
-// ============================================================================
-// WEB ADMIN TAGS — Tag system management for admin dashboard
-// ============================================================================
-// Generic tag system usable across domains (medical, legal, customer service).
-// Admin can:
-//   - CRUD tag categories (grouping tags logically)
-//   - CRUD tags within categories
-//   - Activate/deactivate tags and categories
-//   - Reorder tags via sort_order
-//
-// Go-style: no throw, no any, no as. Tuple return.
-// ============================================================================
 
 import { z } from 'zod';
 import postgres from 'postgres';
@@ -57,7 +43,7 @@ import { withTenantContext } from '../internal/tenant-context';
 import { createDbClient } from '../internal/db/client';
 import type { Result } from '../internal/result';
 
-// ─── Schemas ────────────────────────────────────────────────────────────────
+// ─── Input & Schema ─────────────────────────────────────────────────────────
 
 const ActionSchema = z.enum([
   'list_categories',
@@ -87,7 +73,9 @@ const InputSchema = z.object({
   is_active: z.boolean().optional(),
 });
 
-// ─── Types ──────────────────────────────────────────────────────────────────
+type TagInput = Readonly<z.infer<typeof InputSchema>>;
+
+// ─── Data Types ─────────────────────────────────────────────────────────────
 
 interface CategoryRow {
   readonly category_id: string;
@@ -95,7 +83,7 @@ interface CategoryRow {
   readonly description: string | null;
   readonly is_active: boolean;
   readonly sort_order: number;
-  readonly created_at: string;
+  readonly created_at: Date;
   readonly tag_count: number;
 }
 
@@ -108,348 +96,275 @@ interface TagRow {
   readonly color: string;
   readonly is_active: boolean;
   readonly sort_order: number;
-  readonly created_at: string;
+  readonly created_at: Date;
 }
 
-// ─── Category CRUD ──────────────────────────────────────────────────────────
+// ─── Access Control ──────────────────────────────────────────────────────────
 
-async function listCategories(tx: postgres.Sql): Promise<Result<CategoryRow[]>> {
-  const rows = await tx.values<[string, string, string | null, boolean, number, string, number][]>`
-    SELECT tc.category_id, tc.name, tc.description, tc.is_active, tc.sort_order, tc.created_at,
-           COUNT(t.tag_id) FILTER (WHERE t.is_active = true) AS tag_count
-    FROM tag_categories tc
-    LEFT JOIN tags t ON t.category_id = tc.category_id
-    GROUP BY tc.category_id, tc.name, tc.description, tc.is_active, tc.sort_order, tc.created_at
-    ORDER BY tc.sort_order ASC, tc.name ASC
-  `;
-
-  const categories: CategoryRow[] = rows.map((row) => ({
-    category_id: row[0],
-    name: row[1],
-    description: row[2],
-    is_active: row[3],
-    sort_order: row[4],
-    created_at: row[5],
-    tag_count: row[6],
-  }));
-
-  return [null, categories];
-}
-
-async function createCategory(
+/**
+ * Ensures the requesting user has admin privileges.
+ */
+async function verifyAdminAccess(
   tx: postgres.Sql,
-  name: string,
-  description: string | null,
-  sortOrder: number,
-): Promise<Result<CategoryRow>> {
-  const rows = await tx.values<[string, string, string | null, boolean, number, string][]>`
-    INSERT INTO tag_categories (name, description, sort_order)
-    VALUES (${name}, ${description}, ${sortOrder})
-    RETURNING category_id, name, description, is_active, sort_order, created_at
+  userId: string
+): Promise<Result<boolean>> {
+  const rows = await tx<{ role: string }[]>`
+    SELECT role FROM users
+    WHERE user_id = ${userId}::uuid AND is_active = true
+    LIMIT 1
   `;
+  const user = rows[0];
 
-  const row = rows[0];
-  if (row === undefined) return [new Error('Failed to create category'), null];
+  if (!user) return [new Error('UNAUTHORIZED: Admin user not found or inactive'), null];
+  if (user.role !== 'admin') return [new Error('FORBIDDEN: Admin access required'), null];
 
-  return [null, {
-    category_id: row[0],
-    name: row[1],
-    description: row[2],
-    is_active: row[3],
-    sort_order: row[4],
-    created_at: row[5],
-    tag_count: 0,
-  }];
+  return [null, true];
 }
 
-async function updateCategory(
-  tx: postgres.Sql,
-  categoryId: string,
-  name: string | null,
-  description: string | null,
-  sortOrder: number | null,
-): Promise<Result<CategoryRow>> {
-  const fields: string[] = [];
-  const params: (string | number | null)[] = [];
-  let pIdx = 1;
+// ─── Tag Repository ──────────────────────────────────────────────────────────
 
-  if (name != null) { fields.push(`name = $${String(pIdx++)}`); params.push(name); }
-  if (description != null) { fields.push(`description = $${String(pIdx++)}`); params.push(description); }
-  if (sortOrder != null) { fields.push(`sort_order = $${String(pIdx++)}`); params.push(sortOrder); }
-
-  if (fields.length === 0) return [new Error('No fields to update'), null];
-
-  fields.push(`updated_at = NOW()`);
-  params.push(categoryId);
-
-  const query = `UPDATE tag_categories SET ${fields.join(', ')} WHERE category_id = $${String(pIdx)}::uuid RETURNING category_id, name, description, is_active, sort_order, created_at`;
-  const rows = await tx.values<[string, string, string | null, boolean, number, string][]>(query, params);
-  const row = rows[0];
-  if (row === undefined) return [new Error('Category not found'), null];
-
-  return [null, {
-    category_id: row[0],
-    name: row[1],
-    description: row[2],
-    is_active: row[3],
-    sort_order: row[4],
-    created_at: row[5],
-    tag_count: 0,
-  }];
-}
-
-async function toggleCategory(tx: postgres.Sql, categoryId: string, active: boolean): Promise<Result<{ readonly category_id: string; readonly is_active: boolean }>> {
-  await tx`
-    UPDATE tag_categories SET is_active = ${active}, updated_at = NOW()
-    WHERE category_id = ${categoryId}::uuid
-  `;
-  return [null, { category_id: categoryId, is_active: active }];
-}
-
-async function deleteCategory(tx: postgres.Sql, categoryId: string): Promise<Result<{ readonly deleted: boolean }>> {
-  await tx`DELETE FROM tag_categories WHERE category_id = ${categoryId}::uuid`;
-  return [null, { deleted: true }];
-}
-
-// ─── Tag CRUD ───────────────────────────────────────────────────────────────
-
-async function listTags(tx: postgres.Sql, categoryId?: string): Promise<Result<TagRow[]>> {
-  let rows: [string, string, string, string, string | null, string, boolean, number, string][];
-
-  if (categoryId != null) {
-    rows = await tx.values<[string, string, string, string, string | null, string, boolean, number, string][]>`
-      SELECT t.tag_id, t.category_id, tc.name AS category_name, t.name, t.description,
-             t.color, t.is_active, t.sort_order, t.created_at
-      FROM tags t
-      JOIN tag_categories tc ON tc.category_id = t.category_id
-      WHERE t.category_id = ${categoryId}::uuid
-      ORDER BY t.sort_order ASC, t.name ASC
+const TagRepository = {
+  async listCategories(tx: postgres.Sql): Promise<Result<CategoryRow[]>> {
+    const rows = await tx<CategoryRow[]>`
+      SELECT tc.category_id, tc.name, tc.description, tc.is_active, tc.sort_order, tc.created_at,
+             COUNT(t.tag_id) FILTER (WHERE t.is_active = true)::int AS tag_count
+      FROM tag_categories tc
+      LEFT JOIN tags t ON t.category_id = tc.category_id
+      GROUP BY tc.category_id, tc.name, tc.description, tc.is_active, tc.sort_order, tc.created_at
+      ORDER BY tc.sort_order ASC, tc.name ASC
     `;
-  } else {
-    rows = await tx.values<[string, string, string, string, string | null, string, boolean, number, string][]>`
+    return [null, rows];
+  },
+
+  async createCategory(
+    tx: postgres.Sql,
+    params: { name: string; description: string | null; sort_order: number }
+  ): Promise<Result<CategoryRow>> {
+    const rows = await tx<CategoryRow[]>`
+      INSERT INTO tag_categories (name, description, sort_order)
+      VALUES (${params.name}, ${params.description}, ${params.sort_order})
+      RETURNING category_id, name, description, is_active, sort_order, created_at, 0 as tag_count
+    `;
+    const row = rows[0];
+    if (!row) return [new Error('DB_ERROR: Failed to create category'), null];
+    return [null, row];
+  },
+
+  async updateCategory(
+    tx: postgres.Sql,
+    categoryId: string,
+    updates: Partial<{ name: string; description: string | null; sort_order: number }>
+  ): Promise<Result<CategoryRow>> {
+    if (Object.keys(updates).length === 0) return [new Error('INVALID_INPUT: No fields to update'), null];
+
+    const rows = await tx<CategoryRow[]>`
+      UPDATE tag_categories SET ${tx(updates)}, updated_at = NOW()
+      WHERE category_id = ${categoryId}::uuid
+      RETURNING category_id, name, description, is_active, sort_order, created_at, 0 as tag_count
+    `;
+    const row = rows[0];
+    if (!row) return [new Error('NOT_FOUND: Category not found'), null];
+    return [null, row];
+  },
+
+  async setCategoryStatus(tx: postgres.Sql, categoryId: string, active: boolean): Promise<Result<{ category_id: string; is_active: boolean }>> {
+    const rows = await tx<{ category_id: string; is_active: boolean }[]>`
+      UPDATE tag_categories SET is_active = ${active}, updated_at = NOW()
+      WHERE category_id = ${categoryId}::uuid
+      RETURNING category_id, is_active
+    `;
+    if (!rows[0]) return [new Error('NOT_FOUND: Category not found'), null];
+    return [null, rows[0]];
+  },
+
+  async deleteCategory(tx: postgres.Sql, categoryId: string): Promise<Result<{ deleted: boolean }>> {
+    const result = await tx`DELETE FROM tag_categories WHERE category_id = ${categoryId}::uuid`;
+    return [null, { deleted: result.count > 0 }];
+  },
+
+  async listTags(tx: postgres.Sql, categoryId?: string): Promise<Result<TagRow[]>> {
+    const rows = await tx<TagRow[]>`
       SELECT t.tag_id, t.category_id, tc.name AS category_name, t.name, t.description,
              t.color, t.is_active, t.sort_order, t.created_at
       FROM tags t
       JOIN tag_categories tc ON tc.category_id = t.category_id
+      ${categoryId ? tx`WHERE t.category_id = ${categoryId}::uuid` : tx``}
       ORDER BY tc.sort_order ASC, t.sort_order ASC, t.name ASC
     `;
+    return [null, rows];
+  },
+
+  async createTag(
+    tx: postgres.Sql,
+    params: { category_id: string; name: string; description: string | null; color: string; sort_order: number }
+  ): Promise<Result<TagRow>> {
+    const rows = await tx<TagRow[]>`
+      INSERT INTO tags (category_id, name, description, color, sort_order)
+      VALUES (${params.category_id}::uuid, ${params.name}, ${params.description}, ${params.color}, ${params.sort_order})
+      RETURNING tag_id, category_id, name, description, color, is_active, sort_order, created_at, (SELECT name FROM tag_categories WHERE category_id = ${params.category_id}::uuid) as category_name
+    `;
+    const row = rows[0];
+    if (!row) return [new Error('DB_ERROR: Failed to create tag'), null];
+    return [null, row];
+  },
+
+  async updateTag(
+    tx: postgres.Sql,
+    tagId: string,
+    updates: Partial<{ name: string; description: string | null; color: string; sort_order: number; category_id: string }>
+  ): Promise<Result<TagRow>> {
+    if (Object.keys(updates).length === 0) return [new Error('INVALID_INPUT: No fields to update'), null];
+
+    const rows = await tx<TagRow[]>`
+      UPDATE tags SET ${tx(updates)}, updated_at = NOW()
+      WHERE tag_id = ${tagId}::uuid
+      RETURNING tag_id, category_id, name, description, color, is_active, sort_order, created_at, (SELECT name FROM tag_categories WHERE category_id = tags.category_id) as category_name
+    `;
+    const row = rows[0];
+    if (!row) return [new Error('NOT_FOUND: Tag not found'), null];
+    return [null, row];
+  },
+
+  async setTagStatus(tx: postgres.Sql, tagId: string, active: boolean): Promise<Result<{ tag_id: string; is_active: boolean }>> {
+    const rows = await tx<{ tag_id: string; is_active: boolean }[]>`
+      UPDATE tags SET is_active = ${active}, updated_at = NOW()
+      WHERE tag_id = ${tagId}::uuid
+      RETURNING tag_id, is_active
+    `;
+    if (!rows[0]) return [new Error('NOT_FOUND: Tag not found'), null];
+    return [null, rows[0]];
+  },
+
+  async deleteTag(tx: postgres.Sql, tagId: string): Promise<Result<{ deleted: boolean }>> {
+    const result = await tx`DELETE FROM tags WHERE tag_id = ${tagId}::uuid`;
+    return [null, { deleted: result.count > 0 }];
+  },
+};
+
+// ─── Orchestration ────────────────────────────────────────────────────────────
+
+async function handleAction(
+  tx: postgres.Sql,
+  input: TagInput
+): Promise<Result<unknown>> {
+  // Step 1: Verify admin access (Boundary Security)
+  const [accessErr] = await verifyAdminAccess(tx, input.admin_user_id);
+  if (accessErr) return [accessErr, null];
+
+  // Step 2: Route action
+  switch (input.action) {
+    case 'list_categories':
+      return TagRepository.listCategories(tx);
+
+    case 'create_category':
+      if (!input.name) return [new Error('REQUIRED: name'), null];
+      return TagRepository.createCategory(tx, {
+        name: input.name,
+        description: input.description ?? null,
+        sort_order: input.sort_order ?? 0,
+      });
+
+    case 'update_category':
+      if (!input.category_id) return [new Error('REQUIRED: category_id'), null];
+      return TagRepository.updateCategory(tx, input.category_id, {
+        ...(input.name && { name: input.name }),
+        ...(input.description !== undefined && { description: input.description }),
+        ...(input.sort_order !== undefined && { sort_order: input.sort_order }),
+      });
+
+    case 'delete_category':
+      if (!input.category_id) return [new Error('REQUIRED: category_id'), null];
+      return TagRepository.deleteCategory(tx, input.category_id);
+
+    case 'activate_category':
+      if (!input.category_id) return [new Error('REQUIRED: category_id'), null];
+      return TagRepository.setCategoryStatus(tx, input.category_id, true);
+
+    case 'deactivate_category':
+      if (!input.category_id) return [new Error('REQUIRED: category_id'), null];
+      return TagRepository.setCategoryStatus(tx, input.category_id, false);
+
+    case 'list_tags':
+      return TagRepository.listTags(tx, input.category_id);
+
+    case 'create_tag':
+      if (!input.category_id || !input.name) return [new Error('REQUIRED: category_id, name'), null];
+      return TagRepository.createTag(tx, {
+        category_id: input.category_id,
+        name: input.name,
+        description: input.description ?? null,
+        color: input.color ?? '#808080',
+        sort_order: input.sort_order ?? 0,
+      });
+
+    case 'update_tag':
+      if (!input.tag_id) return [new Error('REQUIRED: tag_id'), null];
+      return TagRepository.updateTag(tx, input.tag_id, {
+        ...(input.name && { name: input.name }),
+        ...(input.description !== undefined && { description: input.description }),
+        ...(input.color && { color: input.color }),
+        ...(input.sort_order !== undefined && { sort_order: input.sort_order }),
+        ...(input.category_id && { category_id: input.category_id }),
+      });
+
+    case 'delete_tag':
+      if (!input.tag_id) return [new Error('REQUIRED: tag_id'), null];
+      return TagRepository.deleteTag(tx, input.tag_id);
+
+    case 'activate_tag':
+      if (!input.tag_id) return [new Error('REQUIRED: tag_id'), null];
+      return TagRepository.setTagStatus(tx, input.tag_id, true);
+
+    case 'deactivate_tag':
+      if (!input.tag_id) return [new Error('REQUIRED: tag_id'), null];
+      return TagRepository.setTagStatus(tx, input.tag_id, false);
+
+    case 'list_all': {
+      const [catErr, categories] = await TagRepository.listCategories(tx);
+      if (catErr) return [catErr, null];
+      const [tagErr, tags] = await TagRepository.listTags(tx);
+      if (tagErr) return [tagErr, null];
+      return [null, { categories: categories ?? [], tags: tags ?? [] }];
+    }
+
+    default: {
+      const _exhaustive: never = input.action;
+      return [new Error(`UNKNOWN_ACTION: ${String(_exhaustive)}`), null];
+    }
   }
-
-  const tags: TagRow[] = rows.map((row) => ({
-    tag_id: row[0],
-    category_id: row[1],
-    category_name: row[2],
-    name: row[3],
-    description: row[4],
-    color: row[5],
-    is_active: row[6],
-    sort_order: row[7],
-    created_at: row[8],
-  }));
-
-  return [null, tags];
 }
 
-async function createTag(
-  tx: postgres.Sql,
-  categoryId: string,
-  name: string,
-  description: string | null,
-  color: string,
-  sortOrder: number,
-): Promise<Result<TagRow>> {
-  const rows = await tx.values<[string, string, string, string | null, string, boolean, number, string][]>`
-    INSERT INTO tags (category_id, name, description, color, sort_order)
-    VALUES (${categoryId}::uuid, ${name}, ${description}, ${color}, ${sortOrder})
-    RETURNING tag_id, category_id, name, description, color, is_active, sort_order, created_at
-  `;
+// ─── Entry Point ──────────────────────────────────────────────────────────────
 
-  const row = rows[0];
-  if (row === undefined) return [new Error('Failed to create tag'), null];
-
-  return [null, {
-    tag_id: row[0],
-    category_id: row[1],
-    category_name: '',
-    name: row[2],
-    description: row[3],
-    color: row[4] ?? '',
-    is_active: row[5],
-    sort_order: row[6],
-    created_at: row[7],
-  }];
-}
-
-async function updateTag(
-  tx: postgres.Sql,
-  tagId: string,
-  name: string | null,
-  description: string | null,
-  color: string | null,
-  sortOrder: number | null,
-  categoryId: string | null,
-): Promise<Result<TagRow>> {
-  const fields: string[] = [];
-  const params: (string | number | null)[] = [];
-  let pIdx = 1;
-
-  if (name != null) { fields.push(`name = $${String(pIdx++)}`); params.push(name); }
-  if (description != null) { fields.push(`description = $${String(pIdx++)}`); params.push(description); }
-  if (color != null) { fields.push(`color = $${String(pIdx++)}`); params.push(color); }
-  if (sortOrder != null) { fields.push(`sort_order = $${String(pIdx++)}`); params.push(sortOrder); }
-  if (categoryId != null) { fields.push(`category_id = $${String(pIdx++)}::uuid`); params.push(categoryId); }
-
-  if (fields.length === 0) return [new Error('No fields to update'), null];
-
-  fields.push(`updated_at = NOW()`);
-  params.push(tagId);
-
-  const query = `UPDATE tags SET ${fields.join(', ')} WHERE tag_id = $${String(pIdx)}::uuid RETURNING tag_id, category_id, name, description, color, is_active, sort_order, created_at`;
-  const rows = await tx.values<[string, string, string, string | null, string, boolean, number, string][]>(query, params);
-  const row = rows[0];
-  if (row === undefined) return [new Error('Tag not found'), null];
-
-  return [null, {
-    tag_id: row[0],
-    category_id: row[1],
-    category_name: '',
-    name: row[2],
-    description: row[3],
-    color: row[4],
-    is_active: row[5],
-    sort_order: row[6],
-    created_at: row[7],
-  }];
-}
-
-async function toggleTag(tx: postgres.Sql, tagId: string, active: boolean): Promise<Result<{ readonly tag_id: string; readonly is_active: boolean }>> {
-  await tx`UPDATE tags SET is_active = ${active}, updated_at = NOW() WHERE tag_id = ${tagId}::uuid`;
-  return [null, { tag_id: tagId, is_active: active }];
-}
-
-async function deleteTag(tx: postgres.Sql, tagId: string): Promise<Result<{ readonly deleted: boolean }>> {
-  await tx`DELETE FROM tags WHERE tag_id = ${tagId}::uuid`;
-  return [null, { deleted: true }];
-}
-
-// ─── Main ───────────────────────────────────────────────────────────────────
-
+/**
+ * Main Windmill entry point for web_admin_tags.
+ */
 export async function main(rawInput: unknown): Promise<Result<unknown>> {
+  // 1. Validate Input (Zod)
   const parsed = InputSchema.safeParse(rawInput);
   if (!parsed.success) {
-    return [new Error(`Validation error: ${parsed.error.message}`), null];
+    return [new Error(`VALIDATION_ERROR: ${parsed.error.message}`), null];
   }
+  const input: TagInput = parsed.data;
 
-  const input: Readonly<z.infer<typeof InputSchema>> = parsed.data;
-
+  // 2. Setup Infrastructure
   const dbUrl = process.env['DATABASE_URL'];
-  if (dbUrl === undefined || dbUrl === '') {
+  if (!dbUrl) {
     return [new Error('CONFIGURATION_ERROR: DATABASE_URL is required'), null];
   }
 
   const sql = createDbClient({ url: dbUrl });
-  const tenantId = input.admin_user_id;
 
   try {
-    const [txErr, txData] = await withTenantContext<unknown>(sql, tenantId, async (tx) => {
-      // Verify admin
-      const adminRows = await tx.values<[string][]>`
-        SELECT role FROM users WHERE user_id = ${input.admin_user_id}::uuid AND is_active = true LIMIT 1
-      `;
-      const adminRow = adminRows[0];
-      if (adminRow === undefined) return [new Error('Admin not found or inactive'), null];
-      if (adminRow[0] !== 'admin') return [new Error('Forbidden: admin access required'), null];
-
-      switch (input.action) {
-        case 'list_categories':
-          return listCategories(tx);
-
-        case 'create_category': {
-          const name = input.name;
-          if (name == null) return [new Error('name is required'), null];
-          return createCategory(tx, name, input.description ?? null, input.sort_order ?? 0);
-        }
-
-        case 'update_category': {
-          const categoryId = input.category_id;
-          if (categoryId == null) return [new Error('category_id is required'), null];
-          return updateCategory(tx, categoryId, input.name ?? null, input.description ?? null, input.sort_order ?? null);
-        }
-
-        case 'delete_category': {
-          const categoryId = input.category_id;
-          if (categoryId == null) return [new Error('category_id is required'), null];
-          return deleteCategory(tx, categoryId);
-        }
-
-        case 'activate_category': {
-          const categoryId = input.category_id;
-          if (categoryId == null) return [new Error('category_id is required'), null];
-          return toggleCategory(tx, categoryId, true);
-        }
-
-        case 'deactivate_category': {
-          const categoryId = input.category_id;
-          if (categoryId == null) return [new Error('category_id is required'), null];
-          return toggleCategory(tx, categoryId, false);
-        }
-
-        case 'list_tags':
-          return listTags(tx, input.category_id ?? undefined);
-
-        case 'create_tag': {
-          const categoryId = input.category_id;
-          const name = input.name;
-          if (categoryId == null || name == null) return [new Error('category_id and name are required'), null];
-          return createTag(tx, categoryId, name, input.description ?? null, input.color ?? '#808080', input.sort_order ?? 0);
-        }
-
-        case 'update_tag': {
-          const tagId = input.tag_id;
-          if (tagId == null) return [new Error('tag_id is required'), null];
-          return updateTag(tx, tagId, input.name ?? null, input.description ?? null, input.color ?? null, input.sort_order ?? null, input.category_id ?? null);
-        }
-
-        case 'delete_tag': {
-          const tagId = input.tag_id;
-          if (tagId == null) return [new Error('tag_id is required'), null];
-          return deleteTag(tx, tagId);
-        }
-
-        case 'activate_tag': {
-          const tagId = input.tag_id;
-          if (tagId == null) return [new Error('tag_id is required'), null];
-          return toggleTag(tx, tagId, true);
-        }
-
-        case 'deactivate_tag': {
-          const tagId = input.tag_id;
-          if (tagId == null) return [new Error('tag_id is required'), null];
-          return toggleTag(tx, tagId, false);
-        }
-
-        case 'list_all': {
-          const [catErr, categories] = await listCategories(tx);
-          if (catErr != null) return [catErr, null];
-          const [tagErr, tags] = await listTags(tx);
-          if (tagErr != null) return [tagErr, null];
-          return [null, { categories: categories ?? [], tags: tags ?? [] }];
-        }
-
-        default: {
-          const _exhaustive: never = input.action;
-          return [new Error(`Unknown action: ${String(_exhaustive)}`), null];
-        }
-      }
+    // 3. Execute with Multi-Tenant RLS Context
+    return await withTenantContext(sql, input.admin_user_id, async (tx) => {
+      return handleAction(tx, input);
     });
-
-    if (txErr !== null) return [txErr, null];
-    if (txData === null) return [new Error('Operation failed'), null];
-    return [null, txData as unknown];
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    return [new Error(`Internal error: ${msg}`), null];
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    return [new Error(`SYSTEM_ERROR: ${message}`), null];
   } finally {
+    // 4. Resource Management
     await sql.end();
   }
 }
