@@ -1,73 +1,36 @@
 /*
  * PRE-FLIGHT CHECKLIST
- * Mission         : Web-compatible booking API (create, cancel, reschedule)
- * DB Tables Used  : bookings, providers, clients, services, provider_schedules
- * Concurrency Risk: YES — booking creation uses SELECT FOR UPDATE + GIST constraint
- * GCal Calls      : NO — gcal_sync handles async sync after creation
- * Idempotency Key : YES — ON CONFLICT (idempotency_key) DO UPDATE returns existing booking
- * RLS Tenant ID   : YES — withTenantContext uses provider_id ALWAYS (never user_id)
- * Zod Schemas     : YES — InputSchema validates action and booking parameters
+ * Mission         : Refactor Web Booking API to SOLID standards
+ * DB Tables Used  : providers, services, bookings, clients, users
+ * Concurrency Risk: YES — uses SELECT FOR UPDATE on provider row
+ * GCal Calls      : NO — handled by async background sync
+ * Idempotency Key : YES — deterministic SHA-256 derivation
+ * RLS Tenant ID   : YES — withTenantContext enforces provider_id isolation
+ * Zod Schemas     : YES — InputSchema validation
  */
-
-/*
- * REASONING TRACE
- * ### Mission Decomposition
- * - Validate action (create/cancel/reschedule) and parameters via Zod
- * - For create: tenantId = provider_id (required field)
- * - For cancel/reschedule: tenantId MUST come from the booking's provider_id,
- *   NOT from user_id input — because RLS enforces provider_id = app.current_tenant.
- *   Strategy: resolve booking's provider_id via a non-RLS pool query first,
- *   then open withTenantContext(booking.provider_id).
- * - Inside tenant context: verify client ownership, execute mutation.
- *
- * ### Schema Verification
- * - Tables: bookings, providers, clients, services
- * - Columns: bookings (booking_id, provider_id, client_id, service_id, start_time,
- *   end_time, status, idempotency_key, gcal_sync_status, cancellation_reason,
- *   rescheduled_from), clients (client_id, email), services (service_id, duration_minutes)
- *
- * ### Failure Mode Analysis
- * - Scenario 1: Double-booking → GIST exclusion constraint + ON CONFLICT handles
- * - Scenario 2: cancel/reschedule with wrong user → client_id ownership check
- * - Scenario 3: RLS mismatch → tenantId always = provider_id, never user_id
- * - Scenario 4: Retry of create → ON CONFLICT (idempotency_key) DO UPDATE returns
- *   the ORIGINAL booking_id (true idempotency, not "slot taken" error)
- *
- * ### Concurrency Analysis
- * - Risk: YES — SELECT FOR UPDATE on provider row before INSERT serializes concurrent creates
- *
- * ### SOLID Compliance Check
- * - SRP: YES — resolveProviderIdForBooking handles only pre-RLS lookup
- * - DRY: YES — idempotency key derivation extracted once per action
- * - KISS: YES — switch-based routing; booking lookup separated cleanly
- *
- * → CLEARED FOR CODE GENERATION
- */
-
-// ============================================================================
-// WEB BOOKING API — Web-compatible booking API (create, cancel, reschedule)
-// ============================================================================
-// Unified endpoint for web booking operations.
-// Validates user permissions, checks availability, handles transactions.
-// RLS: tenantId is ALWAYS provider_id — never user_id.
-// Idempotency: ON CONFLICT (idempotency_key) DO UPDATE returns original row.
-// ============================================================================
 
 import { z } from 'zod';
 import { createHash } from 'node:crypto';
 import { withTenantContext } from '../internal/tenant-context';
 import { createDbClient } from '../internal/db/client';
+import type { Result } from '../internal/result';
+
+// ============================================================================
+// SCHEMAS & TYPES
+// ============================================================================
 
 const InputSchema = z.object({
   action: z.enum(['crear', 'cancelar', 'reagendar']),
-  user_id: z.string().uuid(),
-  booking_id: z.string().uuid().optional(),
-  provider_id: z.string().uuid().optional(),
-  service_id: z.string().uuid().optional(),
+  user_id: z.uuid(),
+  booking_id: z.uuid().optional(),
+  provider_id: z.uuid().optional(),
+  service_id: z.uuid().optional(),
   start_time: z.string().optional(),
   cancellation_reason: z.string().max(500).optional(),
   idempotency_key: z.string().min(1).max(255).optional(),
 });
+
+type Input = z.infer<typeof InputSchema>;
 
 interface BookingResult {
   readonly booking_id: string;
@@ -75,354 +38,294 @@ interface BookingResult {
   readonly message: string;
 }
 
+type DB = ReturnType<typeof createDbClient>;
+
+// ============================================================================
+// HELPERS
+// ============================================================================
+
 /**
- * resolveProviderIdForBooking — Pre-RLS lookup.
- *
- * For cancel/reschedule, the tenantId MUST be the booking's provider_id.
- * This query runs OUTSIDE withTenantContext (no RLS) because we cannot open
- * a tenant context without knowing which tenant owns the booking.
- * This is safe: we only read provider_id — no patient data is exposed.
+ * Generates a deterministic idempotency key if none provided.
  */
-async function resolveProviderIdForBooking(
-  sql: ReturnType<typeof createDbClient>,
-  bookingId: string,
-): Promise<[Error | null, string | null]> {
+function deriveIdempotencyKey(prefix: string, parts: readonly string[]): string {
+  return createHash('sha256')
+    .update(`${prefix}:${parts.join(':')}`)
+    .digest('hex')
+    .slice(0, 32);
+}
+
+/**
+ * Calculates end_time based on duration.
+ */
+function calculateEndTime(startTimeStr: string, durationMinutes: number): [Error | null, string | null] {
+  const start = new Date(startTimeStr);
+  if (Number.isNaN(start.getTime())) {
+    return [new Error('formato_fecha_invalido'), null];
+  }
+  return [null, new Date(start.getTime() + durationMinutes * 60000).toISOString()];
+}
+
+// ============================================================================
+// IDENTITY & CONTEXT RESOLUTION
+// ============================================================================
+
+/**
+ * Resolves the tenant (provider_id) for an existing booking.
+ * Runs outside RLS context to identify the owner.
+ */
+async function resolveTenantForBooking(sql: DB, bookingId: string): Promise<Result<string>> {
   try {
     const rows = await sql<readonly { provider_id: string }[]>`
-      SELECT provider_id FROM bookings
-      WHERE booking_id = ${bookingId}::uuid
-      LIMIT 1
+      SELECT provider_id FROM bookings WHERE booking_id = ${bookingId}::uuid LIMIT 1
     `;
-    const row = rows[0];
-    if (row === undefined) {
-      return [new Error('Booking not found'), null];
-    }
-    return [null, row.provider_id];
+    const providerId = rows[0]?.provider_id;
+    if (!providerId) return [new Error('cita_no_encontrada'), null];
+    return [null, providerId];
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    return [new Error(`resolve_provider_failed: ${msg}`), null];
+    return [new Error(`error_resolucion_tenant: ${String(e)}`), null];
   }
 }
 
-export async function main(rawInput: unknown): Promise<[Error | null, BookingResult | null]> {
+/**
+ * Resolves client_id from user_id (identity mapping).
+ */
+async function resolveClientId(tx: DB, userId: string): Promise<Result<string>> {
+  try {
+    // 1. Check direct map
+    const directRows = await tx<readonly { client_id: string }[]>`
+      SELECT client_id FROM clients WHERE client_id = ${userId}::uuid LIMIT 1
+    `;
+    if (directRows[0]) return [null, directRows[0].client_id];
+
+    // 2. Check via email
+    const userRows = await tx<readonly { email: string | null }[]>`
+      SELECT email FROM users WHERE user_id = ${userId}::uuid LIMIT 1
+    `;
+    const email = userRows[0]?.email;
+    if (email) {
+      const emailRows = await tx<readonly { client_id: string }[]>`
+        SELECT client_id FROM clients WHERE email = ${email} LIMIT 1
+      `;
+      if (emailRows[0]) return [null, emailRows[0].client_id];
+    }
+
+    return [new Error('cliente_no_registrado'), null];
+  } catch (e) {
+    return [new Error(`error_resolucion_cliente: ${String(e)}`), null];
+  }
+}
+
+// ============================================================================
+// ACTION HANDLERS
+// ============================================================================
+
+/**
+ * Handles 'crear' action logic.
+ */
+async function handleCrear(
+  tx: DB,
+  tenantId: string,
+  clientId: string,
+  input: Input
+): Promise<Result<BookingResult>> {
+  const { service_id, start_time } = input;
+  if (!service_id || !start_time) return [new Error('datos_insuficientes_crear'), null];
+
+  // Concurrency Lock: Provider serialization
+  const lock = await tx`SELECT provider_id FROM providers WHERE provider_id = ${tenantId}::uuid AND is_active = true FOR UPDATE`;
+  if (!lock[0]) return [new Error('proveedor_inactivo'), null];
+
+  const service = await tx<{ duration_minutes: number }[]>`SELECT duration_minutes FROM services WHERE service_id = ${service_id}::uuid LIMIT 1`;
+  if (!service[0]) return [new Error('servicio_no_encontrado'), null];
+
+  const [timeErr, endTime] = calculateEndTime(start_time, service[0].duration_minutes);
+  if (timeErr || !endTime) return [timeErr ?? new Error('error_tiempo'), null];
+
+  // Overlap check
+  const overlap = await tx`
+    SELECT booking_id FROM bookings
+    WHERE provider_id = ${tenantId}::uuid
+      AND status NOT IN ('cancelada', 'no_presentado', 'reagendada')
+      AND start_time < ${endTime}::timestamptz
+      AND end_time > ${start_time}::timestamptz
+    LIMIT 1
+  `;
+  if (overlap[0]) return [new Error('horario_ocupado'), null];
+
+  const idempotencyKey = input.idempotency_key ?? deriveIdempotencyKey('crear', [tenantId, clientId, service_id, start_time]);
+
+  const rows = await tx<{ booking_id: string; status: string }[]>`
+    INSERT INTO bookings (
+      provider_id, client_id, service_id, start_time, end_time,
+      status, idempotency_key, gcal_sync_status
+    ) VALUES (
+      ${tenantId}::uuid, ${clientId}::uuid, ${service_id}::uuid,
+      ${start_time}, ${endTime},
+      'pendiente', ${idempotencyKey}, 'pending'
+    )
+    ON CONFLICT (idempotency_key) DO UPDATE SET updated_at = NOW()
+    RETURNING booking_id, status
+  `;
+
+  if (!rows[0]) return [new Error('error_creacion_cita'), null];
+
+  return [null, {
+    booking_id: rows[0].booking_id,
+    status: rows[0].status,
+    message: 'Cita creada exitosamente',
+  }];
+}
+
+/**
+ * Handles 'cancelar' action logic.
+ */
+async function handleCancelar(
+  tx: DB,
+  clientId: string,
+  input: Input
+): Promise<Result<BookingResult>> {
+  const { booking_id, cancellation_reason } = input;
+  if (!booking_id) return [new Error('booking_id_requerido'), null];
+
+  const booking = await tx<{ status: string; client_id: string }[]>`
+    SELECT status, client_id FROM bookings WHERE booking_id = ${booking_id}::uuid LIMIT 1
+  `;
+  if (!booking[0]) return [new Error('cita_no_encontrada'), null];
+  if (booking[0].client_id !== clientId) return [new Error('permiso_denegado_cita'), null];
+
+  if (!['pendiente', 'confirmada'].includes(booking[0].status)) {
+    return [new Error(`estado_invalido_cancelar: ${booking[0].status}`), null];
+  }
+
+  const rows = await tx<{ booking_id: string; status: string }[]>`
+    UPDATE bookings SET
+      status = 'cancelada',
+      cancellation_reason = ${cancellation_reason ?? null},
+      updated_at = NOW()
+    WHERE booking_id = ${booking_id}::uuid
+    RETURNING booking_id, status
+  `;
+
+  if (!rows[0]) return [new Error('error_cancelacion_cita'), null];
+
+  return [null, {
+    booking_id: rows[0].booking_id,
+    status: rows[0].status,
+    message: 'Cita cancelada exitosamente',
+  }];
+}
+
+/**
+ * Handles 'reagendar' action logic.
+ */
+async function handleReagendar(
+  tx: DB,
+  tenantId: string,
+  clientId: string,
+  input: Input
+): Promise<Result<BookingResult>> {
+  const { booking_id, start_time } = input;
+  if (!booking_id || !start_time) return [new Error('datos_insuficientes_reagendar'), null];
+
+  const old = await tx<{ service_id: string; status: string; client_id: string }[]>`
+    SELECT service_id, status, client_id FROM bookings WHERE booking_id = ${booking_id}::uuid LIMIT 1
+  `;
+  if (!old[0]) return [new Error('cita_no_encontrada'), null];
+  if (old[0].client_id !== clientId) return [new Error('permiso_denegado_cita'), null];
+  if (!['pendiente', 'confirmada'].includes(old[0].status)) return [new Error('estado_invalido_reagendar'), null];
+
+  const service = await tx<{ duration_minutes: number }[]>`SELECT duration_minutes FROM services WHERE service_id = ${old[0].service_id}::uuid LIMIT 1`;
+  if (!service[0]) return [new Error('servicio_no_encontrado'), null];
+
+  const [timeErr, endTime] = calculateEndTime(start_time, service[0].duration_minutes);
+  if (timeErr || !endTime) return [timeErr ?? new Error('error_tiempo'), null];
+
+  // Concurrency Lock
+  await tx`SELECT provider_id FROM providers WHERE provider_id = ${tenantId}::uuid AND is_active = true FOR UPDATE`;
+
+  // Overlap check
+  const overlap = await tx`
+    SELECT booking_id FROM bookings
+    WHERE provider_id = ${tenantId}::uuid
+      AND status NOT IN ('cancelada', 'no_presentado', 'reagendada')
+      AND start_time < ${endTime}::timestamptz
+      AND end_time > ${start_time}::timestamptz
+    LIMIT 1
+  `;
+  if (overlap[0]) return [new Error('horario_ocupado'), null];
+
+  const idempotencyKey = input.idempotency_key ?? deriveIdempotencyKey('reagendar', [booking_id, start_time]);
+
+  const rows = await tx<{ booking_id: string; status: string }[]>`
+    INSERT INTO bookings (
+      provider_id, client_id, service_id, start_time, end_time,
+      status, idempotency_key, rescheduled_from, gcal_sync_status
+    ) VALUES (
+      ${tenantId}::uuid, ${clientId}::uuid, ${old[0].service_id}::uuid,
+      ${start_time}, ${endTime},
+      'pendiente', ${idempotencyKey}, ${booking_id}::uuid, 'pending'
+    )
+    ON CONFLICT (idempotency_key) DO UPDATE SET updated_at = NOW()
+    RETURNING booking_id, status
+  `;
+
+  if (!rows[0]) return [new Error('error_reagendar_cita'), null];
+
+  await tx`UPDATE bookings SET status = 'reagendada', updated_at = NOW() WHERE booking_id = ${booking_id}::uuid`;
+
+  return [null, {
+    booking_id: rows[0].booking_id,
+    status: rows[0].status,
+    message: 'Cita reagendada exitosamente',
+  }];
+}
+
+// ============================================================================
+// MAIN ENTRY POINT
+// ============================================================================
+
+export async function main(rawInput: unknown): Promise<Result<BookingResult>> {
   const parsed = InputSchema.safeParse(rawInput);
-  if (!parsed.success) {
-    return [new Error('Validation error: ' + parsed.error.message), null];
-  }
+  if (!parsed.success) return [new Error(`error_validacion: ${parsed.error.message}`), null];
 
-  const { action, user_id, booking_id, provider_id, service_id, start_time, cancellation_reason } = parsed.data;
-
-  const dbUrl = process.env['DATABASE_URL'];
-  if (dbUrl === undefined || dbUrl === '') {
-    return [new Error('CONFIGURATION_ERROR: DATABASE_URL is not set'), null];
-  }
+  const dbUrl = process.env['DATABASE_URL'] || '';
+  if (!dbUrl) return [new Error('configuracion_db_faltante'), null];
 
   const sql = createDbClient({ url: dbUrl });
 
   try {
-    // ── Determine tenantId ────────────────────────────────────────────────
-    // RULE: tenantId MUST ALWAYS be provider_id — NEVER user_id.
-    // For 'crear': provider_id is a required input field.
-    // For 'cancelar'/'reagendar': resolve provider_id from the booking row
-    //   via a non-RLS query before opening withTenantContext.
+    const input = parsed.data;
 
+    // 1. Resolve Tenant ID
     let tenantId: string;
-
-    if (action === 'crear') {
-      if (provider_id === undefined) {
-        return [new Error('provider_id is required for crear'), null];
-      }
-      tenantId = provider_id;
+    if (input.action === 'crear') {
+      if (!input.provider_id) return [new Error('provider_id_requerido'), null];
+      tenantId = input.provider_id;
     } else {
-      // cancel or reschedule — must have booking_id
-      if (booking_id === undefined) {
-        return [new Error('booking_id is required for cancelar/reagendar'), null];
-      }
-      const [resolveErr, resolvedProviderId] = await resolveProviderIdForBooking(sql, booking_id);
-      if (resolveErr !== null || resolvedProviderId === null) {
-        return [resolveErr ?? new Error('Booking not found'), null];
-      }
-      tenantId = resolvedProviderId;
+      if (!input.booking_id) return [new Error('booking_id_requerido'), null];
+      const [err, resolved] = await resolveTenantForBooking(sql, input.booking_id);
+      if (err || !resolved) return [err ?? new Error('resolucion_tenant_fallida'), null];
+      tenantId = resolved;
     }
 
-    const [txErr, txData] = await withTenantContext(sql, tenantId, async (tx) => {
-      // ── Resolve client_id from user_id ──────────────────────────────────
-      const userRows = await tx<readonly { email: string | null }[]>`
-        SELECT email FROM users WHERE user_id = ${user_id}::uuid LIMIT 1
-      `;
-      const userRow = userRows[0];
-      if (userRow === undefined) {
-        return [new Error('User not found'), null];
-      }
+    // 2. Execute within Tenant Context
+    return await withTenantContext(sql, tenantId, async (tx) => {
+      const [clientErr, clientId] = await resolveClientId(tx, input.user_id);
+      if (clientErr || !clientId) return [clientErr ?? new Error('resolucion_cliente_fallida'), null];
 
-      let clientId: string | null = null;
-
-      // First: check if user_id maps directly to client_id
-      const directRows = await tx<readonly { client_id: string }[]>`
-        SELECT client_id FROM clients WHERE client_id = ${user_id}::uuid LIMIT 1
-      `;
-      if (directRows[0] !== undefined) {
-        clientId = directRows[0].client_id;
-      }
-
-      // Second: check via email match
-      if (clientId === null && userRow.email !== null) {
-        const emailRows = await tx<readonly { client_id: string }[]>`
-          SELECT client_id FROM clients WHERE email = ${userRow.email} LIMIT 1
-        `;
-        if (emailRows[0] !== undefined) {
-          clientId = emailRows[0].client_id;
-        }
-      }
-
-      if (clientId === null) {
-        return [new Error('Client record not found. Please complete your profile first.'), null];
-      }
-
-      switch (action) {
-        case 'crear': {
-          // provider_id is guaranteed non-undefined here (validated above)
-          if (service_id === undefined || start_time === undefined) {
-            return [new Error('service_id and start_time are required for create'), null];
-          }
-
-          // Lock provider row to serialize concurrent bookings (prevents TOCTOU)
-          const lockRows = await tx<readonly { provider_id: string }[]>`
-            SELECT provider_id FROM providers
-            WHERE provider_id = ${tenantId}::uuid AND is_active = true
-            LIMIT 1 FOR UPDATE
-          `;
-          if (lockRows[0] === undefined) {
-            return [new Error('Provider not found or inactive'), null];
-          }
-
-          const serviceRows = await tx<readonly { duration_minutes: number }[]>`
-            SELECT duration_minutes FROM services WHERE service_id = ${service_id}::uuid LIMIT 1
-          `;
-          const sRow = serviceRows[0];
-          if (sRow === undefined) {
-            return [new Error('Service not found'), null];
-          }
-
-          const startTime = new Date(start_time);
-          if (Number.isNaN(startTime.getTime())) {
-            return [new Error('Invalid start_time format'), null];
-          }
-          const endTime = new Date(startTime.getTime() + sRow.duration_minutes * 60000);
-
-          // Check slot overlap inside transaction (GIST constraint is backup)
-          const overlapRows = await tx<readonly { booking_id: string }[]>`
-            SELECT booking_id FROM bookings
-            WHERE provider_id = ${tenantId}::uuid
-              AND status NOT IN ('cancelled', 'no_show', 'rescheduled')
-              AND start_time < ${endTime.toISOString()}::timestamptz
-              AND end_time > ${startTime.toISOString()}::timestamptz
-            LIMIT 1
-          `;
-          if (overlapRows[0] !== undefined) {
-            return [new Error('The selected time slot is already booked'), null];
-          }
-
-          // Deterministic idempotency key: same request → same hash → ON CONFLICT catches retry
-          const idempotencyKey = parsed.data.idempotency_key ??
-            createHash('sha256')
-              .update(`${tenantId}:${clientId}:${service_id}:${start_time}`)
-              .digest('hex')
-              .slice(0, 32);
-
-          // ON CONFLICT DO UPDATE: returns existing row on retry (TRUE idempotency).
-          // The client gets their original booking_id — NOT a "slot taken" error.
-          const insertRows = await tx<readonly { booking_id: string; status: string }[]>`
-            INSERT INTO bookings (
-              provider_id, client_id, service_id, start_time, end_time,
-              status, idempotency_key, gcal_sync_status
-            ) VALUES (
-              ${tenantId}::uuid, ${clientId}::uuid, ${service_id}::uuid,
-              ${start_time}, ${endTime.toISOString()},
-              'pending', ${idempotencyKey}, 'pending'
-            )
-            ON CONFLICT (idempotency_key)
-            DO UPDATE SET updated_at = NOW(), status = EXCLUDED.status
-            RETURNING booking_id, status
-          `;
-
-          const newRow = insertRows[0];
-          if (newRow === undefined) {
-            return [new Error('Failed to create booking. The slot may already be taken.'), null];
-          }
-
-          return [null, {
-            booking_id: newRow.booking_id,
-            status: newRow.status,
-            message: 'Booking created successfully',
-          }];
-        }
-
-        case 'cancelar': {
-          // booking_id is guaranteed non-undefined here (validated above)
-          const bId = booking_id as string;
-
-          const bookingRows = await tx<readonly { booking_id: string; status: string; client_id: string }[]>`
-            SELECT booking_id, status, client_id FROM bookings
-            WHERE booking_id = ${bId}::uuid LIMIT 1
-          `;
-
-          const bRow = bookingRows[0];
-          if (bRow === undefined) {
-            return [new Error('Booking not found'), null];
-          }
-
-          if (bRow.client_id !== clientId) {
-            return [new Error('You can only cancel your own bookings'), null];
-          }
-
-          if (bRow.status !== 'pending' && bRow.status !== 'confirmed') {
-            return [new Error('Cannot cancel booking with status: ' + bRow.status), null];
-          }
-
-          const updateRows = await tx<readonly { booking_id: string; status: string }[]>`
-            UPDATE bookings SET
-              status = 'cancelled',
-              cancellation_reason = ${cancellation_reason ?? null},
-              cancelled_by = 'client',
-              updated_at = NOW()
-            WHERE booking_id = ${bId}::uuid
-            RETURNING booking_id, status
-          `;
-
-          const updatedRow = updateRows[0];
-          if (updatedRow === undefined) {
-            return [new Error('Failed to cancel booking'), null];
-          }
-
-          return [null, {
-            booking_id: updatedRow.booking_id,
-            status: updatedRow.status,
-            message: 'Booking cancelled successfully',
-          }];
-        }
-
-        case 'reagendar': {
-          // booking_id and start_time both required — validated above for reschedule path
-          if (start_time === undefined) {
-            return [new Error('start_time is required for reschedule'), null];
-          }
-          const bId = booking_id as string;
-
-          const bookingRows = await tx<readonly { booking_id: string; status: string; client_id: string; provider_id: string; service_id: string }[]>`
-            SELECT booking_id, status, client_id, provider_id, service_id FROM bookings
-            WHERE booking_id = ${bId}::uuid LIMIT 1
-          `;
-
-          const bRow = bookingRows[0];
-          if (bRow === undefined) {
-            return [new Error('Booking not found'), null];
-          }
-
-          if (bRow.client_id !== clientId) {
-            return [new Error('You can only reschedule your own bookings'), null];
-          }
-
-          if (bRow.status !== 'pending' && bRow.status !== 'confirmed') {
-            return [new Error('Cannot reschedule booking with status: ' + bRow.status), null];
-          }
-
-          const serviceRows = await tx<readonly { duration_minutes: number }[]>`
-            SELECT duration_minutes FROM services WHERE service_id = ${bRow.service_id}::uuid LIMIT 1
-          `;
-          const sRow = serviceRows[0];
-          if (sRow === undefined) {
-            return [new Error('Service not found'), null];
-          }
-
-          const startTime = new Date(start_time);
-          if (Number.isNaN(startTime.getTime())) {
-            return [new Error('Invalid start_time format'), null];
-          }
-          const endTime = new Date(startTime.getTime() + sRow.duration_minutes * 60000);
-
-          // Lock provider row to serialize concurrent bookings (prevents TOCTOU)
-          const reschedLockRows = await tx<readonly { provider_id: string }[]>`
-            SELECT provider_id FROM providers
-            WHERE provider_id = ${bRow.provider_id}::uuid AND is_active = true
-            LIMIT 1 FOR UPDATE
-          `;
-          if (reschedLockRows[0] === undefined) {
-            return [new Error('Provider not found or inactive'), null];
-          }
-
-          // Check slot overlap inside transaction
-          const overlapRows = await tx<readonly { booking_id: string }[]>`
-            SELECT booking_id FROM bookings
-            WHERE provider_id = ${bRow.provider_id}::uuid
-              AND status NOT IN ('cancelled', 'no_show', 'rescheduled')
-              AND start_time < ${endTime.toISOString()}::timestamptz
-              AND end_time > ${startTime.toISOString()}::timestamptz
-            LIMIT 1
-          `;
-          if (overlapRows[0] !== undefined) {
-            return [new Error('The selected time slot is already booked'), null];
-          }
-
-          // Deterministic idempotency key for reschedule: same booking + new time → same key
-          const idempotencyKey = parsed.data.idempotency_key ??
-            createHash('sha256')
-              .update(`reschedule:${bId}:${start_time}`)
-              .digest('hex')
-              .slice(0, 32);
-
-          // ON CONFLICT DO UPDATE: returns original row on retry
-          const insertRows = await tx<readonly { booking_id: string; status: string }[]>`
-            INSERT INTO bookings (
-              provider_id, client_id, service_id, start_time, end_time,
-              status, idempotency_key, rescheduled_from, gcal_sync_status
-            ) VALUES (
-              ${bRow.provider_id}::uuid, ${clientId}::uuid, ${bRow.service_id}::uuid,
-              ${start_time}, ${endTime.toISOString()},
-              'pending', ${idempotencyKey}, ${bId}::uuid, 'pending'
-            )
-            ON CONFLICT (idempotency_key)
-            DO UPDATE SET updated_at = NOW(), status = EXCLUDED.status
-            RETURNING booking_id, status
-          `;
-
-          const newRow = insertRows[0];
-          if (newRow === undefined) {
-            return [new Error('Failed to create rescheduled booking. The slot may already be taken.'), null];
-          }
-
-          await tx`
-            UPDATE bookings SET status = 'rescheduled', updated_at = NOW()
-            WHERE booking_id = ${bId}::uuid
-          `;
-
-          return [null, {
-            booking_id: newRow.booking_id,
-            status: newRow.status,
-            message: 'Booking rescheduled successfully',
-          }];
-        }
-
+      switch (input.action) {
+        case 'crear':     return handleCrear(tx, tenantId, clientId, input);
+        case 'cancelar':  return handleCancelar(tx, clientId, input);
+        case 'reagendar': return handleReagendar(tx, tenantId, clientId, input);
         default: {
-          const _exhaustive: never = action;
-          return [new Error(`Unknown action: ${String(_exhaustive)}`), null];
+            const _exhaustive: never = input.action;
+            return [new Error(`accion_no_soportada: ${String(_exhaustive)}`), null];
         }
       }
     });
 
-    if (txErr !== null) {
-      const message = txErr.message;
-      if (message.includes('conflicting key value violates exclusion constraint')) {
-        return [new Error('The selected time slot is already booked. Please choose another time.'), null];
-      }
-      if (message.startsWith('transaction_failed: ')) {
-        return [new Error(message.slice(20)), null];
-      }
-      return [txErr, null];
-    }
-
-    return [null, txData];
-
+  } catch (e) {
+    return [new Error(`error_inesperado: ${String(e)}`), null];
   } finally {
     await sql.end();
   }
