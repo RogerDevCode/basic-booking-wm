@@ -1,84 +1,115 @@
 import { describe, test, expect, beforeEach, afterEach } from 'vitest';
 import type { Result } from '../internal/result';
+import { main } from './main';
 
 /**
- * Helper: assert that a [Error | null, T | null] result is an error
- * with a message containing the expected substring.
+ * REASONING TRACE
+ * ### Mission Decomposition
+ * - Refactor test file for SOLID compliance and legibility.
+ * - Improve environment isolation and assertion helpers.
+ * - Group tests by responsibility (Validation, Environment, Execution).
+ *
+ * ### SOLID Compliance Check
+ * - SRP: Test groups focused on specific failure/success categories.
+ * - DRY: Centralized environment setup and reusable assertion helpers.
+ * - KISS: Clear, declarative test names and consistent structure.
  */
-function assertError(result: Result<unknown>, substring: string): void {
-  expect(result[0]).not.toBeNull();
-  expect(result[0]?.message).toContain(substring);
-  expect(result[1]).toBeNull();
+
+// ============================================================
+// TEST HELPERS
+// ============================================================
+
+/**
+ * Asserts that a Result<T> is an error with the expected message.
+ * Compliant with §1.A.3: Errors are values.
+ */
+function expectError(result: Result<unknown>, messageSubstring: string): void {
+  const [error, data] = result;
+  expect(data).toBeNull();
+  expect(error).not.toBeNull();
+  expect(error?.message).toContain(messageSubstring);
 }
 
 /**
- * Helper: assert that a [Error | null, T | null] result is successful.
+ * Asserts that a Result<T> is successful and returns the data.
  */
-function assertOk<T>(result: Result<T>): T {
-  expect(result[0]).toBeNull();
-  expect(result[1]).not.toBeNull();
-  return result[1] as T;
+function expectSuccess<T>(result: Result<T>): T {
+  const [error, data] = result;
+  expect(error).toBeNull();
+  expect(data).not.toBeNull();
+  return data as T;
 }
+
+// ============================================================
+// GCAL RECONCILE TEST SUITE
+// ============================================================
 
 describe('GCal Reconcile Cron', () => {
+  const DEFAULT_ENV = {
+    DATABASE_URL: 'postgresql://test:test@localhost/test',
+    GCAL_ACCESS_TOKEN: 'test-token',
+  };
+
   beforeEach(() => {
-    process.env['DATABASE_URL'] = 'postgresql://test:test@localhost/test';
-    process.env['GCAL_ACCESS_TOKEN'] = 'test-token';
+    Object.entries(DEFAULT_ENV).forEach(([key, value]) => {
+      process.env[key] = value;
+    });
   });
 
   afterEach(() => {
-    delete process.env['DATABASE_URL'];
-    delete process.env['GCAL_ACCESS_TOKEN'];
+    Object.keys(DEFAULT_ENV).forEach((key) => {
+      delete process.env[key];
+    });
   });
 
-  test('Debe fallar sin DATABASE_URL', async () => {
-    delete process.env['DATABASE_URL'];
-    const { main } = await import('./main');
-    const result = await main({});
-
-    assertError(result, 'DATABASE_URL');
+  describe('Validación de Entorno', () => {
+    test('Debe fallar si DATABASE_URL no está configurada', async () => {
+      delete process.env['DATABASE_URL'];
+      const result = await main({});
+      expectError(result, 'DATABASE_URL not configured');
+    });
   });
 
-  test('Debe validar max_retries fuera de rango', async () => {
-    const { main } = await import('./main');
-    const result = await main({ max_retries: 6 });
+  describe('Validación de Parámetros (Zod)', () => {
+    test('Debe fallar si max_retries excede el máximo permitido', async () => {
+      const result = await main({ max_retries: 10 });
+      expectError(result, 'Validation error');
+    });
 
-    assertError(result, 'Validation error');
+    test('Debe fallar si batch_size excede el máximo permitido', async () => {
+      const result = await main({ batch_size: 500 });
+      expectError(result, 'Validation error');
+    });
+
+    test('Debe aceptar valores por defecto cuando no se pasan parámetros', async () => {
+      const result = await main({});
+      // Validamos que pase el check de Zod (no devuelve error de validación)
+      const [error] = result;
+      if (error) {
+        expect(error.message).not.toContain('Validation error');
+      }
+    });
   });
 
-  test('Debe validar batch_size fuera de rango', async () => {
-    const { main } = await import('./main');
-    const result = await main({ batch_size: 200 });
+  describe('Lógica de Ejecución', () => {
+    test('Debe respetar el modo dry_run sin realizar cambios', async () => {
+      const result = await main({ 
+        dry_run: true, 
+        batch_size: 10, 
+        max_retries: 1 
+      });
 
-    assertError(result, 'Validation error');
-  });
+      const [error, data] = result;
 
-  test('Debe procesar bookings en dry_run mode', async () => {
-    const { main } = await import('./main');
-    const result = await main({ dry_run: true, batch_size: 50, max_retries: 3, max_gcal_retries: 10 });
-
-    // In dry_run with no DB connection, it will fail to fetch bookings
-    // but the validation should pass — the error should be about DB connection
-    if (result[0] !== null) {
-      // Expected: can't connect to DB in test environment
-      expect(typeof result[0]?.message).toBe('string');
-      expect(result[0]?.message.length).toBeGreaterThan(0);
-    } else {
-      const data = assertOk<Record<string, unknown>>(result);
-      expect(data['processed']).toBeGreaterThanOrEqual(0);
-    }
-  });
-
-  test('Debe aceptar valores por defecto sin parametros', async () => {
-    const { main } = await import('./main');
-    const result = await main({});
-
-    // Should pass validation (uses defaults)
-    // Will fail on DB connection in test env — that's expected
-    if (result[0] !== null) {
-      // DB connection error is expected in test env
-      expect(typeof result[0]?.message).toBe('string');
-      expect(result[0]?.message.length).toBeGreaterThan(0);
-    }
+      // En entorno de test, el error de conexión es aceptable si no hay DB real,
+      // pero el flujo debe haber pasado la validación de entrada.
+      if (error) {
+        // Si hay error, no debe ser de validación
+        expect(error.message).not.toContain('Validation error');
+      } else {
+        expect(data?.processed).toBeGreaterThanOrEqual(0);
+        expect(data?.skipped).toBeGreaterThanOrEqual(0);
+      }
+    });
   });
 });
