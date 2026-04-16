@@ -5,102 +5,138 @@
  * Concurrency Risk: NO — single-row INSERT
  * GCal Calls      : NO
  * Idempotency Key : N/A — log entries are inherently non-idempotent
- * RLS Tenant ID   : NO — conversations uses user_id (bigint), not client_id UUID
+ * RLS Tenant ID   : YES — inserts provider_id as tenant context
  * Zod Schemas     : YES — InputSchema validates channel, direction, content
  */
 
-/*
+/**
  * REASONING TRACE
  * ### Mission Decomposition
- * - Validate input (channel, direction, content, optional client_id, intent, metadata)
- * - Extract tenant ID from raw input by scanning known tenant key patterns
- * - INSERT a new row into conversations table with all message data
- * - Return the generated message_id
+ * - Validate raw input against InputSchema.
+ * - Establish DB connection and execute within tenant context for RLS compliance.
+ * - Decouple insert logic into a dedicated pure function.
+ * - Ensure all error paths return Result<T> tuples per §1.A.3.
  *
- * ### Schema Verification
- * - Tables: conversations (message_id, client_id, channel, direction, content, intent, metadata)
- * - Columns: All verified — conversations is a logging table not in §6 core schema but present in the actual database
+ * ### SOLID Compliance
+ * - S: Separated input validation, DB orchestration, and data persistence.
+ * - O: Schema and insert function are easily extendable.
+ * - L: Adheres to TxClient interface for database operations.
+ * - I: Minimal dependencies and focused function signatures.
+ * - D: Depends on abstractions (Result, TxClient, createDbClient).
  *
  * ### Failure Mode Analysis
- * - Scenario 1: DATABASE_URL not configured → return error before any DB call
- * - Scenario 2: INSERT fails (constraint violation, connection error) → return error, no silent swallow
- *
- * ### Concurrency Analysis
- * - Risk: NO — single-row INSERT, no concurrent access concerns
- *
- * ### SOLID Compliance Check
- * - SRP: Single function does one thing — YES (main validates, extracts tenant, inserts, returns)
- * - DRY: No duplicated logic — YES (minimal code, no repeated patterns)
- * - KISS: No unnecessary complexity — YES (straight INSERT with tenant context wrapper)
+ * - Configuration: DATABASE_URL missing.
+ * - Validation: Malformed UUIDs or invalid enums.
+ * - Persistence: Database down or constraint violation.
  *
  * → CLEARED FOR CODE GENERATION
  */
 
 import { z } from 'zod';
 import { withTenantContext } from '../internal/tenant-context';
+import type { TxClient } from '../internal/tenant-context';
 import { createDbClient } from '../internal/db/client';
+import type { Result } from '../internal/result';
 
+/**
+ * Input validation schema.
+ * Mandates provider_id for RLS context per §12.3.
+ */
 const InputSchema = z.object({
-  client_id: z.uuid().optional(),
-  provider_id: z.uuid().optional(),
+  client_id: z.string().uuid().optional().nullable(),
+  provider_id: z.string().uuid(),
   channel: z.enum(['telegram', 'web', 'api']),
   direction: z.enum(['incoming', 'outgoing']),
   content: z.string().min(1).max(2000),
-  intent: z.string().optional(),
-  metadata: z.record(z.string(), z.string()).optional(),
+  intent: z.string().optional().nullable(),
+  metadata: z.record(z.string(), z.unknown()).optional().nullable(),
 });
 
-export async function main(rawInput: unknown): Promise<[Error | null, { message_id: string } | null]> {
+type Input = Readonly<z.infer<typeof InputSchema>>;
+
+/**
+ * Persists the conversation message to the database.
+ * Pure persistence logic following SRP.
+ */
+async function persistLog(
+  tx: TxClient,
+  input: Input
+): Promise<Result<{ message_id: string }>> {
+  try {
+    const rows = await tx<Array<{ message_id: string }>>`
+      INSERT INTO conversations (
+        client_id,
+        channel,
+        direction,
+        content,
+        intent,
+        metadata
+      ) VALUES (
+        ${input.client_id ?? null},
+        ${input.channel},
+        ${input.direction},
+        ${input.content},
+        ${input.intent ?? null},
+        ${JSON.stringify(input.metadata ?? {})}::jsonb
+      ) RETURNING message_id
+    `;
+
+    const row = rows[0];
+    if (!row) {
+      return [new Error('db_insert_failed: No message_id returned from insert'), null];
+    }
+
+    return [null, { message_id: row.message_id }];
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return [new Error(`persistence_error: ${msg}`), null];
+  }
+}
+
+/**
+ * Windmill main entry point.
+ * Orchestrates validation, connection management, and RLS context.
+ */
+export async function main(rawInput: unknown): Promise<Result<{ message_id: string }>> {
+  // 1. Validate Input strictly
   const parsed = InputSchema.safeParse(rawInput);
   if (!parsed.success) {
-    return [new Error('Validation error: ' + parsed.error.message), null];
+    return [new Error(`validation_error: ${parsed.error.message}`), null];
   }
+  const input = parsed.data;
 
-  const input: Readonly<z.infer<typeof InputSchema>> = parsed.data;
-
+  // 2. Resolve Environment
   const dbUrl = process.env['DATABASE_URL'];
-  if (dbUrl === undefined || dbUrl === '') {
-    return [new Error('CONFIGURATION_ERROR: DATABASE_URL is required'), null];
+  if (!dbUrl) {
+    return [new Error('config_error: DATABASE_URL is missing'), null];
   }
 
+  // 3. Initialize DB Connection
   const sql = createDbClient({ url: dbUrl });
 
-  // Tenant ID from validated input — no key scanning, no guesswork
-  const tenantId = input.provider_id;
-  if (tenantId === undefined) {
-    return [new Error('provider_id is required for tenant isolation'), null];
-  }
-
   try {
-    const [txErr, txData] = await withTenantContext(sql, tenantId, async (tx) => {
-      const rows = await tx.values<[string][]>`
-        INSERT INTO conversations (client_id, channel, direction, content, intent, metadata)
-        VALUES (
-          ${input.client_id ?? null}::uuid,
-          ${input.channel},
-          ${input.direction},
-          ${input.content},
-          ${input.intent ?? null},
-          ${JSON.stringify(input.metadata ?? {})}::jsonb
-        )
-        RETURNING message_id
-      `;
+    // 4. Execute within RLS Tenant Context
+    // AGENTS.md §12.4: All DB operations MUST flow through withTenantContext.
+    const [txErr, txData] = await withTenantContext(
+      sql,
+      input.provider_id,
+      async (tx) => persistLog(tx, input)
+    );
 
-      const row = rows[0];
-      if (row === undefined) {
-        return [new Error('Failed to log conversation'), null];
-      }
+    if (txErr !== null) {
+      return [txErr, null];
+    }
 
-      return [null, { message_id: row[0] }];
-    });
+    if (txData === null) {
+      return [new Error('orchestration_error: Data returned from transaction was null'), null];
+    }
 
-    if (txErr !== null) return [txErr, null];
-    if (txData === null) return [new Error('Conversation logging failed'), null];
     return [null, txData];
-  } catch (e) {
-    const message = e instanceof Error ? e.message : String(e);
-    return [new Error('Internal error: ' + message), null];
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return [new Error(`orchestration_error: ${msg}`), null];
   } finally {
+    // 5. Always release pool resources
     await sql.end();
   }
 }
