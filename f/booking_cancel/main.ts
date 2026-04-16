@@ -20,41 +20,37 @@
  * - Mark GCal events for async cleanup
  *
  * ### Schema Verification
- * - Tables: bookings (booking_id, status, client_id, provider_id, gcal_provider_event_id, gcal_client_event_id, cancelled_by, cancellation_reason), booking_audit (booking_id, from_status, to_status, changed_by, actor_id, reason, metadata)
- * - Columns: All verified against §6 schema; cancelled_by, cancellation_reason, gcal_* columns are extension columns on bookings
+ * - Tables: bookings, booking_audit
+ * - Columns: Verified against §6 schema
  *
  * ### Failure Mode Analysis
- * - Scenario 1: Booking not found → return error before any mutation
- * - Scenario 2: Invalid state transition (e.g., completed → cancelled) → return transition error from state machine
- * - Scenario 3: Actor unauthorized → return error, no DB writes
- * - Scenario 4: GCal sync failure after cancel → handled by setting gcal_sync_status='pending' for background reconciliation
+ * - Booking not found → return error
+ * - Invalid state transition → return error
+ * - Actor unauthorized → return error
+ * - DB/Transaction failure → rollback and return error
  *
  * ### Concurrency Analysis
- * - Risk: YES — booking row read outside transaction, but status update + audit are inside withTenantContext transaction; GIST exclusion constraint prevents double-booking side effects
+ * - Risk: YES. Lock strategy: Explicit SELECT FOR UPDATE inside the transaction
+ *   prevents TOCTOU races between initial lookup and update.
  *
  * ### SOLID Compliance Check
- * - SRP: Each function does one thing — YES (main orchestrates, lookup is separate, state-machine validation delegated)
- * - DRY: No duplicated logic — YES (uses shared validateTransition, withTenantContext, typed row interfaces)
- * - KISS: No unnecessary complexity — YES (linear flow: validate → authorize → mutate → audit)
+ * - SRP: Split validation, authorization, and data access into helper functions.
+ * - DRY: Use shared result types and validation logic.
+ * - KISS: Simple procedural orchestration in main.
+ * - DIP: DB client is passed to internal service functions.
  *
  * → CLEARED FOR CODE GENERATION
  */
 
-// ============================================================================
-// BOOKING CANCEL — Cancel an existing medical appointment
-// ============================================================================
-// Go-style: no throw for control flow, no any, no as.
-// All errors returned as Error values. All DB operations use withTenantContext.
-// Uses tx.unsafe() with parameterized queries inside transactions.
-// Enforces state machine transitions via shared module.
-// ============================================================================
-
+import postgres from 'postgres';
 import { z } from 'zod';
 import type { UUID, BookingStatus } from '../internal/db-types';
 import { toUUID, isBookingStatus } from '../internal/db-types';
 import { withTenantContext } from '../internal/tenant-context';
 import { validateTransition } from '../internal/state-machine';
 import { createDbClient } from '../internal/db/client';
+import { logger } from '../internal/logger';
+import type { Result } from '../internal/result';
 
 // ─── Input Validation ───────────────────────────────────────────────────────
 const InputSchema = z.object({
@@ -92,74 +88,117 @@ interface UpdatedBooking {
   readonly cancellation_reason: string | null;
 }
 
-// ─── Constants ─────────────────────────────────────────────────────────────
-// Note: CANCELLABLE_STATUSES removed. State machine validation is now used.
+const MODULE = 'booking_cancel';
+
+// ─── Authorization ──────────────────────────────────────────────────────────
+/**
+ * Verifies that the actor has permission to cancel the specific booking.
+ */
+function authorizeActor(
+  input: Readonly<CancelBookingInput>,
+  booking: Readonly<BookingLookup>
+): Result<true> {
+  if (input.actor === 'client' && booking.client_id !== input.actor_id) {
+    return [new Error('unauthorized: client_id mismatch'), null];
+  }
+  if (input.actor === 'provider' && booking.provider_id !== input.actor_id) {
+    return [new Error('unauthorized: provider_id mismatch'), null];
+  }
+  return [null, true];
+}
+
+// ─── Data Access ────────────────────────────────────────────────────────────
+/**
+ * Fetches booking details for validation and authorization.
+ */
+async function fetchBooking(
+  sql: postgres.Sql,
+  bookingId: string
+): Promise<Result<BookingLookup>> {
+  try {
+    const rows = await sql.values<[string, string, string, string, string | null, string | null][]>`
+      SELECT booking_id, status, client_id, provider_id,
+             gcal_provider_event_id, gcal_client_event_id
+      FROM bookings
+      WHERE booking_id = ${bookingId}::uuid
+      LIMIT 1
+    `;
+    
+    const row = rows[0];
+    if (row === undefined) {
+      return [new Error(`booking_not_found: ${bookingId}`), null];
+    }
+
+    const rawStatus = row[1];
+    if (!isBookingStatus(rawStatus)) {
+      return [new Error(`invalid_booking_status: ${rawStatus}`), null];
+    }
+
+    return [null, {
+      booking_id: row[0],
+      status: rawStatus,
+      client_id: row[2],
+      provider_id: row[3],
+      gcal_provider_event_id: row[4],
+      gcal_client_event_id: row[5],
+    }];
+  } catch (err) {
+    return [err instanceof Error ? err : new Error(String(err)), null];
+  }
+}
 
 // ─── Main Entry Point ───────────────────────────────────────────────────────
 export async function main(
   rawInput: unknown,
-): Promise<[Error | null, CancelResult | null]> {
+): Promise<Result<CancelResult>> {
+  // 1. Input Validation
   const parsed = InputSchema.safeParse(rawInput);
   if (!parsed.success) {
-    return [new Error(`Validation error: ${parsed.error.message}`), null];
+    logger.error(MODULE, 'validation_failed', parsed.error);
+    return [new Error(`validation_error: ${parsed.error.message}`), null];
   }
 
   const input: Readonly<CancelBookingInput> = parsed.data;
-
   const dbUrl = process.env['DATABASE_URL'];
-  if (dbUrl === undefined || dbUrl === '') {
-    return [new Error('CONFIGURATION_ERROR: DATABASE_URL is required'), null];
+  if (!dbUrl) {
+    return [new Error('configuration_error: DATABASE_URL is missing'), null];
   }
 
   const sql = createDbClient({ url: dbUrl });
 
   try {
-    // 1. Find booking (admin read — booking_id acts as capability token)
-    const bookingRows = await sql.values<[string, string, string, string, string | null, string | null][]>`
-      SELECT booking_id, status, client_id, provider_id,
-             gcal_provider_event_id, gcal_client_event_id
-      FROM bookings
-      WHERE booking_id = ${input.booking_id}::uuid
-      LIMIT 1
-    `;
-    const bookingRow = bookingRows[0];
-    if (bookingRow === undefined) {
-      return [new Error(`Booking ${input.booking_id} not found`), null];
-    }
+    // 2. Initial Lookup & Auth
+    const [fetchErr, booking] = await fetchBooking(sql, input.booking_id);
+    if (fetchErr !== null || booking === null) return [fetchErr, null];
 
-    const rawStatus = bookingRow[1];
-    if (!isBookingStatus(rawStatus)) {
-      return [new Error(`Invalid booking status: ${rawStatus}`), null];
-    }
+    const [authErr] = authorizeActor(input, booking);
+    if (authErr !== null) return [authErr, null];
 
-    const booking: BookingLookup = {
-      booking_id: bookingRow[0],
-      status: rawStatus,
-      client_id: bookingRow[2],
-      provider_id: bookingRow[3],
-      gcal_provider_event_id: bookingRow[4],
-      gcal_client_event_id: bookingRow[5],
-    };
-
-    // 2. Validate state machine transition
+    // 3. Logic Validation
     const [transitionErr] = validateTransition(booking.status, 'cancelled');
-    if (transitionErr !== null) {
-      return [transitionErr, null];
-    }
+    if (transitionErr !== null) return [transitionErr, null];
 
-    // 3. Validate actor permission
-    if (input.actor === 'client' && booking.client_id !== input.actor_id) {
-      return [new Error('Unauthorized: client_id mismatch'), null];
-    }
-    if (input.actor === 'provider' && booking.provider_id !== input.actor_id) {
-      return [new Error('Unauthorized: provider_id mismatch'), null];
-    }
-
-    // 4. Update status + audit trail atomically under tenant context
+    // 4. Atomic Execution via Tenant Context
     const [txErr, updated] = await withTenantContext<UpdatedBooking>(
       sql,
       booking.provider_id,
       async (tx) => {
+        // SELECT FOR UPDATE to prevent concurrency races
+        const lockRows = await tx.values<[string][]>`
+          SELECT status FROM bookings 
+          WHERE booking_id = ${input.booking_id}::uuid 
+          FOR UPDATE
+        `;
+        
+        const currentStatus = lockRows[0]?.[0];
+        if (!currentStatus) {
+          return [new Error('booking_lost_during_transaction'), null];
+        }
+        if (currentStatus === 'cancelled') {
+          return [new Error('booking_already_cancelled'), null];
+        }
+
+        // Perform status update
         const updRows = await tx.values<[string, string, string, string | null][]>`
           UPDATE bookings
           SET status = 'cancelled',
@@ -171,35 +210,30 @@ export async function main(
         `;
 
         const updRow = updRows[0];
-        if (updRow === undefined) {
-          return [new Error('Failed to update booking status'), null];
+        if (!updRow) {
+          return [new Error('failed_to_update_booking_status'), null];
         }
 
-        const updatedBooking: UpdatedBooking = {
-          booking_id: updRow[0],
-          status: updRow[1],
-          cancelled_by: updRow[2],
-          cancellation_reason: updRow[3],
-        };
-
-        await tx.unsafe(
-          `INSERT INTO booking_audit (booking_id, from_status, to_status, changed_by, actor_id, reason, metadata)
-           VALUES ($1::uuid, $2, 'cancelled', $3, $4::uuid, $5, $6::jsonb)`,
-          [
-            input.booking_id,
-            booking.status,
-            input.actor,
-            input.actor_id ?? null,
-            input.reason ?? 'Cancelled via API',
-            JSON.stringify({
+        // Record Audit Trail
+        await tx`
+          INSERT INTO booking_audit (
+            booking_id, from_status, to_status, changed_by, actor_id, reason, metadata
+          ) VALUES (
+            ${input.booking_id}::uuid, 
+            ${booking.status}, 
+            'cancelled', 
+            ${input.actor}, 
+            ${input.actor_id ?? null}::uuid, 
+            ${input.reason ?? 'Cancelled via API'}, 
+            ${JSON.stringify({
               gcal_provider_event_id: booking.gcal_provider_event_id,
               gcal_client_event_id: booking.gcal_client_event_id,
-            }),
-          ],
-        );
+            })}::jsonb
+          )
+        `;
 
-        // Mark GCal events for cleanup (inside transaction — atomic with cancel)
-        if (booking.gcal_provider_event_id !== null || booking.gcal_client_event_id !== null) {
+        // Trigger GCal Synchronizer cleanup
+        if (booking.gcal_provider_event_id || booking.gcal_client_event_id) {
           await tx`
             UPDATE bookings
             SET gcal_sync_status = 'pending', gcal_retry_count = 0
@@ -207,31 +241,36 @@ export async function main(
           `;
         }
 
-        return [null, updatedBooking];
-      },
+        return [null, {
+          booking_id: updRow[0],
+          status: updRow[1],
+          cancelled_by: updRow[2],
+          cancellation_reason: updRow[3],
+        }];
+      }
     );
 
     if (txErr !== null || updated === null) {
-      return [txErr ?? new Error('Unknown transaction error'), null];
+      logger.error(MODULE, 'transaction_failed', txErr);
+      return [txErr ?? new Error('transaction_failed'), null];
     }
 
     const bookingId = toUUID(updated.booking_id);
-    if (bookingId === null) {
-      return [new Error('cancel_failed: invalid booking_id returned from DB'), null];
+    if (!bookingId) {
+      return [new Error('cancel_failed: invalid uuid returned from database'), null];
     }
 
-    const result: CancelResult = {
+    return [null, {
       booking_id: bookingId,
       previous_status: booking.status,
       new_status: updated.status,
       cancelled_by: updated.cancelled_by,
       cancellation_reason: updated.cancellation_reason,
-    };
+    }];
 
-    return [null, result];
-  } catch (e) {
-    const message = e instanceof Error ? e.message : String(e);
-    return [new Error(`Internal error: ${message}`), null];
+  } catch (err) {
+    logger.error(MODULE, 'unexpected_exception', err);
+    return [err instanceof Error ? err : new Error(String(err)), null];
   } finally {
     await sql.end();
   }
