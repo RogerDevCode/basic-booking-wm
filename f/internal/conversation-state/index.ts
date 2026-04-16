@@ -16,6 +16,7 @@
 import { Redis } from 'ioredis';
 import { z } from 'zod';
 import type { Result } from '../result';
+import { BookingStateSchema, DraftBookingSchema, type BookingState, type DraftBooking } from '../booking_fsm';
 
 // ── TTL ───────────────────────────────────────────────────────────────────────
 const DEFAULT_CONV_TTL_SECONDS = 30 * 60; // 30 minutes
@@ -40,9 +41,11 @@ const ConversationStateSchema = z.object({
   flow_step:            z.number().int().min(0).default(0),
   pending_data:         z.record(z.string(), z.string().nullable()).default({}),
   last_user_utterance:  z.string().nullable().catch(null),
-  last_updated:         z.string().datetime(),
+  last_updated:         z.iso.datetime(),
   completed:            z.boolean().default(false),
   message_id:           z.number().int().nullable().catch(null),
+  booking_state:        BookingStateSchema.nullable().catch(null),
+  booking_draft:        DraftBookingSchema.nullable().catch(null),
 }).readonly();
 
 export type ConversationState = z.infer<typeof ConversationStateSchema>;
@@ -69,6 +72,8 @@ export function fromLegacyFormat(
     last_updated: new Date().toISOString(),
     completed: false,
     message_id: null,
+    booking_state: null,
+    booking_draft: null,
   };
 }
 
@@ -127,6 +132,9 @@ export async function updateConversationState(
   entities: Readonly<Record<string, string | null>>,
   existingState: ConversationState | null,
   flowStepOverride?: number,
+  bookingState?: BookingState | null,
+  bookingDraft?: DraftBooking | null,
+  messageId?: number | null,
 ): Promise<Result<ConversationState>> {
   try {
     const existingData = existingState?.pending_data ?? {};
@@ -162,11 +170,20 @@ export async function updateConversationState(
         flowStep = 1;
       } else if (intent === 'duda_general' && (existingState?.active_flow ?? 'none') !== 'none') {
         flowStep = existingState?.flow_step ?? 0;
-      } else if (['completada', 'cancelada', 'reagendada'].includes(intent)) {
-        activeFlow = 'none';
-        flowStep = 0;
       }
+      // Note: flow completion is handled by the caller setting flowStepOverride = 0
+      // and activeFlow = 'none'. No NLU intent maps to flow-completion markers.
     }
+
+    const persistedBookingState = bookingState !== undefined
+      ? bookingState
+      : (existingState?.booking_state ?? null);
+    const persistedBookingDraft = bookingDraft !== undefined
+      ? bookingDraft
+      : (existingState?.booking_draft ?? null);
+    const persistedMessageId = messageId !== undefined
+      ? messageId
+      : (existingState?.message_id ?? null);
 
     const newState: ConversationState = {
       chat_id:              chatId,
@@ -177,7 +194,9 @@ export async function updateConversationState(
       last_user_utterance:  Object.values(entities)[0] ?? null,
       last_updated:         new Date().toISOString(),
       completed:            false,
-      message_id:           null,
+      message_id:           persistedMessageId,
+      booking_state:        persistedBookingState,
+      booking_draft:        persistedBookingDraft,
     };
 
     const ttl = getConvTTL();

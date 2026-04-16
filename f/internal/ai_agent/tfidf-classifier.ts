@@ -268,9 +268,7 @@ function buildModel(): TfIdfModel {
 let model: TfIdfModel | null = null;
 
 function getModel(): TfIdfModel {
-  if (model == null) {
-    model = buildModel();
-  }
+  model ??= buildModel();
   return model;
 }
 
@@ -296,8 +294,7 @@ export function classifyIntent(text: string): TfIdfResult {
   // Score against each intent's documents, take max
   const scores: { intent: string; score: number }[] = [];
 
-  for (let i = 0; i < m.intents.length; i++) {
-    const intent = m.intents[i];
+  for (const intent of m.intents) {
     if (intent == null) continue;
     const docs = CORPUS[intent];
     if (docs == null) continue;

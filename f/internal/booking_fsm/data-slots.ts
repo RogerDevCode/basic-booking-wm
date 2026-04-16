@@ -1,40 +1,34 @@
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : Query available time slots for a doctor on a given date
- * DB Tables Used  : provider_schedules, bookings, services
+ * DB Tables Used  : services (service lookup), then delegates to scheduling-engine
+ *                   (provider_schedules, schedule_overrides, bookings)
  * Concurrency Risk: NO — read-only query
  * GCal Calls      : NO
  * Idempotency Key : NO — read-only
  * RLS Tenant ID   : YES — query runs within withTenantContext
- * Zod Schemas     : YES — output validated
+ * Zod Schemas     : YES — AvailabilityQuery validated inside scheduling-engine
  */
 
 // ============================================================================
-// BOOKING FSM — Data: Available Time Slots
+// BOOKING FSM — Data: Available Time Slots (thin adapter over scheduling-engine)
 // ============================================================================
-// Calculates available time slots for a provider on a specific date.
-// Combines provider_schedules with existing bookings to find free slots.
-// Caller must provide a SQL client that is already within a tenant context.
+// T8 — SSOT for slot computation is scheduling-engine/index.ts.
+// This module is a pure adapter that:
+//   1. Resolves a service_id for the provider (§6-compliant: services.provider_id)
+//   2. Delegates to getAvailability() — the authoritative slot computation engine
+//   3. Filters to only available slots and maps them to wizard-friendly format
+//
+// Bugs eliminated by delegation to scheduling-engine:
+//   - Status filter was Spanish ('cancelada' etc.) → engine uses §6 English statuses
+//   - getDay() (local-TZ) replaced by getUTCDay() inside engine
+//   - services WHERE is_active (non-existent column) replaced by §6-compliant lookup
 // ============================================================================
 
-import { z } from 'zod';
 import type postgres from 'postgres';
+import { getAvailability } from '../scheduling-engine';
 
-const ScheduleRowSchema = z.object({
-  day_of_week: z.number().int(),
-  start_time: z.string(),
-  end_time: z.string(),
-});
-
-const BookingRowSchema = z.object({
-  start_time: z.string(),
-  end_time: z.string(),
-});
-
-const ServiceRowSchema = z.object({
-  duration_minutes: z.number().int().positive(),
-  buffer_minutes: z.number().int().default(0),
-});
+// ─── Output types (wizard-compatible, unchanged) ──────────────────────────────
 
 export interface TimeSlot {
   readonly id: string;
@@ -43,125 +37,96 @@ export interface TimeSlot {
 }
 
 export interface FetchSlotsResult {
-  readonly slots: ReadonlyArray<TimeSlot>;
+  readonly slots: readonly TimeSlot[];
 }
 
+// ─── Internal helpers ─────────────────────────────────────────────────────────
+
+/**
+ * Formats an ISO datetime string as a 12-hour AM/PM label for Telegram display.
+ * Example: "2026-04-14T10:30:00.000Z" → "10:30 AM"
+ * Uses UTC hours/minutes because slot start times are stored as UTC.
+ */
+function formatSlotLabel(isoStart: string): string {
+  const d = new Date(isoStart);
+  const hours = d.getUTCHours();
+  const minutes = d.getUTCMinutes();
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  const displayHours = hours % 12 || 12;
+  return `${displayHours.toString()}:${minutes.toString().padStart(2, '0')} ${ampm}`;
+}
+
+/**
+ * Resolves the first service_id for a provider using the §6 canonical schema.
+ * (services table has provider_id FK — no provider_services junction table in §6)
+ */
+async function resolveServiceId(
+  sql: postgres.Sql,
+  providerId: string,
+): Promise<string | null> {
+  const rows = await sql<{ service_id: string }[]>`
+    SELECT service_id
+    FROM services
+    WHERE provider_id = ${providerId}::uuid
+    ORDER BY duration_minutes ASC
+    LIMIT 1
+  `;
+  return rows[0]?.service_id ?? null;
+}
+
+// ─── Public API ───────────────────────────────────────────────────────────────
 
 /**
  * fetchSlots — Returns available time slots for a provider on a given date.
+ *
+ * Delegates slot computation to the scheduling-engine (SSOT).
  * The sql client must already be inside withTenantContext.
+ *
+ * @param sql        Postgres client (should be inside withTenantContext)
+ * @param providerId UUID of the provider
+ * @param date       Target date in YYYY-MM-DD format
+ * @param serviceId  Optional service UUID; resolved from provider's services if absent
  */
 export async function fetchSlots(
   sql: postgres.Sql,
   providerId: string,
   date: string, // YYYY-MM-DD
+  serviceId?: string,
 ): Promise<[Error | null, FetchSlotsResult | null]> {
-  try {
-    // Get day of week (0=Sunday, 6=Saturday)
-    const dayOfWeek = new Date(date + 'T00:00:00').getDay();
+  // Resolve service_id — required by scheduling-engine
+  const effectiveServiceId = serviceId ?? await resolveServiceId(sql, providerId);
+  if (effectiveServiceId === null) {
+    return [new Error(`No services found for provider ${providerId}`), null];
+  }
 
-    // Fetch provider schedule for this day
-    const scheduleRows = await sql`
-      SELECT day_of_week, start_time::text, end_time::text
-      FROM provider_schedules
-      WHERE provider_id = ${providerId}::uuid
-        AND day_of_week = ${dayOfWeek}
-      ORDER BY start_time ASC
-    `;
+  // Delegate to scheduling-engine — the canonical slot computation authority
+  const [schedErr, schedResult] = await getAvailability(sql, {
+    provider_id: providerId,
+    date,
+    service_id: effectiveServiceId,
+  });
 
-    const scheduleValidated = z.array(ScheduleRowSchema).safeParse(scheduleRows);
-    if (!scheduleValidated.success) {
-      return [new Error(`Invalid schedule rows: ${scheduleValidated.error.message}`), null];
-    }
+  if (schedErr !== null) {
+    return [schedErr, null];
+  }
 
-    if (scheduleValidated.data.length === 0) {
-      return [null, { slots: [] }]; // No schedule for this day
-    }
+  if (schedResult === null) {
+    return [new Error('Unexpected null result from scheduling-engine'), null];
+  }
 
-    // Fetch service duration (use first active service as default)
-    const serviceRows = await sql`
-      SELECT duration_minutes, buffer_minutes
-      FROM services
-      WHERE is_active = true
-      LIMIT 1
-    `;
+  // Blocked day → no slots (not an error; wizard handles this gracefully)
+  if (schedResult.is_blocked) {
+    return [null, { slots: [] }];
+  }
 
-    const serviceValidated = z.array(ServiceRowSchema).safeParse(serviceRows);
-    if (!serviceValidated.success || serviceValidated.data.length === 0) {
-      return [new Error('No active services found'), null];
-    }
-
-    const firstService = serviceValidated.data[0];
-    const slotDuration = firstService!.duration_minutes;
-    const bufferMinutes = firstService!.buffer_minutes;
-    const totalSlotMinutes = slotDuration + bufferMinutes;
-
-    // Fetch existing bookings for this date
-    const dayStart = `${date}T00:00:00`;
-    const dayEnd = `${date}T23:59:59`;
-
-    const bookingRows = await sql`
-      SELECT start_time::text, end_time::text
-      FROM bookings
-      WHERE provider_id = ${providerId}::uuid
-        AND status NOT IN ('cancelada', 'no_presentado', 'reagendada')
-        AND start_time >= ${dayStart}::timestamptz
-        AND start_time < ${dayEnd}::timestamptz
-    `;
-
-    const bookingValidated = z.array(BookingRowSchema).safeParse(bookingRows);
-    if (!bookingValidated.success) {
-      return [new Error(`Invalid booking rows: ${bookingValidated.error.message}`), null];
-    }
-
-    // Build booked intervals
-    const bookedIntervals = bookingValidated.data.map(b => ({
-      start: new Date(b.start_time).getTime(),
-      end: new Date(b.end_time).getTime(),
+  // Map available slots to wizard-compatible format
+  const slots: TimeSlot[] = schedResult.slots
+    .filter((s) => s.available)
+    .map((s, index) => ({
+      id: String(index + 1),
+      label: formatSlotLabel(s.start),
+      start_time: s.start,
     }));
 
-    // Generate available slots
-    const slots: TimeSlot[] = [];
-    let slotIndex = 1;
-
-    for (const schedule of scheduleValidated.data) {
-      const [schedHour, schedMin] = schedule.start_time.split(':').map(Number);
-      const [endHour, endMin] = schedule.end_time.split(':').map(Number);
-
-      let current = new Date(`${date}T${String(schedHour).padStart(2, '0')}:${String(schedMin).padStart(2, '0')}:00`).getTime();
-      const end = new Date(`${date}T${String(endHour).padStart(2, '0')}:${String(endMin).padStart(2, '0')}:00`).getTime();
-
-      while (current + slotDuration * 60000 <= end) {
-        const slotEnd = current + slotDuration * 60000;
-
-        // Check if this slot overlaps with any booking
-        const isBooked = bookedIntervals.some(b =>
-          current < b.end && slotEnd > b.start,
-        );
-
-        if (!isBooked) {
-          const slotDate = new Date(current);
-          const hours = slotDate.getHours();
-          const minutes = slotDate.getMinutes();
-          const ampm = hours >= 12 ? 'PM' : 'AM';
-          const displayHours = hours % 12 || 12;
-          const label = `${displayHours}:${String(minutes).padStart(2, '0')} ${ampm}`;
-
-          slots.push({
-            id: String(slotIndex),
-            label,
-            start_time: slotDate.toISOString(),
-          });
-          slotIndex++;
-        }
-
-        current += totalSlotMinutes * 60000;
-      }
-    }
-
-    return [null, { slots }];
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    return [new Error(`fetch_slots_failed: ${msg}`), null];
-  }
+  return [null, { slots }];
 }

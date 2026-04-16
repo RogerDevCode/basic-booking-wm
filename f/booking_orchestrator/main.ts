@@ -48,6 +48,11 @@
 import { z } from 'zod';
 import { createDbClient } from '../internal/db/client';
 import { withTenantContext } from '../internal/tenant-context';
+import { resolveDate, resolveTime } from '../internal/date-resolver';
+import type { BookingState, DraftBooking } from '../internal/booking_fsm/types';
+import { logger } from '../internal/logger';
+
+const MODULE = 'booking_orchestrator';
 
 // ── Orchestrator intent types — Spanish, matching AutorizadoIntent (§5.1) ──
 type OrchestratorBookingIntent =
@@ -62,13 +67,13 @@ function isOrchestratorBookingIntent(value: string): value is OrchestratorBookin
 }
 
 const InputSchema = z.object({
-  tenant_id: z.uuid(),
+  tenant_id: z.uuid().optional(),
   intent: z.enum([
     'crear_cita', 'cancelar_cita', 'reagendar_cita', 'ver_disponibilidad', 'mis_citas',
     // Legacy aliases accepted but normalized to canonical form
     'reagendar', 'consultar_disponible', 'consultar_disponibilidad', 'ver_mis_citas',
   ]),
-  entities: z.record(z.string(), z.string()).default({}),
+  entities: z.record(z.string(), z.string().nullable()).default({}),
   client_id: z.uuid().optional(),
   provider_id: z.uuid().optional(),
   service_id: z.uuid().optional(),
@@ -77,6 +82,8 @@ const InputSchema = z.object({
   time: z.string().optional(),
   notes: z.string().optional(),
   channel: z.enum(['telegram', 'web', 'api']).default('api'),
+  telegram_chat_id: z.string().optional(),
+  telegram_name: z.string().optional(),
 });
 
 export interface OrchestratorResult {
@@ -85,10 +92,13 @@ export interface OrchestratorResult {
   readonly data: unknown;
   readonly message: string;
   readonly follow_up?: string;
+  readonly nextState?: BookingState | null;
+  readonly nextDraft?: DraftBooking | null;
 }
 
-function getEntity(entities: Record<string, string>, key: string): string | undefined {
-  return entities[key];
+function getEntity(entities: Record<string, string | null>, key: string): string | undefined {
+  const val = entities[key];
+  return val ?? undefined;
 }
 
 // ─── Action Handlers ────────────────────────────────────────────────────────
@@ -101,19 +111,31 @@ async function handleCreateBooking(
   const date = input.date ?? getEntity(input.entities, 'date');
   const time = input.time ?? getEntity(input.entities, 'time');
 
+  // If data is missing, hand off to wizard instead of just returning an error
   if (clientId === undefined || providerId === undefined || serviceId === undefined || date === undefined || time === undefined) {
     const result: OrchestratorResult = {
       action: 'crear_cita',
       success: false,
       data: null,
-      message: 'Faltan datos para agendar la cita.',
-      follow_up: 'Necesito: paciente, doctor, servicio, fecha y hora.',
+      message: 'Faltan algunos datos para confirmar la cita. Vamos a completarlos en el asistente.',
+      follow_up: '¿Te parece bien si continuamos por aquí?',
+      nextState: { name: 'selecting_specialty', error: null, items: [] }, // Start wizard
+      nextDraft: {
+        specialty_id: null,
+        specialty_name: null,
+        doctor_id: providerId ?? null,
+        doctor_name: getEntity(input.entities, 'provider_name') ?? null,
+        target_date: date ?? null,
+        start_time: time ? `${date ?? ''}T${time}:00` : null,
+        time_label: time ?? null,
+        client_id: clientId ?? null,
+      }
     };
     return [null, result];
   }
 
   const startTime = new Date(`${date}T${time}:00`);
-  const idempotencyKey = `orch-${clientId}-${providerId}-${date}-${time}-${String(Date.now())}`;
+  const idempotencyKey = `orch-${clientId}-${providerId}-${date}-${time}`;
 
   const createInput = {
     client_id: clientId,
@@ -149,21 +171,21 @@ async function handleCreateBooking(
   return [null, result];
 }
 
+type GetMyBookingsInput = Readonly<z.infer<typeof InputSchema>> & { readonly follow_up?: string };
+
 async function handleCancelBooking(
   input: Readonly<z.infer<typeof InputSchema>>
 ): Promise<[Error | null, OrchestratorResult | null]> {
   const bookingId = input.booking_id ?? getEntity(input.entities, 'booking_id');
-  const clientId = input.client_id ?? getEntity(input.entities, 'client_id');
+  const clientId = input.client_id;
 
   if (bookingId === undefined) {
-    const result: OrchestratorResult = {
-      action: 'cancelar_cita',
-      success: false,
-      data: null,
-      message: 'Necesito el ID de la cita que quieres cancelar.',
-      follow_up: '¿Cuál es el ID de tu cita?',
+    // If no booking ID, list appointments first so user can choose
+    const listInput: GetMyBookingsInput = {
+      ...input,
+      follow_up: 'Por favor, dime el ID de la cita que deseas cancelar de la lista anterior.',
     };
-    return [null, result];
+    return handleGetMyBookings(listInput);
   }
 
   const cancelInput = {
@@ -199,17 +221,37 @@ async function handleReschedule(
   input: Readonly<z.infer<typeof InputSchema>>
 ): Promise<[Error | null, OrchestratorResult | null]> {
   const bookingId = input.booking_id ?? getEntity(input.entities, 'booking_id');
-  const clientId = input.client_id ?? getEntity(input.entities, 'client_id');
+  const clientId = input.client_id;
   const date = input.date ?? getEntity(input.entities, 'date');
   const time = input.time ?? getEntity(input.entities, 'time');
 
-  if (bookingId === undefined || date === undefined || time === undefined) {
+  if (bookingId === undefined) {
+    // If no booking ID, list appointments first so user can choose
+    const listInput: GetMyBookingsInput = {
+      ...input,
+      follow_up: 'Dime el ID de la cita que quieres mover y la nueva fecha/hora.',
+    };
+    return handleGetMyBookings(listInput);
+  }
+
+  if (date === undefined || time === undefined) {
     const result: OrchestratorResult = {
       action: 'reagendar_cita',
       success: false,
       data: null,
-      message: 'Necesito el ID de la cita y la nueva fecha/hora.',
-      follow_up: '¿Cuál es el ID de tu cita y cuándo la quieres?',
+      message: 'Para reagendar la cita, necesito saber la nueva fecha y hora.',
+      follow_up: '¿Para cuándo te gustaría mover tu cita?',
+      nextState: { name: 'selecting_time', specialtyId: '', doctorId: '', doctorName: '', targetDate: date ?? null, error: null, items: [] },
+      nextDraft: {
+        specialty_id: null,
+        specialty_name: null,
+        doctor_id: input.provider_id ?? null,
+        doctor_name: getEntity(input.entities, 'provider_name') ?? null,
+        target_date: date ?? null,
+        start_time: null,
+        time_label: null,
+        client_id: clientId ?? null,
+      }
     };
     return [null, result];
   }
@@ -282,7 +324,7 @@ async function handleListAvailable(
       readonly slots?: readonly { readonly start: string; readonly available: boolean }[];
     }
 
-    function isAvailabilityData(d: unknown): d is AvailabilityData {
+    const isAvailabilityData = (d: unknown): d is AvailabilityData => {
       if (typeof d !== 'object' || d === null) return false;
       const obj = d as Record<string, unknown>;
       const isBlocked = obj['is_blocked'];
@@ -295,7 +337,7 @@ async function handleListAvailable(
       ) && (
         slots === undefined || Array.isArray(slots)
       );
-    }
+    };
 
     if (!isAvailabilityData(data)) {
       const result: OrchestratorResult = {
@@ -362,14 +404,23 @@ async function handleListAvailable(
 async function handleGetMyBookings(
   input: Readonly<z.infer<typeof InputSchema>>
 ): Promise<[Error | null, OrchestratorResult | null]> {
+  /*
+   * REASONING TRACE
+   * 1. Mission: Fetch upcoming bookings for a specific client.
+   * 2. Schema: JOIN bookings, providers, services on client_id and provider_id.
+   * 3. Filter: client_id AND status NOT IN ('cancelled', 'no_show', 'rescheduled') AND start_time >= NOW().
+   * 4. Multi-tenancy: Wrapped in withTenantContext for RLS compliance.
+   * 5. Format: List with weekday, day, month, time, provider, specialty, and service.
+   */
   const clientId = input.client_id ?? getEntity(input.entities, 'client_id');
+  const tenantId = input.tenant_id;
 
-  if (clientId === undefined) {
+  if (clientId === undefined || tenantId === undefined) {
     const result: OrchestratorResult = {
       action: 'mis_citas',
       success: false,
       data: null,
-      message: 'Necesito tu ID de paciente para consultar tus citas.',
+      message: 'Necesito identificar al paciente para consultar las citas.',
     };
     return [null, result];
   }
@@ -381,17 +432,20 @@ async function handleGetMyBookings(
 
   const sql = createDbClient({ url: dbUrl });
 
-  const [dbErr, bookings] = await withTenantContext<readonly unknown[]>(sql, input.tenant_id, async (tx) => {
+  const [dbErr, bookings] = await withTenantContext<readonly unknown[]>(sql, tenantId, async (tx) => {
+    // b.status uses canonical lowercase English states
     const rows = await tx`
       SELECT b.booking_id, b.status, b.start_time, b.end_time,
-             p.name as provider_name, s.name as service_name
+             p.name as provider_name, p.specialty as provider_specialty,
+             s.name as service_name
       FROM bookings b
       JOIN providers p ON p.provider_id = b.provider_id
       JOIN services s ON s.service_id = b.service_id
       WHERE b.client_id = ${clientId}::uuid
         AND b.status NOT IN ('cancelled', 'no_show', 'rescheduled')
+        AND b.start_time >= NOW()
       ORDER BY b.start_time ASC
-      LIMIT 20
+      LIMIT 10
     `;
     return [null, rows as readonly unknown[]];
   });
@@ -403,8 +457,8 @@ async function handleGetMyBookings(
       action: 'mis_citas',
       success: true,
       data: [],
-      message: '📋 No tienes citas programadas.',
-      follow_up: '¿Quieres agendar una cita?',
+      message: '📋 No tienes próximas citas programadas.',
+      follow_up: '¿Te gustaría agendar una nueva cita?',
     };
     return [null, result];
   }
@@ -412,26 +466,42 @@ async function handleGetMyBookings(
   interface BookingRow {
     readonly start_time: string;
     readonly provider_name: string;
+    readonly provider_specialty: string;
     readonly service_name: string;
     readonly status: string;
   }
 
-  function isBookingRow(obj: unknown): obj is BookingRow {
+  const isBookingRow = (obj: unknown): obj is BookingRow => {
     if (typeof obj !== 'object' || obj === null) return false;
     const r = obj as Record<string, unknown>;
     return typeof r['start_time'] === 'string'
       && typeof r['provider_name'] === 'string'
+      && typeof r['provider_specialty'] === 'string'
       && typeof r['service_name'] === 'string'
       && typeof r['status'] === 'string';
-  }
+  };
+
+  // Spanish date formatter (deterministic wall-clock representation)
+  const fmtDate = new Intl.DateTimeFormat('es-AR', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    timeZone: 'America/Mexico_City', // Default timezone
+  });
+  const fmtTime = new Intl.DateTimeFormat('es-AR', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: 'America/Mexico_City',
+  });
 
   const bookingList = bookings
     .filter(isBookingRow)
     .map((bb: BookingRow) => {
       const d = new Date(bb.start_time);
-      const dateStr = d.toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric', month: 'short' });
-      const timeStr = d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
-      return `• ${dateStr} ${timeStr} - ${bb.provider_name} (${bb.service_name}) [${bb.status}]`;
+      const dateStr = fmtDate.format(d);
+      const timeStr = fmtTime.format(d);
+      return `• ${dateStr} ${timeStr}hs - ${bb.provider_name} (${bb.provider_specialty}): ${bb.service_name}`;
     })
     .join('\n');
 
@@ -440,6 +510,7 @@ async function handleGetMyBookings(
     success: true,
     data: bookings,
     message: `📋 Tus próximas citas:\n${bookingList}`,
+    follow_up: 'Si necesitas cancelar o reagendar alguna, házmelo saber.',
   };
   return [null, result];
 }
@@ -450,10 +521,12 @@ export async function main(
 ): Promise<[Error | null, OrchestratorResult | null]> {
   const parsed = InputSchema.safeParse(rawInput);
   if (!parsed.success) {
-    return [new Error(`Validation error: ${parsed.error.message}`), null];
+    logger.error(MODULE, 'Validation failed', parsed.error);
+    return [new Error(`Invalid input: ${parsed.error.message}`), null];
   }
 
   const input: Readonly<z.infer<typeof InputSchema>> = parsed.data;
+  logger.info(MODULE, 'Starting orchestration', { intent: input.intent, channel: input.channel });
 
   // Normalize legacy Spanish intent aliases to canonical form
   const legacyAliasMap: Record<string, OrchestratorBookingIntent> = {
@@ -468,23 +541,118 @@ export async function main(
     isOrchestratorBookingIntent(input.intent) ? input.intent : undefined
   );
   if (normalizedIntent === undefined) {
-    return [new Error(`Unknown intent: ${String(input.intent)}`), null];
+    return [new Error(`Unknown intent: ${input.intent}`), null];
   }
 
-  switch (normalizedIntent) {
-    case 'crear_cita':
-      return handleCreateBooking(input);
-    case 'cancelar_cita':
-      return handleCancelBooking(input);
-    case 'reagendar_cita':
-      return handleReschedule(input);
-    case 'ver_disponibilidad':
-      return handleListAvailable(input);
-    case 'mis_citas':
-      return handleGetMyBookings(input);
-    default: {
-      const _exhaustiveCheck: never = normalizedIntent;
-      return [new Error(`Unknown intent: ${String(_exhaustiveCheck)}`), null];
+  let resolvedTenantId = input.tenant_id;
+  let resolvedClientId = input.client_id;
+  let resolvedProviderId = input.provider_id ?? getEntity(input.entities, 'provider_id');
+  let resolvedServiceId = input.service_id ?? getEntity(input.entities, 'service_id');
+  let resolvedDate = input.date ?? getEntity(input.entities, 'date');
+  let resolvedTime = input.time ?? getEntity(input.entities, 'time');
+
+  // Normalize relative dates (hoy, mañana, etc.) to absolute YYYY-MM-DD
+  if (resolvedDate !== undefined) {
+    const absoluteDate = resolveDate(resolvedDate);
+    if (absoluteDate !== null) {
+      resolvedDate = absoluteDate;
     }
   }
+
+  // Normalize relative times (10am, etc.) to absolute HH:MM
+  if (resolvedTime !== undefined) {
+    const absoluteTime = resolveTime(resolvedTime);
+    if (absoluteTime !== null) {
+      resolvedTime = absoluteTime;
+    }
+  }
+
+  const dbUrl = process.env['DATABASE_URL'];
+  if (dbUrl !== undefined && dbUrl !== '') {
+    const sql = createDbClient({ url: dbUrl });
+
+    // 1. Resolve tenant_id to default if not provided
+    if (resolvedTenantId === undefined) {
+      const providerRows = await sql`SELECT provider_id FROM providers LIMIT 1`;
+      const firstProvider = providerRows[0];
+      if (firstProvider && typeof firstProvider['provider_id'] === 'string') {
+        resolvedTenantId = firstProvider['provider_id'];
+        resolvedProviderId ??= resolvedTenantId;
+      }
+    }
+
+    // 2. Resolve client_id if telegram_chat_id is provided
+    if (resolvedClientId === undefined && input.telegram_chat_id !== undefined) {
+      const clientRows = await sql`
+        SELECT client_id FROM clients WHERE telegram_chat_id = ${input.telegram_chat_id} LIMIT 1
+      `;
+      const firstClient = clientRows[0];
+      if (firstClient && typeof firstClient['client_id'] === 'string') {
+        resolvedClientId = firstClient['client_id'];
+      } else {
+        const insertRows = await sql`
+          INSERT INTO clients (name, telegram_chat_id)
+          VALUES (${input.telegram_name ?? 'Usuario Telegram'}, ${input.telegram_chat_id})
+          RETURNING client_id
+        `;
+        const insertedClient = insertRows[0];
+        if (insertedClient && typeof insertedClient['client_id'] === 'string') {
+          resolvedClientId = insertedClient['client_id'];
+        }
+      }
+    }
+
+    // 3. Resolve service_id to default if missing
+    if (resolvedServiceId === undefined && resolvedProviderId !== undefined) {
+      const serviceRows = await sql`SELECT service_id FROM services WHERE provider_id = ${resolvedProviderId}::uuid LIMIT 1`;
+      const firstService = serviceRows[0];
+      if (firstService && typeof firstService['service_id'] === 'string') {
+        resolvedServiceId = firstService['service_id'];
+      }
+    }
+  }
+
+  if (resolvedTenantId === undefined) {
+    return [new Error('tenant_id not provided and could not be resolved from DB'), null];
+  }
+
+  const enrichedInput = {
+    ...input,
+    tenant_id: resolvedTenantId,
+    client_id: resolvedClientId,
+    provider_id: resolvedProviderId,
+    service_id: resolvedServiceId,
+    date: resolvedDate,
+    time: resolvedTime,
+  };
+
+  let orchRes: [Error | null, OrchestratorResult | null];
+  switch (normalizedIntent) {
+    case 'crear_cita':
+      orchRes = await handleCreateBooking(enrichedInput);
+      break;
+    case 'cancelar_cita':
+      orchRes = await handleCancelBooking(enrichedInput);
+      break;
+    case 'reagendar_cita':
+      orchRes = await handleReschedule(enrichedInput);
+      break;
+    case 'ver_disponibilidad':
+      orchRes = await handleListAvailable(enrichedInput);
+      break;
+    case 'mis_citas':
+      orchRes = await handleGetMyBookings(enrichedInput);
+      break;
+    default: {
+      const _exhaustiveCheck: never = normalizedIntent;
+      orchRes = [new Error(`Unknown intent: ${String(_exhaustiveCheck)}`), null];
+    }
+  }
+
+  if (orchRes[0] !== null) {
+    logger.error(MODULE, 'Orchestration failed', orchRes[0]);
+  } else {
+    logger.info(MODULE, 'Orchestration complete', { action: orchRes[1]?.action, success: orchRes[1]?.success });
+  }
+  return orchRes;
 }

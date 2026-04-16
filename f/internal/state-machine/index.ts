@@ -40,7 +40,7 @@ export function validateTransition(
   next: BookingStatus,
 ): [Error | null, true | null] {
   const allowed = VALID_TRANSITIONS[current];
-  if (allowed === undefined || !allowed.includes(next)) {
+  if (!allowed?.includes(next)) {
     return [
       new Error(`invalid_transition: ${current} -> ${next}`),
       null,

@@ -1,7 +1,13 @@
-summary: Telegram Webhook - Single Provider (v8.0)
+summary: Telegram Webhook - Single Provider (v9.0)
 description: |
   Flow con InlineKeyboardMarkup + editMessageText + FSM wizard.
-  
+
+  CAMBIOS v9.0 (T5):
+  - send_telegram_response se ejecuta ANTES de update_conversation_state
+  - message_id real de sendMessage se captura del resultado y persiste en Redis
+  - edit_message preserva el message_id existente (no sobreescribe con null)
+  - Flujo garantiza cero spam: primer mensaje se edita en callbacks subsecuentes
+
   CAMBIOS v8.0:
   - Soporte callback_query con answerCallbackQuery + editMessageText
   - Router recibe callback_query_id y message_id del estado
@@ -66,33 +72,15 @@ value:
             expr: results.webhook_trigger.username
             type: javascript
           booking_state:
-            expr: results.get_conversation_state.data?.state || null
+            expr: results.get_conversation_state.data?.booking_state || null
             type: javascript
           booking_draft:
-            expr: null
+            expr: results.get_conversation_state.data?.booking_draft || null
             type: javascript
           message_id:
-            expr: results.get_conversation_state.data?.state?.message_id || null
+            expr: results.get_conversation_state.data?.message_id || results.webhook_trigger.callback_message_id || null
             type: javascript
       summary: Router con InlineKeyboard + FSM wizard
-    - id: update_conversation_state
-      value:
-        path: f/internal/conversation_update
-        type: script
-        input_transforms:
-          chat_id:
-            expr: results.webhook_trigger.chat_id
-            type: javascript
-          intent:
-            expr: results.telegram_router.data?.route || 'desconocido'
-            type: javascript
-          entities:
-            expr: '{}'
-            type: javascript
-          flow_step:
-            expr: results.telegram_router.data?.nextFlowStep || 0
-            type: javascript
-      summary: Actualizar estado conversacional en Redis
     - id: answer_callback
       value:
         path: f/telegram_send
@@ -137,9 +125,11 @@ value:
               if (router && router.response_text && router.response_text.length > 0) {
                 return router.response_text;
               }
-              const booking = results.execute_action.data;
-              if (booking?.id) {
-                return `✅ *Reserva Confirmada*\n\nID: \`${booking.id}\`\nFecha: ${booking.start_time}`;
+              const orch = results.execute_action?.data;
+              if (orch) {
+                if (orch.message) {
+                  return orch.message + (orch.follow_up ? `\n\n${orch.follow_up}` : '');
+                }
               }
               return results.ai_agent.data?.ai_response || 'Procesado';
             type: javascript
@@ -150,7 +140,12 @@ value:
             expr: >
               const router = results.telegram_router.data;
               if (router && router.should_edit) {
-                return router.message_id || results.get_conversation_state.data?.state?.message_id || null;
+                return (
+                  router.message_id ||
+                  results.get_conversation_state.data?.message_id ||
+                  results.webhook_trigger.callback_message_id ||
+                  null
+                );
               }
               return null;
             type: javascript
@@ -212,7 +207,7 @@ value:
             expr: results.parse_message.data.chat_id
             type: javascript
           conversation_state:
-            expr: results.get_conversation_state.data?.state || null
+            expr: results.get_conversation_state.data || null
             type: javascript
       summary: AI Agent con contexto conversacional
     - id: gate_execute_action
@@ -229,31 +224,57 @@ value:
     - id: execute_action
       value:
         path: f/flows/booking_orchestrator__flow
+        type: flow
+        input_transforms:
+          intent:
+            expr: results.ai_agent.data?.intent || 'duda_general'
+            type: javascript
+          entities:
+            expr: results.ai_agent.data?.entities || {}
+            type: javascript
+          telegram_chat_id:
+            expr: results.parse_message.data.chat_id
+            type: javascript
+          telegram_name:
+            expr: results.webhook_trigger.username
+            type: javascript
+      summary: Ejecutar acción de booking (via orchestrator flow)
+    - id: update_conversation_state
+      value:
+        path: f/internal/conversation_update
         type: script
         input_transforms:
           chat_id:
-            expr: results.parse_message.data.chat_id
+            expr: results.webhook_trigger.chat_id
             type: javascript
-          user_name:
-            expr: results.webhook_trigger.username
+          intent:
+            expr: results.telegram_router.data?.route || results.ai_agent.data?.intent || 'desconocido'
             type: javascript
-          service_id:
-            type: static
-            value: 1
-          start_time:
-            expr: |
-              const entities = results.ai_agent.data?.entities || {};
-              return entities.start_time || '';
+          entities:
+            expr: results.ai_agent.data?.entities || {}
             type: javascript
-          user_email:
-            expr: |
-              const entities = results.ai_agent.data?.entities || {};
-              return entities.email || ''
+          flow_step:
+            expr: results.telegram_router.data?.nextFlowStep || 0
             type: javascript
-          provider_id:
-            type: static
-            value: 1
-      summary: Ejecutar acción de booking
+          booking_state:
+             expr: >
+               results.telegram_router.data?.nextState ||
+               results.execute_action.data?.nextState ||
+               null
+          booking_draft:
+            expr: >
+              results.telegram_router.data?.nextDraft ||
+              results.execute_action.data?.nextDraft ||
+              null
+          message_id:
+            expr: >
+              const newMsgId = results.send_telegram_response.data?.message_id;
+              if (typeof newMsgId === 'number') {
+                return newMsgId;
+              }
+              return results.get_conversation_state.data?.message_id || null;
+            type: javascript
+      summary: Actualizar estado conversacional en Redis (soporta hand-off de AI a wizard)
 schema:
   type: object
   properties:

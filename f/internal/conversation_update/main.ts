@@ -19,12 +19,16 @@ import {
   getConversationState,
   updateConversationState,
 } from '../conversation-state';
+import { BookingStateSchema, DraftBookingSchema } from '../booking_fsm';
 
 const InputSchema = z.object({
   chat_id: z.string().min(1),
   intent: z.string(),
-  entities: z.record(z.string(), z.unknown()).default({}),
+  entities: z.record(z.string(), z.string().nullable()).default({}),
   flow_step: z.number().int().min(0).optional(),
+  booking_state: BookingStateSchema.nullable().optional(),
+  booking_draft: DraftBookingSchema.nullable().optional(),
+  message_id: z.number().int().nullable().optional(),
 }).readonly();
 
 interface UpdateOutput {
@@ -39,7 +43,7 @@ export async function main(rawInput: unknown): Promise<UpdateOutput> {
     return { success: false, data: { updated: false }, error_message: parsed.error.message };
   }
 
-  const { chat_id, intent, entities, flow_step } = parsed.data;
+  const { chat_id, intent, entities, flow_step, booking_state, booking_draft, message_id } = parsed.data;
 
   const redis = createConversationRedis();
   if (redis === null) {
@@ -50,9 +54,19 @@ export async function main(rawInput: unknown): Promise<UpdateOutput> {
     const [getErr, existingState] = await getConversationState(redis, chat_id);
     const entitiesFlat: Record<string, string | null> = {};
     for (const [k, v] of Object.entries(entities)) {
-      entitiesFlat[k] = v !== null && v !== undefined ? String(v) : null;
+      entitiesFlat[k] = v;
     }
-    const [err] = await updateConversationState(redis, chat_id, intent, entitiesFlat, getErr === null ? existingState : null, flow_step);
+    const [err] = await updateConversationState(
+      redis,
+      chat_id,
+      intent,
+      entitiesFlat,
+      getErr === null ? existingState : null,
+      flow_step,
+      booking_state,
+      booking_draft,
+      message_id,
+    );
     if (err !== null) {
       return { success: false, data: { updated: false }, error_message: err.message };
     }
@@ -61,6 +75,6 @@ export async function main(rawInput: unknown): Promise<UpdateOutput> {
     const msg = e instanceof Error ? e.message : String(e);
     return { success: false, data: { updated: false }, error_message: msg };
   } finally {
-    redis.quit().catch(() => { /* ignore */ });
+    await redis.quit().catch(() => { /* ignore */ });
   }
 }

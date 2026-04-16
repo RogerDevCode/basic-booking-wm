@@ -131,7 +131,7 @@ export async function buildRAGContext(
     const title = typeof row[2] === 'string' ? row[2] : '';
     const content = typeof row[3] === 'string' ? row[3] : '';
     const category = typeof row[4] === 'string' ? row[4] : '';
-    const rowProviderId = row[1] != null ? row[1] : null;
+    const rowProviderId = row[1] ?? null;
 
     const s = scoreFAQ({ title, content, category }, terms);
     if (s > 0) {
@@ -185,7 +185,7 @@ export async function buildRAGContext(
   };
   } finally {
     if (ownConnection) {
-      await (tx as postgres.Sql).end();
+      await (tx).end();
     }
   }
 }

@@ -22,6 +22,7 @@ import {
   ESCALATION_THRESHOLDS,
   RULE_CONFIDENCE_VALUES,
   SOCIAL_CONFIDENCE_VALUES,
+  CONFIDENCE_BOUNDARIES,
 } from './constants';
 import { buildSystemPrompt, buildUserMessage } from './prompt-builder';
 import { callLLM } from './llm-client';
@@ -86,7 +87,7 @@ function adjustIntentWithContext(
       adjusted: true,
       intent: INTENT.CREAR_CITA,
       confidence: 0.95,
-      reason: `Context: user selected specialty #${lower} in ${state.active_flow} flow (step ${state.flow_step})`,
+      reason: `Context: user selected specialty #${lower} in ${state.active_flow} flow (step ${String(state.flow_step)})`,
     };
   }
 
@@ -96,7 +97,7 @@ function adjustIntentWithContext(
       adjusted: true,
       intent: INTENT.CREAR_CITA,
       confidence: 0.90,
-      reason: `Context: user provided date/time in datetime selection flow (step ${state.flow_step})`,
+      reason: `Context: user provided date/time in datetime selection flow (step ${String(state.flow_step)})`,
     };
   }
 
@@ -105,7 +106,7 @@ function adjustIntentWithContext(
     return {
       adjusted: true,
       intent: INTENT.PREGUNTA_GENERAL,
-      confidence: 0.85,
+      confidence: CONFIDENCE_BOUNDARIES.HIGH_MIN,
       reason: `Context: user wants to exit current flow (${state.active_flow})`,
     };
   }
@@ -116,7 +117,7 @@ function adjustIntentWithContext(
       adjusted: true,
       intent: INTENT.CREAR_CITA,
       confidence: 0.95,
-      reason: `Context: user confirmed booking in wizard flow (step ${state.flow_step})`,
+      reason: `Context: user confirmed booking in wizard flow (step ${String(state.flow_step)})`,
     };
   }
 
@@ -386,7 +387,7 @@ function generateAIResponse(
         followUpQuestion: "¿Deseas agendar, cancelar o cambiar una cita?"
       };
     }
-    if (userProfile != null && userProfile.booking_count != null && userProfile.booking_count > 3) {
+    if ((userProfile?.booking_count ?? 0) > 3) {
       return {
         aiResponse: "Hola de nuevo, qué bueno verte de nuevo. Soy tu asistente médico. ¿En qué puedo ayudarte?",
         needsMoreInfo: true,
@@ -760,10 +761,11 @@ async function runLLMInquiryWithPrompt(systemPrompt: string, userMsg: string): P
     const cleaned = sanitizeJSONResponse(response.content);
     const raw: unknown = JSON.parse(cleaned);
 
-    if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+    const isRecord = (val: unknown): val is Record<string, unknown> => typeof val === 'object' && val !== null && !Array.isArray(val);
+    if (!isRecord(raw)) {
       return [new Error('LLM response is not a valid JSON object'), null];
     }
-    const parsed: Record<string, unknown> = raw as any; // Temporary to avoid 'as' but still unsafe? No, must use type guard.
+    const parsed = raw;
 
 
     const rawIntent = parsed['intent'];

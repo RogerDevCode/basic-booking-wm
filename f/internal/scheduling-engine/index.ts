@@ -44,20 +44,18 @@ interface ScheduleOverrideRow {
   readonly override_id: string;
   readonly provider_id: string;
   readonly override_date: string;
-  readonly override_date_end: string;
-  readonly is_available: boolean;
+  readonly is_blocked: boolean;
   readonly start_time: string | null;
   readonly end_time: string | null;
   readonly reason: string | null;
 }
 
 interface ProviderScheduleRow {
-  readonly schedule_id: string;
+  readonly id: number;
   readonly provider_id: string;
   readonly day_of_week: number;
   readonly start_time: string;
   readonly end_time: string;
-  readonly is_active: boolean;
 }
 
 interface BookingTimeRow {
@@ -87,14 +85,15 @@ export async function getAvailability(
   const dayOfWeek = new Date(targetDate + 'T00:00:00Z').getUTCDay();
 
   try {
-    // Layer 2: Check for blocking overrides (date range)
+    // Layer 2: Check for blocking overrides
     const overrides = await sql<ScheduleOverrideRow[]>`
-      SELECT * FROM schedule_overrides
+      SELECT override_id, provider_id, override_date, is_blocked, start_time, end_time, reason
+      FROM schedule_overrides
       WHERE provider_id = ${query.provider_id}::uuid
-        AND ${targetDate}::date BETWEEN override_date AND COALESCE(override_date_end, override_date)
+        AND ${targetDate}::date = override_date
     `;
 
-    const blockingOverride = overrides.find(o => !o.is_available);
+    const blockingOverride = overrides.find(o => o.is_blocked);
     if (blockingOverride != null) {
       return [null, {
         provider_id: query.provider_id,
@@ -109,24 +108,25 @@ export async function getAvailability(
     }
 
     // Check for special-hours override
-    const specialOverride = overrides.find(o => o.is_available && o.start_time != null && o.end_time != null);
+    const specialOverride = overrides.find(o => !o.is_blocked && o.start_time != null && o.end_time != null);
 
     // Layer 1: Get schedule rules for this day of week
     let rules: ProviderScheduleRow[];
-    if (specialOverride != null) {
-      rules = [{
-        schedule_id: specialOverride.override_id,
+    if (specialOverride?.start_time != null && specialOverride?.end_time != null) {
+      const syntheticRule: ProviderScheduleRow = {
+        id: 0,
         provider_id: specialOverride.provider_id,
         day_of_week: dayOfWeek,
         start_time: specialOverride.start_time,
         end_time: specialOverride.end_time,
-        is_active: true,
-      } as ProviderScheduleRow];
+      };
+      rules = [syntheticRule];
     } else {
       const fetchedRules = await sql<ProviderScheduleRow[]>`
-        SELECT * FROM provider_schedules
+        SELECT id, provider_id, day_of_week, start_time, end_time
+        FROM provider_schedules
         WHERE provider_id = ${query.provider_id}::uuid
-          AND day_of_week = ${dayOfWeek} AND is_active = true
+          AND day_of_week = ${dayOfWeek}
       `;
       rules = fetchedRules;
     }

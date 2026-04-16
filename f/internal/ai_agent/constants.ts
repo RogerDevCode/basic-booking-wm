@@ -273,9 +273,3 @@ export const CONFIDENCE_BOUNDARIES = Object.freeze({
   LOW_MAX: 0.60,
 });
 
-// ============================================================================
-// NULL TENANT SENTINEL — Security constant for tenant isolation
-// Used only for rejection guards — never as a fallback tenant ID.
-// ============================================================================
-
-export const NULL_TENANT_SENTINEL = '00000000-0000-0000-0000-000000000000';

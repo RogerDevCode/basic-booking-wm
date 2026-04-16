@@ -73,7 +73,7 @@ const MOCK_SPECIALTIES = [
   { id: 's3', name: 'Dermatología' },
 ];
 
-const MOCK_DOCTORS: Record<string, Array<{ id: string; name: string }>> = {
+const MOCK_DOCTORS: Record<string, { id: string; name: string }[]> = {
   s1: [
     { id: 'd1', name: 'Dr. Pérez' },
     { id: 'd2', name: 'Dra. Kim' },
@@ -86,7 +86,7 @@ const MOCK_DOCTORS: Record<string, Array<{ id: string; name: string }>> = {
   ],
 };
 
-const MOCK_SLOTS: Record<string, Array<{ id: string; label: string; start_time: string }>> = {
+const MOCK_SLOTS: Record<string, { id: string; label: string; start_time: string }[]> = {
   d1: [
     { id: 't1', label: '9:00 AM', start_time: '2026-04-13T09:00:00Z' },
     { id: 't2', label: '10:00 AM', start_time: '2026-04-13T10:00:00Z' },
@@ -140,14 +140,14 @@ async function clearConvState(redis: Redis, chatId: string): Promise<void> {
 // ============================================================================
 
 class TelegramBubble {
-  private redis: Redis | null;
+  private readonly redis: Redis | null;
 
-  constructor(private chatId: string) {
+  constructor(private readonly chatId: string) {
     this.redis = createRedis();
   }
 
   async close(): Promise<void> {
-    await this.redis?.quit().catch(() => {});
+    await this.redis?.quit().catch(() => { /* ignore */ });
   }
 
   async send(text: string | null, callbackData: string | null): Promise<Result<BubbleOutput>> {
@@ -272,37 +272,48 @@ class TelegramBubble {
       case 'selecting_specialty': return { ...state, items: MOCK_SPECIALTIES };
       case 'selecting_doctor': return { ...state, items: MOCK_DOCTORS[state.specialtyId] ?? [] };
       case 'selecting_time': return { ...state, items: MOCK_SLOTS[state.doctorId] ?? [] };
-      default: return state;
+      case 'confirming':
+      case 'completed':
+      case 'idle':
+        return state;
     }
   }
 
-  private getMockItemsForState(state: BookingState): Array<{ id: string; name: string; label?: string; start_time?: string }> {
+  private getMockItemsForState(state: BookingState): { id: string; name: string; label?: string; start_time?: string }[] {
     switch (state.name) {
       case 'selecting_specialty': return MOCK_SPECIALTIES;
-      case 'selecting_doctor': return (MOCK_DOCTORS[state.specialtyId] ?? []) as Array<{ id: string; name: string; label?: string; start_time?: string }>;
-      case 'selecting_time': return (MOCK_SLOTS[state.doctorId] ?? []) as Array<{ id: string; name: string; label?: string; start_time?: string }>;
-      default: return [];
+      case 'selecting_doctor': return (MOCK_DOCTORS[state.specialtyId] ?? []) as { id: string; name: string; label?: string; start_time?: string }[];
+      case 'selecting_time': return (MOCK_SLOTS[state.doctorId] ?? []) as { id: string; name: string; label?: string; start_time?: string }[];
+      case 'confirming':
+      case 'completed':
+      case 'idle':
+        return [];
     }
   }
 
-  private getKeyboardForState(state: BookingState, items?: Array<{ id: string; name?: string; label?: string; start_time?: string }>): InlineButton[][] {
+  private getKeyboardForState(state: BookingState, items?: { id: string; name?: string; label?: string; start_time?: string }[]): InlineButton[][] {
     switch (state.name) {
       case 'selecting_specialty': return buildSpecialtyKeyboard((items ?? []).filter((i): i is { id: string; name: string } => 'name' in i && typeof i.name === 'string'));
       case 'selecting_doctor': return buildDoctorKeyboard((items ?? []).filter((i): i is { id: string; name: string } => 'name' in i && typeof i.name === 'string'));
       case 'selecting_time': return buildTimeSlotKeyboard((items ?? []).filter((i): i is { id: string; label: string; start_time: string } => 'label' in i && typeof i.label === 'string' && 'start_time' in i));
       case 'confirming': return buildConfirmationKeyboard();
-      default: return [];
+      case 'completed':
+      case 'idle':
+        return [];
     }
   }
 
   private mergeDraft(draft: DraftBooking, state: BookingState, action: BookingAction): DraftBooking {
     if (state.name === 'selecting_doctor' && action.type === 'select') {
-      const items = MOCK_DOCTORS[(draft as any)._lastState?.specialtyId] ?? [];
-      const idx = parseInt(action.value, 10) - 1;
-      if (idx >= 0 && idx < items.length) {
-        const item = items[idx];
-        if (item === undefined) return draft;
-        return { ...draft, doctor_id: item.id, doctor_name: item.name };
+      const lastState = draft._lastState;
+      if (lastState?.name === 'selecting_doctor') {
+        const items = MOCK_DOCTORS[lastState.specialtyId] ?? [];
+        const idx = parseInt(action.value, 10) - 1;
+        if (idx >= 0 && idx < items.length) {
+          const item = items[idx];
+          if (item === undefined) return draft;
+          return { ...draft, doctor_id: item.id, doctor_name: item.name };
+        }
       }
     }
     return draft;
@@ -334,9 +345,9 @@ function formatResponse(output: BubbleOutput) {
   const edit = output.should_edit ? ' ✏️ (edit)' : ' 📤 (new)';
 
   console.log(`\n${'─'.repeat(64)}`);
-  console.log(`  ${icon} Paso ${output.step_num}: ${output.step_name} | ${output.latency_ms}ms${edit}`);
+  console.log(`  ${icon} Paso ${String(output.step_num)}: ${output.step_name} | ${String(output.latency_ms)}ms${edit}`);
   if (output.draft_summary) console.log(`  📝 ${output.draft_summary}`);
-  console.log(`${'─'.repeat(64)}`);
+  console.log('─'.repeat(64));
   console.log(`  ${output.text.replace(/\n/g, '\n  ')}`);
   if (keyboard) console.log(`  Teclado:${keyboard}`);
   console.log(`${'─'.repeat(64)}\n`);
@@ -387,7 +398,7 @@ if (process.argv[1]?.endsWith('telegram_bubble/main.ts')) {
     process.exit(1);
   }
 
-  const cbMatch = message.match(/^(spec|doc|time|cfm|menu|back|cancel)(:.*)?$/);
+  const cbMatch = /^(spec|doc|time|cfm|menu|back|cancel)(:.*)?$/.exec(message);
   const text = cbMatch ? null : message;
   const callback = cbMatch ? message : null;
 

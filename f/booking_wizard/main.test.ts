@@ -1,6 +1,8 @@
 import { describe, test, expect, beforeEach } from 'vitest';
 import type { Result } from '../internal/result';
 
+const hasDB = !!process.env['DATABASE_URL'];
+
 function assertOk<T>(result: Result<T>): T {
   expect(result[0]).toBeNull();
   expect(result[1]).not.toBeNull();
@@ -36,6 +38,11 @@ async function ensureTestSeeds(): Promise<{ provider_id: string; service_id: str
 
 describe('Booking Wizard', () => {
   beforeEach(() => { /* DATABASE_URL from testcontainers */ });
+
+  if (!hasDB) {
+    test.skip('requires DATABASE_URL', () => {});
+    return;
+  }
 
   test('start should return date selection prompt', async () => {
     const { main } = await import('./main');

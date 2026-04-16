@@ -339,7 +339,7 @@ export async function main(rawInput: unknown): Promise<Result<RouteResult>> {
   }
 
   const input: RouterInput = parsed.data;
-  const { text, callback_data, booking_state, booking_draft, message_id } = input;
+  const { text, chat_id, callback_data, booking_state, booking_draft, message_id } = input;
 
   // Parse booking state from raw input
   let parsedState: BookingState | null = null;
@@ -358,6 +358,8 @@ export async function main(rawInput: unknown): Promise<Result<RouteResult>> {
       callbackData: callback_data,
       currentState: parsedState,
       draft: parsedDraft ?? emptyDraft(),
+      chatId: chat_id,
+      userName: input.username ?? 'Usuario',
     });
 
     if (wizardErr !== null || wizardResult === null) {
@@ -384,6 +386,8 @@ export async function main(rawInput: unknown): Promise<Result<RouteResult>> {
       callbackData: null,
       currentState: parsedState,
       draft: parsedDraft ?? emptyDraft(),
+      chatId: chat_id,
+      userName: input.username ?? 'Usuario',
     });
 
     if (wizardErr !== null || wizardResult === null) {
@@ -421,6 +425,8 @@ export async function main(rawInput: unknown): Promise<Result<RouteResult>> {
         callbackData: null,
         currentState: null, // Start from idle
         draft: emptyDraft(),
+        chatId: chat_id,
+        userName: input.username ?? 'Usuario',
       });
       if (wizardErr === null && wizardResult !== null) {
         return [null, buildRouteResult('wizard', wizardResult.response_text, {

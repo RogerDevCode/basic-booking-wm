@@ -16,21 +16,21 @@
 // No LLM involved. All strings are pre-defined and predictable.
 // ============================================================================
 
-export function buildSpecialtyPrompt(items: ReadonlyArray<{ id: string; name: string }>, error?: string | null): string {
-  const lines = items.map((it, i) => `${i + 1}. ${it.name}`).join('\n');
+export function buildSpecialtyPrompt(items: readonly { id: string; name: string }[], error?: string | null): string {
+  const lines = items.map((it, i) => `${(i + 1).toString()}. ${it.name}`).join('\n');
   const header = error ? `⚠️ ${error}\n\n` : '';
   return `${header}📅 *Pedir hora*\n\nEspecialidades disponibles:\n\n${lines}\n\nEscribe el número de la especialidad que necesitas.`;
 }
 
-export function buildDoctorsPrompt(specialtyName: string, items: ReadonlyArray<{ id: string; name: string }>, error?: string | null): string {
-  const lines = items.map((it, i) => `${i + 1}. ${it.name}`).join('\n');
+export function buildDoctorsPrompt(specialtyName: string, items: readonly { id: string; name: string }[], error?: string | null): string {
+  const lines = items.map((it, i) => `${(i + 1).toString()}. ${it.name}`).join('\n');
   const header = error ? `⚠️ ${error}\n\n` : '';
   const specialty = specialtyName ? ` en *${specialtyName}*` : '';
   return `${header}👨‍⚕️ *Doctores disponibles*${specialty}\n\n${lines}\n\nEscribe el número del doctor que prefieres.`;
 }
 
-export function buildSlotsPrompt(doctorName: string, items: ReadonlyArray<{ id: string; label: string; start_time: string }>, error?: string | null): string {
-  const lines = items.map((it, i) => `${i + 1}. ${it.label}`).join('\n');
+export function buildSlotsPrompt(doctorName: string, items: readonly { id: string; label: string; start_time: string }[], error?: string | null): string {
+  const lines = items.map((it, i) => `${(i + 1).toString()}. ${it.label}`).join('\n');
   const header = error ? `⚠️ ${error}\n\n` : '';
   return `${header}🕐 *Horarios disponibles*\n\nDoctor: *${doctorName}*\n\n${lines}\n\nEscribe el número del horario que prefieres.`;
 }
@@ -73,21 +73,21 @@ function makeButton(text: string, data: string): InlineButton {
   return { text, callback_data: data };
 }
 
-export function buildSpecialtyKeyboard(items: ReadonlyArray<{ id: string; name: string }>): InlineButton[][] {
-  const buttons = items.map((it, i) => makeButton(it.name, `spec:${i + 1}`));
+export function buildSpecialtyKeyboard(items: readonly { id: string; name: string }[]): InlineButton[][] {
+  const buttons = items.map((it, i) => makeButton(it.name, `spec:${(i + 1).toString()}`));
   buttons.push(makeButton('❌ Cancelar', 'cancel'));
   return chunkButtons(buttons);
 }
 
-export function buildDoctorKeyboard(items: ReadonlyArray<{ id: string; name: string }>): InlineButton[][] {
-  const buttons = items.map((it, i) => makeButton(it.name, `doc:${i + 1}`));
+export function buildDoctorKeyboard(items: readonly { id: string; name: string }[]): InlineButton[][] {
+  const buttons = items.map((it, i) => makeButton(it.name, `doc:${(i + 1).toString()}`));
   buttons.push(makeButton('⬅️ Volver', 'back'));
   buttons.push(makeButton('❌ Cancelar', 'cancel'));
   return chunkButtons(buttons);
 }
 
-export function buildTimeSlotKeyboard(items: ReadonlyArray<{ id: string; label: string; start_time: string }>): InlineButton[][] {
-  const buttons = items.map((it, i) => makeButton(it.label, `time:${i + 1}`));
+export function buildTimeSlotKeyboard(items: readonly { id: string; label: string; start_time: string }[]): InlineButton[][] {
+  const buttons = items.map((it, i) => makeButton(it.label, `time:${(i + 1).toString()}`));
   buttons.push(makeButton('⬅️ Volver', 'back'));
   buttons.push(makeButton('❌ Cancelar', 'cancel'));
   return chunkButtons(buttons);
