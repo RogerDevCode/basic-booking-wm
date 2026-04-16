@@ -19,7 +19,7 @@ export type { BookingStatus } from '../db-types';
 // ============================================================================
 export const VALID_TRANSITIONS: Readonly<Record<BookingStatus, readonly BookingStatus[]>> = {
   pending: ['confirmed', 'cancelled', 'rescheduled'],
-  confirmed: ['in_service', 'cancelled', 'rescheduled'],
+  confirmed: ['in_service', 'cancelled', 'rescheduled', 'no_show'],
   in_service: ['completed', 'no_show'],
   completed: [],
   cancelled: [],
