@@ -1,7 +1,7 @@
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : Client booking history and upcoming appointments
- * DB Tables Used  : bookings, providers, services
+ * DB Tables Used  : bookings, providers, services, clients, users
  * Concurrency Risk: NO — read-only queries filtered by client_id
  * GCal Calls      : NO
  * Idempotency Key : N/A — read-only operation
@@ -9,52 +9,61 @@
  * Zod Schemas     : YES — InputSchema validates client_id and filters
  */
 
-/*
+/**
  * REASONING TRACE
  * ### Mission Decomposition
- * - Validate client_user_id and filter parameters via Zod
- * - Resolve user to client_id via clients JOIN users, with email fallback
- * - Query bookings with provider/service joins, split into upcoming vs past by current time
- * - Return paginated results with total count
+ * - Extract Zod validation to InputSchema using mandatory Spanish vocabulary (§5.1).
+ * - Define BookingInfo and BookingsResult as Readonly interfaces (Go-style).
+ * - Decompose monolithic main into:
+ *   - resolveClientId: Handles patient identity resolution with fallback logic.
+ *   - fetchBookingsData: Encapsulates SQL query construction and execution.
+ *   - PatientBookingService: Orchestrates resolution, fetching, and domain mapping (SRP).
+ * - Ensure all components return Result<T> tuples [Error | null, T | null] per §1.A.3.
+ * - Maintain main as a clean Windmill-compatible orchestrator.
  *
  * ### Schema Verification
- * - Tables: bookings, clients, users, providers, services
- * - Columns: bookings (booking_id, client_id, provider_id, service_id, start_time, end_time, status, cancellation_reason), clients (client_id, email), providers (name, specialty), services (name)
+ * - Tables: bookings, clients, users, providers, services.
+ * - Columns: bookings (booking_id, client_id, provider_id, service_id, start_time, end_time, status, cancellation_reason).
+ * - Verified against §6 and current file logic.
  *
  * ### Failure Mode Analysis
- * - Scenario 1: No client record found → fallback query by email, then error if still not found
- * - Scenario 2: No bookings → returns empty arrays with total=0 (not an error)
- * - Scenario 3: DB failure → caught by try/catch, returned as Internal error
+ * - Scenario 1: Invalid input -> Zod error returned.
+ * - Scenario 2: DB config missing -> Configuration error returned.
+ * - Scenario 3: Client identity resolution fails -> [Error, null] returned.
+ * - Scenario 4: Query execution panic -> Caught by try/catch and returned as Result error.
  *
  * ### Concurrency Analysis
- * - Risk: NO — read-only queries filtered by client_id, no mutation or lock contention
+ * - Risk: NO. This is a read-only historical view for a single patient.
  *
  * ### SOLID Compliance Check
- * - SRP: YES — main handles orchestration, query logic is a single coherent read operation
- * - DRY: YES — cancellable/reschedulable status arrays defined once, tenant extraction uses shared pattern
- * - KISS: YES — straightforward SELECT with JOINs, client-side split by timestamp, no over-engineering
+ * - SRP: main (orchestrator), Service (business logic), data functions (data access).
+ * - DRY: Centralized status constants and mapping logic.
+ * - KISS: Explicit logic flow, no complex generic gymnastics or "clever" hacks.
  *
  * → CLEARED FOR CODE GENERATION
  */
 
-// ============================================================================
-// WEB PATIENT BOOKINGS — Client booking history and upcoming appointments
-// ============================================================================
-// Returns upcoming and past bookings for a client.
-// Supports filtering by status and date range.
-// Go-style: no throw, no any, no as. Tuple return.
-// ============================================================================
-
 import { z } from 'zod';
 import { withTenantContext } from '../internal/tenant-context';
+import type { TxClient } from '../internal/tenant-context';
 import { createDbClient } from '../internal/db/client';
+import type { Result } from '../internal/result';
+
+// --- Domain Constants ---
+
+const CANCELLABLE_STATUSES: readonly string[] = ['pendiente', 'confirmada'];
+const RESCHEDULABLE_STATUSES: readonly string[] = ['pendiente', 'confirmada'];
+
+// --- Types & Schemas ---
 
 const InputSchema = z.object({
   client_user_id: z.uuid(),
-  status: z.enum(['all', 'pending', 'confirmed', 'in_service', 'completed', 'cancelled', 'no_show', 'rescheduled']).default('all'),
+  status: z.enum(['all', 'pendiente', 'confirmada', 'en_servicio', 'completada', 'cancelada', 'no_presentado', 'reagendada']).default('all'),
   limit: z.number().int().min(1).max(100).default(50),
   offset: z.number().int().min(0).default(0),
 });
+
+type InputParams = Readonly<z.infer<typeof InputSchema>>;
 
 interface BookingInfo {
   readonly booking_id: string;
@@ -75,107 +84,172 @@ interface BookingsResult {
   readonly total: number;
 }
 
-export async function main(rawInput: unknown): Promise<[Error | null, BookingsResult | null]> {
+// Type for raw SQL values results to avoid 'unknown' indexing issues
+type RawBookingRow = [string, string, string, string, string | null, string | null, string, string];
+
+// --- Data Access Functions ---
+
+/**
+ * Resolves a client_id from a user_id, with a fallback to email match
+ * if the direct user_id link is missing.
+ */
+async function resolveClientId(tx: TxClient, userId: string): Promise<Result<string>> {
+  try {
+    const userRows = await tx.values<[string][]>`
+      SELECT p.client_id FROM clients p
+      INNER JOIN users u ON u.user_id = p.client_id
+      WHERE u.user_id = ${userId}::uuid
+      LIMIT 1
+    `;
+
+    const firstRow = userRows[0];
+    if (firstRow !== undefined) {
+      return [null, String(firstRow[0])];
+    }
+
+    // Fallback: search by email match
+    const clientRows = await tx.values<[string][]>`
+      SELECT client_id FROM clients
+      WHERE email = (SELECT email FROM users WHERE user_id = ${userId}::uuid LIMIT 1)
+      LIMIT 1
+    `;
+
+    const fallbackRow = clientRows[0];
+    if (fallbackRow === undefined) {
+      return [new Error(`client_identity_not_found: userId=${userId}`), null];
+    }
+
+    return [null, String(fallbackRow[0])];
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    return [new Error(`identity_resolution_failed: ${msg}`), null];
+  }
+}
+
+/**
+ * Fetches raw booking data and total count for a client.
+ */
+async function fetchBookingsData(
+  tx: TxClient,
+  clientId: string,
+  input: InputParams
+): Promise<Result<{ rows: readonly RawBookingRow[], total: number }>> {
+  try {
+    const statusFilter = input.status === 'all' 
+      ? tx`` 
+      : tx`AND b.status = ${input.status}`;
+
+    // Execute queries sequentially to ensure clean type inference
+    const rows = await tx.values<RawBookingRow[]>`
+      SELECT b.booking_id, b.start_time, b.end_time, b.status,
+             b.cancellation_reason,
+             p.name AS provider_name, p.specialty AS provider_specialty,
+             s.name AS service_name
+      FROM bookings b
+      INNER JOIN providers p ON b.provider_id = p.provider_id
+      INNER JOIN services s ON b.service_id = s.service_id
+      WHERE b.client_id = ${clientId}::uuid
+      ${statusFilter}
+      ORDER BY b.start_time DESC
+      LIMIT ${input.limit} OFFSET ${input.offset}
+    `;
+
+    const countRows = await tx.values<[string | number | bigint][]>`
+      SELECT COUNT(*) FROM bookings b
+      WHERE b.client_id = ${clientId}::uuid
+      ${statusFilter}
+    `;
+
+    const firstCountRow = countRows[0];
+    const total = (firstCountRow !== undefined && firstCountRow[0] !== undefined) 
+      ? Number(firstCountRow[0]) 
+      : 0;
+
+    return [null, { rows, total }];
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    return [new Error(`fetch_bookings_failed: ${msg}`), null];
+  }
+}
+
+// --- Service Layer ---
+
+class PatientBookingService {
+  constructor(private readonly tx: TxClient) {}
+
+  async getBookings(input: InputParams): Promise<Result<BookingsResult>> {
+    // 1. Resolve Identity
+    const [idErr, clientId] = await resolveClientId(this.tx, input.client_user_id);
+    if (idErr !== null || clientId === null) return [idErr, null];
+
+    // 2. Fetch Raw Data
+    const [dataErr, data] = await fetchBookingsData(this.tx, clientId, input);
+    if (dataErr !== null || data === null) return [dataErr, null];
+
+    // 3. Map to Domain Model
+    const now = new Date().toISOString();
+    const mapped: BookingInfo[] = data.rows.map((row) => {
+      const status = row[3] ? String(row[3]) : 'pendiente';
+      return {
+        booking_id: String(row[0]),
+        start_time: String(row[1]),
+        end_time: String(row[2]),
+        status: status,
+        cancellation_reason: row[4] ? String(row[4]) : null,
+        provider_name: row[5] ? String(row[5]) : null,
+        provider_specialty: row[6] ? String(row[6]) : 'General',
+        service_name: row[7] ? String(row[7]) : 'Consulta',
+        can_cancel: CANCELLABLE_STATUSES.includes(status),
+        can_reschedule: RESCHEDULABLE_STATUSES.includes(status),
+      };
+    });
+
+    // 4. Split and Return
+    return [null, {
+      upcoming: Object.freeze(mapped.filter((b) => b.start_time > now)),
+      past: Object.freeze(mapped.filter((b) => b.start_time <= now)),
+      total: data.total
+    }];
+  }
+}
+
+// --- Windmill Endpoint ---
+
+/**
+ * Main entry point for patient booking history.
+ * Decomposes logic into PatientBookingService for SOLID compliance.
+ */
+export async function main(rawInput: unknown): Promise<Result<BookingsResult>> {
+  // 1. Validate Input
   const parsed = InputSchema.safeParse(rawInput);
   if (!parsed.success) {
-    return [new Error('Validation error: ' + parsed.error.message), null];
+    return [new Error(`validation_error: ${parsed.error.message}`), null];
   }
 
-  const input: Readonly<z.infer<typeof InputSchema>> = parsed.data;
+  const input: InputParams = parsed.data;
 
+  // 2. Initialize Infrastructure
   const dbUrl = process.env['DATABASE_URL'];
-  if (dbUrl === undefined || dbUrl === '') {
-    return [new Error('CONFIGURATION_ERROR: DATABASE_URL is not set'), null];
+  if (!dbUrl) {
+    return [new Error('configuration_error: DATABASE_URL is not set'), null];
   }
 
   const sql = createDbClient({ url: dbUrl });
 
   try {
+    // 3. Orchestrate inside Tenant Context
     const [txErr, txData] = await withTenantContext(sql, input.client_user_id, async (tx) => {
-      const userRows = await tx.values<[string][]>`
-        SELECT p.client_id FROM clients p
-        INNER JOIN users u ON u.user_id = p.client_id
-        WHERE u.user_id = ${input.client_user_id}::uuid
-        LIMIT 1
-      `;
-
-      let clientId: string;
-
-      if (userRows[0] === undefined) {
-        const clientRows = await tx.values<[string][]>`
-          SELECT client_id FROM clients
-          WHERE email = (SELECT email FROM users WHERE user_id = ${input.client_user_id}::uuid LIMIT 1)
-          LIMIT 1
-        `;
-        const pRow = clientRows[0];
-        if (pRow === undefined) {
-          return [new Error('Client record not found for this user'), null];
-        }
-        clientId = pRow[0];
-      } else {
-        clientId = userRows[0][0];
-      }
-
-      const cancellableStatuses = ['pending', 'confirmed'];
-      const reschedulableStatuses = ['pending', 'confirmed'];
-      const now = new Date().toISOString();
-
-      let statusCondition = '';
-      const statusParams: (string | number)[] = [clientId];
-      let paramIdx = 2;
-
-      if (input.status !== 'all') {
-        statusCondition = ' AND b.status = $' + String(paramIdx);
-        statusParams.push(input.status);
-        paramIdx++;
-      }
-
-      const rows = await tx.values<[string, string, string, string, string, string | null, string, string, string][]>`
-        SELECT b.booking_id, b.start_time, b.end_time, b.status,
-               b.cancellation_reason,
-               p.name AS provider_name, p.specialty AS provider_specialty,
-               s.name AS service_name, b.start_time
-        FROM bookings b
-        INNER JOIN providers p ON b.provider_id = p.provider_id
-        INNER JOIN services s ON b.service_id = s.service_id
-        WHERE b.client_id = ${clientId}::uuid
-        ${statusCondition}
-        ORDER BY b.start_time DESC
-        LIMIT ${input.limit} OFFSET ${input.offset}
-      `;
-
-      const bookings: BookingInfo[] = rows.map((row) => ({
-        booking_id: row[0],
-        start_time: row[1],
-        end_time: row[2],
-        status: row[3],
-        cancellation_reason: row[4],
-        provider_name: row[5],
-        provider_specialty: row[6],
-        service_name: row[7],
-        can_cancel: cancellableStatuses.includes(row[3]),
-        can_reschedule: reschedulableStatuses.includes(row[3]),
-      }));
-
-      const upcoming = bookings.filter((b) => b.start_time > now);
-      const past = bookings.filter((b) => b.start_time <= now);
-
-      const countRows = await tx.values<[bigint | number][]>`
-        SELECT COUNT(*) FROM bookings
-        WHERE client_id = ${clientId}::uuid
-        ${statusCondition}
-      `;
-      const total = countRows[0] !== undefined ? Number(countRows[0][0]) : 0;
-
-      return [null, { upcoming, past, total }];
+      const service = new PatientBookingService(tx);
+      return await service.getBookings(input);
     });
 
     if (txErr !== null) return [txErr, null];
-    if (txData === null) return [new Error('Bookings query failed'), null];
+    if (txData === null) return [new Error('execution_error: empty result'), null];
+
     return [null, txData];
-  } catch (e) {
-    const message = e instanceof Error ? e.message : String(e);
-    return [new Error('Internal error: ' + message), null];
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    return [new Error(`internal_server_error: ${msg}`), null];
   } finally {
     await sql.end();
   }
