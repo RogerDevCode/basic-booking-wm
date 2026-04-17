@@ -69,7 +69,7 @@ async function getGlobalTx<T>(
     await reserved`COMMIT`;
     return [null, data];
   } catch (error: unknown) {
-    await reserved`ROLLBACK`.catch(() => {});
+    await reserved`ROLLBACK`.catch(() => { /* ignore */ });
     const msg = error instanceof Error ? error.message : String(error);
     return [new Error(`transaction_failed: ${msg}`), null];
   } finally {
