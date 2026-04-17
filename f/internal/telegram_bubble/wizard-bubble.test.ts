@@ -11,12 +11,9 @@
 
 import { describe, test, expect } from 'vitest';
 import {
-  parseAction,
   applyTransition,
-  flowStepFromState,
   emptyDraft,
   type BookingState,
-  type DraftBooking,
   BOOKING_STEP,
 } from '../booking_fsm';
 
@@ -27,9 +24,9 @@ describe('Telegram Bubble — wizard back navigation', () => {
       error: null,
       items: [{ id: 's1', name: 'Cardiología' }],
     };
-    const result = applyTransition(state, { type: 'back' }, emptyDraft());
-    expect(result.ok).toBe(true);
-    expect(result.nextState.name).toBe('idle');
+    const [err, outcome] = applyTransition(state, { type: 'back' }, emptyDraft());
+    expect(err).toBeNull();
+    expect(outcome?.nextState.name).toBe('idle');
   });
 
   test('selecting_doctor → back → selecting_specialty', () => {
@@ -40,9 +37,9 @@ describe('Telegram Bubble — wizard back navigation', () => {
       error: null,
       items: [{ id: 'd1', name: 'Dr. Pérez' }],
     };
-    const result = applyTransition(state, { type: 'back' }, emptyDraft(), []);
-    expect(result.ok).toBe(true);
-    expect(result.nextState.name).toBe('selecting_specialty');
+    const [err, outcome] = applyTransition(state, { type: 'back' }, emptyDraft(), []);
+    expect(err).toBeNull();
+    expect(outcome?.nextState.name).toBe('selecting_specialty');
   });
 
   test('selecting_time → back → selecting_doctor', () => {
@@ -51,12 +48,13 @@ describe('Telegram Bubble — wizard back navigation', () => {
       specialtyId: 's1',
       doctorId: 'd1',
       doctorName: 'Dr. Pérez',
+      targetDate: null,
       error: null,
       items: [{ id: 't1', label: '9:00 AM', start_time: '2026-04-13T09:00:00Z' }],
     };
-    const result = applyTransition(state, { type: 'back' }, emptyDraft(), []);
-    expect(result.ok).toBe(true);
-    expect(result.nextState.name).toBe('selecting_doctor');
+    const [err, outcome] = applyTransition(state, { type: 'back' }, emptyDraft(), []);
+    expect(err).toBeNull();
+    expect(outcome?.nextState.name).toBe('selecting_doctor');
   });
 
   test('confirming → back → selecting_time', () => {
@@ -68,9 +66,9 @@ describe('Telegram Bubble — wizard back navigation', () => {
       timeSlot: '9:00 AM',
       draft: emptyDraft(),
     };
-    const result = applyTransition(state, { type: 'back' }, emptyDraft(), []);
-    expect(result.ok).toBe(true);
-    expect(result.nextState.name).toBe('selecting_time');
+    const [err, outcome] = applyTransition(state, { type: 'back' }, emptyDraft(), []);
+    expect(err).toBeNull();
+    expect(outcome?.nextState.name).toBe('selecting_time');
   });
 
   test('cancel from confirming → idle', () => {
@@ -82,10 +80,10 @@ describe('Telegram Bubble — wizard back navigation', () => {
       timeSlot: '9:00 AM',
       draft: emptyDraft(),
     };
-    const result = applyTransition(state, { type: 'cancel' }, emptyDraft());
-    expect(result.ok).toBe(true);
-    expect(result.nextState.name).toBe('idle');
-    expect(result.responseText).toContain('Menú Principal');
+    const [err, outcome] = applyTransition(state, { type: 'cancel' }, emptyDraft());
+    expect(err).toBeNull();
+    expect(outcome?.nextState.name).toBe('idle');
+    expect(outcome?.responseText).toContain('Menú Principal');
   });
 });
 
@@ -96,9 +94,9 @@ describe('Telegram Bubble — invalid inputs', () => {
       error: null,
       items: [{ id: 's1', name: 'Cardiología' }],
     };
-    const result = applyTransition(state, { type: 'select', value: '99' }, emptyDraft());
-    expect(result.ok).toBe(false);
-    expect(result.responseText).toContain('Opción inválida');
+    const [err, outcome] = applyTransition(state, { type: 'select', value: '99' }, emptyDraft());
+    expect(err).not.toBeNull();
+    expect(outcome?.responseText).toContain('Opción inválida');
   });
 
   test('invalid time selection shows error', () => {
@@ -107,11 +105,12 @@ describe('Telegram Bubble — invalid inputs', () => {
       specialtyId: 's1',
       doctorId: 'd1',
       doctorName: 'Dr. Pérez',
+      targetDate: null,
       error: null,
       items: [{ id: 't1', label: '9:00 AM', start_time: '2026-04-13T09:00:00Z' }],
     };
-    const result = applyTransition(state, { type: 'select', value: '5' }, emptyDraft());
-    expect(result.ok).toBe(false);
-    expect(result.responseText).toContain('Opción inválida');
+    const [err, outcome] = applyTransition(state, { type: 'select', value: '5' }, emptyDraft());
+    expect(err).not.toBeNull();
+    expect(outcome?.responseText).toContain('Opción inválida');
   });
 });
