@@ -18,15 +18,11 @@
 //   1. Resolves a service_id for the provider (§6-compliant: services.provider_id)
 //   2. Delegates to getAvailability() — the authoritative slot computation engine
 //   3. Filters to only available slots and maps them to wizard-friendly format
-//
-// Bugs eliminated by delegation to scheduling-engine:
-//   - Status filter was Spanish ('cancelada' etc.) → engine uses §6 English statuses
-//   - getDay() (local-TZ) replaced by getUTCDay() inside engine
-//   - services WHERE is_active (non-existent column) replaced by §6-compliant lookup
 // ============================================================================
 
 import type postgres from 'postgres';
 import { getAvailability } from '../scheduling-engine';
+import type { Result } from '../result';
 
 // ─── Output types (wizard-compatible, unchanged) ──────────────────────────────
 
@@ -53,7 +49,8 @@ function formatSlotLabel(isoStart: string): string {
   const minutes = d.getUTCMinutes();
   const ampm = hours >= 12 ? 'PM' : 'AM';
   const displayHours = hours % 12 || 12;
-  return `${displayHours.toString()}:${minutes.toString().padStart(2, '0')} ${ampm}`;
+  const minutesStr = minutes.toString().padStart(2, '0');
+  return `${displayHours}:${minutesStr} ${ampm}`;
 }
 
 /**
@@ -63,15 +60,26 @@ function formatSlotLabel(isoStart: string): string {
 async function resolveServiceId(
   sql: postgres.Sql,
   providerId: string,
-): Promise<string | null> {
-  const rows = await sql<{ service_id: string }[]>`
-    SELECT service_id
-    FROM services
-    WHERE provider_id = ${providerId}::uuid
-    ORDER BY duration_minutes ASC
-    LIMIT 1
-  `;
-  return rows[0]?.service_id ?? null;
+): Promise<Result<string>> {
+  try {
+    const rows = await sql<{ service_id: string }[]>`
+      SELECT service_id
+      FROM services
+      WHERE provider_id = ${providerId}::uuid
+      ORDER BY duration_minutes ASC
+      LIMIT 1
+    `;
+
+    const serviceId = rows[0]?.service_id ?? null;
+    if (serviceId === null) {
+      return [new Error(`No services found for provider ${providerId}`), null];
+    }
+
+    return [null, serviceId];
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    return [new Error(`db_query_failed: ${msg}`), null];
+  }
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────
@@ -92,18 +100,22 @@ export async function fetchSlots(
   providerId: string,
   date: string, // YYYY-MM-DD
   serviceId?: string,
-): Promise<[Error | null, FetchSlotsResult | null]> {
-  // Resolve service_id — required by scheduling-engine
-  const effectiveServiceId = serviceId ?? await resolveServiceId(sql, providerId);
+): Promise<Result<FetchSlotsResult>> {
+  // 1. Resolve effective service_id
+  let effectiveServiceId = serviceId ?? null;
   if (effectiveServiceId === null) {
-    return [new Error(`No services found for provider ${providerId}`), null];
+    const [resolveErr, resolvedId] = await resolveServiceId(sql, providerId);
+    if (resolveErr !== null) {
+      return [resolveErr, null];
+    }
+    effectiveServiceId = resolvedId;
   }
 
-  // Delegate to scheduling-engine — the canonical slot computation authority
+  // 2. Delegate to scheduling-engine — the canonical slot computation authority
   const [schedErr, schedResult] = await getAvailability(sql, {
     provider_id: providerId,
     date,
-    service_id: effectiveServiceId,
+    service_id: effectiveServiceId!,
   });
 
   if (schedErr !== null) {
@@ -111,16 +123,16 @@ export async function fetchSlots(
   }
 
   if (schedResult === null) {
-    return [new Error('Unexpected null result from scheduling-engine'), null];
+    return [new Error('unexpected_null_availability'), null];
   }
 
-  // Blocked day → no slots (not an error; wizard handles this gracefully)
+  // 3. Handle blocked days (wizard handles empty slots gracefully)
   if (schedResult.is_blocked) {
     return [null, { slots: [] }];
   }
 
-  // Map available slots to wizard-compatible format
-  const slots: TimeSlot[] = schedResult.slots
+  // 4. Transform to wizard format (SRP: mapping logic isolated)
+  const availableSlots: TimeSlot[] = schedResult.slots
     .filter((s) => s.available)
     .map((s, index) => ({
       id: String(index + 1),
@@ -128,5 +140,5 @@ export async function fetchSlots(
       start_time: s.start,
     }));
 
-  return [null, { slots }];
+  return [null, { slots: availableSlots }];
 }
