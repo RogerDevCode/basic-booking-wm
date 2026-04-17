@@ -208,7 +208,7 @@ export async function main(rawInput: unknown): Promise<[Error | null, Record<str
               end_time: String(b['end_time']),
               status: String(b['status']),
               client_name: String(b['client_name']),
-              client_email: b['client_email'] != null ? String(b['client_email']) : null,
+              client_email: (typeof b['client_email'] === 'string') ? b['client_email'] : null,
               service_name: String(b['service_name']),
             })),
           }];
@@ -292,7 +292,7 @@ export async function main(rawInput: unknown): Promise<[Error | null, Record<str
           return [null, { services: rows.map((r: Record<string, unknown>) => ({
             service_id: String(r['service_id']),
             name: String(r['name']),
-            description: r['description'] != null ? String(r['description']) : null,
+            description: (typeof r['description'] === 'string') ? r['description'] : null,
             duration_minutes: Number(r['duration_minutes']),
             buffer_minutes: Number(r['buffer_minutes']),
             price_cents: Number(r['price_cents']),
@@ -313,9 +313,9 @@ export async function main(rawInput: unknown): Promise<[Error | null, Record<str
           return [null, { overrides: rows.map((r: Record<string, unknown>) => ({
             override_id: String(r['override_id']),
             override_date: String(r['override_date']),
-            override_date_end: r['override_date_end'] != null ? String(r['override_date_end']) : null,
+            override_date_end: (typeof r['override_date_end'] === 'string') ? r['override_date_end'] : null,
             is_available: Boolean(r['is_available']),
-            reason: r['reason'] != null ? String(r['reason']) : null,
+            reason: (typeof r['reason'] === 'string') ? r['reason'] : null,
           }))}];
         }
 
