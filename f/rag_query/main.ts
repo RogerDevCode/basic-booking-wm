@@ -9,127 +9,13 @@
  * Zod Schemas     : YES — InputSchema validates query text and top_k
  */
 
-import { z } from 'zod';
-import type { Result } from '../internal/result';
 import { withTenantContext } from '../internal/tenant-context';
-import type { TxClient } from '../internal/tenant-context';
 import { createDbClient } from '../internal/db/client';
+import type { Result } from '../internal/result';
 
-// ============================================================================
-// SCHEMAS & TYPES
-// ============================================================================
-
-const InputSchema = z.object({
-  query: z.string().min(1).max(500),
-  top_k: z.number().int().min(1).max(20).default(5),
-  category: z.string().optional(),
-  provider_id: z.uuid(),
-});
-
-type Input = Readonly<z.infer<typeof InputSchema>>;
-
-interface KBEntry {
-  readonly kb_id: string;
-  readonly category: string;
-  readonly title: string;
-  readonly content: string;
-  readonly similarity: number;
-}
-
-interface RAGResult {
-  readonly entries: KBEntry[];
-  readonly count: number;
-  readonly method: 'keyword' | 'vector';
-}
-
-interface KBRow {
-  readonly kb_id: string;
-  readonly category: string;
-  readonly title: string;
-  readonly content: string;
-}
-
-// ============================================================================
-// REPOSITORY LAYER (SRP: Data Access)
-// ============================================================================
-
-class KBRepository {
-  constructor(private readonly tx: TxClient) {}
-
-  /**
-   * Fetches active knowledge base entries, optionally filtered by category.
-   * Assumes schema: knowledge_base (kb_id, category, title, content, is_active)
-   */
-  async fetchActiveEntries(category?: string): Promise<Result<readonly KBRow[]>> {
-    try {
-      const rows = category
-        ? await this.tx<KBRow[]>`
-            SELECT kb_id, category, title, content
-            FROM knowledge_base
-            WHERE category = ${category} AND is_active = true
-          `
-        : await this.tx<KBRow[]>`
-            SELECT kb_id, category, title, content
-            FROM knowledge_base
-            WHERE is_active = true
-          `;
-      
-      return [null, rows];
-    } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : String(error);
-      return [new Error(`kb_fetch_failed: ${msg}`), null];
-    }
-  }
-}
-
-// ============================================================================
-// SERVICE LAYER (SRP: Business Logic)
-// ============================================================================
-
-/**
- * Keyword-based search implementation.
- * KISS: Simple scoring without external dependencies or complex embeddings.
- */
-function performKeywordSearch(
-  query: string, 
-  entries: readonly KBRow[],
-  topK: number
-): KBEntry[] {
-  const terms = query.toLowerCase()
-    .split(/\s+/)
-    .filter((t): boolean => t.length > 2);
-
-  if (terms.length === 0) return [];
-
-  const scored = entries.map((row) => {
-    const title = row.title.toLowerCase();
-    const content = row.content.toLowerCase();
-    const category = row.category.toLowerCase();
-    
-    let score = 0;
-    for (const term of terms) {
-      if (title.includes(term)) score += 3;
-      if (content.includes(term)) score += 1;
-      if (category.includes(term)) score += 2;
-    }
-
-    return {
-      entry: {
-        kb_id: row.kb_id,
-        category: row.category,
-        title: row.title,
-        content: row.content,
-        similarity: Math.min(score / (terms.length * 3), 1.0),
-      },
-      score
-    };
-  })
-  .filter((s): boolean => s.score > 0)
-  .sort((a, b): number => b.score - a.score)
-  .slice(0, topK);
-
-  return scored.map((s): KBEntry => s.entry);
-}
+import { InputSchema } from './types';
+import type { Input, RAGResult } from './types';
+import { KBRepository, performKeywordSearch } from './services';
 
 // ============================================================================
 // MAIN ENTRY POINT (Windmill Endpoint)

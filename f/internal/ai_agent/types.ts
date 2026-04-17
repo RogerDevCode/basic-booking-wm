@@ -295,3 +295,17 @@ export const LLMRawAPIResponseSchema = z.object({
 }).readonly();
 
 export type LLMRawAPIResponse = z.infer<typeof LLMRawAPIResponseSchema>;
+
+export interface ContextAdjustment {
+  readonly adjusted: boolean;
+  readonly intent: IntentType;
+  readonly confidence: number;
+  readonly reason: string;
+}
+
+export interface LLMInquiryResult {
+  readonly intent: IntentType;
+  readonly confidence: number;
+  readonly provider: "groq" | "openai" | "openrouter";
+  readonly cot_reasoning: string;
+}

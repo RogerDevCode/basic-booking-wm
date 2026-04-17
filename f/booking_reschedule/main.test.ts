@@ -1,0 +1,36 @@
+import { describe, test, expect } from 'vitest';
+import type { Result } from '../internal/result';
+
+/**
+ * Helper: assert that a [Error | null, T | null] result is an error
+ * with a message containing the expected substring.
+ */
+function assertError(result: Result<unknown>, substring: string): void {
+  expect(result[0]).not.toBeNull();
+  expect(result[0]?.message.toLowerCase()).toContain(substring.toLowerCase());
+  expect(result[1]).toBeNull();
+}
+
+describe('Booking Reschedule - Input Validation', () => {
+  test('should reject invalid booking_id', async () => {
+    const { main } = await import('./main');
+    const result = await main({
+      booking_id: 'not-a-uuid',
+      new_start_time: '2026-04-16T14:00:00Z',
+      actor: 'client',
+    });
+
+    expect(result[0]).not.toBeNull();
+  });
+
+  test('should reject invalid new_start_time', async () => {
+    const { main } = await import('./main');
+    const result = await main({
+      booking_id: '550e8400-e29b-41d4-a716-446655440000',
+      new_start_time: 'not-a-date',
+      actor: 'client',
+    });
+
+    assertError(result, 'new_start_time');
+  });
+});

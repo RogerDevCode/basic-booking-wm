@@ -87,11 +87,11 @@ describe('flowStepFromState', () => {
 
 describe('applyTransition — successful flows', () => {
   test('idle → selecting_specialty', () => {
-    const result = testTransition({ name: BOOKING_STEP.IDLE }, { type: 'select', value: '1' }, MOCK_SPECIALTIES);
+    const [err, outcome] = testTransition({ name: BOOKING_STEP.IDLE }, { type: 'select', value: '1' }, MOCK_SPECIALTIES);
 
-    expect(result.ok).toBe(true);
-    expect(result.nextState.name).toBe(BOOKING_STEP.SELECTING_SPECIALTY);
-    expect(result.advance).toBe(true);
+    expect(err).toBeNull();
+    expect(outcome?.nextState.name).toBe(BOOKING_STEP.SELECTING_SPECIALTY);
+    expect(outcome?.advance).toBe(true);
   });
 
   test('selecting_specialty → selecting_doctor', () => {
@@ -99,12 +99,12 @@ describe('applyTransition — successful flows', () => {
       name: BOOKING_STEP.SELECTING_SPECIALTY,
       items: MOCK_SPECIALTIES,
     };
-    const result = testTransition(state, { type: 'select', value: '1' }, MOCK_DOCTORS);
+    const [err, outcome] = testTransition(state, { type: 'select', value: '1' }, MOCK_DOCTORS);
 
-    expect(result.ok).toBe(true);
-    expect(result.nextState.name).toBe(BOOKING_STEP.SELECTING_DOCTOR);
-    if (result.nextState.name === BOOKING_STEP.SELECTING_DOCTOR) {
-      expect(result.nextState.specialtyId).toBe('s1');
+    expect(err).toBeNull();
+    expect(outcome?.nextState.name).toBe(BOOKING_STEP.SELECTING_DOCTOR);
+    if (outcome?.nextState.name === BOOKING_STEP.SELECTING_DOCTOR) {
+      expect(outcome.nextState.specialtyId).toBe('s1');
     }
   });
 
@@ -115,10 +115,10 @@ describe('applyTransition — successful flows', () => {
       specialtyName: 'Cardiología',
       items: MOCK_DOCTORS,
     };
-    const result = testTransition(state, { type: 'select', value: '1' }, MOCK_SLOTS);
+    const [err, outcome] = testTransition(state, { type: 'select', value: '1' }, MOCK_SLOTS);
 
-    expect(result.ok).toBe(true);
-    expect(result.nextState.name).toBe(BOOKING_STEP.SELECTING_TIME);
+    expect(err).toBeNull();
+    expect(outcome?.nextState.name).toBe(BOOKING_STEP.SELECTING_TIME);
   });
 
   test('selecting_time → confirming (and draft accumulation)', () => {
@@ -129,16 +129,16 @@ describe('applyTransition — successful flows', () => {
       doctorName: 'Dr. Pérez',
       items: MOCK_SLOTS,
     };
-    const result = testTransition(state, { type: 'select', value: '1' });
+    const [err, outcome] = testTransition(state, { type: 'select', value: '1' });
 
-    expect(result.ok).toBe(true);
-    expect(result.nextState.name).toBe(BOOKING_STEP.CONFIRMING);
+    expect(err).toBeNull();
+    expect(outcome?.nextState.name).toBe(BOOKING_STEP.CONFIRMING);
 
-    if (result.nextState.name === BOOKING_STEP.CONFIRMING) {
-      expect(result.nextState.timeSlot).toBe('9:00 AM');
-      expect(result.nextState.draft.specialty_id).toBe('s1');
-      expect(result.nextState.draft.doctor_id).toBe('d1');
-      expect(result.nextState.draft.start_time).toBe('2026-04-13T09:00:00Z');
+    if (outcome?.nextState.name === BOOKING_STEP.CONFIRMING) {
+      expect(outcome.nextState.timeSlot).toBe('9:00 AM');
+      expect(outcome.nextState.draft.specialty_id).toBe('s1');
+      expect(outcome.nextState.draft.doctor_id).toBe('d1');
+      expect(outcome.nextState.draft.start_time).toBe('2026-04-13T09:00:00Z');
     }
   });
 
@@ -151,29 +151,29 @@ describe('applyTransition — successful flows', () => {
       timeSlot: '9:00 AM',
       draft: DRAFT,
     };
-    const result = testTransition(state, { type: 'confirm_yes' });
+    const [err, outcome] = testTransition(state, { type: 'confirm_yes' });
 
-    expect(result.ok).toBe(true);
-    expect(result.nextState.name).toBe(BOOKING_STEP.COMPLETED);
-    expect(result.responseText).toContain('Confirmada');
+    expect(err).toBeNull();
+    expect(outcome?.nextState.name).toBe(BOOKING_STEP.COMPLETED);
+    expect(outcome?.responseText).toContain('Confirmada');
   });
 
   test('completed → idle', () => {
     const state: BookingState = { name: BOOKING_STEP.COMPLETED, bookingId: 'b1' };
-    const result = testTransition(state, { type: 'select', value: '1' });
+    const [err, outcome] = testTransition(state, { type: 'select', value: '1' });
 
-    expect(result.ok).toBe(true);
-    expect(result.nextState.name).toBe(BOOKING_STEP.IDLE);
+    expect(err).toBeNull();
+    expect(outcome?.nextState.name).toBe(BOOKING_STEP.IDLE);
   });
 });
 
 describe('applyTransition — navigation & cancellation', () => {
   test('selecting_specialty → back → idle', () => {
     const state: BookingState = { name: BOOKING_STEP.SELECTING_SPECIALTY, items: MOCK_SPECIALTIES };
-    const result = testTransition(state, { type: 'back' });
+    const [err, outcome] = testTransition(state, { type: 'back' });
 
-    expect(result.ok).toBe(true);
-    expect(result.nextState.name).toBe(BOOKING_STEP.IDLE);
+    expect(err).toBeNull();
+    expect(outcome?.nextState.name).toBe(BOOKING_STEP.IDLE);
   });
 
   test('confirming → confirm_no → selecting_time', () => {
@@ -185,27 +185,27 @@ describe('applyTransition — navigation & cancellation', () => {
       timeSlot: '9:00 AM',
       draft: DRAFT,
     };
-    const result = testTransition(state, { type: 'confirm_no' }, MOCK_SLOTS);
+    const [err, outcome] = testTransition(state, { type: 'confirm_no' }, MOCK_SLOTS);
 
-    expect(result.ok).toBe(true);
-    expect(result.nextState.name).toBe(BOOKING_STEP.SELECTING_TIME);
+    expect(err).toBeNull();
+    expect(outcome?.nextState.name).toBe(BOOKING_STEP.SELECTING_TIME);
   });
 });
 
 describe('applyTransition — error handling', () => {
   test('selecting_specialty → invalid selection → error', () => {
     const state: BookingState = { name: BOOKING_STEP.SELECTING_SPECIALTY, items: MOCK_SPECIALTIES };
-    const result = testTransition(state, { type: 'select', value: '99' });
+    const [err, outcome] = testTransition(state, { type: 'select', value: '99' });
 
-    expect(result.ok).toBe(false);
-    expect(result.responseText).toContain('Opción inválida');
+    expect(err).toBeInstanceOf(Error);
+    expect(outcome?.responseText).toContain('Opción inválida');
   });
 
   test('idle with no items → error', () => {
-    const result = testTransition({ name: BOOKING_STEP.IDLE }, { type: 'select', value: '1' }, []);
+    const [err, outcome] = testTransition({ name: BOOKING_STEP.IDLE }, { type: 'select', value: '1' }, []);
 
-    expect(result.ok).toBe(false);
-    expect(result.responseText).toContain('No hay especialidades');
+    expect(err).toBeInstanceOf(Error);
+    expect(outcome?.responseText).toContain('No hay especialidades');
   });
 
   test('selecting_time with invalid slot → error', () => {
@@ -216,9 +216,9 @@ describe('applyTransition — error handling', () => {
       doctorName: 'Dr. Pérez',
       items: MOCK_SLOTS,
     };
-    const result = testTransition(state, { type: 'select', value: '99' });
+    const [err, outcome] = testTransition(state, { type: 'select', value: '99' });
 
-    expect(result.ok).toBe(false);
-    expect(result.responseText).toContain('Opción inválida');
+    expect(err).toBeInstanceOf(Error);
+    expect(outcome?.responseText).toContain('Opción inválida');
   });
 });

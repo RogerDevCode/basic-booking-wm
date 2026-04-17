@@ -1,1 +1,1 @@
-Instructions are in @AUDITOR.md
+Instructions are in @AGENTS.md

@@ -42,110 +42,17 @@
  * → CLEARED FOR CODE GENERATION
  */
 
-import postgres from 'postgres';
-import { z } from 'zod';
-import type { UUID, BookingStatus } from '../internal/db-types';
-import { toUUID, isBookingStatus } from '../internal/db-types';
+import { toUUID } from '../internal/db-types';
 import { withTenantContext } from '../internal/tenant-context';
 import { validateTransition } from '../internal/state-machine';
 import { createDbClient } from '../internal/db/client';
 import { logger } from '../internal/logger';
 import type { Result } from '../internal/result';
-
-// ─── Input Validation ───────────────────────────────────────────────────────
-const InputSchema = z.object({
-  booking_id: z.uuid(),
-  actor: z.enum(['client', 'provider', 'system']),
-  actor_id: z.uuid().optional(),
-  reason: z.string().max(500).optional(),
-});
-
-type CancelBookingInput = z.infer<typeof InputSchema>;
-
-// ─── Output Types ───────────────────────────────────────────────────────────
-export interface CancelResult {
-  readonly booking_id: UUID;
-  readonly previous_status: string;
-  readonly new_status: string;
-  readonly cancelled_by: string;
-  readonly cancellation_reason: string | null;
-}
-
-// ─── Typed Row Interfaces ───────────────────────────────────────────────────
-interface BookingLookup {
-  readonly booking_id: string;
-  readonly status: BookingStatus;
-  readonly client_id: string;
-  readonly provider_id: string;
-  readonly gcal_provider_event_id: string | null;
-  readonly gcal_client_event_id: string | null;
-}
-
-interface UpdatedBooking {
-  readonly booking_id: string;
-  readonly status: string;
-  readonly cancelled_by: string;
-  readonly cancellation_reason: string | null;
-}
+import { InputSchema } from './types';
+import type { CancelBookingInput, CancelResult, UpdatedBooking } from './types';
+import { authorizeActor, fetchBooking } from './services';
 
 const MODULE = 'booking_cancel';
-
-// ─── Authorization ──────────────────────────────────────────────────────────
-/**
- * Verifies that the actor has permission to cancel the specific booking.
- */
-function authorizeActor(
-  input: Readonly<CancelBookingInput>,
-  booking: Readonly<BookingLookup>
-): Result<true> {
-  if (input.actor === 'client' && booking.client_id !== input.actor_id) {
-    return [new Error('unauthorized: client_id mismatch'), null];
-  }
-  if (input.actor === 'provider' && booking.provider_id !== input.actor_id) {
-    return [new Error('unauthorized: provider_id mismatch'), null];
-  }
-  return [null, true];
-}
-
-// ─── Data Access ────────────────────────────────────────────────────────────
-/**
- * Fetches booking details for validation and authorization.
- */
-async function fetchBooking(
-  sql: postgres.Sql,
-  bookingId: string
-): Promise<Result<BookingLookup>> {
-  try {
-    const rows = await sql.values<[string, string, string, string, string | null, string | null][]>`
-      SELECT booking_id, status, client_id, provider_id,
-             gcal_provider_event_id, gcal_client_event_id
-      FROM bookings
-      WHERE booking_id = ${bookingId}::uuid
-      LIMIT 1
-    `;
-    
-    const row = rows[0];
-    if (row === undefined) {
-      return [new Error(`booking_not_found: ${bookingId}`), null];
-    }
-
-    const rawStatus = row[1];
-    if (!isBookingStatus(rawStatus)) {
-      return [new Error(`invalid_booking_status: ${rawStatus}`), null];
-    }
-
-    return [null, {
-      booking_id: row[0],
-      status: rawStatus,
-      client_id: row[2],
-      provider_id: row[3],
-      gcal_provider_event_id: row[4],
-      gcal_client_event_id: row[5],
-    }];
-  } catch (err) {
-    return [err instanceof Error ? err : new Error(String(err)), null];
-  }
-}
 
 // ─── Main Entry Point ───────────────────────────────────────────────────────
 export async function main(

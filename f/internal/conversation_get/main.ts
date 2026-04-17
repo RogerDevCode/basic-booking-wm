@@ -17,31 +17,8 @@
 // Graceful degradation: returns null state if Redis is unavailable.
 // ============================================================================
 
-import { z } from 'zod';
-import { createConversationRedis, getConversationState, type ConversationState } from '../conversation-state';
-import type { Result } from '../result';
-
-// ── SCHEMA & TYPES ────────────────────────────────────────────────────────────
-
-const InputSchema = z.object({
-  chat_id: z.string().min(1),
-}).readonly();
-
-type ChatId = z.infer<typeof InputSchema>['chat_id'];
-
-interface GetStateOutput {
-  readonly success: boolean;
-  readonly data: ConversationState | null;
-  readonly error_message: string | null;
-  readonly redis_connected: boolean;
-}
-
-interface FetchResult {
-  readonly data: ConversationState | null;
-  readonly redis_connected: boolean;
-}
-
-// ── MAIN ENTRY POINT ──────────────────────────────────────────────────────────
+import { validateInput, fetchConversationData, formatOutput } from './services';
+import type { GetStateOutput } from './types';
 
 /**
  * main — Entry point for Windmill conversation_get.
@@ -66,62 +43,4 @@ export async function main(rawInput: unknown): Promise<GetStateOutput> {
     null,
     fetchResult?.redis_connected ?? false
   );
-}
-
-// ── HELPER FUNCTIONS ─────────────────────────────────────────────────────────
-
-/**
- * validateInput — Validates the raw input against the InputSchema.
- */
-function validateInput(rawInput: unknown): Result<ChatId> {
-  const parsed = InputSchema.safeParse(rawInput);
-  if (!parsed.success) {
-    return [new Error(parsed.error.message), null];
-  }
-  return [null, parsed.data.chat_id];
-}
-
-/**
- * fetchConversationData — Manages the Redis client lifecycle and data retrieval.
- * Gracefully handles Redis unavailability per requirements.
- */
-async function fetchConversationData(chatId: string): Promise<Result<FetchResult>> {
-  const redis = createConversationRedis();
-  
-  if (redis === null) {
-    return [null, { data: null, redis_connected: false }];
-  }
-
-  try {
-    const [err, state] = await getConversationState(redis, chatId);
-    
-    if (err !== null) {
-      return [err, { data: null, redis_connected: true }];
-    }
-
-    return [null, { data: state, redis_connected: true }];
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e);
-    return [new Error(`redis_operation_failed: ${msg}`), { data: null, redis_connected: true }];
-  } finally {
-    // Fire-and-forget disconnection to prevent leaking connections
-    void redis.quit().catch(() => { /* skip log on cleanup failure */ });
-  }
-}
-
-/**
- * formatOutput — Standardizes the GetStateOutput response.
- */
-function formatOutput(
-  success: boolean,
-  data: ConversationState | null,
-  errorMessage: string | null,
-  redisConnected: boolean
-): GetStateOutput {
-  return {
-    success,
-    data,
-    error_message: errorMessage,
-    redis_connected: redisConnected,
-  };
 }

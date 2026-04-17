@@ -117,6 +117,9 @@ async function fetchBookingDetails(
     }
 
     const r = rows[0];
+    if (!r) {
+      return [new Error(`Booking ${bookingId} row is undefined`), null];
+    }
     const details: BookingDetails = {
       booking_id:             r['booking_id'],
       provider_id:            r['provider_id'],
