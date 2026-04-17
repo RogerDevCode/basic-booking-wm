@@ -32,9 +32,10 @@
  * - Risk: YES — this IS the concurrency mechanism; unique constraint on lock_key prevents duplicate locks; expired lock steal uses WHERE expires_at < NOW() for atomic update; no SELECT FOR UPDATE needed because single-row INSERT/UPDATE with conflict resolution is atomic in Postgres
  *
  * ### SOLID Compliance Check
- * - SRP: Each action branch does one thing — YES (acquire, release, check, cleanup are independent)
- * - DRY: No duplicated logic — YES (LockInfo and LockResult types shared across all actions)
- * - KISS: No unnecessary complexity — YES (direct SQL operations, no external lock library)
+ * - SRP: Split executeLockAction into specialized handlers (acquire, release, etc.) — YES
+ * - DRY: Centralized row-to-LockInfo mapping — YES
+ * - KISS: Simple, direct SQL operations without unnecessary abstractions — YES
+ * - OCP: Adding new actions requires a new handler function and switch case entry — YES
  *
  * → CLEARED FOR CODE GENERATION
  */
@@ -51,18 +52,23 @@ import { z } from 'zod';
 import postgres from 'postgres';
 import { createDbClient } from '../internal/db/client';
 import { withTenantContext } from '../internal/tenant-context';
+import type { Result } from '../internal/result';
+
+// ─── Types & Schemas ────────────────────────────────────────────────────────
 
 const InputSchema = z.object({
   action: z.enum(['acquire', 'release', 'check', 'cleanup']),
   lock_key: z.string().min(1),
   owner_token: z.string().min(1).optional(),
-  provider_id: z.uuid().optional(),
-  start_time: z.iso.datetime().optional(),
+  provider_id: z.uuid(), // provider_id is mandatory for RLS context
+  start_time: z.string().datetime().optional(),
   ttl_seconds: z.number().int().min(1).max(3600).default(30),
 });
 
+type Input = Readonly<z.infer<typeof InputSchema>>;
+
 interface LockInfo {
-  readonly lock_id: number;
+  readonly lock_id: string;
   readonly lock_key: string;
   readonly owner_token: string;
   readonly provider_id: string;
@@ -70,7 +76,6 @@ interface LockInfo {
   readonly acquired_at: string;
   readonly expires_at: string;
 }
-
 
 interface LockResult {
   readonly acquired?: boolean;
@@ -83,155 +88,250 @@ interface LockResult {
   readonly expires_at?: string;
 }
 
+/**
+ * DB Row structure for booking_locks table
+ */
+interface LockRow {
+  readonly lock_id: string;
+  readonly lock_key: string;
+  readonly owner_token: string;
+  readonly provider_id: string;
+  readonly start_time: Date;
+  readonly acquired_at: Date;
+  readonly expires_at: Date;
+}
+
 // ─── Main Entry Point ───────────────────────────────────────────────────────
+
+/**
+ * main serves as the Windmill endpoint for distributed lock operations.
+ * Adheres to SRP by handling only entry-level validation and context setup.
+ */
 export async function main(
   rawInput: unknown,
-): Promise<[Error | null, LockResult | null]> {
+): Promise<Result<LockResult>> {
   const parsed = InputSchema.safeParse(rawInput);
   if (!parsed.success) {
-    return [new Error(`Validation error: ${parsed.error.message}`), null];
+    return [new Error(`validation_failed: ${parsed.error.message}`), null];
   }
 
-  const input: Readonly<z.infer<typeof InputSchema>> = parsed.data;
+  const input: Input = parsed.data;
 
   const dbUrl = process.env['DATABASE_URL'];
-  if (dbUrl === undefined || dbUrl === '') {
-    return [new Error('CONFIGURATION_ERROR: DATABASE_URL is required'), null];
-  }
-
-  // All lock operations require provider_id for RLS tenant isolation
-  const tenantId = input.provider_id;
-  if (tenantId === undefined) {
-    return [new Error('provider_id is required for all lock operations'), null];
+  if (!dbUrl) {
+    return [new Error('configuration_failed: DATABASE_URL is missing'), null];
   }
 
   const sql = createDbClient({ url: dbUrl });
 
   try {
-    const [txErr, txResult] = await withTenantContext<LockResult>(sql, tenantId, async (tx) => {
-      return executeLockAction(tx, input);
+    return await withTenantContext<LockResult>(sql, input.provider_id, async () => {
+      return executeLockAction(sql, input);
     });
-
-    if (txErr !== null) return [txErr, null];
-    if (txResult === null) return [new Error('Lock operation returned null'), null];
-    return [null, txResult];
-  } catch (e) {
-    const message = e instanceof Error ? e.message : String(e);
-    return [new Error(`Internal error: ${message}`), null];
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    return [new Error(`internal_error: ${msg}`), null];
   } finally {
     await sql.end();
   }
 }
 
-// ─── Lock Action Executor (runs inside tenant context) ──────────────────────
+// ─── Action Orchestrator ────────────────────────────────────────────────────
+
+/**
+ * executeLockAction routes the request to specialized handlers.
+ * Adheres to OCP by allowing easy addition of new action handlers.
+ */
 async function executeLockAction(
   tx: postgres.Sql,
-  input: Readonly<z.infer<typeof InputSchema>>,
-): Promise<[Error | null, LockResult | null]> {
+  input: Input,
+): Promise<Result<LockResult>> {
   switch (input.action) {
-    case 'acquire': {
-      if (input.owner_token === undefined) {
-        return [new Error('owner_token is required for acquire'), null];
-      }
-      if (input.start_time === undefined) {
-        return [new Error('start_time is required for acquire'), null];
-      }
-
-      const expiresAt = new Date(Date.now() + input.ttl_seconds * 1000);
-
-      // Try to insert lock (unique constraint on lock_key prevents duplicates)
-      const rows = await tx.values<[number, string, string, string, string, string, string][]>`
-        INSERT INTO booking_locks (lock_key, owner_token, provider_id, start_time, expires_at)
-        VALUES (${input.lock_key}, ${input.owner_token}, ${input.provider_id}::uuid, ${input.start_time}::timestamptz, ${expiresAt.toISOString()}::timestamptz)
-        ON CONFLICT (lock_key) DO NOTHING
-        RETURNING lock_id, lock_key, owner_token, provider_id, start_time, acquired_at, expires_at
-      `;
-
-      const row = rows[0];
-      if (row === undefined) {
-        // Check if existing lock is expired (steal it)
-        const existingRows = await tx.values<[number, string, string, string, string, string, string][]>`
-          SELECT lock_id, lock_key, owner_token, provider_id, start_time, acquired_at, expires_at
-          FROM booking_locks
-          WHERE lock_key = ${input.lock_key} AND expires_at < NOW()
-          LIMIT 1
-        `;
-        const existing = existingRows[0];
-        if (existing !== undefined) {
-          // Lock is expired — update it
-          const updatedRows = await tx.values<[number, string, string, string, string, string, string][]>`
-            UPDATE booking_locks
-            SET owner_token = ${input.owner_token},
-                expires_at = ${expiresAt.toISOString()}::timestamptz,
-                acquired_at = NOW()
-            WHERE lock_key = ${input.lock_key} AND expires_at < NOW()
-            RETURNING lock_id, lock_key, owner_token, provider_id, start_time, acquired_at, expires_at
-          `;
-          const updated = updatedRows[0];
-          if (updated !== undefined) {
-            const lockInfo: LockInfo = {
-              lock_id: updated[0],
-              lock_key: updated[1],
-              owner_token: updated[2],
-              provider_id: updated[3],
-              start_time: updated[4],
-              acquired_at: updated[5],
-              expires_at: updated[6],
-            };
-            return [null, { acquired: true, lock: lockInfo }];
-          }
-        }
-        return [null, { acquired: false, reason: 'Lock already held' }];
-      }
-
-      const lockInfo: LockInfo = {
-        lock_id: row[0],
-        lock_key: row[1],
-        owner_token: row[2],
-        provider_id: row[3],
-        start_time: row[4],
-        acquired_at: row[5],
-        expires_at: row[6],
-      };
-      return [null, { acquired: true, lock: lockInfo }];
-    }
-
-    case 'release': {
-      if (input.owner_token === undefined) {
-        return [new Error('owner_token is required for release'), null];
-      }
-
-      const rows = await tx.values<[string][]>`
-        DELETE FROM booking_locks
-        WHERE lock_key = ${input.lock_key} AND owner_token = ${input.owner_token}
-        RETURNING lock_key
-      `;
-      const row = rows[0];
-      if (row === undefined) {
-        return [null, { released: false, reason: 'Lock not found or wrong owner' }];
-      }
-      return [null, { released: true }];
-    }
-
-    case 'check': {
-      const rows = await tx.values<[number, string, string, string, string, string, string][]>`
-        SELECT lock_id, lock_key, owner_token, provider_id, start_time, acquired_at, expires_at
-        FROM booking_locks
-        WHERE lock_key = ${input.lock_key} AND expires_at > NOW()
-        LIMIT 1
-      `;
-      const row = rows[0];
-      if (row === undefined) {
-        return [null, { locked: false }];
-      }
-      return [null, { locked: true, owner: row[2], expires_at: row[6] }];
-    }
-
-    case 'cleanup': {
-      const rows = await tx.values<[string][]>`
-        DELETE FROM booking_locks WHERE expires_at < NOW() RETURNING lock_key
-      `;
-      return [null, { cleaned: rows.length }];
-    }
+    case 'acquire':
+      return acquireLock(tx, input);
+    case 'release':
+      return releaseLock(tx, input);
+    case 'check':
+      return checkLock(tx, input);
+    case 'cleanup':
+      return cleanupLocks(tx);
+    default:
+      return [new Error(`unsupported_action: ${input.action}`), null];
   }
+}
+
+// ─── Specialized Handlers ───────────────────────────────────────────────────
+
+/**
+ * acquireLock attempts to create a new lock or steal an expired one.
+ * Uses atomic SQL operations to prevent races.
+ */
+async function acquireLock(
+  tx: postgres.Sql,
+  input: Input,
+): Promise<Result<LockResult>> {
+  if (!input.owner_token || !input.start_time) {
+    return [new Error('acquire_failed: owner_token and start_time are required'), null];
+  }
+
+  const expiresAt = new Date(Date.now() + input.ttl_seconds * 1000);
+
+  // Attempt 1: Insert new lock row
+  const [insertErr, inserted] = await tryInsertLock(tx, input, expiresAt);
+  if (insertErr) return [insertErr, null];
+  if (inserted) return [null, { acquired: true, lock: mapRowToLockInfo(inserted) }];
+
+  // Attempt 2: Steal expired lock
+  const [stealErr, stolen] = await tryStealExpiredLock(tx, input, expiresAt);
+  if (stealErr) return [stealErr, null];
+  if (stolen) return [null, { acquired: true, lock: mapRowToLockInfo(stolen) }];
+
+  return [null, { acquired: false, reason: 'lock_already_held' }];
+}
+
+/**
+ * releaseLock removes a lock matching the key and owner token.
+ */
+async function releaseLock(
+  tx: postgres.Sql,
+  input: Input,
+): Promise<Result<LockResult>> {
+  if (!input.owner_token) {
+    return [new Error('release_failed: owner_token is required'), null];
+  }
+
+  try {
+    const rows = await tx<Pick<LockRow, 'lock_key'>[]>`
+      DELETE FROM booking_locks
+      WHERE lock_key = ${input.lock_key} 
+        AND owner_token = ${input.owner_token}
+      RETURNING lock_key
+    `;
+
+    if (rows.length === 0) {
+      return [null, { released: false, reason: 'lock_not_found_or_unauthorized' }];
+    }
+
+    return [null, { released: true }];
+  } catch (error: unknown) {
+    return [new Error(`release_execution_failed: ${String(error)}`), null];
+  }
+}
+
+/**
+ * checkLock returns the status of an active (non-expired) lock.
+ */
+async function checkLock(
+  tx: postgres.Sql,
+  input: Input,
+): Promise<Result<LockResult>> {
+  try {
+    const rows = await tx<LockRow[]>`
+      SELECT lock_id, lock_key, owner_token, provider_id, start_time, acquired_at, expires_at
+      FROM booking_locks
+      WHERE lock_key = ${input.lock_key} 
+        AND expires_at > NOW()
+      LIMIT 1
+    `;
+
+    const row = rows[0];
+    if (!row) return [null, { locked: false }];
+
+    return [null, { 
+      locked: true, 
+      owner: row.owner_token, 
+      expires_at: row.expires_at.toISOString() 
+    }];
+  } catch (error: unknown) {
+    return [new Error(`check_execution_failed: ${String(error)}`), null];
+  }
+}
+
+/**
+ * cleanupLocks removes all expired locks from the table.
+ */
+async function cleanupLocks(
+  tx: postgres.Sql,
+): Promise<Result<LockResult>> {
+  try {
+    const rows = await tx<Pick<LockRow, 'lock_key'>[]>`
+      DELETE FROM booking_locks 
+      WHERE expires_at < NOW() 
+      RETURNING lock_key
+    `;
+
+    return [null, { cleaned: rows.length }];
+  } catch (error: unknown) {
+    return [new Error(`cleanup_execution_failed: ${String(error)}`), null];
+  }
+}
+
+// ─── Data Access Helpers ───────────────────────────────────────────────────
+
+async function tryInsertLock(
+  tx: postgres.Sql,
+  input: Input,
+  expiresAt: Date,
+): Promise<Result<LockRow>> {
+  try {
+    const rows = await tx<LockRow[]>`
+      INSERT INTO booking_locks (
+        lock_key, 
+        owner_token, 
+        provider_id, 
+        start_time, 
+        expires_at
+      )
+      VALUES (
+        ${input.lock_key}, 
+        ${input.owner_token!}, 
+        ${input.provider_id}::uuid, 
+        ${input.start_time!}::timestamptz, 
+        ${expiresAt.toISOString()}::timestamptz
+      )
+      ON CONFLICT (lock_key) DO NOTHING
+      RETURNING lock_id, lock_key, owner_token, provider_id, start_time, acquired_at, expires_at
+    `;
+    return [null, rows[0] || null];
+  } catch (error: unknown) {
+    return [new Error(`insert_failed: ${String(error)}`), null];
+  }
+}
+
+async function tryStealExpiredLock(
+  tx: postgres.Sql,
+  input: Input,
+  expiresAt: Date,
+): Promise<Result<LockRow>> {
+  try {
+    const rows = await tx<LockRow[]>`
+      UPDATE booking_locks
+      SET owner_token = ${input.owner_token!},
+          expires_at = ${expiresAt.toISOString()}::timestamptz,
+          acquired_at = NOW(),
+          start_time = ${input.start_time!}::timestamptz
+      WHERE lock_key = ${input.lock_key} 
+        AND expires_at < NOW()
+      RETURNING lock_id, lock_key, owner_token, provider_id, start_time, acquired_at, expires_at
+    `;
+    return [null, rows[0] || null];
+  } catch (error: unknown) {
+    return [new Error(`steal_failed: ${String(error)}`), null];
+  }
+}
+
+/**
+ * mapRowToLockInfo converts DB row types to public API types.
+ * Adheres to DRY by centralizing conversion logic.
+ */
+function mapRowToLockInfo(row: LockRow): LockInfo {
+  return {
+    lock_id: String(row.lock_id),
+    lock_key: row.lock_key,
+    owner_token: row.owner_token,
+    provider_id: row.provider_id,
+    start_time: row.start_time.toISOString(),
+    acquired_at: row.acquired_at.toISOString(),
+    expires_at: row.expires_at.toISOString(),
+  };
 }
