@@ -9,118 +9,19 @@
  * Zod Schemas     : YES — InputSchema validates provider_id, date_range
  */
 
-/*
- * REASONING TRACE
- * ### Mission Decomposition
- * - Validate input (provider_id, date_from, date_to, include_client_details)
- * - Verify provider exists and is active
- * - Iterate date range, fetching provider_schedules, schedule_overrides, and bookings per day
- * - Assemble structured agenda with schedule, blocks, and bookings per day
- *
- * ### Schema Verification
- * - Tables: providers, provider_schedules, bookings, clients, services, schedule_overrides
- * - Columns: All columns verified against §6 + schedule_overrides (is_blocked, reason, override_date)
- *
- * ### Failure Mode Analysis
- * - Scenario 1: Provider not found or inactive → immediate error return before agenda iteration
- * - Scenario 2: No bookings for a day → empty bookings array, still valid agenda entry
- * - Scenario 3: Invalid date format → Zod regex validation rejects before DB query
- *
- * ### Concurrency Analysis
- * - Risk: NO — purely read-only queries, no writes or locks needed
- *
- * ### SOLID Compliance Check
- * - SRP: YES — each day's data retrieval is a single responsibility within the loop
- * - DRY: YES — booking query duplicated for include_client_details branch, but conditional split is necessary
- * - KISS: YES — simple date iteration with per-day queries, no premature optimization
- *
- * → CLEARED FOR CODE GENERATION
- */
-
-// ============================================================================
-// PROVIDER AGENDA — View provider daily/weekly schedule with bookings
-// ============================================================================
-// Returns a provider's agenda for a given date range, showing:
-// - Scheduled hours from provider_schedules
-// - Existing bookings with client info
-// - Schedule overrides (blocked/modified)
-// - Available vs booked slots
-// ============================================================================
-
-import { z } from 'zod';
 import { withTenantContext } from '../internal/tenant-context';
 import { createDbClient } from '../internal/db/client';
+import type { Result } from '../internal/result';
+import { InputSchema, type Input, type AgendaResult } from './types';
+import type { TxClient } from '../internal/tenant-context';
 
-const InputSchema = z.object({
-  provider_id: z.uuid(),
-  date_from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  date_to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  include_client_details: z.boolean().default(false),
-});
-
-interface ProviderRow {
-  readonly provider_id: string;
-  readonly name: string;
-  readonly timezone: string;
-}
-
-interface ScheduleRow {
-  readonly start_time: string;
-  readonly end_time: string;
-  readonly is_active: boolean;
-}
-
-interface OverrideRow {
-  readonly is_blocked: boolean;
-  readonly reason: string | null;
-}
-
-interface BookingWithClient {
-  readonly booking_id: string;
-  readonly start_time: string;
-  readonly end_time: string;
-  readonly status: string;
-  readonly client_name: string;
-  readonly client_email: string | null;
-  readonly service_name: string;
-}
-
-interface BookingWithoutClient {
-  readonly booking_id: string;
-  readonly start_time: string;
-  readonly end_time: string;
-  readonly status: string;
-  readonly service_name: string;
-}
-
-type BookingEntry = BookingWithClient | BookingWithoutClient;
-
-interface AgendaDay {
-  readonly date: string;
-  readonly day_of_week: number;
-  readonly schedule_start: string | null;
-  readonly schedule_end: string | null;
-  readonly is_blocked: boolean;
-  readonly block_reason: string | null;
-  readonly bookings: BookingEntry[];
-  readonly total_bookings: number;
-}
-
-interface AgendaResult {
-  readonly provider_id: string;
-  readonly provider_name: string;
-  readonly days: AgendaDay[];
-}
-
-export async function main(rawInput: unknown): Promise<[Error | null, AgendaResult | null]> {
+export async function main(rawInput: unknown): Promise<Result<AgendaResult>> {
   const parsed = InputSchema.safeParse(rawInput);
   if (!parsed.success) {
     return [new Error('Validation error: ' + parsed.error.message), null];
   }
 
-  const input = parsed.data;
-  const tenantId = input.provider_id;
-
+  const input: Input = parsed.data;
   const dbUrl = process.env['DATABASE_URL'];
   if (dbUrl === undefined || dbUrl === '') {
     return [new Error('CONFIGURATION_ERROR: DATABASE_URL is required'), null];
@@ -129,96 +30,92 @@ export async function main(rawInput: unknown): Promise<[Error | null, AgendaResu
   const sql = createDbClient({ url: dbUrl });
 
   try {
-    const [txErr, txData] = await withTenantContext(sql, tenantId, async (tx) => {
-      // 1. Verify provider exists
-      const providerRows = await tx<ProviderRow[]>`
-        SELECT provider_id, name, timezone FROM providers
+    const [txErr, txData] = await withTenantContext(sql, input.provider_id, async (tx) => {
+      const providerRows = await tx.values<[string, string]>`
+        SELECT provider_id, name FROM providers
         WHERE provider_id = ${input.provider_id}::uuid AND is_active = true LIMIT 1
       `;
-      const provider = providerRows[0];
-      if (provider === undefined) {
+
+      const providerRow = providerRows[0];
+      if (!providerRow) {
         return [new Error('Provider not found or inactive'), null];
       }
 
-      // 2. Generate date range
-      const from = new Date(input.date_from + 'T00:00:00');
-      const to = new Date(input.date_to + 'T23:59:59');
-      const days: AgendaDay[] = [];
-
-      for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
-        const dateStr = d.toISOString().split('T')[0];
-        if (dateStr === undefined) continue;
-        const dayOfWeek = d.getUTCDay();
-
-        // Get schedule for this day
-        const scheduleRows = await tx<ScheduleRow[]>`
-          SELECT start_time, end_time, is_active FROM provider_schedules
-          WHERE provider_id = ${input.provider_id}::uuid AND day_of_week = ${dayOfWeek} AND is_active = true
+      const days: AgendaResult['days'] = [];
+      const startDate = new Date(input.date_from);
+      const endDate = new Date(input.date_to);
+      
+      for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+        const dateStr = d.toISOString().split('T')[0] ?? '';
+        
+        const overrideRows = await tx.values<[boolean, string]>`
+          SELECT is_blocked, reason FROM schedule_overrides
+          WHERE provider_id = ${input.provider_id}::uuid AND override_date = ${dateStr}::date
           LIMIT 1
         `;
-        const scheduleRow = scheduleRows[0];
-        const scheduleStart = scheduleRow !== undefined ? scheduleRow.start_time : null;
-        const scheduleEnd = scheduleRow !== undefined ? scheduleRow.end_time : null;
 
-        // Check for overrides
-        const overrideRows = await tx<OverrideRow[]>`
-          SELECT is_blocked, reason FROM schedule_overrides
-          WHERE provider_id = ${input.provider_id}::uuid AND override_date = ${dateStr}::date LIMIT 1
+        const isBlocked = overrideRows[0]?.[0] ?? false;
+        const blockReason = overrideRows[0]?.[1] ?? null;
+
+        const dayOfWeek = d.getUTCDay();
+        const scheduleRows = await tx.values<[string, string]>`
+          SELECT start_time, end_time FROM provider_schedules
+          WHERE provider_id = ${input.provider_id}::uuid AND day_of_week = ${dayOfWeek} AND is_active = true
         `;
-        const overrideRow = overrideRows[0];
-        const isBlocked = overrideRow !== undefined ? overrideRow.is_blocked : false;
-        const blockReason = overrideRow !== undefined ? overrideRow.reason : null;
 
-        // Get bookings for this day
-        let bookings: BookingEntry[];
-        if (input.include_client_details) {
-          bookings = await tx<BookingWithClient[]>`
-            SELECT b.booking_id, b.start_time, b.end_time, b.status,
-                   p.name as client_name, p.email as client_email,
-                   s.name as service_name
+        const bookingsRows = input.include_client_details
+          ? await tx.values<[string, string, string, string, string]>`
+            SELECT b.booking_id, b.start_time, b.end_time, b.status, s.name,
+                   COALESCE(c.full_name, '') as client_name
             FROM bookings b
-            JOIN clients p ON p.client_id = b.client_id
-            JOIN services s ON s.service_id = b.service_id
+            JOIN services s ON b.service_id = s.service_id
+            LEFT JOIN clients c ON b.client_id = c.client_id
             WHERE b.provider_id = ${input.provider_id}::uuid
-              AND b.start_time >= ${dateStr}::date
-              AND b.start_time < (${dateStr}::date + INTERVAL '1 day')
+              AND DATE(b.start_time AT TIME ZONE 'UTC') = ${dateStr}::date
               AND b.status NOT IN ('cancelled', 'no_show')
-            ORDER BY b.start_time ASC
-          `;
-        } else {
-          bookings = await tx<BookingWithoutClient[]>`
-            SELECT b.booking_id, b.start_time, b.end_time, b.status, s.name as service_name
+            ORDER BY b.start_time
+          `
+          : await tx.values<[string, string, string, string]>`
+            SELECT b.booking_id, b.start_time, b.end_time, b.status, s.name
             FROM bookings b
-            JOIN services s ON s.service_id = b.service_id
+            JOIN services s ON b.service_id = s.service_id
             WHERE b.provider_id = ${input.provider_id}::uuid
-              AND b.start_time >= ${dateStr}::date
-              AND b.start_time < (${dateStr}::date + INTERVAL '1 day')
+              AND DATE(b.start_time AT TIME ZONE 'UTC') = ${dateStr}::date
               AND b.status NOT IN ('cancelled', 'no_show')
-            ORDER BY b.start_time ASC
+            ORDER BY b.start_time
           `;
-        }
+
+        const bookings = bookingsRows.map((row) => ({
+          booking_id: row[0],
+          start_time: row[1],
+          end_time: row[2],
+          status: row[3],
+          service_name: row[4],
+          client_name: input.include_client_details ? row[5] : undefined,
+        }));
 
         days.push({
           date: dateStr,
-          day_of_week: dayOfWeek,
-          schedule_start: scheduleStart,
-          schedule_end: scheduleEnd,
           is_blocked: isBlocked,
-          block_reason: blockReason,
-          bookings: bookings,
-          total_bookings: bookings.length,
+          block_reason: blockReason ?? undefined,
+          schedule: scheduleRows.map((s) => ({
+            start_time: s[0],
+            end_time: s[1],
+          })),
+          bookings,
         });
       }
 
       return [null, {
-        provider_id: provider.provider_id,
-        provider_name: provider.name,
-        days: days,
+        provider_id: input.provider_id,
+        provider_name: providerRow[1],
+        date_from: input.date_from,
+        date_to: input.date_to,
+        days,
       }];
     });
 
-    if (txErr !== null) return [txErr, null];
-    if (txData === null) return [new Error('Agenda query failed'), null];
+    if (txErr) return [txErr, null];
     return [null, txData];
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);

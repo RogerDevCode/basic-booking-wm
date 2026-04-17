@@ -30,8 +30,8 @@ export function getConfiguration(input: Input): Result<InternalConfig> {
 
 export async function setupWebhook(input: Input): Promise<Result<WebhookSetupResult>> {
   const [configErr, config] = getConfiguration(input);
-  if (configErr !== null) {
-    return [configErr, null];
+  if (configErr !== null || config === null) {
+    return [configErr ?? new Error('config_error'), null];
   }
   const { accessToken, webhookUrl, webhookSecret } = config;
 
