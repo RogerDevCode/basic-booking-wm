@@ -12,22 +12,13 @@
 // ============================================================================
 // GEMINI 2.5 FLASH — Connectivity & Basic Q&A Test
 // ============================================================================
-// Tests:
-//   1. API connectivity (Google AI Studio)
-//   2. Model listing (available models)
-//   3. Basic Q&A (greeting, medical intent, availability query)
-//   4. Structured JSON output (NLU intent classification)
-//   5. Spanish language handling
-//   6. Error handling (invalid key, rate limit)
-// ============================================================================
 
 import { z } from 'zod';
+import type { Result } from '../internal/result';
 
 // ============================================================================
 // Types & Schemas
 // ============================================================================
-
-type Result<T> = [Error | null, T | null];
 
 const GeminiCandidateSchema = z.object({
   content: z.object({
@@ -57,6 +48,7 @@ interface TestCase {
   readonly systemPrompt: string;
   readonly userMessage: string;
   readonly temperature: number;
+  readonly jsonMode?: boolean;
 }
 
 interface TestResult {
@@ -73,16 +65,26 @@ interface TestResult {
   readonly modelVersion: string | null;
 }
 
+interface TestReport {
+  readonly model: string;
+  readonly timestamp: string;
+  readonly apiKeySet: boolean;
+  readonly totalTests: number;
+  readonly passed: number;
+  readonly failed: number;
+  readonly results: readonly TestResult[];
+}
+
 // ============================================================================
 // Google AI Studio Client
 // ============================================================================
 
 const GEMINI_MODEL = 'gemini-2.5-flash';
-const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+const GEMINI_API_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 
-function getApiKey(): [Error | null, string | null] {
+function getApiKey(): Result<string> {
   const key = process.env['GOOGLE_API_KEY'];
-  if (key === undefined || key === '') {
+  if (!key) {
     return [new Error('GOOGLE_API_KEY is not set in environment'), null];
   }
   return [null, key];
@@ -90,83 +92,27 @@ function getApiKey(): [Error | null, string | null] {
 
 async function callGemini(
   apiKey: string,
-  systemPrompt: string,
-  userMessage: string,
-  temperature: number = 0.0,
-): Promise<[Error | null, GeminiResponse | null]> {
-  const url = `${GEMINI_API_URL}?key=${apiKey}`;
-
-  const body = {
-    contents: [
-      {
-        role: 'user',
-        parts: [{ text: userMessage }],
-      },
-    ],
-    systemInstruction: {
-      parts: [{ text: systemPrompt }],
-    },
-    generationConfig: {
-      temperature,
-      maxOutputTokens: 1024,
-      responseMimeType: 'text/plain',
-    },
-  };
-
-  try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-
-    if (!response.ok) {
-      const errorBody = await response.text();
-      return [
-        new Error(`HTTP ${response.status}: ${errorBody.slice(0, 500)}`),
-        null,
-      ];
-    }
-
-    const data: unknown = await response.json();
-    const parsed = GeminiResponseSchema.safeParse(data);
-
-    if (!parsed.success) {
-      return [
-        new Error(`Schema validation failed: ${parsed.error.message}`),
-        null,
-      ];
-    }
-
-    return [null, parsed.data];
-  } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : String(error);
-    return [new Error(`Network error: ${msg}`), null];
+  params: {
+    readonly systemPrompt: string;
+    readonly userMessage: string;
+    readonly temperature?: number;
+    readonly jsonMode?: boolean;
   }
-}
-
-async function callGeminiJSON(
-  apiKey: string,
-  systemPrompt: string,
-  userMessage: string,
-  temperature: number = 0.0,
-): Promise<[Error | null, GeminiResponse | null]> {
-  const url = `${GEMINI_API_URL}?key=${apiKey}`;
+): Promise<Result<GeminiResponse>> {
+  const url = `${GEMINI_API_BASE_URL}/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
 
   const body = {
-    contents: [
-      {
-        role: 'user',
-        parts: [{ text: userMessage }],
-      },
-    ],
+    contents: [{
+      role: 'user',
+      parts: [{ text: params.userMessage }],
+    }],
     systemInstruction: {
-      parts: [{ text: systemPrompt }],
+      parts: [{ text: params.systemPrompt }],
     },
     generationConfig: {
-      temperature,
+      temperature: params.temperature ?? 0.0,
       maxOutputTokens: 1024,
-      responseMimeType: 'application/json',
+      responseMimeType: params.jsonMode ? 'application/json' : 'text/plain',
     },
   };
 
@@ -203,7 +149,7 @@ async function callGeminiJSON(
 }
 
 // ============================================================================
-// Test Cases
+// Test Suite Data
 // ============================================================================
 
 const TEST_CASES: readonly TestCase[] = [
@@ -215,53 +161,43 @@ const TEST_CASES: readonly TestCase[] = [
   },
   {
     name: '02_medical_greeting',
-    systemPrompt:
-      'Eres el asistente de una clínica médica. Responde de forma profesional y empática en español.',
+    systemPrompt: 'Eres el asistente de una clínica médica. Responde de forma profesional y empática en español.',
     userMessage: 'Hola, necesito agendar una consulta con el doctor.',
     temperature: 0.0,
   },
   {
     name: '03_availability_query',
-    systemPrompt:
-      'Eres el motor de disponibilidad de una clínica médica. Solo responde con horarios disponibles.',
+    systemPrompt: 'Eres el motor de disponibilidad de una clínica médica. Solo responde con horarios disponibles.',
     userMessage: '¿Tienen hora disponible para el lunes por la mañana?',
     temperature: 0.0,
   },
   {
     name: '04_cancel_intent',
-    systemPrompt:
-      'Eres el asistente de una clínica médica. Ayuda a los pacientes con sus citas.',
+    systemPrompt: 'Eres el asistente de una clínica médica. Ayuda a los pacientes con sus citas.',
     userMessage: 'Quiero cancelar mi cita del próximo martes.',
     temperature: 0.0,
   },
   {
     name: '05_reschedule_intent',
-    systemPrompt:
-      'Eres el asistente de una clínica médica. Ayuda a los pacientes con sus citas.',
+    systemPrompt: 'Eres el asistente de una clínica médica. Ayuda a los pacientes con sus citas.',
     userMessage: 'Necesito cambiar mi cita para otro día, ¿puede ser el jueves?',
     temperature: 0.0,
   },
   {
     name: '06_urgency_detection',
-    systemPrompt:
-      'Eres el asistente de una clínica médica. Si detectas una emergencia, indica que se contacte servicios de urgencia.',
+    systemPrompt: 'Eres el asistente de una clínica médica. Si detectas una emergencia, indica que se contacte servicios de urgencia.',
     userMessage: 'Tengo un dolor muy fuerte en el pecho y no puedo respirar bien.',
     temperature: 0.0,
   },
   {
     name: '07_out_of_scope',
-    systemPrompt:
-      'Eres el asistente de una clínica médica. Solo respondes preguntas sobre citas y servicios médicos.',
+    systemPrompt: 'Eres el asistente de una clínica médica. Solo respondes preguntas sobre citas y servicios médicos.',
     userMessage: '¿Quién ganó el partido de fútbol ayer?',
     temperature: 0.0,
   },
-];
-
-const JSON_TEST_CASES: readonly TestCase[] = [
   {
     name: '08_nlu_json_classification',
-    systemPrompt:
-      `Clasifica el mensaje del usuario en uno de estos intents:
+    systemPrompt: `Clasifica el mensaje del usuario en uno de estos intents:
 - ver_disponibilidad: quiere ver horarios disponibles
 - crear_cita: quiere agendar una cita
 - cancelar_cita: quiere cancelar una cita existente
@@ -274,11 +210,11 @@ Responde SOLO con JSON en este formato exacto:
 {"intent":"<intent>","confidence":<0.0-1.0>,"requires_human":<true/false>}`,
     userMessage: 'Hola buenos días, quiero sacar una hora para la próxima semana',
     temperature: 0.0,
+    jsonMode: true,
   },
   {
     name: '09_nlu_json_reschedule',
-    systemPrompt:
-      `Clasifica el mensaje del usuario en uno de estos intents:
+    systemPrompt: `Clasifica el mensaje del usuario en uno de estos intents:
 - ver_disponibilidad: quiere ver horarios disponibles
 - crear_cita: quiere agendar una cita
 - cancelar_cita: quiere cancelar una cita existente
@@ -291,27 +227,29 @@ Responde SOLO con JSON en este formato exacto:
 {"intent":"<intent>","confidence":<0.0-1.0>,"requires_human":<true/false>}`,
     userMessage: 'Oye, me equivoqué de día, puedo pasar mi cita del lunes al miércoles?',
     temperature: 0.0,
+    jsonMode: true,
   },
 ];
 
 // ============================================================================
-// Test Runner
+// Utilities
 // ============================================================================
 
 function extractText(response: GeminiResponse): string {
   const first = response.candidates[0];
-  if (first === undefined) return '(no content)';
-  const parts = first.content.parts;
-  const texts = parts.map(p => p.text);
-  return texts.join('').trim();
+  if (!first) return '(no content)';
+  return first.content.parts.map(p => p.text).join('').trim();
 }
 
-async function runTest(testCase: TestCase, apiKey: string, jsonMode: boolean = false): Promise<Result<TestResult>> {
+async function runSingleTest(testCase: TestCase, apiKey: string): Promise<Result<TestResult>> {
   const start = Date.now();
 
-  const [err, response] = jsonMode
-    ? await callGeminiJSON(apiKey, testCase.systemPrompt, testCase.userMessage, testCase.temperature)
-    : await callGemini(apiKey, testCase.systemPrompt, testCase.userMessage, testCase.temperature);
+  const [err, response] = await callGemini(apiKey, {
+    systemPrompt: testCase.systemPrompt,
+    userMessage: testCase.userMessage,
+    temperature: testCase.temperature,
+    ...(testCase.jsonMode !== undefined ? { jsonMode: testCase.jsonMode } : {}),
+  });
 
   const latencyMs = Date.now() - start;
 
@@ -341,123 +279,112 @@ async function runTest(testCase: TestCase, apiKey: string, jsonMode: boolean = f
       total: usage?.totalTokenCount ?? null,
     },
     latencyMs,
-    modelVersion: response?.modelVersion ?? null,
+    modelVersion: response.modelVersion ?? null,
   }];
 }
 
 // ============================================================================
-// Main
+// Main Orchestrator
 // ============================================================================
 
-interface TestReport {
-  readonly model: string;
-  readonly timestamp: string;
-  readonly apiKeySet: boolean;
-  readonly totalTests: number;
-  readonly passed: number;
-  readonly failed: number;
-  readonly results: readonly TestResult[];
-}
-
-export async function main(_rawInput: unknown = {}): Promise<[Error | null, TestReport | null]> {
+export async function main(_rawInput: unknown = {}): Promise<Result<TestReport>> {
   const [keyErr, apiKey] = getApiKey();
-  if (keyErr !== null || apiKey === null) {
-    return [new Error(`CONFIG_ERROR: ${keyErr?.message ?? 'apiKey is null'}`), null];
+  if (keyErr !== null) {
+    return [new Error(`CONFIG_ERROR: ${keyErr.message}`), null];
+  }
+  if (apiKey === null) {
+    return [new Error('CONFIG_ERROR: apiKey is null'), null];
   }
 
+  printHeader();
+
+  // ── Step 1: Connectivity Check ──────────────────────────────────────────
+  console.log('[1/2] Testing API connectivity...');
+  const [connErr, connResp] = await callGemini(apiKey, {
+    systemPrompt: 'Reply with exactly: OK',
+    userMessage: 'Ping',
+  });
+
+  if (connErr !== null) {
+    return [new Error(`CONNECTIVITY_FAILED: ${connErr.message}`), null];
+  }
+  if (connResp === null) {
+    return [new Error('CONNECTIVITY_FAILED: null response'), null];
+  }
+  console.log(`  ✓ Connected — Model: ${connResp.modelVersion ?? '(unknown)'}\n`);
+
+  // ── Step 2: Run Test Suite ──────────────────────────────────────────────
+  console.log(`[2/2] Running ${TEST_CASES.length} test cases...\n`);
+
+  const results: TestResult[] = [];
+  for (const tc of TEST_CASES) {
+    const [err, result] = await runSingleTest(tc, apiKey);
+    if (err !== null || result === null) {
+      console.log(`  ✗ ${tc.name}: FATAL RUNTIME ERROR`);
+      continue;
+    }
+    results.push(result);
+    printResultPreview(result);
+  }
+
+  const report = generateReport(results);
+  printSummary(report);
+
+  return [null, report];
+}
+
+// ============================================================================
+// Formatting & Reporting
+// ============================================================================
+
+function printHeader(): void {
   console.log(`\n${'='.repeat(70)}`);
   console.log(`  Gemini 2.5 Flash — Connectivity & Q&A Test`);
   console.log(`  Model: ${GEMINI_MODEL}`);
-  console.log(`  API: ${GEMINI_API_URL.split('?')[0]}`);
   console.log(`${'='.repeat(70)}\n`);
+}
 
-  // ── Step 1: Basic connectivity ──────────────────────────────────────────
-  console.log('[1/3] Testing API connectivity...');
-  const [connErr, connResp] = await callGemini(apiKey, 'Reply with exactly: OK', 'Ping', 0.0);
-  if (connErr !== null || connResp === null) {
-    return [new Error(`CONNECTIVITY_FAILED: ${connErr?.message ?? 'null response'}`), null];
+function printResultPreview(result: TestResult): void {
+  if (result.success && result.response) {
+    const preview = result.response.length > 120
+      ? result.response.slice(0, 120).replace(/\n/g, ' ') + '...'
+      : result.response.replace(/\n/g, ' ');
+    console.log(`  ✓ ${result.name} (${result.latencyMs}ms, ${result.tokenUsage?.total ?? '?'} tokens)`);
+    console.log(`    → ${preview}`);
+  } else {
+    console.log(`  ✗ ${result.name}: ${result.error}`);
   }
-  console.log(`  ✓ Connected — model responded successfully`);
-  console.log(`  ✓ Model version: ${connResp.modelVersion ?? '(not reported)'}`);
+}
 
-  // ── Step 2: Run all text test cases ─────────────────────────────────────
-  console.log(`\n[2/3] Running ${TEST_CASES.length} text test cases...\n`);
+function generateReport(results: readonly TestResult[]): TestReport {
+  const passed = results.filter(r => r.success).length;
+  const failed = results.filter(r => !r.success).length;
 
-  const textResults: TestResult[] = [];
+  return Object.freeze({
+    model: GEMINI_MODEL,
+    timestamp: new Date().toISOString(),
+    apiKeySet: true,
+    totalTests: results.length,
+    passed,
+    failed,
+    results,
+  });
+}
 
-  for (const tc of TEST_CASES) {
-    const [err, result] = await runTest(tc, apiKey);
-    if (err !== null || result === null) {
-      console.log(`  ✗ ${tc.name}: ${err?.message ?? 'null result'}`);
-      continue;
-    }
-    textResults.push(result);
-
-    if (result.success && result.response !== null) {
-      const preview = result.response.length > 120
-        ? result.response.slice(0, 120) + '...'
-        : result.response;
-      console.log(`  ✓ ${tc.name} (${result.latencyMs}ms, ${result.tokenUsage?.total ?? '?'} tokens)`);
-      console.log(`    → ${preview.replace(/\n/g, ' ')}`);
-    } else {
-      console.log(`  ✗ ${tc.name}: ${result.error}`);
-    }
-  }
-
-  // ── Step 3: Run JSON test cases ─────────────────────────────────────────
-  console.log(`\n[3/3] Running ${JSON_TEST_CASES.length} JSON structured output test cases...\n`);
-
-  const jsonResults: TestResult[] = [];
-
-  for (const tc of JSON_TEST_CASES) {
-    const [err, result] = await runTest(tc, apiKey, true);
-    if (err !== null || result === null) {
-      console.log(`  ✗ ${tc.name}: ${err?.message ?? 'null result'}`);
-      continue;
-    }
-    jsonResults.push(result);
-
-    if (result.success) {
-      const preview = result.response!.length > 200
-        ? result.response!.slice(0, 200) + '...'
-        : result.response!;
-      console.log(`  ✓ ${tc.name} (${result.latencyMs}ms, ${result.tokenUsage?.total ?? '?'} tokens)`);
-      console.log(`    → ${preview.replace(/\n/g, ' ')}`);
-    } else {
-      console.log(`  ✗ ${tc.name}: ${result.error}`);
-    }
-  }
-
-  // ── Summary ─────────────────────────────────────────────────────────────
-  const allResults = [...textResults, ...jsonResults];
-  const passed = allResults.filter(r => r.success).length;
-  const failed = allResults.filter(r => !r.success).length;
-  const avgLatency = allResults.length > 0
-    ? Math.round(allResults.reduce((sum, r) => sum + r.latencyMs, 0) / allResults.length)
+function printSummary(report: TestReport): void {
+  const avgLatency = report.results.length > 0
+    ? Math.round(report.results.reduce((sum, r) => sum + r.latencyMs, 0) / report.results.length)
     : 0;
 
   console.log(`\n${'='.repeat(70)}`);
   console.log(`  RESULTS SUMMARY`);
-  console.log(`${'='.repeat(70)}`);
-  console.log(`  Model        : ${GEMINI_MODEL}`);
-  console.log(`  Total tests  : ${allResults.length}`);
-  console.log(`  Passed       : ${passed}`);
-  console.log(`  Failed       : ${failed}`);
+  console.log('='.repeat(70));
+  console.log(`  Model        : ${report.model}`);
+  console.log(`  Total tests  : ${report.totalTests}`);
+  console.log(`  Passed       : ${report.passed}`);
+  console.log(`  Failed       : ${report.failed}`);
   console.log(`  Avg latency  : ${avgLatency}ms`);
-  console.log(`  Model version: ${allResults.find(r => r.modelVersion)?.modelVersion ?? '(not reported)'}`);
   console.log(`${'='.repeat(70)}\n`);
-
-  const report: TestReport = Object.freeze({
-    model: GEMINI_MODEL,
-    timestamp: new Date().toISOString(),
-    apiKeySet: true,
-    totalTests: allResults.length,
-    passed,
-    failed,
-    results: allResults,
-  });
-
-  return [null, report];
 }
 
 // ── CLI entry point ──────────────────────────────────────────────────────
@@ -471,7 +398,7 @@ if (isMain) {
       process.exit(1);
     }
     if (report !== null) {
-      console.log('Full report:', JSON.stringify(report, null, 2));
+      console.log('Full report preview (first 2):', JSON.stringify(report.results.slice(0, 2), null, 2));
     }
     process.exit(report?.failed === 0 ? 0 : 1);
   });
