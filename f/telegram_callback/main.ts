@@ -66,7 +66,7 @@ const InputSchema = z.object({
 const ACTION_MAP: Record<string, string> = {
   'cnf': 'confirm',
   'cxl': 'cancel',
-  'res': 'reschedule',
+  'res': 'reagendar_cita',
   'act': 'activate_reminders',
   'dea': 'deactivate_reminders',
   'ack': 'acknowledge',
@@ -325,7 +325,7 @@ export async function main(rawInput: unknown): Promise<[Error | null, Record<str
       break;
     }
 
-    case 'reschedule': {
+    case 'reagendar_cita': {
       responseText = '🔄 Reprogramar cita';
       followUpText = 'Para reprogramar tu cita, responde con la fecha y hora que prefieres\\. Ejemplo: "Quiero el lunes a las 10am"\\.';
       break;
