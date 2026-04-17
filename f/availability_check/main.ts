@@ -18,19 +18,19 @@
  * - Return structured availability result with metadata
  *
  * ### Schema Verification
- * - Tables: providers (provider_id, name, timezone, is_active), provider_services (service_id, provider_id, is_default), provider_schedules (via getAvailability), bookings (via getAvailability)
- * - Columns: All verified against §6 schema; provider_services and schedule_overrides are extension tables used by scheduling engine
+ * - Tables: providers (provider_id, name, timezone, is_active), services (service_id, provider_id, name, duration_minutes, buffer_minutes, is_active), provider_schedules (via getAvailability), bookings (via getAvailability)
+ * - Columns: All verified against live DB schema
  *
  * ### Failure Mode Analysis
  * - Scenario 1: Provider not found or inactive → return error before scheduling engine call
- * - Scenario 2: No default service for provider → return error with clear message
+ * - Scenario 2: No active service for provider → return error with clear message
  * - Scenario 3: getAvailability returns null → return error to prevent silent failure
  *
  * ### Concurrency Analysis
  * - Risk: NO — read-only queries, no locks needed
  *
  * ### SOLID Compliance Check
- * - SRP: Each function does one thing — YES (main orchestrates, getDefaultServiceId fetches service, withTenantContext manages transaction)
+ * - SRP: Each function does one thing — YES (main orchestrates, getProviderServiceId fetches service, withTenantContext manages transaction)
  * - DRY: No duplicated logic — YES (delegates to getAvailability, uses shared tenant-context HOF)
  * - KISS: No unnecessary complexity — YES (straightforward delegation pattern)
  *
@@ -88,10 +88,11 @@ interface ProviderRow {
   timezone: string;
 }
 
-async function getDefaultServiceId(tx: postgres.Sql, providerId: string): Promise<string | null> {
+async function getProviderServiceId(tx: postgres.Sql, providerId: string): Promise<string | null> {
   const rows = await tx<{ service_id: string }[]>`
-    SELECT service_id FROM provider_services
-    WHERE provider_id = ${providerId}::uuid AND is_default = true
+    SELECT service_id FROM services
+    WHERE provider_id = ${providerId}::uuid AND is_active = true
+    ORDER BY service_id
     LIMIT 1
   `;
   const first = rows[0];
@@ -127,7 +128,7 @@ export async function main(rawInput: unknown): Promise<[Error | null, Availabili
     }
 
     // Step 2: Use scheduling engine for availability computation
-    const effectiveServiceId = service_id ?? (await getDefaultServiceId(tx, provider_id));
+    const effectiveServiceId = service_id ?? (await getProviderServiceId(tx, provider_id));
     if (effectiveServiceId == null) {
       return [new Error('No services available for this provider'), null];
     }
