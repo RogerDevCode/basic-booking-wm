@@ -1,3 +1,7 @@
+import { z } from "zod";
+import type { Result } from "../../internal/result";
+import { ok, fail } from "../../internal/result";
+
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : Extract normalized fields from Telegram webhook event (message + callback_query)
@@ -6,43 +10,57 @@
  * GCal Calls      : NO
  * Idempotency Key : NO
  * RLS Tenant ID   : NO
- * Zod Schemas     : NO — interface-level type guards only (no external deps in trigger)
+ * Zod Schemas     : YES — for robust payload validation
  */
 
 /**
  * TELEGRAM WEBHOOK TRIGGER — Event normalization
  * 
- * This module follows SRP by delegating extraction of specific fields to 
- * specialized internal functions. It adheres to the Go-style Result pattern
- * for robust error handling and strict type safety.
+ * This module follows SOLID principles by using Zod for validation (SRP),
+ * centralizing shared access logic (DRY), and maintaining a clean, deterministic
+ * flow (KISS). Adheres to Go-style Result pattern.
  */
 
-interface TelegramUser {
-  readonly id?: number | string;
-  readonly first_name?: string;
-}
+// ============================================================================
+// Schemas & Types
+// ============================================================================
 
-interface TelegramMessage {
-  readonly message_id?: number;
-  readonly chat?: { readonly id?: number | string };
-  readonly text?: string;
-  readonly from?: TelegramUser;
-}
+const TelegramUserSchema = z.object({
+  id: z.union([z.number(), z.string()]).optional(),
+  first_name: z.string().optional(),
+  username: z.string().optional(),
+});
 
-interface CallbackQuery {
-  readonly id?: string;
-  readonly data?: string;
-  readonly from?: TelegramUser;
-  readonly message?: TelegramMessage;
-}
+const TelegramMessageSchema = z.object({
+  message_id: z.number().optional(),
+  chat: z.object({ 
+    id: z.union([z.number(), z.string()]).optional() 
+  }).optional(),
+  text: z.string().optional(),
+  from: TelegramUserSchema.optional(),
+});
 
-interface TelegramEvent {
-  readonly message?: TelegramMessage;
-  readonly channel_post?: TelegramMessage;
-  readonly callback_query?: CallbackQuery;
-}
+const CallbackQuerySchema = z.object({
+  id: z.string().optional(),
+  data: z.string().optional(),
+  from: TelegramUserSchema.optional(),
+  message: TelegramMessageSchema.optional(),
+});
 
-interface TriggerOutput {
+/**
+ * Validates the incoming Telegram webhook payload.
+ */
+const TelegramEventSchema = z.object({
+  message: TelegramMessageSchema.optional(),
+  channel_post: TelegramMessageSchema.optional(),
+  callback_query: CallbackQuerySchema.optional(),
+}).refine(data => !!(data.message || data.channel_post || data.callback_query), {
+  message: "event must contain at least one of: message, channel_post, or callback_query",
+});
+
+type TelegramEvent = z.infer<typeof TelegramEventSchema>;
+
+export interface TriggerOutput {
   readonly chat_id: string;
   readonly text: string;
   readonly username: string;
@@ -53,111 +71,88 @@ interface TriggerOutput {
 }
 
 // ============================================================================
-// Internal Helpers — Single Responsibility Extraction Logic
+// Internal Helpers — Single Responsibility & DRY
 // ============================================================================
 
 /**
- * Extracts chat_id with falling priority: 
- * message -> callback message -> sender ID
+ * DRY: Extracts the primary source of conversation data from the event.
+ */
+function getEventSource(event: Readonly<TelegramEvent>) {
+  return event.message ?? event.channel_post ?? event.callback_query?.message;
+}
+
+/**
+ * SRP: Extracts chat_id with falling priority: 
+ * message -> callback message -> sender ID.
  */
 function extractChatId(event: Readonly<TelegramEvent>): string {
-  const message = event.message ?? event.channel_post;
-  const callback = event.callback_query;
-
-  const rawId = message?.chat?.id 
-    ?? callback?.message?.chat?.id 
-    ?? callback?.from?.id 
-    ?? '';
-
+  const source = getEventSource(event);
+  const rawId = source?.chat?.id ?? event.callback_query?.from?.id ?? "";
   return String(rawId);
 }
 
 /**
- * Extracts the message text if present.
+ * SRP: Extracts the message text if present.
  */
 function extractText(event: Readonly<TelegramEvent>): string {
-  return event.message?.text ?? event.channel_post?.text ?? '';
+  return getEventSource(event)?.text ?? "";
 }
 
 /**
- * Extracts the sender's name or defaults to 'User'.
+ * SRP: Extracts the sender's display name or username.
  */
 function extractUsername(event: Readonly<TelegramEvent>): string {
-  const message = event.message ?? event.channel_post;
-  const callback = event.callback_query;
+  const source = event.message?.from 
+    ?? event.channel_post?.from 
+    ?? event.callback_query?.from;
 
-  return message?.from?.first_name 
-    ?? callback?.from?.first_name 
-    ?? 'User';
+  return source?.first_name ?? source?.username ?? "User";
 }
 
 /**
- * Extracts metadata from callback queries, including the embedded message ID.
+ * SRP: Extracts metadata specifically for callback interactions.
  */
-function extractCallbackInfo(callback?: Readonly<CallbackQuery>): {
-  readonly data: string | null;
-  readonly id: string | null;
-  readonly messageId: number | null;
-} {
+function extractCallbackInfo(event: Readonly<TelegramEvent>) {
+  const cb = event.callback_query;
   return {
-    data: callback?.data ?? null,
-    id: callback?.id ?? null,
-    messageId: typeof callback?.message?.message_id === 'number' 
-      ? callback.message.message_id 
-      : null,
+    data: cb?.data ?? null,
+    id: cb?.id ?? null,
+    messageId: cb?.message?.message_id ?? null,
   };
-}
-
-// ============================================================================
-// Type Guard
-// ============================================================================
-
-/**
- * Validates that the input is a valid Telegram event object.
- * Uses narrowing instead of prohibited type casting.
- */
-function isTelegramEvent(raw: unknown): raw is TelegramEvent {
-  if (typeof raw !== 'object' || raw === null) {
-    return false;
-  }
-  
-  return (
-    'message' in raw || 
-    'channel_post' in raw || 
-    'callback_query' in raw
-  );
 }
 
 // ============================================================================
 // Main Entry Point
 // ============================================================================
 
+/**
+ * Normalizes Telegram webhook events into a consistent internal format.
+ */
 export async function main(
   rawInput: unknown,
-): Promise<[Error | null, TriggerOutput | null]> {
-  // 1. Validate Input Payload
-  if (!isTelegramEvent(rawInput)) {
-    return [new Error('invalid_telegram_payload: event must contain message, channel_post or callback_query'), null];
+): Promise<Result<TriggerOutput>> {
+  // 1. Validate Input Payload (Fail-Fast)
+  const parseResult = TelegramEventSchema.safeParse(rawInput);
+  if (!parseResult.success) {
+    const errorMsg = parseResult.error.issues.map((e: z.ZodIssue) => e.message).join(", ");
+    return fail(`invalid_telegram_payload: ${errorMsg}`);
   }
 
-  const event: TelegramEvent = rawInput;
+  const event = parseResult.data;
 
-  // 2. Extract and Normalize Fields (SRP)
-  const chat_id = extractChatId(event);
-  const text = extractText(event);
-  const username = extractUsername(event);
-  const callbackInfo = extractCallbackInfo(event.callback_query);
+  // 2. Extract and Normalize Fields (SRP/DRY)
+  const callbackInfo = extractCallbackInfo(event);
 
-  // 3. Construct Immutable Result
   const output: TriggerOutput = {
-    chat_id,
-    text,
-    username,
+    chat_id: extractChatId(event),
+    text: extractText(event),
+    username: extractUsername(event),
     callback_data: callbackInfo.data,
     callback_query_id: callbackInfo.id,
     callback_message_id: callbackInfo.messageId,
     raw_event: event,
   };
 
-  return [null, Object.freeze(output)];
+  // 3. Final Immutability Check
+  return ok(Object.freeze(output));
 }
