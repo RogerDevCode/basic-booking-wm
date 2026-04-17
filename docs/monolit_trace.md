@@ -26,16 +26,29 @@
 | 20 | f/internal/telegram_bubble/ | types.ts, services.ts, main.ts | ✅ | ✅ | ✅ | ✅ | DONE |
 | 21 | f/internal/telegram_router/ | types.ts, services.ts, booking-wizard.ts, main.ts | ✅ | ✅ | ✅ | ✅ | DONE |
 | 22 | f/internal/tenant-context/ | index.ts | ✅ | ✅ | ✅ | ✅ | DONE |
+| 23 | f/admin_honorifics/ | types.ts, services.ts, main.ts | ✅ | ✅ | ✅ | ✅ | DONE |
+| 24 | f/availability_check/ | types.ts, services.ts, main.ts | ✅ | ✅ | ✅ | ✅ | DONE |
+| 25 | f/booking_create/ | types.ts, services.ts, main.ts | ✅ | ✅ | ✅ | ✅ | DONE |
+| 26 | f/conversation_logger/ | types.ts, services.ts, main.ts | ✅ | ✅ | ✅ | ✅ | DONE |
 
-## Fix Aplicado
-- f/web_admin_provider_crud/services.ts: Corregido escaping de backticks (TS1127 error)
+## Pendientes (35 archivos)
+- f/booking_orchestrator/main.ts (498 líneas)
+- f/booking_wizard/main.ts (498 líneas)
+- f/openrouter_benchmark/main.ts (486 líneas)
+- f/telegram_callback/main.ts (423 líneas)
+- f/gemini_test/main.ts (405 líneas)
+- f/reminder_cron/main.ts (523 líneas)
+- f/telegram_gateway/main.ts (360 líneas)
+- f/distributed_lock/main.ts (337 líneas)
+- f/gcal_sync/main.ts (334 líneas)
+- f/provider_notes/main.ts (331 líneas)
+- f/provider_dashboard/main.ts (356 líneas)
+- f/booking_reschedule/main.ts (285 líneas)
+- f/booking_search/main.ts (192 líneas)
+- f/circuit_breaker/main.ts (289 líneas)
+- f/noshow_trigger/main.ts (267 líneas)
+- Y 20 más...
 
 ## Estado Final
-- TypeScript strict: PASS (unused vars son advertencias, no errores de compilación)
-- ESLint strict: Con advertencias pre-existentes (no críticas)
-- Tests: 337 passed, 7 failed, 37 skipped
-
-## Notas
-- carpetas f/internal/* YA estaban refactorizadas según el patrón
-- Excepción: servicios.ts tenía bug de sintaxis (backticks escapados incorrectamente)
-- arch result.ts y constants.ts son shared singletons - NO se tocan
+- TypeScript strict: PASS (unused vars en web_admin_provider_crud son pre-existentes)
+- Commit: db06f1f
