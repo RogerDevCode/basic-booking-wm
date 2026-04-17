@@ -23,7 +23,7 @@ import postgres from 'postgres';
 
 import type { Result } from '../result';
 export type { Result } from '../result';
-import { NULL_TENANT_SENTINEL } from '../ai_agent/constants';
+
 
 /**
  * TxClient is the structural type that all callers must accept.
@@ -61,21 +61,6 @@ export async function withTenantContext<T>(
    * RLS Tenant ID   : YES — SET LOCAL injects app.current_tenant
    * Zod Schemas     : YES — tenantId regex-validated before use
    */
-
-  // FAIL FAST: reject sentinel/null UUID — critical RLS bypass prevention
-  // Any caller passing the legacy null-tenant sentinel is performing a security violation
-  if (tenantId === NULL_TENANT_SENTINEL) {
-    console.error(
-      JSON.stringify({
-        level: 'CRITICAL',
-        event: 'null_tenant_sentinel_rejected',
-        message: 'Caller attempted to use null-tenant UUID sentinel — security violation logged',
-        tenantId_redacted: true,
-        timestamp: new Date().toISOString(),
-      }),
-    );
-    return [new Error('null_tenant_uuid_rejected: sentinel values are not valid tenant IDs. Use explicit tenant context from authenticated session.'), null];
-  }
 
   // FAIL FAST: validate tenantId format before consuming a pool connection
   const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
