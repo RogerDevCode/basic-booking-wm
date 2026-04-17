@@ -14,9 +14,9 @@
 // ============================================================================
 
 import type { Result } from '../internal/result';
+import { generateReport, getApiKey, printSummary, printTestResult, runTest } from './services';
 import type { TestReport, TestResult } from './types';
 import { TEST_CASES } from './types';
-import { getApiKey, runTest, generateReport, printTestResult, printSummary } from './services';
 
 export async function main(_rawInput: unknown = {}): Promise<Result<TestReport>> {
   const [keyErr, apiKey] = getApiKey();

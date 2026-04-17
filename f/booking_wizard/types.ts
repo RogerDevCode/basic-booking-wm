@@ -29,3 +29,16 @@ export interface StepView {
   readonly force_reply?: boolean;
   readonly reply_placeholder?: string;
 }
+
+import type { WizardRepository } from './WizardRepository';
+
+export interface ActionContext {
+  readonly input: Input;
+  readonly state: WizardState;
+  readonly repo: WizardRepository;
+  readonly serviceDurationMin: number;
+}
+
+export interface ActionHandler {
+  handle(context: ActionContext): Promise<[Error | null, StepView | null]>;
+}

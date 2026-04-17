@@ -43,8 +43,15 @@
 
 import { createDbClient } from '../internal/db/client';
 import type { Result } from '../internal/result';
-import { InputSchema, WizardStateSchema, type Input, type WizardState, type StepView } from './types';
-import { DateUtils, WizardUI, WizardRepository } from './services';
+import { InputSchema, WizardStateSchema, type Input, type StepView, type WizardState } from './types';
+import { WizardRepository } from './WizardRepository';
+import { WizardRouter } from './WizardRouter';
+import { StartHandler } from './handlers/StartHandler';
+import { SelectDateHandler } from './handlers/SelectDateHandler';
+import { SelectTimeHandler } from './handlers/SelectTimeHandler';
+import { ConfirmHandler } from './handlers/ConfirmHandler';
+import { BackHandler } from './handlers/BackHandler';
+import { CancelHandler } from './handlers/CancelHandler';
 
 export async function main(rawInput: unknown): Promise<Result<Record<string, unknown>>> {
   const parsed = InputSchema.safeParse(rawInput);
@@ -95,120 +102,28 @@ export async function main(rawInput: unknown): Promise<Result<Record<string, unk
   let view: StepView;
 
   try {
-    switch (input.action) {
-      case 'start':
-        view = WizardUI.buildDateSelection(state, 0);
-        break;
+    const router = new WizardRouter();
+    router.register('start', new StartHandler());
+    router.register('select_date', new SelectDateHandler());
+    router.register('select_time', new SelectTimeHandler());
+    router.register('confirm', new ConfirmHandler());
+    router.register('back', new BackHandler());
+    router.register('cancel', new CancelHandler());
 
-      case 'select_date': {
-        const dateStr = input.user_input !== undefined ? DateUtils.parseDate(input.user_input) : null;
-        const finalDate = dateStr ?? state.selected_date;
+    const [err, routeView] = await router.route(input.action, {
+      input,
+      state,
+      repo,
+      serviceDurationMin
+    });
 
-        if (finalDate === null) {
-          view = WizardUI.buildDateSelection(state, 0);
-        } else {
-          const [err, slots] = input.provider_id !== undefined
-            ? await repo.getAvailableSlots(input.provider_id, finalDate, serviceDurationMin)
-            : [null, DateUtils.generateTimeSlots(8, 18, serviceDurationMin)];
-
-          if (err !== null || slots === null || slots.length === 0) {
-            const msg = slots?.length === 0 ? `😅 No hay horarios para el ${DateUtils.format(finalDate, input.timezone)}.` : 'Error al buscar disponibilidad.';
-            const baseView = WizardUI.buildDateSelection({ ...state, selected_date: null }, 0);
-            view = { ...baseView, message: `${msg}\n\n${baseView.message}` };
-          } else {
-            view = WizardUI.buildTimeSelection({ ...state, selected_date: finalDate }, slots, input.timezone);
-          }
-        }
-        break;
-      }
-
-      case 'select_time': {
-        const timeStr = input.user_input !== undefined ? DateUtils.parseTime(input.user_input) : null;
-        const finalTime = timeStr ?? input.user_input?.trim() ?? state.selected_time;
-
-        if (finalTime === null) {
-          view = {
-            message: '⚠️ Por favor selecciona un horario o escribe la hora (ej: 10:00).',
-            reply_keyboard: [['« Volver a fechas', '❌ Cancelar']],
-            new_state: state,
-            force_reply: true,
-            reply_placeholder: 'Escribe la hora (ej: 10:00)',
-          };
-        } else if (input.provider_id === undefined || input.service_id === undefined) {
-          view = {
-            message: '⚠️ Faltan datos del profesional o servicio.',
-            reply_keyboard: [['❌ Cancelar']],
-            new_state: state,
-          };
-        } else {
-          const [err, names] = await repo.getProviderAndServiceNames(input.provider_id, input.service_id);
-          if (err !== null || names === null) {
-            view = {
-              message: '⚠️ No se pudo recuperar la información necesaria. Reintenta.',
-              reply_keyboard: [['« Volver a fechas', '❌ Cancelar']],
-              new_state: state,
-            };
-          } else {
-            view = WizardUI.buildConfirmation({ ...state, selected_time: finalTime }, names.provider, names.service, input.timezone);
-          }
-        }
-        break;
-      }
-
-      case 'confirm': {
-        if (state.selected_date === null || state.selected_time === null || input.provider_id === undefined || input.service_id === undefined) {
-          const baseView = WizardUI.buildDateSelection({ ...state, selected_date: null, selected_time: null }, 0);
-          view = { ...baseView, message: `⚠️ Faltan datos críticos.\n\n${baseView.message}` };
-        } else {
-          const [err, bookingId] = await repo.createBooking(state.client_id, input.provider_id, input.service_id, state.selected_date, state.selected_time, input.timezone, serviceDurationMin);
-          if (err !== null) {
-            view = {
-              message: `❌ Error al agendar: ${err.message}. Intenta con otro horario.`,
-              reply_keyboard: [['📅 Agendar otra', '📋 Mis citas']],
-              new_state: { ...state, step: 0, selected_date: null, selected_time: null },
-            };
-          } else {
-            const [_namesErr, names] = await repo.getProviderAndServiceNames(input.provider_id, input.service_id);
-            const providerName = names?.provider ?? 'Profesional';
-            const serviceName = names?.service ?? 'Servicio';
-
-            view = {
-              message: `🎉 *¡Cita Agendada!*\n\n🆔 ID: \`${bookingId ?? ''}\`\n📅 Fecha: ${DateUtils.format(state.selected_date, input.timezone)}\n🕐 Hora: ${state.selected_time}\n👨‍⚕️ Profesional: ${providerName}\n📋 Servicio: ${serviceName}\n\nTu cita ha sido registrada exitosamente.`,
-              reply_keyboard: [['📅 Agendar otra', '📋 Mis citas']],
-              new_state: { ...state, step: 99 },
-            };
-          }
-        }
-        break;
-      }
-
-      case 'back':
-        if (state.step <= 1) {
-          view = {
-            message: '📋 Menú principal.',
-            reply_keyboard: [['📅 Agendar cita', '📋 Mis citas']],
-            new_state: { ...state, step: 0 },
-          };
-        } else if (state.step === 2) {
-          view = WizardUI.buildDateSelection({ ...state, selected_date: null }, 0);
-        } else if (state.step === 3) {
-          const [_err, slots] = (input.provider_id !== undefined && state.selected_date !== null)
-            ? await repo.getAvailableSlots(input.provider_id, state.selected_date, serviceDurationMin)
-            : [null, DateUtils.generateTimeSlots(8, 18, serviceDurationMin)];
-          view = WizardUI.buildTimeSelection({ ...state, selected_time: null }, slots ?? [], input.timezone);
-        } else {
-          view = WizardUI.buildDateSelection({ ...state, selected_date: null, selected_time: null }, 0);
-        }
-        break;
-
-      case 'cancel':
-        view = {
-          message: '❌ Cancelado.',
-          reply_keyboard: [['📅 Agendar cita', '📋 Mis citas']],
-          new_state: { ...state, step: 0, selected_date: null, selected_time: null },
-        };
-        break;
+    if (err) {
+      return [err, null];
     }
+    if (!routeView) {
+      return [new Error('no_view_returned'), null];
+    }
+    view = routeView;
   } finally {
     await sql.end();
   }

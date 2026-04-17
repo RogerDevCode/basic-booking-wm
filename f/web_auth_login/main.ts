@@ -51,100 +51,18 @@
 // Returns user_id, email, role, full_name for session management.
 // ============================================================================
 
-import { z } from 'zod';
-import postgres from 'postgres';
 import { createDbClient } from '../internal/db/client';
-import crypto from 'crypto';
 import type { Result } from '../internal/result';
+import { type Input, InputSchema, type LoginResult, type UserRow } from "./types";
+import { verifyPasswordSync } from "./verifyPasswordSync";
+import { withAdminContext } from "./withAdminContext";
 
 // ============================================================================
 // SCHEMAS & INTERFACES
 // ============================================================================
-
-const InputSchema = z.object({
-  email: z.email(),
-  password: z.string().min(1),
-});
-
-type Input = z.infer<typeof InputSchema>;
-
-interface LoginResult {
-  readonly user_id: string;
-  readonly email: string;
-  readonly full_name: string;
-  readonly role: string;
-  readonly profile_complete: boolean;
-}
-
-interface UserRow {
-  readonly user_id: string;
-  readonly email: string;
-  readonly full_name: string;
-  readonly role: string;
-  readonly password_hash: string;
-  readonly is_active: boolean;
-  readonly profile_complete: boolean;
-}
-
 // ============================================================================
 // HELPERS
 // ============================================================================
-
-/**
- * withAdminContext — Executes DB logic with app.admin_override = 'true'.
- * Required for login because the user's UUID (which drives RLS) is not
- * known until after the email-based lookup.
- * 
- * AGENTS.md §12.4: withTenantContext is the ONLY door. This is its auth-specific variant.
- */
-async function withAdminContext<T>(
-  client: postgres.Sql,
-  operation: (tx: postgres.Sql) => Promise<Result<T>>,
-): Promise<Result<T>> {
-  const reserved = await client.reserve();
-  try {
-    await reserved`BEGIN`;
-    // Bypass RLS for the lookup phase
-    await reserved.unsafe("SELECT set_config('app.admin_override', 'true', true)");
-    
-    const [err, data] = await operation(reserved);
-    
-    if (err !== null) {
-      await reserved`ROLLBACK`;
-      return [err, null];
-    }
-    
-    await reserved`COMMIT`;
-    return [null, data];
-  } catch (error: unknown) {
-    await reserved`ROLLBACK`.catch(() => { /* ignore */ });
-    const msg = error instanceof Error ? error.message : String(error);
-    return [new Error(`transaction_failed: ${msg}`), null];
-  } finally {
-    reserved.release();
-  }
-}
-
-/**
- * verifyPasswordSync — Verifies password against salt:hash scrypt format.
- * Matches logic used in f/web_auth_register/main.ts.
- */
-function verifyPasswordSync(password: string, storedHash: string): boolean {
-  const parts = storedHash.split(':');
-  if (parts.length !== 2) return false;
-
-  const salt = parts[0];
-  const storedKey = parts[1];
-  if (salt === undefined || storedKey === undefined) return false;
-  
-  try {
-    const key = crypto.scryptSync(password, salt, 64);
-    return key.toString('hex') === storedKey;
-  } catch {
-    return false;
-  }
-}
-
 // ============================================================================
 // MAIN EXECUTION
 // ============================================================================

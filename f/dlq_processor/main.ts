@@ -76,29 +76,25 @@ export async function main(rawInput: unknown): Promise<Result<unknown>> {
   try {
     // 3. Execution via Global Transaction
     const [err, data] = await withGlobalTx(sql, async (tx) => {
-      switch (input.action) {
-        case 'list':
-          return listDLQ(tx, input.status_filter);
-        case 'retry':
-          return retryDLQ(tx, input.dlq_id);
-        case 'resolve':
-          if (input.dlq_id === undefined) {
-            return [new Error('resolve_error: dlq_id is required'), null];
-          }
+      const router: Record<string, () => Promise<Result<unknown>>> = {
+        list: () => listDLQ(tx, input.status_filter),
+        retry: () => retryDLQ(tx, input.dlq_id),
+        resolve: () => {
+          if (input.dlq_id === undefined) return Promise.resolve([new Error('resolve_error: dlq_id is required'), null]);
           return resolveDLQ(tx, input.dlq_id, input.resolved_by, input.resolution_notes);
-        case 'discard':
-          if (input.dlq_id === undefined) {
-            return [new Error('discard_error: dlq_id is required'), null];
-          }
+        },
+        discard: () => {
+          if (input.dlq_id === undefined) return Promise.resolve([new Error('discard_error: dlq_id is required'), null]);
           return discardDLQ(tx, input.dlq_id, input.resolution_notes);
-        case 'status':
-          return getDLQStatus(tx);
-        default: {
-          // Exhaustive check to ensure all actions are handled
-          const _exhaustive: never = input.action;
-          return [new Error(`unknown_action: ${String(_exhaustive)}`), null];
-        }
+        },
+        status: () => getDLQStatus(tx)
+      };
+
+      const handler = router[input.action];
+      if (!handler) {
+        return [new Error(`unknown_action: ${input.action}`), null];
       }
+      return handler();
     });
 
     if (err !== null) {

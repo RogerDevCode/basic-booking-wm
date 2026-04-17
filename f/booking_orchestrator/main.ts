@@ -41,7 +41,13 @@
 import { logger } from '../internal/logger';
 import type { Result } from '../internal/result';
 import { InputSchema, type InputType, type OrchestratorResult, type OrchestratorBookingIntent } from './types';
-import { normalizeIntent, resolveContext, handleCreateBooking, handleCancelBooking, handleReschedule, handleListAvailable, handleGetMyBookings } from './services';
+import { normalizeIntent } from './normalizeIntent';
+import { resolveContext } from './resolveContext';
+import { handleCreateBooking } from './handleCreateBooking';
+import { handleCancelBooking } from './handleCancelBooking';
+import { handleReschedule } from './handleReschedule';
+import { handleListAvailable } from './handleListAvailable';
+import { handleGetMyBookings } from './handleGetMyBookings';
 
 const MODULE = 'booking_orchestrator';
 

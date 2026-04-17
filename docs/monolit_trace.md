@@ -22,25 +22,25 @@
 | 37 | f/web_provider_dashboard | types, main | DONE |
 | 38 | f/web_auth_change_role | types, main | DONE |
 | 39 | f/patient_register | types, main | DONE |
+| 40 | f/booking_orchestrator | types, getEntity.ts, normalizeIntent.ts, resolveContext.ts, handleCreateBooking.ts, handleCancelBooking.ts, handleReschedule.ts, handleListAvailable.ts, handleGetMyBookings.ts, main.ts | DONE |
+| 41 | f/telegram_callback | types.ts, main.ts, answerCallbackQuery.ts, confirmBooking.ts, parseCallbackData.ts, sendFollowUpMessage.ts, updateBookingStatus.ts, updateReminderPreferences.ts | DONE |
+| 42 | f/booking_wizard | types.ts, main.ts, WizardRepository.ts, WizardUI.ts, DateUtils.ts | DONE |
+| 43 | f/openrouter_benchmark | types.ts, main.ts, services.ts | DONE |
+| 44 | f/gemini_test | types.ts, main.ts, services.ts | DONE |
+| 45 | f/reminder_cron | types.ts, main.ts, services.ts | DONE |
+| 46 | f/telegram_gateway | types.ts, main.ts, services.ts | DONE |
+| 47 | f/distributed_lock | types.ts, main.ts, acquireLock.ts, checkLock.ts, cleanupLocks.ts, executeLockAction.ts, mapRowToLockInfo.ts, releaseLock.ts, tryInsertLock.ts, tryStealExpiredLock.ts | DONE |
+| 48 | f/gcal_sync | types.ts, main.ts, callGCalAPI.ts, fetchBookingDetails.ts, syncEvent.ts, updateBookingSyncStatus.ts | DONE |
+| 49 | f/web_provider_notes | types.ts, main.ts, decryptContent.ts, encryptContent.ts, mapRowToNote.ts | DONE |
+| 50 | f/provider_dashboard | types.ts, main.ts | DONE |
+| 51 | f/booking_reschedule | types.ts, main.ts, authorize.ts, executeReschedule.ts, fetchBooking.ts, fetchService.ts | DONE |
+| 52 | f/noshow_trigger | types.ts, main.ts | DONE |
+| 53 | f/reminder_config | types.ts, main.ts, buildConfigMessage.ts, buildWindowConfig.ts, formatPrefs.ts, loadPreferences.ts, savePreferences.ts, setAll.ts, toggleValue.ts | DONE |
+| 54 | f/circuit_breaker | types.ts, main.ts, getCircuitBreakerTx.ts, getState.ts, initService.ts | DONE |
 
-## Pendientes (14 archivos)
-- f/booking_orchestrator/main.ts (498 líneas)
-- f/booking_wizard/main.ts (498 líneas)
-- f/telegram_callback/main.ts (423 líneas)
-- f/openrouter_benchmark/main.ts (486 líneas)
-- f/gemini_test/main.ts (405 líneas)
-- f/reminder_cron/main.ts (523 líneas)
-- f/telegram_gateway/main.ts (360 líneas)
-- f/distributed_lock/main.ts (337 líneas)
-- f/gcal_sync/main.ts (334 líneas)
-- f/provider_notes/main.ts (331 líneas)
-- f/provider_dashboard/main.ts (356 líneas)
-- f/booking_reschedule/main.ts (285 líneas)
-- f/noshow_trigger/main.ts (267 líneas)
-- f/reminder_config/main.ts (265 líneas)
-- f/circuit_breaker/main.ts (289 líneas)
+## Pendientes (0 archivos)
 
 ## Estado Final
 - TypeScript strict: PASS
-- Progreso: 32/53 features (60%)
-- Commit: 4cf2459
+- Progreso: 54/54 features (100%)
+- Estado: COMPLETADO

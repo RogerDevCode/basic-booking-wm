@@ -27,7 +27,7 @@ const fmt = {
 };
 
 export function buildSpecialtyPrompt(
-  items: ReadonlyArray<{ readonly id: string; readonly name: string }>,
+  items: readonly { readonly id: string; readonly name: string }[],
   error?: string | null
 ): string {
   const header = fmt.header(error);
@@ -37,7 +37,7 @@ export function buildSpecialtyPrompt(
 
 export function buildDoctorsPrompt(
   specialtyName: string,
-  items: ReadonlyArray<{ readonly id: string; readonly name: string }>,
+  items: readonly { readonly id: string; readonly name: string }[],
   error?: string | null
 ): string {
   const header = fmt.header(error);
@@ -48,7 +48,7 @@ export function buildDoctorsPrompt(
 
 export function buildSlotsPrompt(
   doctorName: string,
-  items: ReadonlyArray<{ readonly id: string; readonly label: string; readonly start_time: string }>,
+  items: readonly { readonly id: string; readonly label: string; readonly start_time: string }[],
   error?: string | null
 ): string {
   const header = fmt.header(error);
@@ -97,21 +97,21 @@ const buttons = {
 };
 
 export function buildSpecialtyKeyboard(
-  items: ReadonlyArray<{ readonly id: string; readonly name: string }>
+  items: readonly { readonly id: string; readonly name: string }[]
 ): InlineButton[][] {
   const list = items.map((it, i) => buttons.make(it.name, `spec:${(i + 1).toString()}`));
   return chunkButtons([...list, buttons.cancel()]);
 }
 
 export function buildDoctorKeyboard(
-  items: ReadonlyArray<{ readonly id: string; readonly name: string }>
+  items: readonly { readonly id: string; readonly name: string }[]
 ): InlineButton[][] {
   const list = items.map((it, i) => buttons.make(it.name, `doc:${(i + 1).toString()}`));
   return chunkButtons([...list, buttons.back(), buttons.cancel()]);
 }
 
 export function buildTimeSlotKeyboard(
-  items: ReadonlyArray<{ readonly id: string; readonly label: string; readonly start_time: string }>
+  items: readonly { readonly id: string; readonly label: string; readonly start_time: string }[]
 ): InlineButton[][] {
   const list = items.map((it, i) => buttons.make(it.label, `time:${(i + 1).toString()}`));
   return chunkButtons([...list, buttons.back(), buttons.cancel()]);
@@ -134,7 +134,7 @@ export function buildMainMenuKeyboard(): InlineButton[][] {
 /**
  * Standard grid layout for Telegram keyboards
  */
-function chunkButtons(btns: ReadonlyArray<InlineButton>, size: number = 2): InlineButton[][] {
+function chunkButtons(btns: readonly InlineButton[], size = 2): InlineButton[][] {
   if (btns.length === 0) return [];
   const rows: InlineButton[][] = [];
   for (let i = 0; i < btns.length; i += size) {

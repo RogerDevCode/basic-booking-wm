@@ -17,9 +17,9 @@
 // Each model gets the SAME 5 prompts + JSON response.
 // ============================================================================
 
-import type { BenchmarkReport, ModelSummary, ModelTestResult } from './types';
-import { MODELS, TASKS, SYSTEM_PROMPT } from './types';
 import { getApiKey, runTaskForModel } from './services';
+import type { BenchmarkReport, ModelSummary, ModelTestResult } from './types';
+import { MODELS, SYSTEM_PROMPT, TASKS } from './types';
 
 export async function main(_rawInput: unknown = {}): Promise<[Error | null, BenchmarkReport | null]> {
   const [keyErr, apiKey] = getApiKey();

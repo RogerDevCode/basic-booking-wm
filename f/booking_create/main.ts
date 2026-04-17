@@ -60,7 +60,7 @@ export async function main(rawInput: unknown): Promise<Result<BookingCreated>> {
     }
 
     logger.info(MODULE, 'Booking creation complete', { booking_id: txResult?.booking_id });
-    return [null, txResult as BookingCreated];
+    return [null, txResult!];
 
   } catch (e) {
     logger.error(MODULE, 'Unexpected infrastructure error', e);

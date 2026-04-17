@@ -39,7 +39,7 @@ export async function listDLQ(tx: TxClient, filter?: string): Promise<Result<unk
   const status = filter && ['pending', 'resolved', 'discarded'].includes(filter) ? filter : 'pending';
 
   try {
-    const rows = await tx<Record<string, unknown>[]>`
+    const rows = await tx`
       SELECT 
         dlq_id, booking_id, provider_id, service_id, 
         failure_reason, last_error_message, last_error_stack, 

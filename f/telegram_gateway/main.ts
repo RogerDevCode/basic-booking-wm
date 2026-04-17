@@ -34,9 +34,9 @@
  * - DIP: Business logic depends on abstractions, even if implemented locally for Windmill compatibility.
  */
 
-import { TelegramUpdateSchema } from './types';
-import { TelegramClient, ClientRepository, TelegramRouter } from './services';
 import type { Result } from '../internal/result';
+import { ClientRepository, TelegramClient, TelegramRouter } from './services';
+import { TelegramUpdateSchema } from './types';
 
 export async function main(rawInput: unknown): Promise<Result<{ readonly message: string }>> {
   const parseResult = TelegramUpdateSchema.safeParse(rawInput);

@@ -40,37 +40,16 @@
  * → CLEARED FOR CODE GENERATION
  */
 
-import { z } from 'zod';
 import type { Sql } from 'postgres';
-import type { Result } from '../internal/result';
-import { withTenantContext } from '../internal/tenant-context';
 import { createDbClient } from '../internal/db/client';
+import type { Result } from '../internal/result';
 import { validateTransition } from '../internal/state-machine';
+import { withTenantContext } from '../internal/tenant-context';
+import { type Input, InputSchema, type NoShowStats, type ProviderRow, ProviderRowSchema } from "./types";
 
 // ============================================================================
 // SCHEMAS & TYPES
 // ============================================================================
-
-const InputSchema = z.object({
-  dry_run: z.boolean().optional().default(false),
-  lookback_minutes: z.number().int().min(1).max(1440).default(60),
-});
-
-type Input = Readonly<z.infer<typeof InputSchema>>;
-
-const ProviderRowSchema = z.object({
-  provider_id: z.uuid(),
-});
-
-type ProviderRow = z.infer<typeof ProviderRowSchema>;
-
-interface NoShowStats {
-  readonly processed: number;
-  readonly marked: number;
-  readonly skipped: number;
-  readonly booking_ids: readonly string[];
-}
-
 // ============================================================================
 // REPOSITORY LAYER — SOLID-S: Single Responsibility (DB Access)
 // ============================================================================

@@ -44,87 +44,10 @@
 // ============================================================================
 
 import { z } from 'zod';
-import { withTenantContext } from '../internal/tenant-context';
 import { createDbClient } from '../internal/db/client';
-
-const InputSchema = z.object({
-  headers: z.record(z.string(), z.string()).optional(),
-  body: z.record(z.string(), z.unknown()).optional(),
-  raw_channel_id: z.string().optional(),
-});
-
-const GCAL_BASE = 'https://www.googleapis.com/calendar/v3';
-
-interface GCalEventItem {
-  readonly id?: string;
-  readonly status?: string;
-  readonly description?: string;
-  readonly summary?: string;
-  readonly start?: { readonly dateTime?: string; readonly date?: string };
-  readonly end?: { readonly dateTime?: string; readonly date?: string };
-}
-
-interface GCalEventsResponse {
-  readonly items?: readonly GCalEventItem[];
-  readonly nextSyncToken?: string;
-  readonly nextPageToken?: string;
-}
-
-interface GCalFetchResult {
-  readonly events: readonly GCalEventItem[];
-  readonly nextSyncToken: string | null;
-  readonly error: string | null;
-}
-
-interface WebhookResult {
-  readonly acknowledged: boolean;
-  readonly reason?: string;
-  readonly changes_count?: number;
-  readonly changes?: readonly { booking_id: string | null; event_id: string; status: string; action: string }[];
-}
-
-function isGCalEventsResponse(data: unknown): data is GCalEventsResponse {
-  return typeof data === 'object' && data !== null && (
-    'items' in (data as Record<string, unknown>) ||
-    'nextSyncToken' in (data as Record<string, unknown>)
-  );
-}
-
-async function fetchCalendarEvents(
-  calendarId: string,
-  accessToken: string,
-  syncToken: string | null
-): Promise<GCalFetchResult> {
-  const url = GCAL_BASE + '/calendars/' + encodeURIComponent(calendarId) + '/events';
-  const params: string[] = ['maxResults=50', 'showDeleted=true'];
-  if (syncToken) params.push('syncToken=' + encodeURIComponent(syncToken));
-  else params.push('timeMin=' + new Date(Date.now() - 86400000).toISOString());
-
-  try {
-    const response = await fetch(url + '?' + params.join('&'), {
-      headers: { 'Authorization': 'Bearer ' + accessToken },
-      signal: AbortSignal.timeout(15000),
-    });
-
-    if (!response.ok) {
-      const text = await response.text().catch(function(): string { return ''; });
-      if (response.status === 410 && syncToken) {
-        return await fetchCalendarEvents(calendarId, accessToken, null);
-      }
-      return { events: [], nextSyncToken: null, error: 'GCal API ' + String(response.status) + ': ' + text };
-    }
-
-    const data = await response.json();
-    if (!isGCalEventsResponse(data)) {
-      return { events: [], nextSyncToken: null, error: 'Invalid GCal response format' };
-    }
-    const events = data.items ?? [];
-    const nextSyncToken = typeof data.nextSyncToken === 'string' ? data.nextSyncToken : null;
-    return { events, nextSyncToken, error: null };
-  } catch (e) {
-    return { events: [], nextSyncToken: null, error: e instanceof Error ? e.message : String(e) };
-  }
-}
+import { withTenantContext } from '../internal/tenant-context';
+import { fetchCalendarEvents } from "./fetchCalendarEvents";
+import { InputSchema, type WebhookResult } from "./types";
 
 export async function main(rawInput: unknown): Promise<[Error | null, WebhookResult | null]> {
   const parsed = InputSchema.safeParse(rawInput);

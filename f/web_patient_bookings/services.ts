@@ -81,7 +81,7 @@ async function fetchBookingsData(
     `;
 
     const firstCountRow = countRows[0];
-    const total = (firstCountRow !== undefined && firstCountRow[0] !== undefined) 
+    const total = (firstCountRow?.[0] !== undefined) 
       ? Number(firstCountRow[0]) 
       : 0;
 

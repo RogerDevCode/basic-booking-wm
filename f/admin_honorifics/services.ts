@@ -22,7 +22,7 @@ export async function listHonorifics(tx: postgres.Sql): Promise<Result<Honorific
     FROM honorifics
     ORDER BY sort_order ASC, label ASC
   `;
-  const honorifics = rows.map((r) => mapRow(r as HonorificRaw));
+  const honorifics = rows.map((r) => mapRow(r));
   return [null, honorifics];
 }
 
@@ -58,7 +58,7 @@ export async function createHonorific(
   `;
   const row = rows[0];
   if (row === undefined) return [new Error('create_failed: no row returned'), null];
-  return [null, mapRow(row as HonorificRaw)];
+  return [null, mapRow(row)];
 }
 
 export async function updateHonorific(
@@ -89,7 +89,7 @@ export async function updateHonorific(
   const rows = await tx.values<HonorificRaw[]>(query, params);
   const row = rows[0];
   if (row === undefined) return [new Error(`update_failed: honorific '${id}' not found`), null];
-  return [null, mapRow(row as HonorificRaw)];
+  return [null, mapRow(row)];
 }
 
 export async function deleteHonorific(tx: postgres.Sql, id: string): Promise<Result<{ readonly deleted: boolean }>> {

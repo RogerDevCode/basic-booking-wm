@@ -44,38 +44,9 @@
 // List, get, update, deactivate users. Admin-only.
 // ============================================================================
 
-import { z } from 'zod';
-import { withTenantContext } from '../internal/tenant-context';
 import { createDbClient } from '../internal/db/client';
-
-const InputSchema = z.object({
-  admin_user_id: z.uuid(),
-  action: z.enum(['list', 'get', 'update', 'deactivate', 'activate']).default('list'),
-  target_user_id: z.uuid().optional(),
-  full_name: z.string().min(1).max(200).optional(),
-  email: z.email().optional(),
-  phone: z.string().max(50).optional(),
-  role: z.enum(['client', 'provider', 'admin']).optional(),
-  is_active: z.boolean().optional(),
-});
-
-interface UserInfo {
-  readonly user_id: string;
-  readonly full_name: string;
-  readonly email: string | null;
-  readonly rut: string | null;
-  readonly phone: string | null;
-  readonly role: string;
-  readonly is_active: boolean;
-  readonly telegram_chat_id: string | null;
-  readonly last_login: string | null;
-  readonly created_at: string;
-}
-
-interface UsersListResult {
-  readonly users: readonly UserInfo[];
-  readonly total: number;
-}
+import { withTenantContext } from '../internal/tenant-context';
+import { InputSchema, type UserInfo, type UsersListResult } from "./types";
 
 export async function main(rawInput: unknown): Promise<[Error | null, UserInfo | UsersListResult | null]> {
   const parsed = InputSchema.safeParse(rawInput);

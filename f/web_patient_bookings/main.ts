@@ -43,11 +43,13 @@
  * → CLEARED FOR CODE GENERATION
  */
 
-import { z } from 'zod';
-import { withTenantContext } from '../internal/tenant-context';
-import type { TxClient } from '../internal/tenant-context';
 import { createDbClient } from '../internal/db/client';
 import type { Result } from '../internal/result';
+import type { TxClient } from '../internal/tenant-context';
+import { withTenantContext } from '../internal/tenant-context';
+import { fetchBookingsData } from "./fetchBookingsData";
+import { resolveClientId } from "./resolveClientId";
+import { type BookingInfo, type BookingsResult, type InputParams, InputSchema } from "./types";
 
 // --- Domain Constants ---
 
@@ -55,123 +57,8 @@ const CANCELLABLE_STATUSES: readonly string[] = ['pendiente', 'confirmada'];
 const RESCHEDULABLE_STATUSES: readonly string[] = ['pendiente', 'confirmada'];
 
 // --- Types & Schemas ---
-
-const InputSchema = z.object({
-  client_user_id: z.uuid(),
-  status: z.enum(['all', 'pendiente', 'confirmada', 'en_servicio', 'completada', 'cancelada', 'no_presentado', 'reagendada']).default('all'),
-  limit: z.number().int().min(1).max(100).default(50),
-  offset: z.number().int().min(0).default(0),
-});
-
-type InputParams = Readonly<z.infer<typeof InputSchema>>;
-
-interface BookingInfo {
-  readonly booking_id: string;
-  readonly provider_name: string | null;
-  readonly provider_specialty: string;
-  readonly service_name: string;
-  readonly start_time: string;
-  readonly end_time: string;
-  readonly status: string;
-  readonly cancellation_reason: string | null;
-  readonly can_cancel: boolean;
-  readonly can_reschedule: boolean;
-}
-
-interface BookingsResult {
-  readonly upcoming: readonly BookingInfo[];
-  readonly past: readonly BookingInfo[];
-  readonly total: number;
-}
-
 // Type for raw SQL values results to avoid 'unknown' indexing issues
-type RawBookingRow = [string, string, string, string, string | null, string | null, string, string];
-
 // --- Data Access Functions ---
-
-/**
- * Resolves a client_id from a user_id, with a fallback to email match
- * if the direct user_id link is missing.
- */
-async function resolveClientId(tx: TxClient, userId: string): Promise<Result<string>> {
-  try {
-    const userRows = await tx.values<[string][]>`
-      SELECT p.client_id FROM clients p
-      INNER JOIN users u ON u.user_id = p.client_id
-      WHERE u.user_id = ${userId}::uuid
-      LIMIT 1
-    `;
-
-    const firstRow = userRows[0];
-    if (firstRow !== undefined) {
-      return [null, String(firstRow[0])];
-    }
-
-    // Fallback: search by email match
-    const clientRows = await tx.values<[string][]>`
-      SELECT client_id FROM clients
-      WHERE email = (SELECT email FROM users WHERE user_id = ${userId}::uuid LIMIT 1)
-      LIMIT 1
-    `;
-
-    const fallbackRow = clientRows[0];
-    if (fallbackRow === undefined) {
-      return [new Error(`client_identity_not_found: userId=${userId}`), null];
-    }
-
-    return [null, String(fallbackRow[0])];
-  } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : String(error);
-    return [new Error(`identity_resolution_failed: ${msg}`), null];
-  }
-}
-
-/**
- * Fetches raw booking data and total count for a client.
- */
-async function fetchBookingsData(
-  tx: TxClient,
-  clientId: string,
-  input: InputParams
-): Promise<Result<{ rows: readonly RawBookingRow[], total: number }>> {
-  try {
-    const statusFilter = input.status === 'all' 
-      ? tx`` 
-      : tx`AND b.status = ${input.status}`;
-
-    // Execute queries sequentially to ensure clean type inference
-    const rows = await tx.values<RawBookingRow[]>`
-      SELECT b.booking_id, b.start_time, b.end_time, b.status,
-             b.cancellation_reason,
-             p.name AS provider_name, p.specialty AS provider_specialty,
-             s.name AS service_name
-      FROM bookings b
-      INNER JOIN providers p ON b.provider_id = p.provider_id
-      INNER JOIN services s ON b.service_id = s.service_id
-      WHERE b.client_id = ${clientId}::uuid
-      ${statusFilter}
-      ORDER BY b.start_time DESC
-      LIMIT ${input.limit} OFFSET ${input.offset}
-    `;
-
-    const countRows = await tx.values<[string | number | bigint][]>`
-      SELECT COUNT(*) FROM bookings b
-      WHERE b.client_id = ${clientId}::uuid
-      ${statusFilter}
-    `;
-
-    const firstCountRow = countRows[0];
-    const total = (firstCountRow !== undefined && firstCountRow[0] !== undefined) 
-      ? Number(firstCountRow[0]) 
-      : 0;
-
-    return [null, { rows, total }];
-  } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : String(error);
-    return [new Error(`fetch_bookings_failed: ${msg}`), null];
-  }
-}
-
 // --- Service Layer ---
 
 class PatientBookingService {

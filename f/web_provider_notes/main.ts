@@ -39,85 +39,23 @@
  * → CLEARED FOR CODE GENERATION
  */
 
-import { withTenantContext } from '../internal/tenant-context';
-import { z } from 'zod';
 import postgres from 'postgres';
-import { encryptData, decryptData } from '../internal/crypto';
 import { createDbClient } from '../internal/db/client';
 import type { Result } from '../internal/result';
+import { withTenantContext } from '../internal/tenant-context';
+import { encryptContent } from "./encryptContent";
+import { mapRowToNote } from "./mapRowToNote";
+import { type HandlerResult, type Input, InputSchema, type NoteRow, type Tag } from "./types";
 
 // ============================================================================
 // TYPES & SCHEMAS
 // ============================================================================
-
-const InputSchema = z.object({
-  provider_id: z.uuid(),
-  action: z.enum(['create', 'read', 'update', 'delete', 'list']),
-  note_id: z.uuid().optional(),
-  booking_id: z.uuid().optional(),
-  client_id: z.uuid().optional(),
-  content: z.string().min(1).max(5000).optional(),
-  tag_ids: z.array(z.uuid()).optional().default([]),
-});
-
-type Input = Readonly<z.infer<typeof InputSchema>>;
-
-interface Tag {
-  readonly tag_id: string;
-  readonly name: string;
-  readonly color: string;
-}
-
-interface NoteRow {
-  readonly note_id: string;
-  readonly booking_id: string | null;
-  readonly client_id: string | null;
-  readonly provider_id: string;
-  readonly content_encrypted: string | null;
-  readonly content: string;
-  readonly encryption_version: number;
-  readonly created_at: Date | string;
-  readonly updated_at: Date | string;
-  readonly tags: readonly Tag[];
-}
-
 // ============================================================================
 // CRYPTO HELPERS
 // ============================================================================
-
-function encryptContent(plainContent: string): { readonly encrypted: string; readonly version: number } {
-  const encrypted = encryptData(plainContent);
-  return { encrypted, version: 1 };
-}
-
-function decryptContent(encrypted: string | null): string {
-  if (encrypted == null) return '';
-  try {
-    return decryptData(encrypted);
-  } catch {
-    return '[ERROR: Unable to decrypt note]';
-  }
-}
-
 // ============================================================================
 // DATA MAPPING (DRY)
 // ============================================================================
-
-function mapRowToNote(row: any, tags: readonly Tag[] = []): NoteRow {
-  return {
-    note_id: row.note_id,
-    booking_id: row.booking_id,
-    client_id: row.client_id,
-    provider_id: row.provider_id,
-    content_encrypted: row.content_encrypted,
-    encryption_version: row.encryption_version,
-    created_at: row.created_at,
-    updated_at: row.updated_at,
-    content: decryptContent(row.content_encrypted),
-    tags,
-  };
-}
-
 // ============================================================================
 // NOTE REPOSITORY (SRP)
 // ============================================================================
@@ -152,7 +90,7 @@ const NoteRepository = {
   ): Promise<Result<NoteRow>> {
     const { encrypted, version } = encryptContent(data.content);
 
-    const [row] = await tx<any[]>`
+    const [row] = await tx`
       INSERT INTO service_notes (provider_id, booking_id, client_id, content_encrypted, encryption_version)
       VALUES (${data.provider_id}::uuid, ${data.booking_id}::uuid, ${data.client_id}::uuid, ${encrypted}, ${version})
       RETURNING *
@@ -160,14 +98,14 @@ const NoteRepository = {
 
     if (!row) return [new Error('create_failed: no row returned'), null];
 
-    await this.assignTags(tx, row.note_id, data.tag_ids);
-    const [_err, tags] = await this.getTags(tx, row.note_id);
+    await this.assignTags(tx, row['note_id'], data.tag_ids);
+    const [_err, tags] = await this.getTags(tx, row['note_id']);
 
     return [null, mapRowToNote(row, tags ?? [])];
   },
 
   async read(tx: postgres.Sql, providerId: string, noteId: string): Promise<Result<NoteRow>> {
-    const [row] = await tx<any[]>`
+    const [row] = await tx`
       SELECT * FROM service_notes
       WHERE note_id = ${noteId}::uuid AND provider_id = ${providerId}::uuid
       LIMIT 1
@@ -175,7 +113,7 @@ const NoteRepository = {
 
     if (!row) return [new Error('Note not found or access denied'), null];
 
-    const [_err, tags] = await this.getTags(tx, row.note_id);
+    const [_err, tags] = await this.getTags(tx, row['note_id']);
     return [null, mapRowToNote(row, tags ?? [])];
   },
 
@@ -187,7 +125,7 @@ const NoteRepository = {
   ): Promise<Result<NoteRow>> {
     const { encrypted, version } = encryptContent(data.content);
 
-    const [row] = await tx<any[]>`
+    const [row] = await tx`
       UPDATE service_notes
       SET content_encrypted = ${encrypted}, encryption_version = ${version}, updated_at = NOW()
       WHERE note_id = ${noteId}::uuid AND provider_id = ${providerId}::uuid
@@ -214,7 +152,7 @@ const NoteRepository = {
   },
 
   async list(tx: postgres.Sql, providerId: string, bookingId?: string): Promise<Result<NoteRow[]>> {
-    const rows = await tx<any[]>`
+    const rows = await tx`
       SELECT sn.*, t.tag_id, t.name as tag_name, t.color as tag_color
       FROM service_notes sn
       LEFT JOIN note_tags nt ON nt.note_id = sn.note_id
@@ -227,19 +165,19 @@ const NoteRepository = {
 
     const noteMap = new Map<string, NoteRow & { _tags: Tag[] }>();
     for (const row of rows) {
-      if (!noteMap.has(row.note_id)) {
-        noteMap.set(row.note_id, {
+      if (!noteMap.has(row['note_id'])) {
+        noteMap.set(row['note_id'], {
           ...mapRowToNote(row),
           _tags: [],
           tags: [] // placeholder
         });
       }
       
-      if (row.tag_id) {
-        noteMap.get(row.note_id)?._tags.push({
-          tag_id: row.tag_id,
-          name: row.tag_name,
-          color: row.tag_color
+      if (row['tag_id']) {
+        noteMap.get(row['note_id'])?._tags.push({
+          tag_id: row['tag_id'],
+          name: row['tag_name'],
+          color: row['tag_color']
         });
       }
     }
@@ -260,8 +198,6 @@ const NoteRepository = {
 // ============================================================================
 // ACTION HANDLERS (OCP / Strategy Pattern)
 // ============================================================================
-
-type HandlerResult = Promise<Result<any>>;
 const ACTION_HANDLERS: Record<string, (tx: postgres.Sql, input: Input) => HandlerResult> = {
   create: async (tx, input) => {
     const { booking_id, client_id, content, tag_ids, provider_id } = input;
