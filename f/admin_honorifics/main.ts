@@ -112,7 +112,7 @@ async function listHonorificsGlobal(client: postgres.Sql): Promise<Result<Honori
     await reserved`COMMIT`;
     return [null, data];
   } catch (error: unknown) {
-    await reserved`ROLLBACK`.catch(() => {});
+    await reserved`ROLLBACK`.catch(() => { /* ignore */ });
     const msg = error instanceof Error ? error.message : String(error);
     return [new Error(`transaction_failed: ${msg}`), null];
   } finally {
@@ -259,5 +259,5 @@ export async function main(rawInput: unknown): Promise<Result<unknown>> {
     return [null, result];
   }
 
-  return [new Error(`Unknown action: ${input.action}`), null];
+  return [new Error(`Unknown action: ${String(input.action)}`), null];
 }
