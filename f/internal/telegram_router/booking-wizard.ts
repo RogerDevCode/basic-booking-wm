@@ -21,7 +21,7 @@
 
 import {
   type BookingState,
-  type TransitionResult,
+  type TransitionOutcome,
   type DraftBooking,
   applyTransition,
   parseAction,
@@ -109,52 +109,56 @@ export async function handleBookingWizard(input: WizardInput): Promise<[Error | 
       }
     }
 
-    const transition = applyTransition(state, action, currentDraft, preFetchedItems);
-    logger.info(MODULE, 'Transition applied', { nextState: transition.nextState.name, ok: transition.ok });
-
-    // 2. Fetch data based on the transition result
-    // We only fetch data if the transition was valid (transition.ok)
-    if (!transition.ok) {
-      logger.info(MODULE, 'Wizard step complete (invalid transition)', { nextState: transition.nextState.name });
+    const [transitionErr, outcome] = applyTransition(state, action, currentDraft, preFetchedItems);
+    
+    if (transitionErr !== null || outcome === null) {
+      const finalOutcome = outcome ?? { nextState: state, responseText: transitionErr?.message ?? 'Error', advance: false };
+      logger.info(MODULE, 'Wizard step complete (invalid transition)', { 
+        nextState: finalOutcome.nextState.name,
+        error: transitionErr?.message 
+      });
       return [null, {
         route: 'wizard',
         forward_to_ai: false,
-        response_text: transition.responseText,
+        response_text: finalOutcome.responseText,
         inline_keyboard: [],
-        nextState: transition.nextState,
+        nextState: finalOutcome.nextState,
         nextDraft: currentDraft,
-        nextFlowStep: flowStepFromState(transition.nextState),
+        nextFlowStep: flowStepFromState(finalOutcome.nextState),
         advance: false,
         should_edit: state.name !== 'idle',
       }];
     }
 
+    logger.info(MODULE, 'Transition applied', { nextState: outcome.nextState.name });
+
+    // 2. Fetch data based on the transition result
     // Use the draft from the transition if available (it carries the latest selections)
     let nextDraft = currentDraft;
-    if (transition.nextState.name === 'confirming' && 'draft' in transition.nextState) {
-      nextDraft = transition.nextState.draft as DraftBooking;
-    } else if (transition.nextState.name === 'completed') {
+    if (outcome.nextState.name === 'confirming' && 'draft' in outcome.nextState) {
+      nextDraft = outcome.nextState.draft as DraftBooking;
+    } else if (outcome.nextState.name === 'completed') {
       // For completed, we usually want to keep the draft that was used to create the booking
       nextDraft = currentDraft;
     }
 
-    const result = await fetchDataForState(transition, nextDraft, sql, input.chatId, input.userName);
+    const result = await fetchDataForState(outcome, nextDraft, sql, input.chatId, input.userName);
 
     if (result !== null) {
       logger.info(MODULE, 'Wizard step complete (with data)', { nextState: result.nextState.name });
       return [null, result];
     }
 
-    logger.info(MODULE, 'Wizard step complete (no data)', { nextState: transition.nextState.name });
+    logger.info(MODULE, 'Wizard step complete (no data)', { nextState: outcome.nextState.name });
     return [null, {
       route: 'wizard',
       forward_to_ai: false,
-      response_text: transition.responseText,
+      response_text: outcome.responseText,
       inline_keyboard: [],
-      nextState: transition.nextState,
+      nextState: outcome.nextState,
       nextDraft: currentDraft,
-      nextFlowStep: flowStepFromState(transition.nextState),
-      advance: transition.advance,
+      nextFlowStep: flowStepFromState(outcome.nextState),
+      advance: outcome.advance,
       should_edit: state.name !== 'idle',
     }];
   } finally {
@@ -167,14 +171,14 @@ export async function handleBookingWizard(input: WizardInput): Promise<[Error | 
 // ============================================================================
 
 async function fetchDataForState(
-  transition: TransitionResult,
+  outcome: TransitionOutcome,
   currentDraft: DraftBooking,
   sql: ReturnType<typeof createDbClient>,
   chatId: string,
   userName: string,
 ): Promise<WizardOutput | null> {
-  const nextState = transition.nextState;
-  const shouldEdit = transition.advance;
+  const nextState = outcome.nextState;
+  const shouldEdit = outcome.advance;
 
   try {
     switch (nextState.name) {
@@ -204,7 +208,7 @@ async function fetchDataForState(
         nextState: { ...nextState, items: [...specialties] },
         nextDraft: { ...currentDraft, specialty_id: null, specialty_name: null, doctor_id: null, doctor_name: null, start_time: null, target_date: currentDraft.target_date },
         nextFlowStep: flowStepFromState(nextState),
-        advance: transition.advance,
+        advance: outcome.advance,
         should_edit: shouldEdit,
       };
     }
@@ -234,7 +238,7 @@ async function fetchDataForState(
         nextState: { ...nextState, items: [...doctors] },
         nextDraft: { ...currentDraft, specialty_id: nextState.specialtyId, specialty_name: nextState.specialtyName, doctor_id: null, doctor_name: null, start_time: null, target_date: currentDraft.target_date },
         nextFlowStep: flowStepFromState(nextState),
-        advance: transition.advance,
+        advance: outcome.advance,
         should_edit: shouldEdit,
       };
     }
@@ -266,7 +270,7 @@ async function fetchDataForState(
         nextState: { ...nextState, items: [...slots], targetDate: dateToFetch },
         nextDraft: { ...currentDraft, doctor_id: nextState.doctorId, doctor_name: nextState.doctorName, target_date: dateToFetch },
         nextFlowStep: flowStepFromState(nextState),
-        advance: transition.advance,
+        advance: outcome.advance,
         should_edit: shouldEdit,
       };
     }
@@ -280,7 +284,7 @@ async function fetchDataForState(
         nextState,
         nextDraft: draftFromState as DraftBooking,
         nextFlowStep: flowStepFromState(nextState),
-        advance: transition.advance,
+        advance: outcome.advance,
         should_edit: shouldEdit,
       };
     }
@@ -375,7 +379,7 @@ async function fetchDataForState(
       return null;
     }
   }
-  } catch (e) {
+} catch (e) {
     logger.error(MODULE, 'fetchDataForState fatal error', e);
     return {
       route: 'wizard', forward_to_ai: false,
