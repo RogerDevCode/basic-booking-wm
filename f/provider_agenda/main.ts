@@ -13,7 +13,6 @@ import { withTenantContext } from '../internal/tenant-context';
 import { createDbClient } from '../internal/db/client';
 import type { Result } from '../internal/result';
 import { InputSchema, type Input, type AgendaResult } from './types';
-import type { TxClient } from '../internal/tenant-context';
 
 export async function main(rawInput: unknown): Promise<Result<AgendaResult>> {
   const parsed = InputSchema.safeParse(rawInput);
