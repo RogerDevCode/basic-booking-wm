@@ -69,7 +69,7 @@ export async function listProviders(tx: postgres.Sql): Promise<Result<ProviderRo
     return [null, providers];
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    return [new Error(\`list_failed: \${msg}\`), null];
+    return [new Error(`list_failed: ${msg}`), null];
   }
 }
 
@@ -90,7 +90,7 @@ export async function createProvider(
   const tempPassword = generateReadablePassword(4);
   const passwordHash = await hashPassword(tempPassword);
 
-  const insertRows = await tx.values<[string, string, string][]>\`
+  const insertRows = await tx.values<[string, string, string][]>`
     INSERT INTO providers (
       name, email, specialty_id, honorific_id, timezone_id,
       phone_app, phone_contact, telegram_chat_id, gcal_calendar_id,
@@ -103,7 +103,7 @@ export async function createProvider(
       \${input.region_id ?? null}, \${input.commune_id ?? null}, \${input.is_active ?? true}, \${passwordHash}, NOW()
     )
     RETURNING id, name, email
-  \`;
+  `;
 
   const row = insertRows[0];
   if (row === undefined) {
@@ -156,32 +156,32 @@ export async function updateProvider(
   const params: (string | number | boolean | null)[] = [];
   let paramIdx = 1;
 
-  if (input.name != null) { fields.push(\`name = $\${String(paramIdx++)}\`); params.push(input.name); }
-  if (input.email != null) { fields.push(\`email = $\${String(paramIdx++)}\`); params.push(input.email); }
-  if (input.specialty_id != null) { fields.push(\`specialty_id = $\${String(paramIdx++)}::uuid\`); params.push(input.specialty_id); }
-  if (input.honorific_id != null) { fields.push(\`honorific_id = $\${String(paramIdx++)}::uuid\`); params.push(input.honorific_id); }
-  if (input.timezone_id != null) { fields.push(\`timezone_id = $\${String(paramIdx++)}\`); params.push(input.timezone_id); }
-  if (input.phone_app != null) { fields.push(\`phone_app = $\${String(paramIdx++)}\`); params.push(input.phone_app); }
-  if (input.phone_contact != null) { fields.push(\`phone_contact = $\${String(paramIdx++)}\`); params.push(input.phone_contact); }
-  if (input.telegram_chat_id != null) { fields.push(\`telegram_chat_id = $\${String(paramIdx++)}\`); params.push(input.telegram_chat_id); }
-  if (input.gcal_calendar_id != null) { fields.push(\`gcal_calendar_id = $\${String(paramIdx++)}\`); params.push(input.gcal_calendar_id); }
-  if (input.address_street != null) { fields.push(\`address_street = $\${String(paramIdx++)}\`); params.push(input.address_street); }
-  if (input.address_number != null) { fields.push(\`address_number = $\${String(paramIdx++)}\`); params.push(input.address_number); }
-  if (input.address_complement != null) { fields.push(\`address_complement = $\${String(paramIdx++)}\`); params.push(input.address_complement); }
-  if (input.address_sector != null) { fields.push(\`address_sector = $\${String(paramIdx++)}\`); params.push(input.address_sector); }
-  if (input.region_id != null) { fields.push(\`region_id = $\${String(paramIdx++)}\`); params.push(input.region_id); }
-  if (input.commune_id != null) { fields.push(\`commune_id = $\${String(paramIdx++)}\`); params.push(input.commune_id); }
-  if (input.is_active != null) { fields.push(\`is_active = $\${String(paramIdx++)}\`); params.push(input.is_active); }
+  if (input.name != null) { fields.push(`name = $\${String(paramIdx++)}`); params.push(input.name); }
+  if (input.email != null) { fields.push(`email = $\${String(paramIdx++)}`); params.push(input.email); }
+  if (input.specialty_id != null) { fields.push(`specialty_id = $\${String(paramIdx++)}::uuid`); params.push(input.specialty_id); }
+  if (input.honorific_id != null) { fields.push(`honorific_id = $\${String(paramIdx++)}::uuid`); params.push(input.honorific_id); }
+  if (input.timezone_id != null) { fields.push(`timezone_id = $\${String(paramIdx++)}`); params.push(input.timezone_id); }
+  if (input.phone_app != null) { fields.push(`phone_app = $\${String(paramIdx++)}`); params.push(input.phone_app); }
+  if (input.phone_contact != null) { fields.push(`phone_contact = $\${String(paramIdx++)}`); params.push(input.phone_contact); }
+  if (input.telegram_chat_id != null) { fields.push(`telegram_chat_id = $\${String(paramIdx++)}`); params.push(input.telegram_chat_id); }
+  if (input.gcal_calendar_id != null) { fields.push(`gcal_calendar_id = $\${String(paramIdx++)}`); params.push(input.gcal_calendar_id); }
+  if (input.address_street != null) { fields.push(`address_street = $\${String(paramIdx++)}`); params.push(input.address_street); }
+  if (input.address_number != null) { fields.push(`address_number = $\${String(paramIdx++)}`); params.push(input.address_number); }
+  if (input.address_complement != null) { fields.push(`address_complement = $\${String(paramIdx++)}`); params.push(input.address_complement); }
+  if (input.address_sector != null) { fields.push(`address_sector = $\${String(paramIdx++)}`); params.push(input.address_sector); }
+  if (input.region_id != null) { fields.push(`region_id = $\${String(paramIdx++)}`); params.push(input.region_id); }
+  if (input.commune_id != null) { fields.push(`commune_id = $\${String(paramIdx++)}`); params.push(input.commune_id); }
+  if (input.is_active != null) { fields.push(`is_active = $\${String(paramIdx++)}`); params.push(input.is_active); }
 
   if (fields.length === 0) return [new Error('update_failed: no fields provided'), null];
 
-  fields.push(\`updated_at = NOW()\`);
+  fields.push(`updated_at = NOW()`);
   params.push(providerId);
 
-  const query = \`UPDATE providers SET \${fields.join(', ')} WHERE id = $\${String(paramIdx)}::uuid RETURNING id, name, email\`;
+  const query = `UPDATE providers SET \${fields.join(', ')} WHERE id = $\${String(paramIdx)}::uuid RETURNING id, name, email`;
   const rows = await tx.values<[string, string, string][]>(query, params);
   const row = rows[0];
-  if (row === undefined) return [new Error(\`update_failed: provider '\${providerId}' not found\`), null];
+  if (row === undefined) return [new Error(`update_failed: provider '\${providerId}' not found`), null];
 
   const result: ProviderRow = {
     id: row[0],
@@ -226,17 +226,17 @@ export async function resetProviderPassword(
   const tempPassword = generateReadablePassword(4);
   const passwordHash = await hashPassword(tempPassword);
 
-  await tx\`
+  await tx`
     UPDATE providers
     SET password_hash = \${passwordHash},
         last_password_change = NOW(),
         updated_at = NOW()
     WHERE id = \${providerId}::uuid
-  \`;
+  `;
 
   return [null, {
     provider_id: providerId,
     temp_password: tempPassword,
-    message: \`New temp password: \${tempPassword} (expires in 24h, must change on first login)\`,
+    message: `New temp password: \${tempPassword} (expires in 24h, must change on first login)`,
   }];
 }
