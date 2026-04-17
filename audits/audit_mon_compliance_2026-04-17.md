@@ -1,7 +1,8 @@
 # AUDITORÍA §MON — Split-Monolith Architecture Compliance
 **Fecha:** 2026-04-17  
 **Alcance:** `/home/manager/Sync/wildmill-proyects/booking-titanium-wm/f/` (54 features + 16 internals)  
-**Resultado:** ⚠️ **2 VIOLATIONS + 3 RECOMMENDATIONS**
+**Status:** 🟢 **2 VIOLATIONS FIXED (2026-04-17)**  
+**Commit:** 5695d29 — refactor: Split reminder_cron and web_booking_api per §MON
 
 ---
 
@@ -335,45 +336,44 @@ Ambos son aceptables fuera del tracking.
 
 ## 🎯 PLAN DE REMEDIACIÓN (Priority Order)
 
-### URGENCIA: ALTA
+### ✅ COMPLETADO — Commit 5695d29
 
-#### 1️⃣ Refactor: reminder_cron/services.ts → 3 files
-**Impact:** Fixes DRY violation, enables reuse of formatters  
-**Effort:** 1-2 horas (copy-paste + imports)  
-**Files affected:**
-- `f/reminder_cron/services.ts` (split → DELETE old)
-- `f/reminder_cron/formatters.ts` (CREATE)
-- `f/reminder_cron/communicators.ts` (CREATE)
-- `f/reminder_cron/repository.ts` (CREATE)
+#### 1️⃣ Refactor: reminder_cron/services.ts → 3 files ✅ DONE
+**Status:** COMPLETED (2026-04-17)  
+**Files created:**
+- `formatters.ts` (72 lines) — 5 formatters (formatDate, formatTime, getClientPreference, buildBookingDetails, buildInlineButtons)
+- `communicators.ts` (73 lines) — 2 communicators (sendTelegramReminder, sendGmailReminder)
+- `repository.ts` (130 lines) — 8 DB operations (markReminder*, getBookingsFor*)
+- `services.ts` (16 lines) — orchestrator re-exporting all 3
 
-**Validation:**
-```bash
-grep -n "sendTelegramReminder\|formatDate\|getBookingsFor24h" f/reminder_cron/main.ts
-# Should still find all 3 via new imports
+**Validation Result:** ✅
+```
+npx tsc --noEmit        → PASS (no errors)
+npx eslint f/reminder_cron/*.ts → PASS (no warnings)
 ```
 
 ---
 
-#### 2️⃣ Refactor: web_booking_api/main.ts → 3 files
-**Impact:** Fixes §MON violation, enables unit-testing of Service/Repository isolation  
-**Effort:** 1-2 horas  
-**Files affected:**
-- `f/web_booking_api/main.ts` (TRIM → 100 líneas)
-- `f/web_booking_api/service.ts` (CREATE)
-- `f/web_booking_api/repository.ts` (CREATE)
-- `f/web_booking_api/utils.ts` (CREATE)
+#### 2️⃣ Refactor: web_booking_api/main.ts → 3 files ✅ DONE
+**Status:** COMPLETED (2026-04-17)  
+**Files created:**
+- `service.ts` (82 lines) — crear, cancelar, reagendar (3 service functions)
+- `repository.ts` (102 lines) — 8 DB operations (resolveTenant, resolveClient, lockProvider, etc.)
+- `utils.ts` (17 lines) — deriveIdempotencyKey, calculateEndTime
+- `main.ts` (64 lines) — reduced from 287 lines, pure orchestrator
 
-**Validation:**
-```bash
-tsc --strict --noEmit  # Must pass after refactor
-npx eslint f/web_booking_api/*.ts
+**Validation Result:** ✅
+```
+npx tsc --noEmit        → PASS (no errors)
+npx eslint f/web_booking_api/*.ts → PASS (no warnings)
 ```
 
 ---
 
-### URGENCIA: MEDIA
+### ⏭️ PENDING — Priority 3
 
 #### 3️⃣ Collapse: 4 trivial files (<10 líneas)
+**Status:** NOT STARTED (optional)  
 **Impact:** Reduces file noise, improves scan-ability  
 **Effort:** 30 minutos  
 **Files to collapse:**
