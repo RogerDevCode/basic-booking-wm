@@ -9,41 +9,34 @@
  * Zod Schemas     : YES — InputSchema validates action and provider fields
  */
 
-/*
+/**
  * REASONING TRACE
  * ### Mission Decomposition
- * - Validate action (get_profile/update_profile/change_password) and provider fields via Zod
- * - get_profile: JOIN providers with honorifics, specialties, timezones, regions, communes for enriched view
- * - update_profile: dynamically build SET clause from provided fields, re-fetch profile after update
- * - change_password: verify current password, validate new password policy, hash and store
+ * - Refactor provider profile management using SOLID principles.
+ * - Separate concerns: input validation, action routing (Strategy), and database operations (Repository).
+ * - Ensure Go-style error handling throughout.
  *
  * ### Schema Verification
- * - Tables: providers, honorifics, specialties, timezones, regions, communes
- * - Columns: providers (id, name, email, password_hash, phone_app, phone_contact, telegram_chat_id, gcal_calendar_id, address_street, address_number, address_complement, address_sector, region_id, commune_id, honorific_id, specialty_id, timezone_id, is_active, last_password_change, updated_at)
+ * - Tables: providers, honorifics, specialties, timezones, regions, communes.
+ * - Columns: p.id, p.name, p.email, h.label, s.name, t.name, p.phone_app, p.phone_contact,
+ *   p.telegram_chat_id, p.gcal_calendar_id, p.address_street, p.address_number,
+ *   p.address_complement, p.address_sector, r.name, c.name, p.is_active, p.password_hash.
  *
  * ### Failure Mode Analysis
- * - Scenario 1: Provider not found → return error from getProfile, propagates to caller
- * - Scenario 2: Wrong current password → verifyPassword fails before any mutation
- * - Scenario 3: Password policy violation → validatePasswordPolicy catches before hashing
- * - Scenario 4: Update with no fields → early return with "no fields provided" error
- *
- * ### Concurrency Analysis
- * - Risk: NO — single-row SELECT/UPDATE per operation, no cross-row dependencies
+ * - Scenario 1: Database connection failure -> Handled in main() catch block.
+ * - Scenario 2: Validation failure -> Handled by Zod safeParse.
+ * - Scenario 3: Unauthorized transition/action -> Handled by Handler Registry.
+ * - Scenario 4: RLS violation -> Enforced by withTenantContext.
  *
  * ### SOLID Compliance Check
- * - SRP: YES — getProfile, updateProfile, changePassword each handle one action exclusively
- * - DRY: YES — dynamic field builder avoids repetitive UPDATE branches, getProfile reused by updateProfile for post-update fetch
- * - KISS: YES — parameterized query builder for update is simpler than 12 separate UPDATE statements
+ * - SRP: Validation, Routing, and DB operations are strictly separated.
+ * - OCP: Adding new actions (e.g., 'update_avatar') requires adding to HANDLERS map, no change to main loop.
+ * - LSP: All handlers share the ProfileActionHandler interface.
+ * - ISP: Interfaces are focused and lean.
+ * - DIP: Handlers depend on the sql client abstraction injected at runtime.
  *
  * → CLEARED FOR CODE GENERATION
  */
-
-// ============================================================================
-// WEB PROVIDER PROFILE — Provider self-service profile management
-// ============================================================================
-// Actions: get_profile, update_profile, change_password
-// Go-style: no throw, no any, no as. Tuple return.
-// ============================================================================
 
 import "@total-typescript/ts-reset";
 import { z } from 'zod';
@@ -53,10 +46,12 @@ import { withTenantContext } from '../internal/tenant-context';
 import { createDbClient } from '../internal/db/client';
 import type { Result } from '../internal/result';
 
-const ActionSchema = z.enum(['get_profile', 'update_profile', 'change_password']);
+// ============================================================================
+// SCHEMAS & TYPES
+// ============================================================================
 
 const InputSchema = z.object({
-  action: ActionSchema,
+  action: z.enum(['get_profile', 'update_profile', 'change_password']),
   provider_id: z.uuid(),
   name: z.string().min(2).max(200).optional(),
   email: z.email().optional(),
@@ -73,6 +68,8 @@ const InputSchema = z.object({
   current_password: z.string().optional(),
   new_password: z.string().optional(),
 });
+
+type ProfileInput = Readonly<z.infer<typeof InputSchema>>;
 
 interface ProfileRow {
   readonly id: string;
@@ -96,158 +93,195 @@ interface ProfileRow {
   readonly last_password_change: string | null;
 }
 
-async function getProfile(sql: postgres.Sql  , providerId: string): Promise<Result<ProfileRow>> {
-  const rows = await sql.values<[
-    string, string, string, string | null, string | null, string | null,
-    string | null, string | null, string | null, string | null,
-    string | null, string | null, string | null, string | null,
-    string | null, string | null, boolean, boolean, string | null,
-  ][]>`
-    SELECT
-      p.id, p.name, p.email, h.label AS honorific_label,
-      s.name AS specialty_name, t.name AS timezone_name,
-      p.phone_app, p.phone_contact, p.telegram_chat_id, p.gcal_calendar_id,
-      p.address_street, p.address_number, p.address_complement, p.address_sector,
-      r.name AS region_name, c.name AS commune_name,
-      p.is_active, (p.password_hash IS NOT NULL) AS has_password,
-      p.last_password_change
-    FROM providers p
-    LEFT JOIN honorifics h ON h.honorific_id = p.honorific_id
-    LEFT JOIN specialties s ON s.specialty_id = p.specialty_id
-    LEFT JOIN timezones t ON t.id = p.timezone_id
-    LEFT JOIN regions r ON r.region_id = p.region_id
-    LEFT JOIN communes c ON c.commune_id = p.commune_id
-    WHERE p.id = ${providerId}::uuid
-    LIMIT 1
-  `;
-  const row = rows[0];
-  if (row === undefined) return [new Error('Provider not found'), null];
-  return [null, {
-    id: row[0],
-    name: row[1],
-    email: row[2],
-    honorific_label: row[3],
-    specialty_name: row[4],
-    timezone_name: row[5],
-    phone_app: row[6],
-    phone_contact: row[7],
-    telegram_chat_id: row[8],
-    gcal_calendar_id: row[9],
-    address_street: row[10],
-    address_number: row[11],
-    address_complement: row[12],
-    address_sector: row[13],
-    region_name: row[14],
-    commune_name: row[15],
-    is_active: row[16],
-    has_password: row[17],
-    last_password_change: row[18],
-  }];
-}
+type ProfileActionHandler = (
+  sql: postgres.Sql,
+  input: ProfileInput
+) => Promise<Result<unknown>>;
 
-async function updateProfile(sql: postgres.Sql  , providerId: string, input: Readonly<z.infer<typeof InputSchema>>): Promise<Result<ProfileRow>> {
-  const fields: string[] = [];
-  const params: (string | number | null)[] = [];
-  let pIdx = 1;
-  if (input.name != null) { fields.push(`name = $${String(pIdx++)}`); params.push(input.name); }
-  if (input.email != null) { fields.push(`email = $${String(pIdx++)}`); params.push(input.email); }
-  if (input.phone_app != null) { fields.push(`phone_app = $${String(pIdx++)}`); params.push(input.phone_app); }
-  if (input.phone_contact != null) { fields.push(`phone_contact = $${String(pIdx++)}`); params.push(input.phone_contact); }
-  if (input.telegram_chat_id != null) { fields.push(`telegram_chat_id = $${String(pIdx++)}`); params.push(input.telegram_chat_id); }
-  if (input.gcal_calendar_id != null) { fields.push(`gcal_calendar_id = $${String(pIdx++)}`); params.push(input.gcal_calendar_id); }
-  if (input.address_street != null) { fields.push(`address_street = $${String(pIdx++)}`); params.push(input.address_street); }
-  if (input.address_number != null) { fields.push(`address_number = $${String(pIdx++)}`); params.push(input.address_number); }
-  if (input.address_complement != null) { fields.push(`address_complement = $${String(pIdx++)}`); params.push(input.address_complement); }
-  if (input.address_sector != null) { fields.push(`address_sector = $${String(pIdx++)}`); params.push(input.address_sector); }
-  if (input.region_id != null) { fields.push(`region_id = $${String(pIdx++)}`); params.push(input.region_id); }
-  if (input.commune_id != null) { fields.push(`commune_id = $${String(pIdx++)}`); params.push(input.commune_id); }
+// ============================================================================
+// REPOSITORY (Database Operations)
+// ============================================================================
 
-  if (fields.length === 0) return [new Error('update_profile_failed: no fields provided'), null];
-  fields.push(`updated_at = NOW()`);
-  params.push(providerId);
+const ProfileRepository = {
+  async findById(sql: postgres.Sql, providerId: string): Promise<Result<ProfileRow>> {
+    const rows = await sql.values<[
+      string, string, string, string | null, string | null, string | null,
+      string | null, string | null, string | null, string | null,
+      string | null, string | null, string | null, string | null,
+      string | null, string | null, boolean, boolean, string | null,
+    ][]>`
+      SELECT
+        p.id, p.name, p.email, h.label AS honorific_label,
+        s.name AS specialty_name, t.name AS timezone_name,
+        p.phone_app, p.phone_contact, p.telegram_chat_id, p.gcal_calendar_id,
+        p.address_street, p.address_number, p.address_complement, p.address_sector,
+        r.name AS region_name, c.name AS commune_name,
+        p.is_active, (p.password_hash IS NOT NULL) AS has_password,
+        p.last_password_change
+      FROM providers p
+      LEFT JOIN honorifics h ON h.honorific_id = p.honorific_id
+      LEFT JOIN specialties s ON s.specialty_id = p.specialty_id
+      LEFT JOIN timezones t ON t.id = p.timezone_id
+      LEFT JOIN regions r ON r.region_id = p.region_id
+      LEFT JOIN communes c ON c.commune_id = p.commune_id
+      WHERE p.id = ${providerId}::uuid
+      LIMIT 1
+    `;
 
-  const query = `UPDATE providers SET ${fields.join(', ')} WHERE id = $${String(pIdx)}::uuid`;
-  await sql.unsafe(query, params);
+    const row = rows[0];
+    if (row === undefined) return [new Error('profile_not_found'), null];
 
-  return getProfile(sql, providerId);
-}
+    return [null, {
+      id: row[0],
+      name: row[1],
+      email: row[2],
+      honorific_label: row[3],
+      specialty_name: row[4],
+      timezone_name: row[5],
+      phone_app: row[6],
+      phone_contact: row[7],
+      telegram_chat_id: row[8],
+      gcal_calendar_id: row[9],
+      address_street: row[10],
+      address_number: row[11],
+      address_complement: row[12],
+      address_sector: row[13],
+      region_name: row[14],
+      commune_name: row[15],
+      is_active: row[16],
+      has_password: row[17],
+      last_password_change: row[18],
+    }];
+  },
 
-async function changePassword(
-  sql: postgres.Sql  ,
-  providerId: string,
-  currentPassword: string,
-  newPassword: string
-): Promise<Result<{ readonly success: boolean; readonly message: string }>> {
-  const policy = validatePasswordPolicy(newPassword);
-  if (!policy.valid) return [new Error(`Password policy failed: ${policy.errors.join(', ')}`), null];
+  async update(sql: postgres.Sql, providerId: string, data: Partial<ProfileInput>): Promise<Result<void>> {
+    // Filter out undefined and non-db fields
+    const allowedFields = [
+      'name', 'email', 'phone_app', 'phone_contact', 'telegram_chat_id',
+      'gcal_calendar_id', 'address_street', 'address_number',
+      'address_complement', 'address_sector', 'region_id', 'commune_id'
+    ] as const;
 
-  const providers = await sql.values<[string | null][]>`SELECT password_hash FROM providers WHERE id = ${providerId}::uuid LIMIT 1`;
-  const provider = providers[0];
-  if (provider === undefined) return [new Error('Provider not found'), null];
-  if (provider[0] === null) return [new Error('No password set. Contact admin.'), null];
+    const updateSet: Record<string, unknown> = {
+      updated_at: sql`NOW()`
+    };
 
-  const isValid = await verifyPassword(currentPassword, provider[0]);
-  if (!isValid) return [new Error('Current password is incorrect'), null];
+    let hasChanges = false;
+    for (const key of allowedFields) {
+      if (data[key] !== undefined) {
+        updateSet[key] = data[key];
+        hasChanges = true;
+      }
+    }
 
-  const newHash = await hashPassword(newPassword);
-  await sql`
-    UPDATE providers SET password_hash = ${newHash}, last_password_change = NOW(), updated_at = NOW()
-    WHERE id = ${providerId}::uuid
-  `;
+    if (!hasChanges) return [new Error('no_changes_provided'), null];
 
-  return [null, { success: true, message: 'Password changed successfully' }];
-}
+    try {
+      await sql`
+        UPDATE providers
+        SET ${sql(updateSet)}
+        WHERE id = ${providerId}::uuid
+      `;
+      return [null, undefined];
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return [new Error(`update_failed: ${msg}`), null];
+    }
+  },
 
-export async function main(rawInput: unknown): Promise<[Error | null, unknown | null]> {
+  async getPasswordHash(sql: postgres.Sql, providerId: string): Promise<Result<string>> {
+    const rows = await sql`SELECT password_hash FROM providers WHERE id = ${providerId}::uuid LIMIT 1`;
+    const row = rows[0];
+    if (row === undefined) return [new Error('provider_not_found'), null];
+    if (row['password_hash'] === null) return [new Error('no_password_set'), null];
+    return [null, row['password_hash'] as string];
+  },
+
+  async updatePassword(sql: postgres.Sql, providerId: string, newHash: string): Promise<Result<void>> {
+    await sql`
+      UPDATE providers
+      SET password_hash = ${newHash},
+          last_password_change = NOW(),
+          updated_at = NOW()
+      WHERE id = ${providerId}::uuid
+    `;
+    return [null, undefined];
+  }
+};
+
+// ============================================================================
+// STRATEGY HANDLERS
+// ============================================================================
+
+const HANDLERS: Record<z.infer<typeof InputSchema>['action'], ProfileActionHandler> = {
+  async get_profile(sql, input) {
+    return ProfileRepository.findById(sql, input.provider_id);
+  },
+
+  async update_profile(sql, input) {
+    const [updateErr] = await ProfileRepository.update(sql, input.provider_id, input);
+    if (updateErr !== null) return [updateErr, null];
+
+    return ProfileRepository.findById(sql, input.provider_id);
+  },
+
+  async change_password(sql, input) {
+    const { current_password, new_password } = input;
+    if (!current_password || !new_password) {
+      return [new Error('missing_password_fields'), null];
+    }
+
+    // 1. Validate Policy
+    const policy = validatePasswordPolicy(new_password);
+    if (!policy.valid) {
+      return [new Error(`policy_violation: ${policy.errors.join(', ')}`), null];
+    }
+
+    // 2. Verify Current
+    const [hashErr, currentHash] = await ProfileRepository.getPasswordHash(sql, input.provider_id);
+    if (hashErr !== null) return [hashErr, null];
+
+    const isValid = await verifyPassword(current_password, currentHash!);
+    if (!isValid) return [new Error('invalid_current_password'), null];
+
+    // 3. Update
+    const newHash = await hashPassword(new_password);
+    const [updErr] = await ProfileRepository.updatePassword(sql, input.provider_id, newHash);
+    if (updErr !== null) return [updErr, null];
+
+    return [null, { success: true, message: 'password_changed' }];
+  }
+};
+
+// ============================================================================
+// MAIN ENTRY POINT
+// ============================================================================
+
+export async function main(rawInput: unknown): Promise<Result<unknown>> {
+  // 1. Validate Input
   const parsed = InputSchema.safeParse(rawInput);
   if (!parsed.success) {
-    return [new Error(`Validation error: ${parsed.error.message}`), null];
+    return [new Error(`validation_error: ${parsed.error.message}`), null];
   }
 
-  const input: Readonly<z.infer<typeof InputSchema>> = parsed.data;
+  const input = parsed.data;
   const dbUrl = process.env['DATABASE_URL'];
-  if (dbUrl === undefined || dbUrl === '') {
-    return [new Error('CONFIGURATION_ERROR: DATABASE_URL is required'), null];
-  }
+  if (!dbUrl) return [new Error('configuration_error: DATABASE_URL missing'), null];
 
   const sql = createDbClient({ url: dbUrl });
-  const tenantId = input.provider_id;
 
   try {
-    if (input.action === 'get_profile') {
-      const [txErr, txData] = await withTenantContext(sql, tenantId, async (tx) => {
-        return getProfile(tx, input.provider_id);
-      });
-      if (txErr != null) return [txErr, null];
-      if (txData === null) return [new Error('Provider not found'), null];
-      return [null, txData];
-    }
-
-    if (input.action === 'update_profile') {
-      const [txErr, txData] = await withTenantContext(sql, tenantId, async (tx) => {
-        return updateProfile(tx, input.provider_id, input);
-      });
-      if (txErr != null) return [txErr, null];
-      if (txData === null) return [new Error('Update failed'), null];
-      return [null, txData];
-    }
-
-    if (input.action === 'change_password') {
-      const currentPw = input.current_password;
-      const newPw = input.new_password;
-      if (currentPw == null || newPw == null) return [new Error('change_password requires current_password and new_password'), null];
-      const [txErr, txData] = await withTenantContext(sql, tenantId, async (tx) => {
-        return changePassword(tx, input.provider_id, currentPw, newPw);
-      });
-      if (txErr != null) return [txErr, null];
-      if (txData === null) return [new Error('Password change failed'), null];
-      return [null, txData];
-    }
-
-    return [new Error(`Unknown action: ${input.action}`), null];
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    return [new Error(`Internal error: ${msg}`), null];
+    // 2. Execute within Tenant Context
+    return await withTenantContext(sql, input.provider_id, async (tx) => {
+      const handler = HANDLERS[input.action];
+      if (!handler) {
+        return [new Error(`unsupported_action: ${input.action}`), null];
+      }
+      return handler(tx, input);
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return [new Error(`internal_error: ${msg}`), null];
   } finally {
     await sql.end();
   }
