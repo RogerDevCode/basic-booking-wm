@@ -57,7 +57,7 @@ const OpenRouterResponseSchema = z.object({
     completion_tokens: z.number().optional(),
     total_tokens: z.number().optional(),
   }).optional(),
-}).passthrough();
+}).loose();
 
 type OpenRouterResponse = z.infer<typeof OpenRouterResponseSchema>;
 
@@ -187,7 +187,7 @@ async function callOpenRouter(
   modelId: string,
   systemPrompt: string,
   userMessage: string,
-  temperature: number = 0.0,
+  temperature = 0.0,
 ): Promise<[Error | null, OpenRouterResponse | null]> {
   try {
     const response = await fetch(OPENROUTER_URL, {
@@ -213,7 +213,7 @@ async function callOpenRouter(
     if (!response.ok) {
       const errorBody = await response.text();
       return [
-        new Error(`HTTP ${response.status}: ${errorBody.slice(0, 500)}`),
+        new Error(`HTTP ${String(response.status)}: ${errorBody.slice(0, 500)}`),
         null,
       ];
     }
@@ -247,7 +247,7 @@ function extractJSON(text: string): Record<string, unknown> | null {
   } catch { /* fall through */ }
 
   // Try extracting from markdown code fences
-  const fenceMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)```/);
+  const fenceMatch = /```(?:json)?\s*\n?([\s\S]*?)```/.exec(text);
   if (fenceMatch !== null) {
     try {
       const content = fenceMatch[1];
@@ -258,7 +258,7 @@ function extractJSON(text: string): Record<string, unknown> | null {
   }
 
   // Try finding first JSON-like object
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  const jsonMatch = /\{[\s\S]*\}/.exec(text);
   if (jsonMatch !== null) {
     try {
       const obj: unknown = JSON.parse(jsonMatch[0]);
@@ -373,7 +373,7 @@ export async function main(_rawInput: unknown = {}): Promise<[Error | null, Benc
 
   console.log(`\n${'='.repeat(72)}`);
   console.log(`  OpenRouter Free Models — NLU Intent Classification Benchmark`);
-  console.log(`  Tasks: ${TASKS.length} | Models: ${MODELS.length}`);
+  console.log(`  Tasks: ${String(TASKS.length)} | Models: ${String(MODELS.length)}`);
   console.log(`${'='.repeat(72)}\n`);
 
   const allSummaries: ModelSummary[] = [];
@@ -381,7 +381,7 @@ export async function main(_rawInput: unknown = {}): Promise<[Error | null, Benc
   for (const model of MODELS) {
     console.log(`\n${'─'.repeat(72)}`);
     console.log(`  Model: ${model.name} (${model.id})`);
-    console.log(`${'─'.repeat(72)}`);
+    console.log('─'.repeat(72));
 
     const results: ModelTestResult[] = [];
 
@@ -396,18 +396,18 @@ export async function main(_rawInput: unknown = {}): Promise<[Error | null, Benc
       if (result.success && result.correct !== null) {
         const icon = result.correct ? '✓' : '✗';
         const intentInfo = result.parsed !== null
-          ? `${result.parsed.intent} (conf: ${result.parsed.confidence})`
+          ? `${result.parsed.intent} (conf: ${String(result.parsed.confidence)})`
           : '(parse failed)';
         const tokens = result.totalTokens ?? '?';
-        console.log(`  ${icon} ${task.name} — ${intentInfo} | ${result.latencyMs}ms | ${tokens} tok`);
+        console.log(`  ${icon} ${task.name} — ${intentInfo} | ${String(result.latencyMs)}ms | ${String(tokens)} tok`);
         if (!result.correct && result.error !== null) {
           console.log(`    → ${result.error}`);
         }
       } else if (result.success && result.correct === null) {
-        console.log(`  ✗ ${task.name}: ${result.error} | ${result.latencyMs}ms`);
+        console.log(`  ✗ ${task.name}: ${String(result.error)} | ${String(result.latencyMs)}ms`);
         console.log(`    → ${result.rawResponse?.slice(0, 120) ?? '(empty)'}`);
       } else {
-        console.log(`  ✗ ${task.name}: ${result.error} | ${result.latencyMs}ms`);
+        console.log(`  ✗ ${task.name}: ${String(result.error)} | ${String(result.latencyMs)}ms`);
       }
     }
 
@@ -418,7 +418,7 @@ export async function main(_rawInput: unknown = {}): Promise<[Error | null, Benc
       ? Math.round(results.reduce((s, r) => s + r.latencyMs, 0) / results.length)
       : 0;
 
-    console.log(`\n  Summary: ${correct}/${results.length} correct | ${passed} ok | ${failed} err | ${avgLatency}ms avg`);
+    console.log(`\n  Summary: ${String(correct)}/${String(results.length)} correct | ${String(passed)} ok | ${String(failed)} err | ${String(avgLatency)}ms avg`);
 
     allSummaries.push(Object.freeze({
       model: model.name,
@@ -434,12 +434,12 @@ export async function main(_rawInput: unknown = {}): Promise<[Error | null, Benc
   // ── Final Summary Table ────────────────────────────────────────────────
   console.log(`\n\n${'═'.repeat(72)}`);
   console.log(`  FINAL BENCHMARK RESULTS`);
-  console.log(`${'═'.repeat(72)}`);
-  console.log(`  ${'Model'.padEnd(35)} ${'Correct'.padEnd(10)} ${'Avg ms'.padEnd(10)} ${'Status'}`);
+  console.log('═'.repeat(72));
+  console.log(`  ${'Model'.padEnd(35)} ${'Correct'.padEnd(10)} ${'Avg ms'.padEnd(10)} Status`);
   console.log(`  ${'─'.repeat(35)} ${'─'.repeat(10)} ${'─'.repeat(10)} ${'─'.repeat(10)}`);
 
   for (const s of allSummaries) {
-    const pct = `${s.correct}/${s.totalTasks}`;
+    const pct = `${String(s.correct)}/${String(s.totalTasks)}`;
     const status = s.failed > 2 ? '🔴 FAIL' : s.correct === s.totalTasks ? '🟢 OK' : '🟡 PARTIAL';
     console.log(`  ${s.model.padEnd(35)} ${pct.padEnd(10)} ${String(s.avgLatencyMs).padEnd(10)} ${status}`);
   }
@@ -471,9 +471,9 @@ if (isMain) {
       for (const s of report.summaries) {
         console.log(`\n--- ${s.model} ---`);
         for (const r of s.results) {
-          console.log(`  [${r.taskId}] correct=${r.correct} latency=${r.latencyMs}ms tokens=${r.totalTokens ?? '?'}`);
+          console.log(`  [${r.taskId}] correct=${String(r.correct)} latency=${String(r.latencyMs)}ms tokens=${String(r.totalTokens ?? '?')}`);
           if (r.parsed !== null) {
-            console.log(`    → intent=${r.parsed.intent} conf=${r.parsed.confidence} human=${r.parsed.requires_human}`);
+            console.log(`    → intent=${r.parsed.intent} conf=${String(r.parsed.confidence)} human=${String(r.parsed.requires_human)}`);
           }
           if (r.error !== null) {
             console.log(`    → error: ${r.error}`);
