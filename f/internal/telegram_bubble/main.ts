@@ -220,12 +220,13 @@ class TelegramBubble {
 
     // Enrich state with mock items so FSM can read from state.items
     const enrichedState = this.enrichStateWithMock(state);
-    const transition = applyTransition(enrichedState, action, draft, this.getMockItemsForState(enrichedState));
+    const [transitionErr, transition] = applyTransition(enrichedState, action, draft, this.getMockItemsForState(enrichedState));
 
-    if (!transition.ok) {
+    if (transitionErr !== null || transition === null) {
+      const finalOutcome = transition ?? { nextState: state, responseText: transitionErr?.message ?? 'Error', advance: false };
       // Stay on current state with error
       return [null, {
-        text: transition.responseText,
+        text: finalOutcome.responseText,
         inline_keyboard: this.getKeyboardForState(state),
         route: 'wizard', latency_ms: Date.now() - startMs, step_name: state.name, step_num: flowStepFromState(state), should_edit: true, draft_summary: this.draftSummary(draft),
       }];
