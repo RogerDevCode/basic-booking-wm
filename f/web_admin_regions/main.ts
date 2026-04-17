@@ -46,6 +46,7 @@
 import "@total-typescript/ts-reset";
 import { z } from 'zod';
 import { createDbClient } from '../internal/db/client';
+import type { Result } from '../internal/result';
 
 const ActionSchema = z.enum(['list_regions', 'list_communes', 'search_communes']);
 
@@ -72,7 +73,7 @@ interface CommuneRow {
   readonly region_name: string;
 }
 
-export async function main(rawInput: unknown): Promise<[Error | null, unknown | null]> {
+export async function main(rawInput: unknown): Promise<Result<unknown>> {
   const parsed = InputSchema.safeParse(rawInput);
   if (!parsed.success) {
     return [new Error(`Validation error: ${parsed.error.message}`), null];
@@ -160,7 +161,7 @@ export async function main(rawInput: unknown): Promise<[Error | null, unknown | 
       return [null, { communes, count: communes.length }];
     }
 
-    return [new Error(`Unknown action: ${input.action}`), null];
+    return [new Error(`Unknown action: ${String(input.action)}`), null];
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     return [new Error(`Internal error: ${msg}`), null];
