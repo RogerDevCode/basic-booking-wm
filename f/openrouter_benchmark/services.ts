@@ -2,15 +2,12 @@ import type {
   Result,
   ModelCandidate,
   OpenRouterResponse,
-  NLUIntent,
   TaskPrompt,
   ModelTestResult,
 } from './types';
 import { OpenRouterResponseSchema, NLUIntentSchema } from './types';
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
-
-const MODULE = 'openrouter_benchmark:services';
 
 export function getApiKey(): [Error | null, string | null] {
   const key = process.env['OPENROUTER_API_KEY'];

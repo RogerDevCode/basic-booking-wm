@@ -1,10 +1,7 @@
 import postgres from 'postgres';
-import { createDbClient } from '../internal/db/client';
 import { withTenantContext } from '../internal/tenant-context';
 import type { Result } from '../internal/result';
 import type { WizardState, StepView } from './types';
-
-const MODULE = 'booking_wizard:services';
 
 export const DateUtils = {
   format(dateStr: string, tz: string): string {

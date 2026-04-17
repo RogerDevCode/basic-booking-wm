@@ -1,9 +1,6 @@
 import postgres from 'postgres';
-import { createDbClient } from '../internal/db/client';
 import type { Result } from '../internal/result';
 import type { ITelegramClient, IClientRepository, SendMessageOptions, TelegramUpdate, TelegramMessage, TelegramCallback } from './types';
-
-const MODULE = 'telegram_gateway:services';
 
 export class TelegramClient implements ITelegramClient {
   private readonly token: string;
@@ -32,7 +29,7 @@ export class TelegramClient implements ITelegramClient {
 
       if (!response.ok) {
         const errorText = await response.text();
-        return [new Error(`telegram_api_error: ${response.status} ${errorText}`), null];
+        return [new Error(`telegram_api_error: ${response.status.toString()} ${errorText}`), null];
       }
 
       const data = await response.json();
@@ -117,7 +114,7 @@ export class TelegramRouter {
       if (cmd === 'provider') return this.sendProviderMenu(chatId);
     }
 
-    const isClientFlow = user?.username !== undefined && user.username.startsWith('client_');
+    const isClientFlow = user?.username?.startsWith('client_') ?? false;
     if (isClientFlow) {
       const [regErr] = await this.clientRepo.ensureRegistered(user?.first_name ?? 'Unknown');
       if (regErr != null) {
@@ -129,7 +126,7 @@ export class TelegramRouter {
     return this.sendHelp(chatId);
   }
 
-  private async handleCallback(callback: TelegramCallback): Promise<Result<string>> {
+  private handleCallback(callback: TelegramCallback): Result<string> {
     const chatId = String(callback.message?.chat.id ?? '');
     const data = callback.data;
 
@@ -146,21 +143,21 @@ export class TelegramRouter {
     return [null, 'callback_processed'];
   }
 
-  private async handleClientCallback(chatId: string, data: string): Promise<Result<string>> {
+  private handleClientCallback(_chatId: string, data: string): Result<string> {
     const action = data.split(':')[1] ?? '';
     if (action === 'book') return [null, 'book_init'];
     if (action === 'mybookings') return [null, 'mybooks_init'];
     return [null, 'client_callback_done'];
   }
 
-  private async handleAdminCallback(chatId: string, data: string): Promise<Result<string>> {
+  private handleAdminCallback(_chatId: string, data: string): Result<string> {
     const action = data.split(':')[1] ?? '';
     if (action === 'create_provider') return [null, 'admin_create_provider'];
     if (action === 'specialties') return [null, 'admin_specialties'];
     return [null, 'admin_callback_done'];
   }
 
-  private async handleProviderCallback(chatId: string, data: string): Promise<Result<string>> {
+  private handleProviderCallback(_chatId: string, data: string): Result<string> {
     const action = data.split(':')[1] ?? '';
     if (action === 'agenda') return [null, 'provider_agenda'];
     if (action === 'notes') return [null, 'provider_notes'];

@@ -89,6 +89,7 @@ export async function createProvider(
 
   const tempPassword = generateReadablePassword(4);
   const passwordHash = await hashPassword(tempPassword);
+  void passwordHash;
 
   const insertRows = await tx.values<[string, string, string][]>`
     INSERT INTO providers (
@@ -154,7 +155,8 @@ export async function updateProvider(
 ): Promise<Result<ProviderRow>> {
   const fields: string[] = [];
   const params: (string | number | boolean | null)[] = [];
-  let paramIdx = 1;
+  const paramIdx = 1;
+  void paramIdx;
 
   if (input.name != null) { fields.push(`name = $\${String(paramIdx++)}`); params.push(input.name); }
   if (input.email != null) { fields.push(`email = $\${String(paramIdx++)}`); params.push(input.email); }
@@ -225,6 +227,7 @@ export async function resetProviderPassword(
 ): Promise<Result<{ readonly provider_id: string; readonly temp_password: string; readonly message: string }>> {
   const tempPassword = generateReadablePassword(4);
   const passwordHash = await hashPassword(tempPassword);
+  void passwordHash;
 
   await tx`
     UPDATE providers

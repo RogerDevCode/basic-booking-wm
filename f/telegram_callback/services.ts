@@ -1,9 +1,4 @@
 import postgres from 'postgres';
-import { withTenantContext } from '../internal/tenant-context';
-import { createDbClient } from '../internal/db/client';
-import type { Result } from '../internal/result';
-
-const MODULE = 'telegram_callback:services';
 
 export async function answerCallbackQuery(
   botToken: string,

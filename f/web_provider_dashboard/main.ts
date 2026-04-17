@@ -30,7 +30,7 @@ export async function main(rawInput: unknown): Promise<Result<DashboardResult>> 
 
   try {
     const [txErr, txData] = await withTenantContext(sql, input.provider_user_id, async (tx) => {
-      const providerRows = await tx.values<[string, string, string]>`
+      const providerRows = await tx.values<[string, string, string][]>`
         SELECT p.provider_id, p.name, p.specialty
         FROM providers p
         WHERE p.email = (SELECT email FROM users WHERE user_id = ${input.provider_user_id}::uuid LIMIT 1)
@@ -43,18 +43,22 @@ export async function main(rawInput: unknown): Promise<Result<DashboardResult>> 
         return [new Error('Provider record not found'), null];
       }
 
+      const providerId = providerRow[0];
+      const providerName = providerRow[1];
+      const providerSpecialty = providerRow[2];
+
       const isoDate = new Date().toISOString().split('T');
       const todayStr = isoDate[0] ?? '';
       const targetDate = input.date ?? todayStr;
 
-      const agendaRows = await tx.values<[string, string, string, string, string, string]>`
+      const agendaRows = await tx.values<[string, string, string, string, string, string][]>`
         SELECT b.booking_id, b.start_time, b.end_time, b.status,
                COALESCE(c.name, '') as client_name,
                s.name as service_name
         FROM bookings b
         INNER JOIN clients c ON b.client_id = c.client_id
         INNER JOIN services s ON b.service_id = s.service_id
-        WHERE b.provider_id = ${providerRow[0]}::uuid
+        WHERE b.provider_id = ${providerId}::uuid
           AND DATE(b.start_time) = ${targetDate}::date
           AND b.status NOT IN ('cancelled', 'rescheduled')
         ORDER BY b.start_time ASC
@@ -70,17 +74,17 @@ export async function main(rawInput: unknown): Promise<Result<DashboardResult>> 
         status: row[3],
       }));
 
-      const completedRows = await tx.values<[number]>`
+      const completedRows = await tx.values<[number][]>`
         SELECT COUNT(*) FILTER (WHERE status = 'completed') FROM bookings
-        WHERE provider_id = ${providerRow[0]}::uuid
+        WHERE provider_id = ${providerId}::uuid
           AND DATE_TRUNC('month', start_time) = DATE_TRUNC('month', CURRENT_DATE)
       `;
       const completed = completedRows[0]?.[0] ?? 0;
 
       return [null, {
-        provider_id: providerRow[0],
-        provider_name: providerRow[1],
-        specialty: providerRow[2],
+        provider_id: providerId,
+        provider_name: providerName,
+        specialty: providerSpecialty,
         agenda,
         stats: {
           today_total: agenda.length,

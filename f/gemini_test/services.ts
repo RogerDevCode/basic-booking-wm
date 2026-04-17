@@ -1,8 +1,6 @@
 import type { Result } from '../internal/result';
 import type { GeminiResponse, TestCase, TestReport, TestResult } from './types';
-import { GEMINI_MODEL, GEMINI_API_BASE_URL, TEST_CASES } from './types';
-
-const MODULE = 'gemini_test:services';
+import { GEMINI_MODEL, GEMINI_API_BASE_URL } from './types';
 
 export function getApiKey(): Result<string> {
   const key = process.env['GOOGLE_API_KEY'];
@@ -48,7 +46,7 @@ export async function callGemini(
     if (!response.ok) {
       const errorBody = await response.text();
       return [
-        new Error(`HTTP ${response.status}: ${errorBody.slice(0, 500)}`),
+        new Error(`HTTP ${response.status.toString()}: ${errorBody.slice(0, 500)}`),
         null,
       ];
     }
@@ -81,7 +79,7 @@ export async function runTest(
     systemPrompt: testCase.systemPrompt,
     userMessage: testCase.userMessage,
     temperature: testCase.temperature,
-    jsonMode: testCase.jsonMode,
+    ...(testCase.jsonMode !== undefined ? { jsonMode: testCase.jsonMode } : {}),
   });
 
   const latencyMs = Date.now() - start;
@@ -133,13 +131,14 @@ export function generateReport(results: readonly TestResult[]): TestReport {
 
 export function printTestResult(result: TestResult): void {
   if (result.success) {
-    const preview = result.response && result.response.length > 120
-      ? result.response.slice(0, 120).replace(/\n/g, ' ') + '...'
-      : result.response.replace(/\n/g, ' ');
-    console.log(`  ✓ ${result.name} (${result.latencyMs}ms, ${result.tokenUsage?.total ?? '?'} tokens)`);
+    const responseText = result.response ?? '';
+  const preview = responseText.length > 120
+    ? responseText.slice(0, 120).replace(/\n/g, ' ') + '...'
+    : responseText.replace(/\n/g, ' ');
+    console.log(`  ✓ ${result.name} (${result.latencyMs.toString()}ms, ${result.tokenUsage?.total?.toString() ?? '?'} tokens)`);
     console.log(`    → ${preview}`);
   } else {
-    console.log(`  ✗ ${result.name}: ${result.error}`);
+    console.log(`  ✗ ${result.name}: ${result.error ?? ''}`);
   }
 }
 
@@ -152,9 +151,9 @@ export function printSummary(report: TestReport): void {
   console.log(`  RESULTS SUMMARY`);
   console.log('='.repeat(70));
   console.log(`  Model        : ${report.model}`);
-  console.log(`  Total tests  : ${report.totalTests}`);
-  console.log(`  Passed       : ${report.passed}`);
-  console.log(`  Failed       : ${report.failed}`);
-  console.log(`  Avg latency  : ${avgLatency}ms`);
+  console.log(`  Total tests  : ${report.totalTests.toString()}`);
+  console.log(`  Passed       : ${report.passed.toString()}`);
+  console.log(`  Failed       : ${report.failed.toString()}`);
+  console.log(`  Avg latency  : ${avgLatency.toString()}ms`);
   console.log(`${'='.repeat(70)}\n`);
 }

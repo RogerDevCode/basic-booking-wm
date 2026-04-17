@@ -1,8 +1,6 @@
 import postgres from 'postgres';
 import type { BookingRecord, ReminderPrefs, ReminderWindow, ScriptResponse } from './types';
 
-const MODULE = 'reminder_cron:services';
-
 export function formatDate(date: Date, tz: string): string {
   return date.toLocaleDateString('es-AR', {
     timeZone: tz,

@@ -1,7 +1,6 @@
 import { createDbClient } from '../internal/db/client';
 import { withTenantContext } from '../internal/tenant-context';
 import { resolveDate, resolveTime } from '../internal/date-resolver';
-import { logger } from '../internal/logger';
 import type { Result } from '../internal/result';
 import type {
   InputType,
@@ -12,7 +11,7 @@ import type {
   ResolvedContext,
 } from './types';
 
-const MODULE = 'booking_orchestrator:services';
+
 
 export function getEntity(entities: Record<string, string | null>, key: string): string | undefined {
   return entities[key] ?? undefined;
@@ -290,7 +289,10 @@ export async function handleGetMyBookings(
     return [null, { action: 'mis_citas', success: false, data: null, message: 'Falta identificación de paciente.' }];
   }
 
-  const dbUrl = process.env['DATABASE_URL']!;
+const dbUrl = process.env['DATABASE_URL'];
+    if (dbUrl === undefined || dbUrl === '') {
+      return [new Error('CONFIGURATION_ERROR: DATABASE_URL is not set'), null];
+    }
   const sql = createDbClient({ url: dbUrl });
 
   const [dbErr, rows] = await withTenantContext<readonly BookingRow[]>(sql, tenant_id, async (tx) => {

@@ -41,7 +41,8 @@ export async function main(rawInput: unknown): Promise<Result<ChangeRoleResult>>
         return [new Error('Admin not found or inactive'), null];
       }
 
-      if (String(adminRow[0]) !== 'admin') {
+      const adminRole = adminRow[0];
+      if (adminRole !== 'admin') {
         return [new Error('Forbidden: only admins can change user roles'), null];
       }
 
@@ -56,11 +57,15 @@ export async function main(rawInput: unknown): Promise<Result<ChangeRoleResult>>
         return [new Error('Target user not found'), null];
       }
 
-      const oldRole = String(targetRow[2]);
+      const [targetUserId, targetFullName, oldRole] = targetRow;
+      if (targetUserId === undefined || targetFullName === undefined || oldRole === undefined) {
+        return [new Error('Target user row missing required data'), null];
+      }
+
       if (oldRole === input.new_role) {
         return [null, {
-          user_id: targetRow[0],
-          full_name: targetRow[1],
+          user_id: targetUserId,
+          full_name: targetFullName,
           old_role: oldRole,
           new_role: input.new_role,
         }];
@@ -73,13 +78,19 @@ export async function main(rawInput: unknown): Promise<Result<ChangeRoleResult>>
       `;
 
       const updatedRow = updateRows[0];
-      if (!updatedRow) {
+      if (updatedRow === undefined) {
+        return [new Error('Failed to update user role'), null];
+      }
+
+      const updatedUserId = updatedRow[0];
+      const updatedFullName = updatedRow[1];
+      if (updatedUserId === undefined || updatedFullName === undefined) {
         return [new Error('Failed to update user role'), null];
       }
 
       return [null, {
-        user_id: updatedRow[0],
-        full_name: updatedRow[1],
+        user_id: updatedUserId,
+        full_name: updatedFullName,
         old_role: oldRole,
         new_role: input.new_role,
       }];

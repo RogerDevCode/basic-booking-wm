@@ -30,7 +30,7 @@ export async function main(rawInput: unknown): Promise<Result<AgendaResult>> {
 
   try {
     const [txErr, txData] = await withTenantContext(sql, input.provider_id, async (tx) => {
-      const providerRows = await tx.values<[string, string]>`
+      const providerRows = await tx.values<[string, string][]>`
         SELECT provider_id, name FROM providers
         WHERE provider_id = ${input.provider_id}::uuid AND is_active = true LIMIT 1
       `;
@@ -47,56 +47,61 @@ export async function main(rawInput: unknown): Promise<Result<AgendaResult>> {
       for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
         const dateStr = d.toISOString().split('T')[0] ?? '';
         
-        const overrideRows = await tx.values<[boolean, string]>`
+        const overrideRows = await tx.values<[boolean, string][]>`
           SELECT is_blocked, reason FROM schedule_overrides
           WHERE provider_id = ${input.provider_id}::uuid AND override_date = ${dateStr}::date
           LIMIT 1
         `;
 
-        const isBlocked = overrideRows[0]?.[0] ?? false;
-        const blockReason = overrideRows[0]?.[1] ?? null;
+        const overrideRow = overrideRows[0];
+        const isBlocked = overrideRow?.[0] ?? false;
+        const blockReason = overrideRow?.[1] ?? null;
 
         const dayOfWeek = d.getUTCDay();
-        const scheduleRows = await tx.values<[string, string]>`
+        const scheduleRows = await tx.values<[string, string][]>`
           SELECT start_time, end_time FROM provider_schedules
           WHERE provider_id = ${input.provider_id}::uuid AND day_of_week = ${dayOfWeek} AND is_active = true
         `;
 
-        const bookingsRows = input.include_client_details
-          ? await tx.values<[string, string, string, string, string]>`
-            SELECT b.booking_id, b.start_time, b.end_time, b.status, s.name,
-                   COALESCE(c.full_name, '') as client_name
-            FROM bookings b
-            JOIN services s ON b.service_id = s.service_id
-            LEFT JOIN clients c ON b.client_id = c.client_id
-            WHERE b.provider_id = ${input.provider_id}::uuid
-              AND DATE(b.start_time AT TIME ZONE 'UTC') = ${dateStr}::date
-              AND b.status NOT IN ('cancelled', 'no_show')
-            ORDER BY b.start_time
-          `
-          : await tx.values<[string, string, string, string]>`
-            SELECT b.booking_id, b.start_time, b.end_time, b.status, s.name
-            FROM bookings b
-            JOIN services s ON b.service_id = s.service_id
-            WHERE b.provider_id = ${input.provider_id}::uuid
-              AND DATE(b.start_time AT TIME ZONE 'UTC') = ${dateStr}::date
-              AND b.status NOT IN ('cancelled', 'no_show')
-            ORDER BY b.start_time
-          `;
-
-        const bookings = bookingsRows.map((row) => ({
-          booking_id: row[0],
-          start_time: row[1],
-          end_time: row[2],
-          status: row[3],
-          service_name: row[4],
-          client_name: input.include_client_details ? row[5] : undefined,
-        }));
+        const bookings = input.include_client_details
+          ? (await tx.values<[string, string, string, string, string, string][]>`
+              SELECT b.booking_id, b.start_time, b.end_time, b.status, COALESCE(c.full_name, '') as client_name,
+                     s.name as service_name
+              FROM bookings b
+              JOIN services s ON b.service_id = s.service_id
+              LEFT JOIN clients c ON b.client_id = c.client_id
+              WHERE b.provider_id = ${input.provider_id}::uuid
+                AND DATE(b.start_time AT TIME ZONE 'UTC') = ${dateStr}::date
+                AND b.status NOT IN ('cancelled', 'no_show')
+              ORDER BY b.start_time
+            `).map((row) => ({
+              booking_id: row[0],
+              start_time: row[1],
+              end_time: row[2],
+              status: row[3],
+              client_name: row[4],
+              service_name: row[5],
+            }))
+          : (await tx.values<[string, string, string, string, string][]>`
+              SELECT b.booking_id, b.start_time, b.end_time, b.status, s.name
+              FROM bookings b
+              JOIN services s ON b.service_id = s.service_id
+              WHERE b.provider_id = ${input.provider_id}::uuid
+                AND DATE(b.start_time AT TIME ZONE 'UTC') = ${dateStr}::date
+                AND b.status NOT IN ('cancelled', 'no_show')
+              ORDER BY b.start_time
+            `).map((row) => ({
+              booking_id: row[0],
+              start_time: row[1],
+              end_time: row[2],
+              status: row[3],
+              service_name: row[4],
+            }));
 
         days.push({
           date: dateStr,
           is_blocked: isBlocked,
-          block_reason: blockReason ?? undefined,
+          ...(blockReason ? { block_reason: blockReason } : {}),
           schedule: scheduleRows.map((s) => ({
             start_time: s[0],
             end_time: s[1],

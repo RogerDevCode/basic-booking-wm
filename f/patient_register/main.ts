@@ -40,17 +40,15 @@ export async function main(rawInput: unknown): Promise<Result<ClientResult>> {
   const sql = createDbClient({ url: dbUrl });
 
   try {
-    const [txErr, txData] = await withTenantContext(sql, tenantId, async (tx) => {
-      return [null, {
-        client_id: '',
-        name: input.name,
-        email: input.email ?? null,
-        phone: input.phone ?? null,
-        telegram_chat_id: input.telegram_chat_id ?? null,
-        timezone: input.timezone ?? DEFAULT_TIMEZONE,
-        created: true,
-      }];
-    });
+    const [txErr, txData] = await withTenantContext(sql, tenantId, () => Promise.resolve([null, {
+      client_id: '',
+      name: input.name,
+      email: input.email ?? null,
+      phone: input.phone ?? null,
+      telegram_chat_id: input.telegram_chat_id ?? null,
+      timezone: input.timezone ?? DEFAULT_TIMEZONE,
+      created: true,
+    }]));
 
     if (txErr) return [txErr, null];
     return [null, txData];
