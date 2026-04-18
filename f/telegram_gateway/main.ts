@@ -35,149 +35,16 @@
  */
 
 import "@total-typescript/ts-reset";
-import { z } from 'zod';
-import postgres from 'postgres';
-
-import { createDbClient } from '../internal/db/client';
 import type { Result } from '../internal/result';
-
-// ============================================================================
-// TYPES & SCHEMAS
-// ============================================================================
-
-const TelegramUserSchema = z.object({
-  id: z.number(),
-  is_bot: z.boolean().optional(),
-  first_name: z.string().default('Usuario'),
-  last_name: z.string().optional(),
-  username: z.string().optional(),
-});
-
-const TelegramMessageSchema = z.object({
-  message_id: z.number(),
-  from: TelegramUserSchema.optional(),
-  chat: z.object({
-    id: z.number(),
-    type: z.enum(['private', 'group', 'supergroup', 'channel']),
-  }),
-  date: z.number(),
-  text: z.string().optional(),
-});
-
-const TelegramCallbackQuerySchema = z.object({
-  id: z.string(),
-  from: TelegramUserSchema,
-  message: TelegramMessageSchema.optional(),
-  data: z.string(),
-});
-
-const TelegramUpdateSchema = z.object({
-  update_id: z.number(),
-  message: TelegramMessageSchema.optional(),
-  callback_query: TelegramCallbackQuerySchema.optional(),
-});
-
-type TelegramUpdate = z.infer<typeof TelegramUpdateSchema>;
-type TelegramMessage = NonNullable<TelegramUpdate['message']>;
-type TelegramCallback = NonNullable<TelegramUpdate['callback_query']>;
-
-interface SendMessageOptions {
-  readonly parse_mode?: 'Markdown' | 'HTML' | 'MarkdownV2';
-  readonly reply_markup?: Readonly<Record<string, unknown>>;
-}
-
-// ============================================================================
-// INFRASTRUCTURE ABSTRACTIONS
-// ============================================================================
-
-interface ITelegramClient {
-  sendMessage(chatId: string, text: string, options?: SendMessageOptions): Promise<Result<unknown>>;
-}
-
-interface IClientRepository {
-  ensureRegistered(fullName: string): Promise<Result<void>>;
-}
-
-// ============================================================================
-// IMPLEMENTATIONS
-// ============================================================================
-
-/**
- * Handles communication with Telegram Bot API
- */
-class TelegramClient implements ITelegramClient {
-  private readonly token: string;
-
-  constructor() {
-    this.token = process.env['TELEGRAM_BOT_TOKEN'] ?? '';
-  }
-
-  async sendMessage(chatId: string, text: string, options?: SendMessageOptions): Promise<Result<unknown>> {
-    if (this.token === '') {
-      return [new Error('TELEGRAM_BOT_TOKEN_MISSING'), null];
-    }
-
-    try {
-      const url = `https://api.telegram.org/bot${this.token}/sendMessage`;
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chat_id: chatId,
-          text,
-          parse_mode: options?.parse_mode ?? 'Markdown',
-          reply_markup: options?.reply_markup,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        return [new Error(`telegram_api_error: ${response.status} ${errorText}`), null];
-      }
-
-      const data = await response.json();
-      return [null, data];
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      return [new Error(`send_message_failed: ${msg}`), null];
-    }
-  }
-}
-
-/**
- * Handles Client persistence (Global context, no RLS per §6)
- */
-class ClientRepository implements IClientRepository {
-  private readonly dbUrl: string;
-
-  constructor() {
-    this.dbUrl = process.env['DATABASE_URL'] ?? '';
-  }
-
-  async ensureRegistered(fullName: string): Promise<Result<void>> {
-    if (this.dbUrl === '') {
-      return [new Error('DATABASE_URL_MISSING'), null];
-    }
-
-    let sql: postgres.Sql | null = null;
-    try {
-      sql = createDbClient({ url: this.dbUrl });
-      await sql`
-        INSERT INTO clients (client_id, name, email, phone, timezone)
-        VALUES (gen_random_uuid(), ${fullName}, NULL, NULL, 'America/Mexico_City')
-        ON CONFLICT (email) DO NOTHING
-      `;
-      // Note: ON CONFLICT DO NOTHING relies on email being UNIQUE per §6.
-      // If client_id was the only unique field, we would need a different strategy.
-      return [null, undefined];
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      return [new Error(`client_registration_failed: ${msg}`), null];
-    } finally {
-      if (sql != null) await sql.end();
-    }
-  }
-}
+import { TelegramClient, ClientRepository } from './services';
+import {
+  TelegramUpdateSchema,
+  type TelegramUpdate,
+  type TelegramMessage,
+  type TelegramCallback,
+  type ITelegramClient,
+  type IClientRepository,
+} from './types';
 
 // ============================================================================
 // DOMAIN LOGIC / ROUTING
@@ -201,7 +68,7 @@ class TelegramRouter {
     return [new Error('unsupported_update_type'), null];
   }
 
-  private async handleCallback(query: TelegramCallback): Promise<Result<string>> {
+  private handleCallback(query: TelegramCallback): Result<string> {
     const data = query.data;
 
     // Pattern matching for callback actions (OCP compliant)
