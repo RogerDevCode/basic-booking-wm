@@ -92,6 +92,20 @@ tsc --strict --noEmit             # Raw tsc command
 npx eslint 'f/**/*.ts'            # ESLint validation
 ```
 
+### Deployment (Auto Git Sync)
+```bash
+bash scripts/git-push-and-sync.sh  # Commit + Push + Auto-reload Windmill
+# Or use alias:
+deploy                             # Same as above (if .bashrc sourced)
+
+# What it does:
+# 1. Stage + commit your changes
+# 2. Push to GitHub (main branch)
+# 3. Trigger Windmill git sync (local + remote)
+# 4. Verify TypeScript
+# 5. Ready to test in Telegram
+```
+
 ### Recent Refactoring (April 2026)
 ```bash
 git log --oneline -5

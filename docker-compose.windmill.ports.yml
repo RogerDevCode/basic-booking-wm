@@ -1,7 +1,0 @@
-# Port mapping — Caddy on 8080 (Apache uses 80)
-services:
-  caddy:
-    ports:
-      - "8080:80"
-      - "2525:25"
-    # Override the default port bindings from main compose
