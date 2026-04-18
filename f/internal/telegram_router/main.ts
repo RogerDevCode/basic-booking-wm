@@ -77,21 +77,30 @@ export async function main(rawInput: unknown): Promise<RouterOutput> {
       userName: input.username ?? 'Usuario',
     });
 
-    if (wizardErr !== null || wizardResult === null) {
-      return { data: null, error: (wizardErr ?? new Error('Wizard returned null')).message };
-    }
+    // ALWAYS return a result with nextState (even if there's an error)
+    // This ensures state persists to Redis via the flow
+    const result = wizardResult ?? {
+      route: 'wizard' as const,
+      forward_to_ai: false,
+      response_text: 'Error procesando comando. Intenta de nuevo.',
+      inline_keyboard: [] as InlineButton[][],
+      nextState: parsedState,
+      nextDraft: parsedDraft ?? emptyDraft(),
+      nextFlowStep: 0,
+      advance: false,
+      should_edit: true,
+    };
 
-    // If this was a callback_query, we should_edit; otherwise sendMessage
-    const shouldEdit = wizardResult.should_edit && message_id !== null;
+    const shouldEdit = result.should_edit && message_id !== null;
 
-    return { data: buildRouteResult('wizard', wizardResult.response_text, {
-      inlineKeyboard: wizardResult.inline_keyboard as InlineButton[][],
-      nextState: wizardResult.nextState,
-      nextDraft: wizardResult.nextDraft,
-      nextFlowStep: wizardResult.nextFlowStep,
+    return { data: buildRouteResult('wizard', result.response_text, {
+      inlineKeyboard: result.inline_keyboard as InlineButton[][],
+      nextState: result.nextState,
+      nextDraft: result.nextDraft,
+      nextFlowStep: result.nextFlowStep,
       shouldEdit,
       messageId: message_id,
-    }), error: null };
+    }), error: wizardErr?.message ?? null };
   }
 
   // Priority 1b: Text input when active booking state (text-based wizard fallback)
@@ -105,20 +114,29 @@ export async function main(rawInput: unknown): Promise<RouterOutput> {
       userName: input.username ?? 'Usuario',
     });
 
-    if (wizardErr !== null || wizardResult === null) {
-      return { data: null, error: (wizardErr ?? new Error('Wizard returned null')).message };
-    }
+    // ALWAYS return a result with nextState (even if there's an error)
+    const result = wizardResult ?? {
+      route: 'wizard' as const,
+      forward_to_ai: false,
+      response_text: 'Error procesando comando. Intenta de nuevo.',
+      inline_keyboard: [] as InlineButton[][],
+      nextState: parsedState,
+      nextDraft: parsedDraft ?? emptyDraft(),
+      nextFlowStep: 0,
+      advance: false,
+      should_edit: true,
+    };
 
-    const shouldEdit = wizardResult.should_edit && message_id !== null;
+    const shouldEdit = result.should_edit && message_id !== null;
 
-    return { data: buildRouteResult('wizard', wizardResult.response_text, {
-      inlineKeyboard: wizardResult.inline_keyboard as InlineButton[][],
-      nextState: wizardResult.nextState,
-      nextDraft: wizardResult.nextDraft,
-      nextFlowStep: wizardResult.nextFlowStep,
+    return { data: buildRouteResult('wizard', result.response_text, {
+      inlineKeyboard: result.inline_keyboard as InlineButton[][],
+      nextState: result.nextState,
+      nextDraft: result.nextDraft,
+      nextFlowStep: result.nextFlowStep,
       shouldEdit,
       messageId: message_id,
-    }), error: null };
+    }), error: wizardErr?.message ?? null };
   }
 
   // Priority 2: Callback data — system patterns (cnf:, cxl:, etc.)
@@ -143,15 +161,25 @@ export async function main(rawInput: unknown): Promise<RouterOutput> {
         chatId: chat_id,
         userName: input.username ?? 'Usuario',
       });
-      if (wizardErr === null && wizardResult !== null) {
-        return { data: buildRouteResult('wizard', wizardResult.response_text, {
-          inlineKeyboard: wizardResult.inline_keyboard as InlineButton[][],
-          nextState: wizardResult.nextState,
-          nextDraft: wizardResult.nextDraft,
-          nextFlowStep: wizardResult.nextFlowStep,
-          shouldEdit: false,
-        }), error: null };
-      }
+      // ALWAYS return result with nextState, even if error
+      const result = wizardResult ?? {
+        route: 'wizard' as const,
+        forward_to_ai: false,
+        response_text: 'Error iniciando asistente. Intenta de nuevo.',
+        inline_keyboard: [] as InlineButton[][],
+        nextState: { name: 'idle' } as const,
+        nextDraft: emptyDraft(),
+        nextFlowStep: 0,
+        advance: false,
+        should_edit: false,
+      };
+      return { data: buildRouteResult('wizard', result.response_text, {
+        inlineKeyboard: result.inline_keyboard as InlineButton[][],
+        nextState: result.nextState,
+        nextDraft: result.nextDraft,
+        nextFlowStep: result.nextFlowStep,
+        shouldEdit: false,
+      }), error: wizardErr?.message ?? null };
     }
     // Handle "menu:back" callback → return to main menu
     if (callback_data === 'menu:back') {

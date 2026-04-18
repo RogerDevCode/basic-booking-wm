@@ -110,13 +110,14 @@ export async function handleBookingWizard(input: WizardInput): Promise<[Error | 
     }
 
     const [transitionErr, outcome] = applyTransition(state, action, currentDraft, preFetchedItems);
-    
+
     if (transitionErr !== null || outcome === null) {
       const finalOutcome = outcome ?? { nextState: state, responseText: transitionErr?.message ?? 'Error', advance: false };
-      logger.info(MODULE, 'Wizard step complete (invalid transition)', { 
+      logger.info(MODULE, 'Wizard step complete (invalid transition)', {
         nextState: finalOutcome.nextState.name,
-        error: transitionErr?.message 
+        error: transitionErr?.message
       });
+      // Return error as null to persist valid nextState (even if transition failed)
       return [null, {
         route: 'wizard',
         forward_to_ai: false,
