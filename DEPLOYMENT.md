@@ -2,13 +2,18 @@
 
 ## Quick Start
 
+**Option 1: With commit message (fastest)**
 ```bash
-bash scripts/git-push-and-sync.sh
-# or
-deploy  # (if alias loaded)
+bash scripts/git-push-and-sync.sh "fix: Telegram wizard state"
+# or with alias
+deploy "fix: Telegram wizard state"
 ```
 
-Then follow the interactive prompts.
+**Option 2: Interactive (no parameter)**
+```bash
+bash scripts/git-push-and-sync.sh
+# Script will ask for commit message
+```
 
 ---
 
