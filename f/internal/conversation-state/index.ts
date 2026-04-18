@@ -58,6 +58,7 @@ function getConvTTL(): number {
  */
 const ConversationStateSchema = z.object({
   chat_id:              z.string().min(1),
+  provider_id:          z.string().uuid().nullable().catch(null),
   previous_intent:      z.string().nullable().catch(null),
   active_flow:          z.enum(['booking_wizard', 'reschedule_flow', 'cancellation_flow', 'reminder_flow', 'selecting_specialty', 'selecting_datetime', 'none']).default('none'),
   flow_step:            z.number().int().min(0).default(0),
@@ -85,9 +86,11 @@ export function fromLegacyFormat(
   chatId: string,
   pendingIntent: string | null,
   accumulatedEntities: Record<string, string | null>,
+  providerId: string | null = null,
 ): ConversationState {
   return {
     chat_id: chatId,
+    provider_id: providerId,
     previous_intent: pendingIntent,
     active_flow: 'none',
     flow_step: 0,
@@ -229,6 +232,7 @@ export async function updateConversationState(
   bookingState?: BookingState | null,
   bookingDraft?: DraftBooking | null,
   messageId?: number | null,
+  providerId?: string | null,
 ): Promise<Result<ConversationState>> {
   try {
     const mergedData = mergeEntities(existingState?.pending_data ?? {}, entities);
@@ -236,6 +240,7 @@ export async function updateConversationState(
 
     const newState: ConversationState = Object.freeze({
       chat_id:              chatId,
+      provider_id:          providerId !== undefined ? providerId : (existingState?.provider_id ?? null),
       previous_intent:      intent,
       active_flow:          activeFlow,
       flow_step:            flowStep,

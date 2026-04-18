@@ -37,6 +37,7 @@ import {
   fetchSlots,
 } from '../booking_fsm';
 import { createDbClient } from '../db/client';
+import { withTenantContext } from '../tenant-context';
 import { todayYMD } from '../date-resolver';
 import { logger } from '../logger';
 
@@ -53,6 +54,7 @@ interface WizardInput {
   readonly draft: DraftBooking;
   readonly chatId: string;
   readonly userName: string;
+  readonly providerId?: string | null;
 }
 
 export interface WizardOutput {
@@ -71,14 +73,32 @@ export interface WizardOutput {
 // Main handler
 // ============================================================================
 
+async function getDefaultProviderId(sql: ReturnType<typeof createDbClient>): Promise<[Error | null, string | null]> {
+  try {
+    const rows = await sql<{ provider_id: string }[]>`SELECT provider_id FROM providers WHERE is_active = true LIMIT 1`;
+    if (rows.length === 0) {
+      return [new Error('no_active_providers'), null];
+    }
+    const row = rows[0];
+    if (row === undefined) {
+      return [new Error('no_active_providers'), null];
+    }
+    return [null, row['provider_id']];
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return [new Error(`get_default_provider_failed: ${msg}`), null];
+  }
+}
+
 export async function handleBookingWizard(input: WizardInput): Promise<[Error | null, WizardOutput | null]> {
-  const { text, callbackData, currentState, draft } = input;
+  const { text, callbackData, currentState, draft, providerId: inputProviderId } = input;
 
   logger.info(MODULE, 'Handling wizard step', {
     chatId: input.chatId,
     currentState: currentState?.name ?? 'idle',
     callbackData,
-    text
+    text,
+    providerId: inputProviderId
   });
 
   const state: BookingState = currentState ?? { name: 'idle' };
@@ -100,10 +120,26 @@ export async function handleBookingWizard(input: WizardInput): Promise<[Error | 
 
   const sql = createDbClient({ url: dbUrl });
 
+  // Determine provider_id (from input or default to first active provider)
+  let providerId = inputProviderId;
+  if (!providerId) {
+    const [provErr, defaultProv] = await getDefaultProviderId(sql);
+    if (provErr !== null) {
+      return [provErr, null];
+    }
+    providerId = defaultProv;
+  }
+
+  if (!providerId) {
+    return [new Error('no_provider_available'), null];
+  }
+
   try {
     let preFetchedItems: readonly { id: string; name: string }[] | undefined = undefined;
     if (state.name === 'idle' && action.type === 'select') {
-      const [err, specRes] = await fetchSpecialties(sql);
+      const [err, specRes] = await withTenantContext(sql, providerId, async (tx) => {
+        return await fetchSpecialties(tx);
+      });
       if (err === null && specRes !== null) {
         preFetchedItems = specRes.specialties;
       }
@@ -143,7 +179,7 @@ export async function handleBookingWizard(input: WizardInput): Promise<[Error | 
       nextDraft = currentDraft;
     }
 
-    const result = await fetchDataForState(outcome, nextDraft, sql, input.chatId, input.userName);
+    const result = await fetchDataForState(outcome, nextDraft, sql, input.chatId, input.userName, providerId);
 
     if (result !== null) {
       logger.info(MODULE, 'Wizard step complete (with data)', { nextState: result.nextState.name });
@@ -177,6 +213,7 @@ async function fetchDataForState(
   sql: ReturnType<typeof createDbClient>,
   chatId: string,
   userName: string,
+  providerId: string,
 ): Promise<WizardOutput | null> {
   const nextState = outcome.nextState;
   const shouldEdit = outcome.advance;
@@ -186,7 +223,9 @@ async function fetchDataForState(
     case 'idle':
       return null;
     case 'selecting_specialty': {
-      const [err, specialtiesResult] = await fetchSpecialties(sql);
+      const [err, specialtiesResult] = await withTenantContext(sql, providerId, async (tx) => {
+        return await fetchSpecialties(tx);
+      });
       if (err !== null || specialtiesResult === null) {
         return {
           route: 'wizard', forward_to_ai: false, response_text: '⚠️ Error al cargar especialidades. Intenta de nuevo.',
@@ -216,7 +255,9 @@ async function fetchDataForState(
 
     case 'selecting_doctor': {
       const specialtyName = nextState.specialtyName;
-      const [err, doctorsResult] = await fetchDoctors(sql, specialtyName);
+      const [err, doctorsResult] = await withTenantContext(sql, providerId, async (tx) => {
+        return await fetchDoctors(tx, specialtyName);
+      });
       if (err !== null || doctorsResult === null) {
         return {
           route: 'wizard', forward_to_ai: false, response_text: '⚠️ Error al cargar doctores. Intenta de nuevo.',
@@ -248,7 +289,9 @@ async function fetchDataForState(
       const { doctorId, doctorName, targetDate } = nextState;
       // Use explicit selected date or fallback to today
       const dateToFetch = targetDate ?? currentDraft.target_date ?? todayYMD();
-      const [err, slotsResult] = await fetchSlots(sql, doctorId, dateToFetch);
+      const [err, slotsResult] = await withTenantContext(sql, providerId, async (tx) => {
+        return await fetchSlots(tx, doctorId, dateToFetch);
+      });
       if (err !== null || slotsResult === null) {
         return {
           route: 'wizard', forward_to_ai: false, response_text: '⚠️ Error al cargar horarios. Intenta de nuevo.',
