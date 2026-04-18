@@ -18,36 +18,36 @@ import { main } from './main';
 
 describe('Telegram Router — deterministic routes (no state)', () => {
   test('/start returns welcome command', async () => {
-    const [err, result] = await main({ chat_id: '12345', text: '/start' });
-    expect(err).toBeNull();
-    expect(result!.route).toBe('command');
-    expect(result!.forward_to_ai).toBe(false);
-    expect(result!.response_text).toContain('Bienvenido');
+    const result = await main({ chat_id: '12345', text: '/start' });
+    expect(result.error).toBeNull();
+    expect(result.data!.route).toBe('command');
+    expect(result.data!.forward_to_ai).toBe(false);
+    expect(result.data!.response_text).toContain('Bienvenido');
   });
 
   test('callback cnf:uuid returns confirmation', async () => {
-    const [err, result] = await main({ chat_id: '12345', text: '', callback_data: 'cnf:booking-123' });
-    expect(err).toBeNull();
-    expect(result!.route).toBe('callback');
-    expect(result!.callback_action).toBe('cnf');
-    expect(result!.callback_booking_id).toBe('booking-123');
+    const result = await main({ chat_id: '12345', text: '', callback_data: 'cnf:booking-123' });
+    expect(result.error).toBeNull();
+    expect(result.data!.route).toBe('callback');
+    expect(result.data!.callback_action).toBe('cnf');
+    expect(result.data!.callback_booking_id).toBe('booking-123');
   });
 
   test('menu option "1" starts wizard with specialty keyboard', async () => {
-    const [err, result] = await main({ chat_id: '12345', text: '1' });
-    expect(err).toBeNull();
+    const result = await main({ chat_id: '12345', text: '1' });
+    expect(result.error).toBeNull();
     // "1" now starts the booking wizard (requires DATABASE_URL for specialty fetch)
     // Without DB, it falls back to menu behavior
-    const isWizard = result!.route === 'wizard';
-    const isMenu = result!.route === 'menu';
+    const isWizard = result.data?.route === 'wizard';
+    const isMenu = result.data?.route === 'menu';
     expect(isWizard || isMenu).toBe(true);
   });
 
   test('free text falls back to AI Agent', async () => {
-    const [err, result] = await main({ chat_id: '12345', text: 'Hola necesito una cita' });
-    expect(err).toBeNull();
-    expect(result!.route).toBe('ai_agent');
-    expect(result!.forward_to_ai).toBe(true);
+    const result = await main({ chat_id: '12345', text: 'Hola necesito una cita' });
+    expect(result.error).toBeNull();
+    expect(result.data!.route).toBe('ai_agent');
+    expect(result.data!.forward_to_ai).toBe(true);
   });
 });
 
@@ -66,18 +66,18 @@ describe('Telegram Router — wizard delegation (requires DATABASE_URL)', () => 
       items: [] as Array<{ id: string; name: string }>,
     };
 
-    const [err, result] = await main({
+    const result = await main({
       chat_id: '12345',
       text: '1',
       booking_state: bookingState,
       booking_draft: null,
     });
 
-    expect(err).toBeNull();
-    expect(result!.route).toBe('wizard');
-    expect(result!.forward_to_ai).toBe(false);
+    expect(result.error).toBeNull();
+    expect(result.data!.route).toBe('wizard');
+    expect(result.data!.forward_to_ai).toBe(false);
     // nextFlowStep should be >= 1 (moved forward or stayed)
-    expect(result!.nextFlowStep).toBeGreaterThanOrEqual(1);
+    expect(result.data!.nextFlowStep).toBeGreaterThanOrEqual(1);
   });
 
   test.skipIf(!hasDb)('wizard back action moves backward', async () => {
@@ -87,18 +87,18 @@ describe('Telegram Router — wizard delegation (requires DATABASE_URL)', () => 
       items: [] as Array<{ id: string; name: string }>,
     };
 
-    const [err, result] = await main({
+    const result = await main({
       chat_id: '12345',
       text: 'volver',
       booking_state: bookingState,
       booking_draft: null,
     });
 
-    expect(err).toBeNull();
-    expect(result!.route).toBe('wizard');
+    expect(result.error).toBeNull();
+    expect(result.data!.route).toBe('wizard');
     // Going back from selecting_specialty → idle
-    expect(result!.nextState).not.toBeNull();
-    expect(result!.nextState!.name).toBe('idle');
+    expect(result.data!.nextState).not.toBeNull();
+    expect(result.data!.nextState!.name).toBe('idle');
   });
 });
 
@@ -108,15 +108,15 @@ describe('Telegram Router — wizard delegation (requires DATABASE_URL)', () => 
 
 describe('Telegram Router — edge cases', () => {
   test('empty text + no callback → ai_agent', async () => {
-    const [err, result] = await main({ chat_id: '12345', text: null, callback_data: null });
-    expect(err).toBeNull();
-    expect(result!.route).toBe('ai_agent');
-    expect(result!.forward_to_ai).toBe(true);
+    const result = await main({ chat_id: '12345', text: null, callback_data: null });
+    expect(result.error).toBeNull();
+    expect(result.data!.route).toBe('ai_agent');
+    expect(result.data!.forward_to_ai).toBe(true);
   });
 
   test('unknown booking state → ai_agent fallback', async () => {
     // When booking_state has an unexpected structure, router should handle gracefully
-    const [err, result] = await main({
+    const result = await main({
       chat_id: '12345',
       text: 'hello',
       booking_state: { name: 'unknown_state' },
@@ -124,7 +124,7 @@ describe('Telegram Router — edge cases', () => {
     });
 
     // Should still route (either wizard or ai_agent depending on how main handles unknown)
-    expect(err).toBeNull();
-    expect(result!.forward_to_ai !== null || result!.route === 'wizard').toBe(true);
+    expect(result.error).toBeNull();
+    expect(result.data!.forward_to_ai !== null || result.data!.route === 'wizard').toBe(true);
   });
 });
