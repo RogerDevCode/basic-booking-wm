@@ -5,18 +5,29 @@ import { emptyDraft } from '../f/internal/booking_fsm';
 // We mock the database and individual data fetchers to keep the test deterministic
 // and avoid needing a live postgres container for this specific flow logic test.
 vi.mock('../f/internal/db/client', () => {
-  const sqlMock = vi.fn((strings, ...values) => {
-    const query = strings.join(' ');
-    if (query.includes('FROM clients') || query.includes('INSERT INTO clients')) {
-      return Promise.resolve([{ client_id: 'client-123' }]);
-    }
-    return Promise.resolve([]);
-  });
+  const makeQueryFn = () => {
+    const fn = vi.fn((strings: TemplateStringsArray, ..._values: unknown[]) => {
+      const query = Array.from(strings).join(' ');
+      if (query.includes('FROM providers')) {
+        return Promise.resolve([{ provider_id: '00000000-0000-0000-0000-000000000123' }]);
+      }
+      if (query.includes('FROM clients') || query.includes('INSERT INTO clients')) {
+        return Promise.resolve([{ client_id: 'client-123' }]);
+      }
+      return Promise.resolve([]);
+    });
+    (fn as any).unsafe = vi.fn().mockResolvedValue([]);
+    (fn as any).release = vi.fn();
+    return fn;
+  };
+
+  const reservedMock = makeQueryFn();
+  const sqlMock = makeQueryFn();
   (sqlMock as any).values = vi.fn().mockResolvedValue([]);
-  (sqlMock as any).unsafe = vi.fn().mockResolvedValue([]);
   (sqlMock as any).end = vi.fn().mockResolvedValue(undefined);
-  (sqlMock as any).begin = vi.fn((op) => op(sqlMock));
-  
+  (sqlMock as any).begin = vi.fn((op: (tx: unknown) => unknown) => op(sqlMock));
+  (sqlMock as any).reserve = vi.fn().mockResolvedValue(reservedMock);
+
   return {
     createDbClient: vi.fn(() => sqlMock),
   };

@@ -72,7 +72,7 @@ describe('Telegram Flow — /start command (deterministic, no LLM)', () => {
     });
 
     expect(routerResult.error).toBeNull();
-    expect(routerData).not.toBeNull();
+    expect(routerResult.data).not.toBeNull();
     expect(routerResult.data!.route).toBe('command');
     expect(routerResult.data!.forward_to_ai).toBe(false);
     expect(routerResult.data!.response_text).toContain('Bienvenido');
@@ -261,7 +261,7 @@ describe('Telegram Flow — Multi-turn conversation with state', () => {
       callback_data: turn1[1]!.callback_data,
       username: turn1[1]!.username,
     });
-    expect(routerResult.data!.route).toBe('command');
+    expect(router1.data!.route).toBe('command');
 
     // Simulate: user selects "1" (Pedir hora)
     // In real flow, bot sends specialty menu, then user responds "1"
@@ -274,7 +274,7 @@ describe('Telegram Flow — Multi-turn conversation with state', () => {
       callback_data: turn2[1]!.callback_data,
       username: turn2[1]!.username,
     });
-    expect(['wizard', 'menu']).toContain(router2[1]!.route);
+    expect(['wizard', 'menu']).toContain(router2.data!.route);
   });
 
   test('scenario: callback priority over text', async () => {
