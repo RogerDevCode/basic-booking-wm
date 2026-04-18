@@ -45,10 +45,15 @@ echo "✓ Staged for commit"
 
 # 4. COMMIT MESSAGE
 echo ""
-read -p "📌 Commit message: " COMMIT_MSG
-if [ -z "$COMMIT_MSG" ]; then
-  echo "❌ Commit message required"
-  exit 1
+if [ $# -gt 0 ]; then
+  COMMIT_MSG="$1"
+  echo "📌 Commit message: $COMMIT_MSG"
+else
+  read -p "📌 Commit message: " COMMIT_MSG
+  if [ -z "$COMMIT_MSG" ]; then
+    echo "❌ Commit message required"
+    exit 1
+  fi
 fi
 
 git commit -m "$COMMIT_MSG" 2>&1 | grep -E "create mode|changed|insertions|deletions" || true
