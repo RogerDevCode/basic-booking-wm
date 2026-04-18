@@ -6,6 +6,11 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
+# Load environment
+set -a
+[ -f .env.wm.local ] && source .env.wm.local
+set +a
+
 WM_TOKEN="${WM_TOKEN:-0xqk7v4qpaP67WJ9XLGdv2jIJARJ2eYA}"
 WM_LOCAL_URL="${WM_BASE_URL:-http://localhost:8080}"
 WM_REMOTE_URL="${WM_REMOTE_URL:-https://wm.stax.ink}"

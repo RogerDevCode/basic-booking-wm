@@ -44,17 +44,16 @@ WM_GIT_BRANCH=main
 WM_GIT_SYNC_INTERVAL=60
 ```
 
-### 2. GitHub Webhook
-Configure at: https://github.com/RogerDevCode/basic-booking-wm/settings/hooks
-
-```
-Payload URL:     https://wm.stax.ink/api/git_sync
-Content type:    application/json
-Events:          Push events
-Active:          ✓
+### 2. Auto-Sync Polling (No webhook needed!)
+Windmill checks Git every 60 seconds:
+```bash
+WM_GIT_SYNC_INTERVAL=60  # in .env.wm.local
 ```
 
-**What it does**: Every push to main → GitHub webhook → Windmill auto-syncs
+**What happens**: 
+- You: `git push origin main`
+- Windmill: Automatically syncs within 60 seconds
+- No webhook configuration needed ✓
 
 ---
 
@@ -83,19 +82,16 @@ bash scripts/git-push-and-sync.sh
 
 ---
 
-## Manual Sync (if script fails)
+## Auto-Sync Details
 
-```bash
-# Reload from Git (local)
-curl -s -X POST http://localhost:8080/api/git_sync \
-  -H "Authorization: Bearer 0xqk7v4qpaP67WJ9XLGdv2jIJARJ2eYA" \
-  -d '{}' | jq .
+Windmill polls Git automatically every 60 seconds:
+- **Local:** `http://localhost:8080` checks Git repo
+- **Remote:** `https://wm.stax.ink` checks Git repo
 
-# Reload from Git (remote)
-curl -s -X POST https://wm.stax.ink/api/git_sync \
-  -H "Authorization: Bearer 0xqk7v4qpaP67WJ9XLGdv2jIJARJ2eYA" \
-  -d '{}' | jq .
-```
+No manual sync commands needed. Just:
+1. `git push origin main`
+2. Wait ≤60 seconds
+3. Windmill syncs automatically
 
 ---
 
