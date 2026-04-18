@@ -76,16 +76,16 @@ class PatientBookingService {
     // 3. Map to Domain Model
     const now = new Date().toISOString();
     const mapped: BookingInfo[] = data.rows.map((row) => {
-      const status = row[3] ? String(row[3]) : 'pendiente';
+      const status = row[3] ? row[3] : 'pendiente';
       return {
-        booking_id: String(row[0]),
-        start_time: String(row[1]),
-        end_time: String(row[2]),
+        booking_id: row[0],
+        start_time: row[1],
+        end_time: row[2],
         status: status,
-        cancellation_reason: row[4] ? String(row[4]) : null,
-        provider_name: row[5] ? String(row[5]) : null,
-        provider_specialty: row[6] ? String(row[6]) : 'General',
-        service_name: row[7] ? String(row[7]) : 'Consulta',
+        cancellation_reason: row[4] ?? null,
+        provider_name: row[5] ?? null,
+        provider_specialty: row[6] ? row[6] : 'General',
+        service_name: row[7] ? row[7] : 'Consulta',
         can_cancel: CANCELLABLE_STATUSES.includes(status),
         can_reschedule: RESCHEDULABLE_STATUSES.includes(status),
       };

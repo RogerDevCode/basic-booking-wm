@@ -66,19 +66,19 @@ export async function main(rawInput: unknown): Promise<Result<ProfileResult>> {
     const [err, data] = await withTenantContext(sql, parsed.data.user_id, async (tx) => {
       // 1. Resolve User
       const [uErr, user] = await findUser(tx, parsed.data.user_id);
-      if (uErr !== null) return [uErr, null];
+      if (uErr !== null || !user) return [uErr ?? new Error('user_not_found'), null];
 
       // 2. Find or Auto-Create Client
-      const [cErr, client] = await findOrCreateClient(tx, parsed.data.user_id, user!);
-      if (cErr !== null) return [cErr, null];
+      const [cErr, client] = await findOrCreateClient(tx, parsed.data.user_id, user);
+      if (cErr !== null || !client) return [cErr ?? new Error('client_not_found'), null];
 
-      let finalClient = client!;
+      let finalClient = client;
 
       // 3. Optional Update
       if (parsed.data.action === 'update') {
         const [upErr, updated] = await updateProfile(tx, finalClient['client_id'] as string, parsed.data);
-        if (upErr !== null) return [upErr, null];
-        finalClient = updated!;
+        if (upErr !== null || !updated) return [upErr ?? new Error('update_failed'), null];
+        finalClient = updated;
       }
 
       return [null, mapToProfileResult(finalClient)];

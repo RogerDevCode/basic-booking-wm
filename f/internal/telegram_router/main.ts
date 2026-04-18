@@ -30,8 +30,7 @@ import {
 import { handleBookingWizard } from './booking-wizard';
 import {
   InputSchema,
-  type Result,
-  type RouteResult,
+  type RouterOutput,
   type RouterInput,
   type InlineButton
 } from './types';
@@ -48,10 +47,10 @@ import {
 // Main entry point
 // ============================================================================
 
-export async function main(rawInput: unknown): Promise<Result<RouteResult>> {
+export async function main(rawInput: unknown): Promise<RouterOutput> {
   const parsed = InputSchema.safeParse(rawInput);
   if (!parsed.success) {
-    return [new Error(`Invalid input: ${parsed.error.message}`), null];
+    return { data: null, error: `Invalid input: ${parsed.error.message}` };
   }
 
   const input: RouterInput = parsed.data;
@@ -79,20 +78,20 @@ export async function main(rawInput: unknown): Promise<Result<RouteResult>> {
     });
 
     if (wizardErr !== null || wizardResult === null) {
-      return [wizardErr ?? new Error('Wizard returned null'), null];
+      return { data: null, error: (wizardErr ?? new Error('Wizard returned null')).message };
     }
 
     // If this was a callback_query, we should_edit; otherwise sendMessage
     const shouldEdit = wizardResult.should_edit && message_id !== null;
 
-    return [null, buildRouteResult('wizard', wizardResult.response_text, {
+    return { data: buildRouteResult('wizard', wizardResult.response_text, {
       inlineKeyboard: wizardResult.inline_keyboard as InlineButton[][],
       nextState: wizardResult.nextState,
       nextDraft: wizardResult.nextDraft,
       nextFlowStep: wizardResult.nextFlowStep,
       shouldEdit,
       messageId: message_id,
-    })];
+    }), error: null };
   }
 
   // Priority 1b: Text input when active booking state (text-based wizard fallback)
@@ -107,28 +106,28 @@ export async function main(rawInput: unknown): Promise<Result<RouteResult>> {
     });
 
     if (wizardErr !== null || wizardResult === null) {
-      return [wizardErr ?? new Error('Wizard returned null'), null];
+      return { data: null, error: (wizardErr ?? new Error('Wizard returned null')).message };
     }
 
     const shouldEdit = wizardResult.should_edit && message_id !== null;
 
-    return [null, buildRouteResult('wizard', wizardResult.response_text, {
+    return { data: buildRouteResult('wizard', wizardResult.response_text, {
       inlineKeyboard: wizardResult.inline_keyboard as InlineButton[][],
       nextState: wizardResult.nextState,
       nextDraft: wizardResult.nextDraft,
       nextFlowStep: wizardResult.nextFlowStep,
       shouldEdit,
       messageId: message_id,
-    })];
+    }), error: null };
   }
 
   // Priority 2: Callback data — system patterns (cnf:, cxl:, etc.)
   const callbackMatch = matchCallback(callback_data);
-  if (callbackMatch !== null) return [null, callbackMatch];
+  if (callbackMatch !== null) return { data: callbackMatch, error: null };
 
   // Priority 3: Slash commands
   const commandMatch = matchCommand(text);
-  if (commandMatch !== null) return [null, commandMatch];
+  if (commandMatch !== null) return { data: commandMatch, error: null };
 
   // Priority 4: Menu & submenu (only if not in active wizard)
   // "1" or "agendar cita" when idle → start wizard with specialties
@@ -145,26 +144,26 @@ export async function main(rawInput: unknown): Promise<Result<RouteResult>> {
         userName: input.username ?? 'Usuario',
       });
       if (wizardErr === null && wizardResult !== null) {
-        return [null, buildRouteResult('wizard', wizardResult.response_text, {
+        return { data: buildRouteResult('wizard', wizardResult.response_text, {
           inlineKeyboard: wizardResult.inline_keyboard as InlineButton[][],
           nextState: wizardResult.nextState,
           nextDraft: wizardResult.nextDraft,
           nextFlowStep: wizardResult.nextFlowStep,
           shouldEdit: false,
-        })];
+        }), error: null };
       }
     }
     // Handle "menu:back" callback → return to main menu
     if (callback_data === 'menu:back') {
-      return [null, buildRouteResult('command', COMMAND_RESPONSES['welcome'] ?? 'Comando procesado.', {
+      return { data: buildRouteResult('command', COMMAND_RESPONSES['welcome'] ?? 'Comando procesado.', {
         inlineKeyboard: buildMainMenuKeyboard(),
         menuAction: 'welcome',
-      })];
+      }), error: null };
     }
     const menuMatch = matchMenu(text);
-    if (menuMatch !== null) return [null, menuMatch];
+    if (menuMatch !== null) return { data: menuMatch, error: null };
   }
 
   // Fallback: forward to AI Agent
-  return [null, buildRouteResult('ai_agent', '', { forwardToAi: true })];
+  return { data: buildRouteResult('ai_agent', '', { forwardToAi: true }), error: null };
 }

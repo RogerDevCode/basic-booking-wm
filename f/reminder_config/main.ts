@@ -91,14 +91,14 @@ export async function main(rawInput: unknown): Promise<[Error | null, ReminderCo
       type ActionFn = (p: ReminderPrefs) => Promise<ReminderPrefs> | ReminderPrefs;
 
       const mutators: Partial<Record<string, ActionFn>> = {
-        toggle_channel: async (p) => {
+        toggle_channel: (p) => {
           if (channel === 'telegram') {
             const allOn = p.telegram_24h && p.telegram_2h && p.telegram_30min;
             return { ...p, telegram_24h: !allOn, telegram_2h: !allOn, telegram_30min: !allOn };
           }
           return channel === 'gmail' ? { ...p, gmail_24h: !p.gmail_24h } : p;
         },
-        toggle_window: async (p) => window ? toggleValue(p, `telegram_${window}`) : p,
+        toggle_window: (p) => window ? toggleValue(p, `telegram_${window}`) : p,
         deactivate_all: (p) => setAll(p, false),
         activate_all: (p) => setAll(p, true),
       };

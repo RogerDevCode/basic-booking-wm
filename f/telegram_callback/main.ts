@@ -89,7 +89,7 @@ export async function main(rawInput: unknown): Promise<[Error | null, Record<str
     return [new Error('tenant_id could not be determined from callback context'), null];
   }
 
-  const dbUrl = process.env['DATABASE_URL'] || '';
+  const dbUrl = process.env['DATABASE_URL'] ?? '';
   if (!dbUrl) {
     await answerCallbackQuery(botToken, input.callback_query_id, '❌ Error de configuración');
     return [new Error('DATABASE_URL not configured'), null];
@@ -115,8 +115,8 @@ export async function main(rawInput: unknown): Promise<[Error | null, Record<str
 
   const [routeErr, result] = await router.route(action, context);
   
-  if (routeErr || !result) {
-      return [routeErr || new Error('route_failed'), null];
+  if (routeErr ?? !result) {
+      return [routeErr ?? new Error('route_failed'), null];
   }
 
   const { responseText, followUpText } = result;

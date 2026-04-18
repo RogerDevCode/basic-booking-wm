@@ -4,7 +4,24 @@ import { type BookingDetails, type Sql } from "./types";
 
 export async function fetchBookingDetails(sql: Sql, tenantId: string, bookingId: string): Promise<Result<BookingDetails>> {
     return withTenantContext(sql, tenantId, async (tx) => {
-    const rows = await tx`
+    interface BookingRow {
+      booking_id: string;
+      provider_id: string;
+      status: string;
+      start_time: Date;
+      end_time: Date;
+      gcal_provider_event_id: string | null;
+      gcal_client_event_id: string | null;
+      provider_name: string;
+      provider_calendar_id: string | null;
+      provider_gcal_access_token: string | null;
+      provider_gcal_refresh_token: string | null;
+      provider_gcal_client_id: string | null;
+      provider_gcal_client_secret: string | null;
+      client_calendar_id: string | null;
+      service_name: string;
+    }
+    const rows = await tx<BookingRow[]>`
       SELECT b.booking_id, b.provider_id, b.status, b.start_time, b.end_time,
              b.gcal_provider_event_id, b.gcal_client_event_id,
              p.name as provider_name, p.gcal_calendar_id as provider_calendar_id,
@@ -31,21 +48,21 @@ export async function fetchBookingDetails(sql: Sql, tenantId: string, bookingId:
       return [new Error(`Booking ${bookingId} row is undefined`), null];
     }
     const details: BookingDetails = {
-      booking_id:             r['booking_id'],
-      provider_id:            r['provider_id'],
-      status:                 r['status'],
-      start_time:             (r['start_time'] as Date).toISOString(),
-      end_time:               (r['end_time'] as Date).toISOString(),
-      gcal_provider_event_id: r['gcal_provider_event_id'],
-      gcal_client_event_id:   r['gcal_client_event_id'],
-      provider_name:          r['provider_name'],
-      provider_calendar_id:   r['provider_calendar_id'],
-      provider_gcal_access_token: r['provider_gcal_access_token'],
-      provider_gcal_refresh_token: r['provider_gcal_refresh_token'],
-      provider_gcal_client_id: r['provider_gcal_client_id'],
-      provider_gcal_client_secret: r['provider_gcal_client_secret'],
-      client_calendar_id:     r['client_calendar_id'],
-      service_name:           r['service_name'],
+      booking_id:             r.booking_id,
+      provider_id:            r.provider_id,
+      status:                 r.status,
+      start_time:             r.start_time.toISOString(),
+      end_time:               r.end_time.toISOString(),
+      gcal_provider_event_id: r.gcal_provider_event_id,
+      gcal_client_event_id:   r.gcal_client_event_id,
+      provider_name:          r.provider_name,
+      provider_calendar_id:   r.provider_calendar_id,
+      provider_gcal_access_token: r.provider_gcal_access_token,
+      provider_gcal_refresh_token: r.provider_gcal_refresh_token,
+      provider_gcal_client_id: r.provider_gcal_client_id,
+      provider_gcal_client_secret: r.provider_gcal_client_secret,
+      client_calendar_id:     r.client_calendar_id,
+      service_name:           r.service_name,
     };
 
     return [null, details];

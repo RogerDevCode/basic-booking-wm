@@ -22,7 +22,7 @@ export async function updateProfile(tx: TxClient, clientId: string, data: Partia
     for (const [col, key] of Object.entries(fieldMap)) {
       const val = data[key];
       if (val !== undefined) {
-        updates.push(`${col} = $${values.length + 1}`);
+        updates.push(`${col} = $${String(values.length + 1)}`);
         values.push(val);
       }
     }
@@ -34,9 +34,9 @@ export async function updateProfile(tx: TxClient, clientId: string, data: Partia
 
     updates.push('updated_at = NOW()');
     const queryText = `
-      UPDATE clients 
-      SET ${updates.join(', ')} 
-      WHERE client_id = $${values.length + 1}::uuid 
+      UPDATE clients
+      SET ${updates.join(', ')}
+      WHERE client_id = $${String(values.length + 1)}::uuid
       RETURNING client_id, name, email, phone, telegram_chat_id, timezone, gcal_calendar_id
     `;
     values.push(clientId);

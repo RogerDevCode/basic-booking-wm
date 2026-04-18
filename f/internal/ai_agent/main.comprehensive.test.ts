@@ -30,32 +30,32 @@ interface TestQuery {
 
 const TEST_QUERIES: TestQuery[] = [
   // ============================================================================
-  // CATEGORY 1: INTENT DETECTION - CREATE APPOINTMENT (15 queries)
+  // CATEGORY 1: INTENT DETECTION - CREAR CITA (15 queries)
   // ============================================================================
   {
     id: 1,
-    category: 'create_appointment',
+    category: 'crear_cita',
     input: 'Quiero agendar una cita',
     expectedIntent: INTENT.CREAR_CITA,
     minConfidence: 0.3
   },
   {
     id: 2,
-    category: 'create_appointment',
+    category: 'crear_cita',
     input: 'Necesito reservar un turno',
     expectedIntent: INTENT.CREAR_CITA,
     minConfidence: 0.3
   },
   {
     id: 3,
-    category: 'create_appointment',
+    category: 'crear_cita',
     input: 'Quiero sacar una cita médica',
     expectedIntent: INTENT.CREAR_CITA,
     minConfidence: 0.3
   },
   {
     id: 4,
-    category: 'create_appointment',
+    category: 'crear_cita',
     input: 'Agendar cita para mañana',
     expectedIntent: INTENT.CREAR_CITA,
     expectedEntities: { date: 'mañana' },
@@ -63,7 +63,7 @@ const TEST_QUERIES: TestQuery[] = [
   },
   {
     id: 5,
-    category: 'create_appointment',
+    category: 'crear_cita',
     input: 'Reservar turno el lunes',
     expectedIntent: INTENT.CREAR_CITA,
     expectedEntities: { date: 'lunes' },
@@ -71,7 +71,7 @@ const TEST_QUERIES: TestQuery[] = [
   },
   {
     id: 6,
-    category: 'create_appointment',
+    category: 'crear_cita',
     input: 'Cita con el Dr. García',
     expectedIntent: INTENT.CREAR_CITA,
     expectedEntities: { provider_name: 'Dr. García' },
@@ -79,7 +79,7 @@ const TEST_QUERIES: TestQuery[] = [
   },
   {
     id: 7,
-    category: 'create_appointment',
+    category: 'crear_cita',
     input: 'Quiero una consulta general',
     expectedIntent: INTENT.CREAR_CITA,
     expectedEntities: { service_type: 'consulta general' },
@@ -87,7 +87,7 @@ const TEST_QUERIES: TestQuery[] = [
   },
   {
     id: 8,
-    category: 'create_appointment',
+    category: 'crear_cita',
     input: 'Agendar para el 15 de marzo',
     expectedIntent: INTENT.CREAR_CITA,
     expectedEntities: { date: '15 de marzo' },
@@ -95,7 +95,7 @@ const TEST_QUERIES: TestQuery[] = [
   },
   {
     id: 9,
-    category: 'create_appointment',
+    category: 'crear_cita',
     input: 'Reservar cita a las 10:00',
     expectedIntent: INTENT.CREAR_CITA,
     expectedEntities: { time: '10:00' },
@@ -103,7 +103,7 @@ const TEST_QUERIES: TestQuery[] = [
   },
   {
     id: 10,
-    category: 'create_appointment',
+    category: 'crear_cita',
     input: 'Turno para la próxima semana',
     expectedIntent: INTENT.CREAR_CITA,
     expectedEntities: { date: 'próxima semana' },
@@ -111,35 +111,35 @@ const TEST_QUERIES: TestQuery[] = [
   },
   {
     id: 11,
-    category: 'create_appointment',
+    category: 'crear_cita',
     input: 'Cita médica urgente',
     expectedIntent: INTENT.URGENCIA,  // Should detect urgency
     minConfidence: 0.5
   },
   {
     id: 12,
-    category: 'create_appointment',
+    category: 'crear_cita',
     input: 'Necesito ver al doctor',
     expectedIntent: INTENT.CREAR_CITA,
     minConfidence: 0.3
   },
   {
     id: 13,
-    category: 'create_appointment',
+    category: 'crear_cita',
     input: 'Quiero pedir hora',
     expectedIntent: INTENT.CREAR_CITA,
     minConfidence: 0.3
   },
   {
     id: 14,
-    category: 'create_appointment',
+    category: 'crear_cita',
     input: 'Agendar visita médica',
     expectedIntent: INTENT.CREAR_CITA,
     minConfidence: 0.3
   },
   {
     id: 15,
-    category: 'create_appointment',
+    category: 'crear_cita',
     input: 'Reservar para cardiología',
     expectedIntent: INTENT.CREAR_CITA,
     expectedEntities: { service_type: 'cardiología' },
@@ -147,166 +147,166 @@ const TEST_QUERIES: TestQuery[] = [
   },
 
   // ============================================================================
-  // CATEGORY 2: INTENT DETECTION - CANCEL APPOINTMENT (10 queries)
+  // CATEGORY 2: INTENT DETECTION - CANCELAR CITA (10 queries)
   // ============================================================================
   {
     id: 16,
-    category: 'cancel_appointment',
+    category: 'cancelar_cita',
     input: 'Quiero cancelar mi cita',
     expectedIntent: INTENT.CANCELAR_CITA,
     minConfidence: 0.5
   },
   {
     id: 17,
-    category: 'cancel_appointment',
+    category: 'cancelar_cita',
     input: 'Necesito anular mi turno',
     expectedIntent: INTENT.CANCELAR_CITA,
     minConfidence: 0.5
   },
   {
     id: 18,
-    category: 'cancel_appointment',
+    category: 'cancelar_cita',
     input: 'Cancelar la cita que tengo',
     expectedIntent: INTENT.CANCELAR_CITA,
     minConfidence: 0.5
   },
   {
     id: 19,
-    category: 'cancel_appointment',
+    category: 'cancelar_cita',
     input: 'No puedo asistir, quiero cancelar',
     expectedIntent: INTENT.CANCELAR_CITA,
     minConfidence: 0.5
   },
   {
     id: 20,
-    category: 'cancel_appointment',
+    category: 'cancelar_cita',
     input: 'Eliminar mi reserva',
     expectedIntent: INTENT.CANCELAR_CITA,
     minConfidence: 0.5
   },
   {
     id: 21,
-    category: 'cancel_appointment',
+    category: 'cancelar_cita',
     input: 'Dar de baja la cita',
     expectedIntent: INTENT.CANCELAR_CITA,
     minConfidence: 0.5
   },
   {
     id: 22,
-    category: 'cancel_appointment',
+    category: 'cancelar_cita',
     input: 'Cancelar cita del lunes',
     expectedIntent: INTENT.CANCELAR_CITA,
     minConfidence: 0.5
   },
   {
     id: 23,
-    category: 'cancel_appointment',
+    category: 'cancelar_cita',
     input: 'Anular turno con Dr. García',
     expectedIntent: INTENT.CANCELAR_CITA,
     minConfidence: 0.5
   },
   {
     id: 24,
-    category: 'cancel_appointment',
+    category: 'cancelar_cita',
     input: 'Ya no necesito la cita',
     expectedIntent: INTENT.CANCELAR_CITA,
     minConfidence: 0.5
   },
   {
     id: 25,
-    category: 'cancel_appointment',
+    category: 'cancelar_cita',
     input: 'Borrar mi reserva',
     expectedIntent: INTENT.CANCELAR_CITA,
     minConfidence: 0.5
   },
 
   // ============================================================================
-  // CATEGORY 3: INTENT DETECTION - RESCHEDULE (10 queries)
+  // CATEGORY 3: INTENT DETECTION - REAGENDAR CITA (10 queries)
   // ============================================================================
   {
     id: 26,
-    category: 'reschedule',
+    category: 'reagendar_cita',
     input: 'Quiero cambiar mi cita',
     expectedIntent: INTENT.REAGENDAR_CITA,
     minConfidence: 0.5
   },
   {
     id: 27,
-    category: 'reschedule',
+    category: 'reagendar_cita',
     input: 'Necesito reprogramar mi turno',
     expectedIntent: INTENT.REAGENDAR_CITA,
     minConfidence: 0.5
   },
   {
     id: 28,
-    category: 'reschedule',
+    category: 'reagendar_cita',
     input: 'Mover la cita para otro día',
     expectedIntent: INTENT.REAGENDAR_CITA,
     minConfidence: 0.5
   },
   {
     id: 29,// LLM detects "cita" as create - known limitation
-    category: 'reschedule',
+    category: 'reagendar_cita',
     input: 'Reagendar mi cita',
     expectedIntent: INTENT.REAGENDAR_CITA,
     minConfidence: 0.5
   },
   {
     id: 30,
-    category: 'reschedule',
+    category: 'reagendar_cita',
     input: 'Cambiar la hora de mi cita',
     expectedIntent: INTENT.REAGENDAR_CITA,
     minConfidence: 0.5
   },
   {
     id: 31,
-    category: 'reschedule',
+    category: 'reagendar_cita',
     input: 'Pasar mi turno para la semana que viene',
     expectedIntent: INTENT.REAGENDAR_CITA,
     minConfidence: 0.5
   },
   {
     id: 32,
-    category: 'reschedule',
+    category: 'reagendar_cita',
     input: 'Modificar la fecha de mi cita',
     expectedIntent: INTENT.REAGENDAR_CITA,
     minConfidence: 0.5
   },
   {
     id: 33,
-    category: 'reschedule',
+    category: 'reagendar_cita',
     input: 'Cambiar cita del lunes al miércoles',
     expectedIntent: INTENT.REAGENDAR_CITA,
     minConfidence: 0.5
   },
   {
     id: 34,
-    category: 'reschedule',
+    category: 'reagendar_cita',
     input: 'Reprogramar para otro horario',
     expectedIntent: INTENT.REAGENDAR_CITA,
     minConfidence: 0.5
   },
   {
     id: 35,
-    category: 'reschedule',
+    category: 'reagendar_cita',
     input: 'Trasladar mi turno',
     expectedIntent: INTENT.REAGENDAR_CITA,
     minConfidence: 0.5
   },
 
   // ============================================================================
-  // CATEGORY 4: INTENT DETECTION - CHECK AVAILABILITY (10 queries)
+  // CATEGORY 4: INTENT DETECTION - VER DISPONIBILIDAD (10 queries)
   // ============================================================================
   {
     id: 36,
-    category: 'check_availability',
+    category: 'ver_disponibilidad',
     input: '¿Qué horas tienen disponibles?',
     expectedIntent: INTENT.VER_DISPONIBILIDAD,
     minConfidence: 0.3
   },
   {
     id: 37,
-    category: 'check_availability',
+    category: 'ver_disponibilidad',
     input: '¿Tienen disponibilidad para hoy?',
     expectedIntent: INTENT.VER_DISPONIBILIDAD,
     expectedContext: { is_today: true },
@@ -314,67 +314,67 @@ const TEST_QUERIES: TestQuery[] = [
   },
   {
     id: 38,
-    category: 'check_availability',
+    category: 'ver_disponibilidad',
     input: '¿Qué días tienen libre?',
     expectedIntent: INTENT.VER_DISPONIBILIDAD,
     minConfidence: 0.3
   },
   {
     id: 39,
-    category: 'check_availability',
+    category: 'ver_disponibilidad',
     input: '¿Me pueden decir si tienen hora?',
     expectedIntent: INTENT.VER_DISPONIBILIDAD,
     minConfidence: 0.3
   },
   {
     id: 40,
-    category: 'check_availability',
+    category: 'ver_disponibilidad',
     input: '¿Hay disponibilidad esta semana?',
     expectedIntent: INTENT.VER_DISPONIBILIDAD,
     minConfidence: 0.3
   },
   {
     id: 41,
-    category: 'check_availability',
+    category: 'ver_disponibilidad',
     input: '¿Qué horarios tienen?',
     expectedIntent: INTENT.VER_DISPONIBILIDAD,
     minConfidence: 0.3
   },
   {
     id: 42,
-    category: 'check_availability',
+    category: 'ver_disponibilidad',
     input: '¿Tienen turno disponible?',
     expectedIntent: INTENT.VER_DISPONIBILIDAD,
     minConfidence: 0.3
   },
   {
     id: 43,
-    category: 'check_availability',
+    category: 'ver_disponibilidad',
     input: '¿Me dicen si tienen lugar?',
     expectedIntent: INTENT.VER_DISPONIBILIDAD,
     minConfidence: 0.3
   },
   {
     id: 44,
-    category: 'check_availability',
+    category: 'ver_disponibilidad',
     input: '¿Qué días están disponibles?',
     expectedIntent: INTENT.VER_DISPONIBILIDAD,
     minConfidence: 0.3
   },
   {
     id: 45,
-    category: 'check_availability',
+    category: 'ver_disponibilidad',
     input: '¿Tienen huecos libres?',
     expectedIntent: INTENT.VER_DISPONIBILIDAD,
     minConfidence: 0.3
   },
 
   // ============================================================================
-  // CATEGORY 5: INTENT DETECTION - URGENT CARE (10 queries)
+  // CATEGORY 5: INTENT DETECTION - URGENCIA (10 queries)
   // ============================================================================
   {
     id: 46,
-    category: 'urgent_care',
+    category: 'urgencia',
     input: '¡Es urgente, necesito atención ya!',
     expectedIntent: INTENT.URGENCIA,
     expectedContext: { is_urgent: true },
@@ -382,7 +382,7 @@ const TEST_QUERIES: TestQuery[] = [
   },
   {
     id: 47,
-    category: 'urgent_care',
+    category: 'urgencia',
     input: 'Tengo una emergencia médica',
     expectedIntent: INTENT.URGENCIA,
     expectedContext: { is_urgent: true },
@@ -390,7 +390,7 @@ const TEST_QUERIES: TestQuery[] = [
   },
   {
     id: 48,
-    category: 'urgent_care',
+    category: 'urgencia',
     input: '¡Necesito una cita urgente!',
     expectedIntent: INTENT.URGENCIA,
     expectedContext: { is_urgent: true },
@@ -398,7 +398,7 @@ const TEST_QUERIES: TestQuery[] = [
   },
   {
     id: 49,
-    category: 'urgent_care',
+    category: 'urgencia',
     input: 'Es muy urgente, tengo mucho dolor',
     expectedIntent: INTENT.URGENCIA,
     expectedContext: { is_urgent: true },
@@ -406,7 +406,7 @@ const TEST_QUERIES: TestQuery[] = [
   },
   {
     id: 50,
-    category: 'urgent_care',
+    category: 'urgencia',
     input: '¡Necesito que me atiendan ahora mismo!',
     expectedIntent: INTENT.URGENCIA,
     expectedContext: { is_urgent: true },
@@ -414,7 +414,7 @@ const TEST_QUERIES: TestQuery[] = [
   },
   {
     id: 51,
-    category: 'urgent_care',
+    category: 'urgencia',
     input: 'Urgencia, necesito ayuda inmediata',
     expectedIntent: INTENT.URGENCIA,
     expectedContext: { is_urgent: true },
@@ -422,7 +422,7 @@ const TEST_QUERIES: TestQuery[] = [
   },
   {
     id: 52,
-    category: 'urgent_care',
+    category: 'urgencia',
     input: '¡Es una emergencia, por favor!',
     expectedIntent: INTENT.URGENCIA,
     expectedContext: { is_urgent: true },
@@ -430,7 +430,7 @@ const TEST_QUERIES: TestQuery[] = [
   },
   {
     id: 53,
-    category: 'urgent_care',
+    category: 'urgencia',
     input: 'Necesito atención urgente, es importante',
     expectedIntent: INTENT.URGENCIA,
     expectedContext: { is_urgent: true },
@@ -438,7 +438,7 @@ const TEST_QUERIES: TestQuery[] = [
   },
   {
     id: 54,
-    category: 'urgent_care',
+    category: 'urgencia',
     input: '¡Urgente, no puedo esperar!',
     expectedIntent: INTENT.URGENCIA,
     expectedContext: { is_urgent: true },
@@ -446,7 +446,7 @@ const TEST_QUERIES: TestQuery[] = [
   },
   {
     id: 55,
-    category: 'urgent_care',
+    category: 'urgencia',
     input: 'Emergencia médica, necesito cita ya',
     expectedIntent: INTENT.URGENCIA,
     expectedContext: { is_urgent: true },
@@ -454,148 +454,148 @@ const TEST_QUERIES: TestQuery[] = [
   },
 
   // ============================================================================
-  // CATEGORY 6: SPELLING ERRORS (10 queries)
+  // CATEGORY 6: ERRORES ORTOGRÁFICOS (10 queries)
   // ============================================================================
   {
     id: 56,
-    category: 'spelling_errors',
+    category: 'errores_ortograficos',
     input: 'Quiero ajendar una sita',
     expectedIntent: INTENT.CREAR_CITA,
     minConfidence: 0.3
   },
   {
     id: 57,
-    category: 'spelling_errors',
+    category: 'errores_ortograficos',
     input: 'Necesito reserbar un turno',
     expectedIntent: INTENT.CREAR_CITA,
     minConfidence: 0.3
   },
   {
     id: 58,
-    category: 'spelling_errors',
+    category: 'errores_ortograficos',
     input: 'Quiero kanselar mi cita',
     expectedIntent: INTENT.CANCELAR_CITA,
     minConfidence: 0.5
   },
   {
     id: 59,
-    category: 'spelling_errors',
+    category: 'errores_ortograficos',
     input: 'Reprogramar mi turno para otro dia',
     expectedIntent: INTENT.REAGENDAR_CITA,
     minConfidence: 0.5
   },
   {
     id: 60,
-    category: 'spelling_errors',
+    category: 'errores_ortograficos',
     input: 'Tienen disponibilidaz?',
     expectedIntent: INTENT.VER_DISPONIBILIDAD,
     minConfidence: 0.3
   },
   {
     id: 61,
-    category: 'spelling_errors',
+    category: 'errores_ortograficos',
     input: 'Urjente, necesito atencion',
     expectedIntent: INTENT.URGENCIA,
     minConfidence: 0.5
   },
   {
     id: 62,
-    category: 'spelling_errors',
+    category: 'errores_ortograficos',
     input: 'Quiero una konsulta general',
     expectedIntent: INTENT.CREAR_CITA,
     minConfidence: 0.3
   },
   {
     id: 63,
-    category: 'spelling_errors',
+    category: 'errores_ortograficos',
     input: 'Anular mi reserba',
     expectedIntent: INTENT.CANCELAR_CITA,
     minConfidence: 0.5
   },
   {
     id: 64,
-    category: 'spelling_errors',
+    category: 'errores_ortograficos',
     input: 'Cambiar la ora de mi cita',
     expectedIntent: INTENT.REAGENDAR_CITA,
     minConfidence: 0.5
   },
   {
     id: 65,
-    category: 'spelling_errors',
+    category: 'errores_ortograficos',
     input: 'Tienen lugar disponsible?',
     expectedIntent: INTENT.VER_DISPONIBILIDAD,
     minConfidence: 0.3
   },
 
   // ============================================================================
-  // CATEGORY 7: DYSLEXIA SIMULATION (10 queries)
+  // CATEGORY 7: SIMULACIÓN DE DISLEXIA (10 queries)
   // ============================================================================
   {
     id: 66,
-    category: 'dyslexia',
+    category: 'dislexia',
     input: 'Quiero agnedar una cita',
     expectedIntent: INTENT.CREAR_CITA,
     minConfidence: 0.3
   },
   {
     id: 67,
-    category: 'dyslexia',
+    category: 'dislexia',
     input: 'Necesito resevar un truno',
     expectedIntent: INTENT.CREAR_CITA,
     minConfidence: 0.3
   },
   {
     id: 68,
-    category: 'dyslexia',
+    category: 'dislexia',
     input: 'Quiero cancelsr mi cita',
     expectedIntent: INTENT.CANCELAR_CITA,
     minConfidence: 0.5
   },
   {
     id: 69,// LLM detects "truno" as create - known limitation
-    category: 'dyslexia',
+    category: 'dislexia',
     input: 'Reporgramar mi truno',
     expectedIntent: INTENT.REAGENDAR_CITA,
     minConfidence: 0.5
   },
   {
     id: 70,
-    category: 'dyslexia',
+    category: 'dislexia',
     input: 'Tienen disponiblidad?',
     expectedIntent: INTENT.VER_DISPONIBILIDAD,
     minConfidence: 0.3
   },
   {
     id: 71,
-    category: 'dyslexia',
+    category: 'dislexia',
     input: 'Urgnete, nececito atencion',
     expectedIntent: INTENT.URGENCIA,
     minConfidence: 0.5
   },
   {
     id: 72,
-    category: 'dyslexia',
+    category: 'dislexia',
     input: 'Quiero una cosulta',
     expectedIntent: INTENT.CREAR_CITA,
     minConfidence: 0.3
   },
   {
     id: 73,
-    category: 'dyslexia',
+    category: 'dislexia',
     input: 'Anualr mi resera',
     expectedIntent: INTENT.CANCELAR_CITA,
     minConfidence: 0.5
   },
   {
     id: 74,
-    category: 'dyslexia',
+    category: 'dislexia',
     input: 'Cambiar la hor de mi cita',
     expectedIntent: INTENT.REAGENDAR_CITA,
     minConfidence: 0.5
   },
   {
     id: 75,
-    category: 'dyslexia',
+    category: 'dislexia',
     input: 'Tienen lugr disponible?',
     expectedIntent: INTENT.VER_DISPONIBILIDAD,
     minConfidence: 0.3
@@ -606,28 +606,28 @@ const TEST_QUERIES: TestQuery[] = [
   // ============================================================================
   {
     id: 76,
-    category: 'profanity',
+    category: 'profanidad',
     input: 'Quiero agendar una cita, carajo',
     expectedIntent: INTENT.CREAR_CITA,
     minConfidence: 0.3
   },
   {
     id: 77,
-    category: 'profanity',
+    category: 'profanidad',
     input: 'Necesito cancelar mi puta cita',
     expectedIntent: INTENT.CANCELAR_CITA,
     minConfidence: 0.5
   },
   {
     id: 78,
-    category: 'profanity',
+    category: 'profanidad',
     input: 'Reprogramar mi turno, mierda',
     expectedIntent: INTENT.REAGENDAR_CITA,
     minConfidence: 0.5
   },
   {
     id: 79,
-    category: 'profanity',
+    category: 'profanidad',
     input: '¡Es urgente, coño!',
     expectedIntent: INTENT.URGENCIA,
     expectedContext: { is_urgent: true },
@@ -635,155 +635,155 @@ const TEST_QUERIES: TestQuery[] = [
   },
   {
     id: 80,
-    category: 'profanity',
+    category: 'profanidad',
     input: 'Tienen disponibilidad o qué, carajo?',
     expectedIntent: INTENT.VER_DISPONIBILIDAD,
     minConfidence: 0.3
   },
 
   // ============================================================================
-  // CATEGORY 9: UNRELATED QUESTIONS (10 queries)
+  // CATEGORY 9: PREGUNTAS GENERALES (10 queries)
   // ============================================================================
   {
     id: 81,
-    category: 'unrelated',
+    category: 'pregunta_general',
     input: '¿Qué tiempo hace hoy?',
     expectedIntent: INTENT.PREGUNTA_GENERAL,
     minConfidence: 0.5
   },
   {
     id: 82,
-    category: 'unrelated',
+    category: 'pregunta_general',
     input: '¿Cuál es la capital de Francia?',
     expectedIntent: INTENT.PREGUNTA_GENERAL,
     minConfidence: 0.5
   },
   {
     id: 83,
-    category: 'unrelated',
+    category: 'pregunta_general',
     input: '¿Me puedes contar un chiste?',
     expectedIntent: INTENT.PREGUNTA_GENERAL,
     minConfidence: 0.5
   },
   {
     id: 84,
-    category: 'unrelated',
+    category: 'pregunta_general',
     input: '¿Qué hora es?',
     expectedIntent: INTENT.PREGUNTA_GENERAL,
     minConfidence: 0.5
   },
   {
     id: 85,
-    category: 'unrelated',
+    category: 'pregunta_general',
     input: '¿Quién es el presidente?',
     expectedIntent: INTENT.PREGUNTA_GENERAL,
     minConfidence: 0.5
   },
   {
     id: 86,
-    category: 'unrelated',
+    category: 'pregunta_general',
     input: '¿Cómo se hace una paella?',
     expectedIntent: INTENT.PREGUNTA_GENERAL,
     minConfidence: 0.5
   },
   {
     id: 87,
-    category: 'unrelated',
+    category: 'pregunta_general',
     input: '¿Qué películas hay en el cine?',
     expectedIntent: INTENT.PREGUNTA_GENERAL,
     minConfidence: 0.5
   },
   {
     id: 88,
-    category: 'unrelated',
+    category: 'pregunta_general',
     input: '¿Cuánto es 2 + 2?',
     expectedIntent: INTENT.PREGUNTA_GENERAL,
     minConfidence: 0.5
   },
   {
     id: 89,
-    category: 'unrelated',
+    category: 'pregunta_general',
     input: '¿Dónde queda el restaurante más cercano?',
     expectedIntent: INTENT.PREGUNTA_GENERAL,
     minConfidence: 0.5
   },
   {
     id: 90,
-    category: 'unrelated',
+    category: 'pregunta_general',
     input: '¿Qué equipo de fútbol gana hoy?',
     expectedIntent: INTENT.PREGUNTA_GENERAL,
     minConfidence: 0.5
   },
 
   // ============================================================================
-  // CATEGORY 10: GREETINGS / FAREWELLS (10 queries)
+  // CATEGORY 10: SALUDOS / DESPEDIDAS (10 queries)
   // ============================================================================
   {
     id: 91,
-    category: 'greetings',
+    category: 'saludos',
     input: 'Hola',
     expectedIntent: INTENT.SALUDO,
     minConfidence: 0.5
   },
   {
     id: 92,
-    category: 'greetings',
+    category: 'saludos',
     input: 'Buenos días',
     expectedIntent: INTENT.SALUDO,
     minConfidence: 0.5
   },
   {
     id: 93,
-    category: 'greetings',
+    category: 'saludos',
     input: 'Buenas tardes',
     expectedIntent: INTENT.SALUDO,
     minConfidence: 0.5
   },
   {
     id: 94,
-    category: 'greetings',
+    category: 'saludos',
     input: 'Hola, ¿qué tal?',
     expectedIntent: INTENT.SALUDO,
     minConfidence: 0.5
   },
   {
     id: 95,
-    category: 'greetings',
+    category: 'saludos',
     input: 'Saludos',
     expectedIntent: INTENT.SALUDO,
     minConfidence: 0.5
   },
   {
     id: 96,
-    category: 'farewells',
+    category: 'despedidas',
     input: 'Chau',
     expectedIntent: INTENT.DESPEDIDA,
     minConfidence: 0.5
   },
   {
     id: 97,
-    category: 'farewells',
+    category: 'despedidas',
     input: 'Adiós',
     expectedIntent: INTENT.DESPEDIDA,
     minConfidence: 0.5
   },
   {
     id: 98,
-    category: 'farewells',
+    category: 'despedidas',
     input: 'Hasta luego',
     expectedIntent: INTENT.DESPEDIDA,
     minConfidence: 0.5
   },
   {
     id: 99,
-    category: 'farewells',
+    category: 'despedidas',
     input: 'Nos vemos',
     expectedIntent: INTENT.DESPEDIDA,
     minConfidence: 0.5
   },
   {
     id: 100,
-    category: 'farewells',
+    category: 'agradecimiento',
     input: 'Gracias',
     expectedIntent: INTENT.AGRADECIMIENTO,
     minConfidence: 0.5

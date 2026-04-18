@@ -16,7 +16,7 @@ export const InputSchema = z.object({
       user_id: z.uuid(),
       action: z.enum(['get', 'update']).default('get'),
       name: z.string().min(1).max(200).optional(),
-      email: z.string().email().optional(), // Improved email validation
+      email: z.email().optional(), // Improved email validation
       phone: z.string().max(50).optional(),
       timezone: z.string().optional(),
     });

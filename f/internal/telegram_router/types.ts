@@ -1,8 +1,6 @@
 import { z } from 'zod';
 import type { BookingState, DraftBooking } from '../booking_fsm';
 
-export type Result<T> = [Error | null, T | null];
-
 export type RouteType = 'callback' | 'command' | 'menu' | 'submenu' | 'wizard' | 'ai_agent';
 
 export interface InlineButton {
@@ -37,3 +35,8 @@ export const InputSchema = z.object({
 });
 
 export type RouterInput = z.infer<typeof InputSchema>;
+
+export interface RouterOutput {
+  readonly data: RouteResult | null;
+  readonly error: string | null;
+}

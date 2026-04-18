@@ -56,7 +56,7 @@ import type { Input } from './types';
 // MAIN
 // ============================================================================
 
-export async function main(rawInput: unknown): Promise<[Error | null, unknown | null]> {
+export async function main(rawInput: unknown): Promise<[Error | null, unknown]> {
   const parsed = InputSchema.safeParse(rawInput);
   if (!parsed.success) {
     return [new Error(`Validation error: ${parsed.error.message}`), null];

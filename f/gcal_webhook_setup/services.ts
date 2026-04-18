@@ -60,7 +60,7 @@ export async function setupWebhook(input: Input): Promise<Result<WebhookSetupRes
 
     if (!response.ok) {
       const errorText = await response.text().catch(() => 'unknown_error');
-      return [new Error(`gcal_api_error (${response.status}): ${errorText}`), null];
+      return [new Error(`gcal_api_error (${String(response.status)}): ${errorText}`), null];
     }
 
     const data = await response.json() as { id?: string; resourceId?: string; expiration?: number };

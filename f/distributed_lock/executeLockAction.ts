@@ -21,6 +21,6 @@ export async function executeLockAction(tx: postgres.Sql, input: Input): Promise
     case 'cleanup':
       return cleanupLocks(tx);
     default:
-      return [new Error(`unsupported_action: ${input.action}`), null];
+      return [new Error(`unsupported_action: ${String(input.action)}`), null];
     }
 }

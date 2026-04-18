@@ -21,7 +21,7 @@ import type postgres from 'postgres';
 import type { Result } from '../result';
 
 const ServiceRowSchema = z.object({
-  service_id: z.string().uuid(),
+  service_id: z.uuid(),
   name: z.string().min(1),
   duration_minutes: z.number().int().positive(),
 });

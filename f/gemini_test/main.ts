@@ -126,7 +126,7 @@ async function callGemini(
     if (!response.ok) {
       const errorBody = await response.text();
       return [
-        new Error(`HTTP ${response.status}: ${errorBody.slice(0, 500)}`),
+        new Error(`HTTP ${String(response.status)}: ${errorBody.slice(0, 500)}`),
         null,
       ];
     }
@@ -314,7 +314,7 @@ export async function main(_rawInput: unknown = {}): Promise<Result<TestReport>>
   console.log(`  ✓ Connected — Model: ${connResp.modelVersion ?? '(unknown)'}\n`);
 
   // ── Step 2: Run Test Suite ──────────────────────────────────────────────
-  console.log(`[2/2] Running ${TEST_CASES.length} test cases...\n`);
+  console.log(`[2/2] Running ${String(TEST_CASES.length)} test cases...\n`);
 
   const results: TestResult[] = [];
   for (const tc of TEST_CASES) {
@@ -349,10 +349,10 @@ function printResultPreview(result: TestResult): void {
     const preview = result.response.length > 120
       ? result.response.slice(0, 120).replace(/\n/g, ' ') + '...'
       : result.response.replace(/\n/g, ' ');
-    console.log(`  ✓ ${result.name} (${result.latencyMs}ms, ${result.tokenUsage?.total ?? '?'} tokens)`);
+    console.log(`  ✓ ${result.name} (${String(result.latencyMs)}ms, ${String(result.tokenUsage?.total ?? '?')} tokens)`);
     console.log(`    → ${preview}`);
   } else {
-    console.log(`  ✗ ${result.name}: ${result.error}`);
+    console.log(`  ✗ ${result.name}: ${String(result.error)}`);
   }
 }
 
@@ -380,10 +380,10 @@ function printSummary(report: TestReport): void {
   console.log(`  RESULTS SUMMARY`);
   console.log('='.repeat(70));
   console.log(`  Model        : ${report.model}`);
-  console.log(`  Total tests  : ${report.totalTests}`);
-  console.log(`  Passed       : ${report.passed}`);
-  console.log(`  Failed       : ${report.failed}`);
-  console.log(`  Avg latency  : ${avgLatency}ms`);
+  console.log(`  Total tests  : ${String(report.totalTests)}`);
+  console.log(`  Passed       : ${String(report.passed)}`);
+  console.log(`  Failed       : ${String(report.failed)}`);
+  console.log(`  Avg latency  : ${String(avgLatency)}ms`);
   console.log(`${'='.repeat(70)}\n`);
 }
 

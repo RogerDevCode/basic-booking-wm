@@ -1,5 +1,17 @@
 # CLAUDE.md
 
+## 🗺️ Read First — Codebase Index
+
+**Before exploring files**, read these pre-built index files in order:
+1. `.ai-codex/index.md` — **auto-generated**: all 40+ modules with mission + real export signatures
+2. `.ai-codex/feature-map.md` — folder map by domain (booking / telegram / gcal / web / internal)
+3. `.ai-codex/schema.md` — database tables, columns and FSM transitions
+4. `.ai-codex/lib.md` — key function signatures for internal/ utilities
+
+> These replace ~40 file reads per session. Regenerate with: `bash scripts/gen-codex-index.sh`
+
+---
+
 ## 📌 Quick Reference
 
 ### What is this?

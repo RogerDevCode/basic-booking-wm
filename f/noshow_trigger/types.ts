@@ -15,7 +15,7 @@ export interface NoShowStats {
 }
 
 export const ProviderRowSchema = z.object({
-  provider_id: z.string().uuid(),
+  provider_id: z.uuid(),
 });
 
 export type ProviderRow = z.infer<typeof ProviderRowSchema>;

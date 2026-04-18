@@ -1,11 +1,11 @@
 import { z } from 'zod';
 
 export const InputSchema = z.object({
-  admin_user_id: z.string().uuid(),
+  admin_user_id: z.uuid(),
   action: z.enum(['list', 'get', 'update', 'deactivate', 'activate']),
-  target_user_id: z.string().uuid().optional(),
+  target_user_id: z.uuid().optional(),
   full_name: z.string().max(200).optional(),
-  email: z.string().email().optional(),
+  email: z.email().optional(),
   phone: z.string().max(20).optional(),
   role: z.enum(['admin', 'provider', 'client']).optional(),
 });

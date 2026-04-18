@@ -50,7 +50,7 @@ function formatSlotLabel(isoStart: string): string {
   const ampm = hours >= 12 ? 'PM' : 'AM';
   const displayHours = hours % 12 || 12;
   const minutesStr = minutes.toString().padStart(2, '0');
-  return `${displayHours}:${minutesStr} ${ampm}`;
+  return `${String(displayHours)}:${minutesStr} ${ampm}`;
 }
 
 /**
@@ -108,14 +108,18 @@ export async function fetchSlots(
     if (resolveErr !== null) {
       return [resolveErr, null];
     }
-    effectiveServiceId = resolvedId;
+    effectiveServiceId = resolvedId ?? null;
+  }
+
+  if (effectiveServiceId === null) {
+    return [new Error('Service resolution failed'), null];
   }
 
   // 2. Delegate to scheduling-engine — the canonical slot computation authority
   const [schedErr, schedResult] = await getAvailability(sql, {
     provider_id: providerId,
     date,
-    service_id: effectiveServiceId!,
+    service_id: effectiveServiceId,
   });
 
   if (schedErr !== null) {

@@ -1,17 +1,24 @@
 import { decryptContent } from "./decryptContent";
 import { type NoteRow, type Tag } from "./types";
 
-export function mapRowToNote(row: any, tags: readonly Tag[] = []): NoteRow {
+export function mapRowToNote(row: Record<string, unknown>, tags: readonly Tag[] = []): NoteRow {
+    // eslint-disable-next-line @typescript-eslint/no-base-to-string
+    const bookingId: string | null = (row['booking_id'] !== null && row['booking_id'] !== undefined) ? String(row['booking_id']) : null;
+    // eslint-disable-next-line @typescript-eslint/no-base-to-string
+    const clientId: string | null = (row['client_id'] !== null && row['client_id'] !== undefined) ? String(row['client_id']) : null;
+    // eslint-disable-next-line @typescript-eslint/no-base-to-string
+    const contentEncrypted: string | null = (row['content_encrypted'] !== null && row['content_encrypted'] !== undefined) ? String(row['content_encrypted']) : null;
+
     return {
-    note_id: row.note_id,
-    booking_id: row.booking_id,
-    client_id: row.client_id,
-    provider_id: row.provider_id,
-    content_encrypted: row.content_encrypted,
-    encryption_version: row.encryption_version,
-    created_at: row.created_at,
-    updated_at: row.updated_at,
-    content: decryptContent(row.content_encrypted),
+    note_id: String(row['note_id']),
+    booking_id: bookingId,
+    client_id: clientId,
+    provider_id: String(row['provider_id']),
+    content_encrypted: contentEncrypted,
+    encryption_version: Number(row['encryption_version']),
+    created_at: row['created_at'] instanceof Date ? row['created_at'] : String(row['created_at']),
+    updated_at: row['updated_at'] instanceof Date ? row['updated_at'] : String(row['updated_at']),
+    content: decryptContent(contentEncrypted),
     tags,
     };
 }

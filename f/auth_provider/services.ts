@@ -85,7 +85,7 @@ export async function providerChangePassword(
     SELECT password_hash FROM providers WHERE provider_id = ${providerId}::uuid LIMIT 1
   `;
   const provider = rows[0];
-  if (provider === undefined || provider.password_hash === null) {
+  if (provider?.password_hash == null) {
     return [new Error('Provider not found or no password set'), null];
   }
 

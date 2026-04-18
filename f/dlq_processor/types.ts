@@ -16,7 +16,7 @@ export type Input = z.infer<typeof InputSchema>;
  * Result shape for final validation.
  * Using passthrough to allow flexible return shapes while ensuring basic structure.
  */
-export const DLQResultSchema = z.object({}).passthrough();
+export const DLQResultSchema = z.object({}).loose();
 
 /**
  * Validates and transforms a raw database row into a structured DLQEntry.

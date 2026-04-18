@@ -6,7 +6,7 @@ import { type Input, type RescheduleWriteResult, type Sql } from "./types";
 export async function executeReschedule(sql: Sql, input: Input, oldBooking: BookingRow, service: ServiceRow): Promise<Result<RescheduleWriteResult>> {
     const newStart = input.new_start_time;
     const newEnd = new Date(newStart.getTime() + service.duration_minutes * 60 * 1000);
-    const newKey = `reschedule-${oldBooking.idempotency_key}-${Date.now()}`;
+    const newKey = `reschedule-${oldBooking.idempotency_key}-${String(Date.now())}`;
     return withTenantContext(sql, oldBooking.provider_id, async (tx) => {
     // 1. Conflict Check (Inside transaction + FOR UPDATE implicit in GIST if we wanted, but logic check is safer)
     const overlaps = await tx`

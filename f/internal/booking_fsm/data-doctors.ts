@@ -21,7 +21,7 @@ import type { Result } from '../result';
 // ============================================================================
 
 const ProviderRowSchema = z.object({
-  provider_id: z.string().uuid(),
+  provider_id: z.uuid(),
   name: z.string(),
 });
 

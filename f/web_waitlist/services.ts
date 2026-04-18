@@ -82,7 +82,7 @@ export async function handleJoin(tx: postgres.Sql, clientId: string, data: Input
   return [null, {
     entries: [],
     position,
-    message: `Joined waitlist at position ${position}`,
+    message: `Joined waitlist at position ${String(position)}`,
   }];
 }
 
@@ -163,6 +163,6 @@ export async function handleCheckPosition(tx: postgres.Sql, clientId: string, wa
   return [null, {
     entries: [],
     position,
-    message: `Your position: ${position}`,
+    message: `Your position: ${String(position)}`,
   }];
 }

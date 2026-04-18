@@ -64,7 +64,7 @@ export async function main(
   }
   const input: Input = parsed.data;
 
-  const dbUrl = process.env['DATABASE_URL'] || '';
+  const dbUrl = process.env['DATABASE_URL'] ?? '';
   if (!dbUrl) return [new Error('CONFIGURATION_ERROR: DATABASE_URL is required'), null];
 
   const sql = createDbClient({ url: dbUrl });
@@ -72,7 +72,7 @@ export async function main(
   try {
     // 1. Fetch
     const [fetchErr, booking] = await fetchBookingDetails(sql, input.tenant_id, input.booking_id);
-    if (fetchErr || !booking) return [fetchErr ?? new Error('Booking not found'), null];
+    if (fetchErr ?? !booking) return [fetchErr ?? new Error('Booking not found'), null];
 
     // 2. Auth
     const [authErr, accessToken] = await getValidAccessToken(

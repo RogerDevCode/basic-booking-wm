@@ -1,8 +1,8 @@
 import { z } from 'zod';
 
 export const InputSchema = z.object({
-  client_id: z.string().uuid().optional().nullable(),
-  provider_id: z.string().uuid(),
+  client_id: z.uuid().optional().nullable(),
+  provider_id: z.uuid(),
   channel: z.enum(['telegram', 'web', 'api']),
   direction: z.enum(['incoming', 'outgoing']),
   content: z.string().min(1).max(2000),

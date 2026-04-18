@@ -6,7 +6,7 @@ import { type LockInfo, type LockRow } from "./types";
  */
 export function mapRowToLockInfo(row: LockRow): LockInfo {
     return {
-    lock_id: String(row.lock_id),
+    lock_id: row.lock_id,
     lock_key: row.lock_key,
     owner_token: row.owner_token,
     provider_id: row.provider_id,

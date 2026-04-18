@@ -191,9 +191,9 @@ const HANDLERS: Record<z.infer<typeof InputSchema>['action'], ProfileActionHandl
 
     // 2. Verify Current
     const [hashErr, currentHash] = await ProfileRepository.getPasswordHash(sql, input.provider_id);
-    if (hashErr !== null) return [hashErr, null];
+    if (hashErr !== null || !currentHash) return [hashErr ?? new Error('password_hash_not_found'), null];
 
-    const isValid = await verifyPassword(current_password, currentHash!);
+    const isValid = await verifyPassword(current_password, currentHash);
     if (!isValid) return [new Error('invalid_current_password'), null];
 
     // 3. Update

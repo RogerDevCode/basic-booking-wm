@@ -30,15 +30,15 @@ export async function main(rawInput: unknown): Promise<Result<unknown>> {
 
   try {
     if (input.action === 'list_regions') {
-      return listRegions(sql);
+      return await listRegions(sql);
     }
 
     if (input.action === 'list_communes') {
-      return listCommunes(sql, input.region_id);
+      return await listCommunes(sql, input.region_id);
     }
 
     if (input.action === 'search_communes') {
-      return searchCommunes(sql, input.search ?? '', input.region_id);
+      return await searchCommunes(sql, input.search ?? '', input.region_id);
     }
 
     return [new Error(`Unknown action: ${String(input.action)}`), null];

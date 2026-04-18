@@ -180,8 +180,9 @@ export async function sendWithRetry(
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      const info = await transporter.sendMail({ from, to, subject, html });
-      const messageId = typeof info.messageId === 'string' ? info.messageId : null;
+      const info: unknown = await transporter.sendMail({ from, to, subject, html });
+      const infoRecord = info as Record<string, unknown>;
+      const messageId = (typeof infoRecord['messageId'] === 'string') ? infoRecord['messageId'] : null;
       return [null, { sent: true, message_id: messageId }];
     } catch (e) {
       const err = e instanceof Error ? e : new Error(String(e));

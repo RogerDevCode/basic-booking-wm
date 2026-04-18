@@ -35,10 +35,10 @@ import type { Result } from '../result';
 // ============================================================================
 
 type StateHandler = (
-  state: any,
+  state: BookingState,
   action: BookingAction,
   draft: DraftBooking,
-  items?: readonly any[]
+  items?: readonly { id: string; name: string; label?: string; start_time?: string }[]
 ) => TransitionResult;
 
 const MAIN_MENU_TEXT = '📱 *Menú Principal*\n\n1️⃣ Agendar cita\n2️⃣ Mis citas\n3️⃣ Recordatorios\n4️⃣ Información';
@@ -48,11 +48,11 @@ const MAIN_MENU_TEXT = '📱 *Menú Principal*\n\n1️⃣ Agendar cita\n2️⃣ 
 // ============================================================================
 
 function getNamedItems(items: unknown): { id: string; name: string }[] {
-  return isNamedItemArray(items) ? items : [];
+  return isNamedItemArray(items) ? [...items] : [];
 }
 
 function getTimeItems(items: unknown): { id: string; label: string; start_time: string }[] {
-  return isTimeItemArray(items) ? items : [];
+  return isTimeItemArray(items) ? [...items] : [];
 }
 
 // ============================================================================
@@ -111,11 +111,12 @@ const handlers: Record<string, StateHandler> = {
   },
 
   [BOOKING_STEP.SELECTING_SPECIALTY]: (state, action): TransitionResult => {
+    if (state.name !== BOOKING_STEP.SELECTING_SPECIALTY) return [new Error('invalid_state'), { nextState: state, responseText: 'Error de estado.', advance: false }];
     if (action.type === 'back') return [null, { nextState: stateFactory.idle(), responseText: MAIN_MENU_TEXT, advance: false }];
     
     if (action.type === 'select') {
       const specialtyItems = state.items;
-      let specialty = specialtyItems.find((i: any) => i.id === action.value);
+      let specialty = specialtyItems.find((i) => i.id === action.value);
       
       if (!specialty && /^\d+$/.test(action.value)) {
         specialty = specialtyItems[parseInt(action.value, 10) - 1];
@@ -141,14 +142,15 @@ const handlers: Record<string, StateHandler> = {
   },
 
   [BOOKING_STEP.SELECTING_DOCTOR]: (state, action, _, items): TransitionResult => {
+    if (state.name !== BOOKING_STEP.SELECTING_DOCTOR) return [new Error('invalid_state'), { nextState: state, responseText: 'Error de estado.', advance: false }];
     if (action.type === 'back') {
       const specialtyItems = getNamedItems(items);
       return [null, { nextState: stateFactory.selectingSpecialty(specialtyItems), responseText: buildSpecialtyPrompt(specialtyItems), advance: false }];
     }
 
     if (action.type === 'select') {
-      const doctorItems = isNamedItemArray(state.items) ? state.items : getNamedItems(items);
-      let doctor = doctorItems.find((i: { id: string; name: string }) => i.id === action.value);
+      const doctorItems = isNamedItemArray(state.items) && state.items.length > 0 ? state.items : getNamedItems(items);
+      let doctor = doctorItems.find((i) => i.id === action.value);
 
       if (!doctor && /^\d+$/.test(action.value)) {
         doctor = doctorItems[parseInt(action.value, 10) - 1];
@@ -174,6 +176,7 @@ const handlers: Record<string, StateHandler> = {
   },
 
   [BOOKING_STEP.SELECTING_TIME]: (state, action, draft, items): TransitionResult => {
+    if (state.name !== BOOKING_STEP.SELECTING_TIME) return [new Error('invalid_state'), { nextState: state, responseText: 'Error de estado.', advance: false }];
     if (action.type === 'back') {
       const doctorItems = getNamedItems(items);
       return [null, { nextState: stateFactory.selectingDoctor(state.specialtyId, state.doctorId, doctorItems), responseText: buildDoctorsPrompt('', doctorItems), advance: false }];
@@ -188,8 +191,8 @@ const handlers: Record<string, StateHandler> = {
     }
 
     if (action.type === 'select') {
-      const timeItems = isTimeItemArray(state.items) ? state.items : getTimeItems(items);
-      let slot = timeItems.find((i: { start_time: string }) => i.start_time === action.value);
+      const timeItems = isTimeItemArray(state.items) && state.items.length > 0 ? state.items : getTimeItems(items);
+      let slot = timeItems.find((i) => i.start_time === action.value);
 
       if (!slot && /^\d+$/.test(action.value)) {
         slot = timeItems[parseInt(action.value, 10) - 1];
@@ -226,6 +229,7 @@ const handlers: Record<string, StateHandler> = {
   },
 
   [BOOKING_STEP.CONFIRMING]: (state, action, draft, items): TransitionResult => {
+    if (state.name !== BOOKING_STEP.CONFIRMING) return [new Error('invalid_state'), { nextState: state, responseText: 'Error de estado.', advance: false }];
     if (action.type === 'confirm_yes') {
       return [null, { 
         nextState: stateFactory.completed('pending'), 

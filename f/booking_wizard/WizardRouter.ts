@@ -1,7 +1,7 @@
 import type { ActionContext, ActionHandler, StepView } from './types';
 
 export class WizardRouter {
-  private handlers = new Map<string, ActionHandler>();
+  private readonly handlers = new Map<string, ActionHandler>();
 
   register(action: string, handler: ActionHandler): void {
     this.handlers.set(action, handler);

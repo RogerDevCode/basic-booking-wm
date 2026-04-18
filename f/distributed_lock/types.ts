@@ -41,6 +41,6 @@ export const InputSchema = z.object({
       lock_key: z.string().min(1),
       owner_token: z.string().min(1).optional(),
       provider_id: z.uuid(), // provider_id is mandatory for RLS context
-      start_time: z.string().datetime().optional(),
+      start_time: z.iso.datetime().optional(),
       ttl_seconds: z.number().int().min(1).max(3600).default(30),
     });

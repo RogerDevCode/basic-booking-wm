@@ -59,7 +59,7 @@ async function analyzeResponse(
 ): Promise<{ readonly isRetryable: boolean; readonly error: Error }> {
   // If we are here, response.ok is false
   const body = await response.text().catch(() => 'no_response_body');
-  const error = new Error(`HTTP_${response.status}: ${body}`);
+  const error = new Error(`HTTP_${String(response.status)}: ${body}`);
   
   // 429 (Too Many Requests) and 5xx (Server Errors) are considered transient/retryable
   const isRetryable = response.status === 429 || (response.status >= 500 && response.status < 600);
@@ -105,6 +105,6 @@ export async function fetchWithRetry(
     }
   }
 
-  const finalError = lastError ?? new Error(`${operationName}: Failed after ${maxRetries} attempts`);
+  const finalError = lastError ?? new Error(`${operationName}: Failed after ${String(maxRetries)} attempts`);
   return [finalError, null];
 }

@@ -17,7 +17,7 @@ export async function callGCalAPI(method: string, path: string, calendarId: stri
 
     if (!response.ok) {
       const errorText = await response.text().catch(() => '');
-      return [new Error(`GCal API ${response.status}: ${errorText}`), null];
+      return [new Error(`GCal API ${String(response.status)}: ${errorText}`), null];
     }
 
     if (method === 'DELETE') {

@@ -1,8 +1,10 @@
+import type postgres from 'postgres';
+
 export interface ActionContext {
-  tx: any;  // Replace with actual type
-  input: any;
+  tx: postgres.Sql;
+  input: unknown;
 }
 
 export interface ActionHandler {
-  handle(context: ActionContext): Promise<[Error | null, unknown | null]>;
+  handle(context: ActionContext): Promise<[Error | null, unknown]>;
 }

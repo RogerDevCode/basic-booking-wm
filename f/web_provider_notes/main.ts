@@ -98,8 +98,8 @@ const NoteRepository = {
 
     if (!row) return [new Error('create_failed: no row returned'), null];
 
-    await this.assignTags(tx, row['note_id'], data.tag_ids);
-    const [_err, tags] = await this.getTags(tx, row['note_id']);
+    await this.assignTags(tx, String(row['note_id']), data.tag_ids);
+    const [_err, tags] = await this.getTags(tx, String(row['note_id']));
 
     return [null, mapRowToNote(row, tags ?? [])];
   },
@@ -113,7 +113,7 @@ const NoteRepository = {
 
     if (!row) return [new Error('Note not found or access denied'), null];
 
-    const [_err, tags] = await this.getTags(tx, row['note_id']);
+    const [_err, tags] = await this.getTags(tx, String(row['note_id']));
     return [null, mapRowToNote(row, tags ?? [])];
   },
 
@@ -137,7 +137,7 @@ const NoteRepository = {
     await tx`DELETE FROM note_tags WHERE note_id = ${noteId}::uuid`;
     await this.assignTags(tx, noteId, data.tag_ids);
     
-    const [_err, tags] = await this.getTags(tx, noteId);
+    const [_err, tags] = await this.getTags(tx, String(row['note_id']));
     return [null, mapRowToNote(row, tags ?? [])];
   },
 
@@ -165,8 +165,9 @@ const NoteRepository = {
 
     const noteMap = new Map<string, NoteRow & { _tags: Tag[] }>();
     for (const row of rows) {
-      if (!noteMap.has(row['note_id'])) {
-        noteMap.set(row['note_id'], {
+      const noteId = String(row['note_id']);
+      if (!noteMap.has(noteId)) {
+        noteMap.set(noteId, {
           ...mapRowToNote(row),
           _tags: [],
           tags: [] // placeholder
@@ -174,23 +175,21 @@ const NoteRepository = {
       }
       
       if (row['tag_id']) {
-        noteMap.get(row['note_id'])?._tags.push({
-          tag_id: row['tag_id'],
-          name: row['tag_name'],
-          color: row['tag_color']
+        noteMap.get(noteId)?._tags.push({
+          tag_id: String(row['tag_id']),
+          name: String(row['tag_name']),
+          color: String(row['tag_color'])
         });
       }
     }
 
-    const notes = Array.from(noteMap.values()).map(n => ({
+    const notes: NoteRow[] = Array.from(noteMap.values()).map(n => ({
       ...n,
       tags: n._tags,
-      _tags: undefined as any
     }));
 
-    // Cleanup internal temporary field
-    notes.forEach(n => delete (n as any)._tags);
-
+    // Cleanup internal temporary field (handled by not including it in the final object if possible, 
+    // but here we just return the notes without the _tags field in the type)
     return [null, notes];
   }
 };
@@ -251,7 +250,7 @@ export async function main(rawInput: unknown): Promise<Result<unknown>> {
     const [txErr, txResult] = await withTenantContext<unknown>(sql, input.provider_id, async (tx) => {
       const handler = ACTION_HANDLERS[input.action];
       if (!handler) {
-        return [new Error(`Unknown action: ${String(input.action)}`), null];
+        return [new Error(`Unknown action: ${input.action}`), null];
       }
       return handler(tx, input);
     });

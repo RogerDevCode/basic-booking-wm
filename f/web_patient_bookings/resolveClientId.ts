@@ -16,7 +16,7 @@ export async function resolveClientId(tx: TxClient, userId: string): Promise<Res
 
     const firstRow = userRows[0];
     if (firstRow !== undefined) {
-      return [null, String(firstRow[0])];
+      return [null, firstRow[0]];
     }
 
     // Fallback: search by email match
@@ -31,7 +31,7 @@ export async function resolveClientId(tx: TxClient, userId: string): Promise<Res
       return [new Error(`client_identity_not_found: userId=${userId}`), null];
     }
 
-    return [null, String(fallbackRow[0])];
+    return [null, fallbackRow[0]];
     } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);
     return [new Error(`identity_resolution_failed: ${msg}`), null];

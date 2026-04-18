@@ -59,9 +59,9 @@ export async function checkTelegram(botToken: string): Promise<ComponentStatus> 
   }
 }
 
-export async function checkGmail(smtpPassword: string): Promise<ComponentStatus> {
+export function checkGmail(smtpPassword: string): Promise<ComponentStatus> {
   if (smtpPassword === '') {
-    return { component: 'gmail', status: 'not_configured', latency_ms: 0, message: 'GMAIL_SMTP_PASSWORD not set' };
+    return Promise.resolve({ component: 'gmail', status: 'not_configured', latency_ms: 0, message: 'GMAIL_SMTP_PASSWORD not set' });
   }
-  return { component: 'gmail', status: 'healthy', latency_ms: 0, message: 'OK' };
+  return Promise.resolve({ component: 'gmail', status: 'healthy', latency_ms: 0, message: 'OK' });
 }

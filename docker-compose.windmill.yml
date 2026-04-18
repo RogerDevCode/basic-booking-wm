@@ -72,58 +72,37 @@ services:
     image: ${WM_IMAGE}
     pull_policy: always
     deploy:
-      replicas: 3
+      replicas: 1
       resources:
         limits:
-          memory: 2048M
-          # for GB, use syntax '2Gi'
+          memory: 1024M
     restart: unless-stopped
-    # Uncomment to enable PID namespace isolation (recommended for security)
-    # Requires privileged mode for --mount-proc flag
-    # See: https://www.windmill.dev/docs/advanced/security_isolation
     privileged: true
     environment:
       - DATABASE_URL=${DATABASE_URL}
       - MODE=worker
       - WORKER_GROUP=default
-      # If running with non-root/non-windmill UID (e.g., user: "1001:1001"),
-      # add: - HOME=/tmp
       - FAVOR_UNSHARE_PID=true
-      # Connect to the dind sidecar instead of the host Docker socket
       - DOCKER_HOST=tcp://dind:2375
     depends_on:
       db:
         condition: service_healthy
       dind:
         condition: service_healthy
-    # to mount the worker folder to debug, KEEP_JOB_DIR=true and mount /tmp/windmill
     volumes:
       - worker_dependency_cache:/tmp/windmill/cache
       - worker_logs:/tmp/windmill/logs
-      ## WARNING: mounting the host Docker socket grants user scripts full access to
-      ## the host Docker daemon, enabling host filesystem access and privilege escalation.
-      ## Only use this if you fully trust all users who can run scripts.
-      ## To use it, remove the DOCKER_HOST env var and dind depends_on above,
-      ## and uncomment the line below:
-      # - /var/run/docker.sock:/var/run/docker.sock
-
     logging: *default-logging
 
-  ## This worker is specialized for "native" jobs. Native jobs run in-process and thus are much more lightweight than other jobs
   windmill_worker_native:
-    # Use ghcr.io/windmill-labs/windmill-ee:main for the ee
     image: ${WM_IMAGE}
     pull_policy: always
     deploy:
       replicas: 1
       resources:
         limits:
-          memory: 2048M
-          # for GB, use syntax '2Gi'
+          memory: 1024M
     restart: unless-stopped
-    # Uncomment to enable PID namespace isolation (recommended for security)
-    # Requires privileged mode for --mount-proc flag
-    # See: https://www.windmill.dev/docs/advanced/security_isolation
     environment:
       - DATABASE_URL=${DATABASE_URL}
       - MODE=worker
@@ -136,40 +115,12 @@ services:
     volumes:
       - worker_logs:/tmp/windmill/logs
     logging: *default-logging
-  # This worker is specialized for reports or scraping jobs. It is assigned the "reports" worker group which has an init script that installs chromium and can be targeted by using the "chromium" worker tag.
-  # windmill_worker_reports:
-  #   image: ${WM_IMAGE}
-  #   pull_policy: always
-  #   deploy:
-  #     replicas: 1
-  #     resources:
-  #       limits:
-  #         memory: 2048M
-  #         # for GB, use syntax '2Gi'
-  #   restart: unless-stopped
-  #   # Uncomment to enable PID namespace isolation (recommended for security)
-  #   # Requires privileged mode for --mount-proc flag
-  #   # See: https://www.windmill.dev/docs/advanced/security_isolation
-  #   privileged: true
-  #   environment:
-  #     - DATABASE_URL=${DATABASE_URL}
-  #     - MODE=worker
-  #     - WORKER_GROUP=reports
-  #     - FAVOR_UNSHARE_PID=true
-  #   depends_on:
-  #     db:
-  #       condition: service_healthy
-  #   # to mount the worker folder to debug, KEEP_JOB_DIR=true and mount /tmp/windmill
-  #   volumes:
-  #     - worker_dependency_cache:/tmp/windmill/cache
-  #     - worker_logs:/tmp/windmill/logs
 
-  # The indexer powers full-text job and log search, an EE feature.
   windmill_indexer:
     image: ${WM_IMAGE}
     pull_policy: always
     deploy:
-      replicas: 0 # set to 1 to enable full-text job and log search
+      replicas: 0
     restart: unless-stopped
     expose:
       - 8002
@@ -185,26 +136,21 @@ services:
       - worker_logs:/tmp/windmill/logs
     logging: *default-logging
 
-  # Combined extra services: LSP, Multiplayer, and Debugger
-  # Each service can be enabled/disabled via environment variables:
-  #   - ENABLE_LSP=true (default) - Language Server Protocol for code intelligence
-  #   - ENABLE_MULTIPLAYER=false - Real-time collaboration (Enterprise Edition)
-  #   - ENABLE_DEBUGGER=false - Interactive debugging via DAP WebSocket
   windmill_extra:
     image: ghcr.io/windmill-labs/windmill-extra:latest
     pull_policy: always
     restart: unless-stopped
     expose:
-      - 3001 # LSP
-      - 3002 # Multiplayer
-      - 3003 # Debugger
+      - 3001
+      - 3002
+      - 3003
     environment:
       - ENABLE_LSP=true
-      - ENABLE_MULTIPLAYER=false # Set to true to enable multiplayer (Enterprise Edition)
-      - ENABLE_DEBUGGER=true # Set to true to enable debugger
-      - DEBUGGER_PORT=3003 # Debugger service port
-      - ENABLE_NSJAIL=false # Set to true for nsjail sandboxing (requires privileged: true)
-      - REQUIRE_SIGNED_DEBUG_REQUESTS=false # Set to true to require JWT tokens for debug sessions
+      - ENABLE_MULTIPLAYER=false
+      - ENABLE_DEBUGGER=true
+      - DEBUGGER_PORT=3003
+      - ENABLE_NSJAIL=false
+      - REQUIRE_SIGNED_DEBUG_REQUESTS=false
       - WINDMILL_BASE_URL=http://windmill_server:8000
     volumes:
       - lsp_cache:/pyls/.cache

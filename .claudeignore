@@ -32,3 +32,20 @@ manifiesto_refactor.txt
 refactor_gemini.sh
 scripts/
 tests/db-integration.test.ts
+
+# --- Windmill metadata (nunca contiene lógica) ---
+f/**/*.lock
+f/**/*.script.yaml
+f/**/*.script.lock
+f/flows/**/*.yaml
+
+# --- Benchmarks y tests de modelos (no son codebase) ---
+f/gemini_test/
+f/openrouter_benchmark/
+
+# --- Documentación de sesiones de debug (archivos temporales) ---
+TELEGRAM_FLOW_ISSUE.md
+AUDITOR.md
+errores_refactor.log
+analyze_mains.py
+fix_ts_errors.py

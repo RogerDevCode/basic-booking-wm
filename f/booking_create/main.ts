@@ -59,8 +59,12 @@ export async function main(rawInput: unknown): Promise<Result<BookingCreated>> {
       return [txErr, null];
     }
 
-    logger.info(MODULE, 'Booking creation complete', { booking_id: txResult?.booking_id });
-    return [null, txResult!];
+    if (!txResult) {
+      logger.error(MODULE, 'Transaction succeeded but no result returned');
+      return [new Error('Booking creation failed: no result'), null];
+    }
+    logger.info(MODULE, 'Booking creation complete', { booking_id: txResult.booking_id });
+    return [null, txResult];
 
   } catch (e) {
     logger.error(MODULE, 'Unexpected infrastructure error', e);

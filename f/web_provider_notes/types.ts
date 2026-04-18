@@ -2,7 +2,7 @@ import { z } from 'zod';
 import type { Result } from '../internal/result';
 
 export type Input = Readonly<z.infer<typeof InputSchema>>;
-export type HandlerResult = Promise<Result<any>>;
+export type HandlerResult = Promise<Result<unknown>>;
 
 export interface Tag {
     readonly tag_id: string;

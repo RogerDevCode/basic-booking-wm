@@ -36,7 +36,7 @@ export function main(rawInput: unknown): MenuResult {
     return {
       success: false,
       data: null,
-      error_message: 'Unknown action: ' + input.action,
+      error_message: `Unknown action: ${String(input.action)}`,
     };
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);

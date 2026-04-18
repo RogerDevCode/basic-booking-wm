@@ -15,7 +15,7 @@ const RESCHEDULABLE_STATUSES: readonly string[] = ['pendiente', 'confirmada'];
  */
 async function resolveClientId(tx: TxClient, userId: string): Promise<Result<string>> {
   try {
-    const userRows = await tx.values<[string][]>`
+    const userRows = await tx.values<[string, string, string, string, boolean][]>`
       SELECT p.client_id FROM clients p
       INNER JOIN users u ON u.user_id = p.client_id
       WHERE u.user_id = ${userId}::uuid
@@ -24,7 +24,7 @@ async function resolveClientId(tx: TxClient, userId: string): Promise<Result<str
 
     const firstRow = userRows[0];
     if (firstRow !== undefined) {
-      return [null, String(firstRow[0])];
+      return [null, firstRow[0]];
     }
 
     // Fallback: search by email match
@@ -39,7 +39,7 @@ async function resolveClientId(tx: TxClient, userId: string): Promise<Result<str
       return [new Error(`client_identity_not_found: userId=${userId}`), null];
     }
 
-    return [null, String(fallbackRow[0])];
+    return [null, fallbackRow[0]];
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);
     return [new Error(`identity_resolution_failed: ${msg}`), null];
@@ -109,16 +109,16 @@ export class PatientBookingService {
     // 3. Map to Domain Model
     const now = new Date().toISOString();
     const mapped: BookingInfo[] = data.rows.map((row) => {
-      const status = row[3] ? String(row[3]) : 'pendiente';
+      const status = row[3] ? row[3] : 'pendiente';
       return {
-        booking_id: String(row[0]),
-        start_time: String(row[1]),
-        end_time: String(row[2]),
+        booking_id: row[0],
+        start_time: row[1],
+        end_time: row[2],
         status: status,
-        cancellation_reason: row[4] ? String(row[4]) : null,
-        provider_name: row[5] ? String(row[5]) : null,
-        provider_specialty: row[6] ? String(row[6]) : 'General',
-        service_name: row[7] ? String(row[7]) : 'Consulta',
+        cancellation_reason: row[4] ?? null,
+        provider_name: row[5] ?? null,
+        provider_specialty: row[6] ? row[6] : 'General',
+        service_name: row[7] ? row[7] : 'Consulta',
         can_cancel: CANCELLABLE_STATUSES.includes(status),
         can_reschedule: RESCHEDULABLE_STATUSES.includes(status),
       };

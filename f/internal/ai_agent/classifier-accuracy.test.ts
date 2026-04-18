@@ -55,17 +55,17 @@ async function assertEntity(text: string, entityKey: string, expectedValue: stri
 describe('AI Agent — Classifier Accuracy', () => {
 
   describe('High-confidence intents (rule-based)', () => {
-    test('greeting: "Hola"', () => assertIntent('Hola', INTENT.SALUDO, 0.8));
-    test('farewell: "Chau"', () => assertIntent('Chau', INTENT.DESPEDIDA, 0.8));
-    test('thank_you: "Gracias"', () => assertIntent('Gracias', INTENT.AGRADECIMIENTO, 0.8));
+    test('saludo', () => assertIntent('Hola', INTENT.SALUDO, 0.8));
+    test('despedida', () => assertIntent('Chau', INTENT.DESPEDIDA, 0.8));
+    test('agradecimiento', () => assertIntent('Gracias', INTENT.AGRADECIMIENTO, 0.8));
     
-    test('create_appointment', () => assertIntent('Quiero agendar una cita', INTENT.CREAR_CITA, 0.3));
-    test('cancel_appointment', () => assertIntent('Cancelar mi cita', INTENT.CANCELAR_CITA, 0.3));
-    test('reschedule', () => assertIntent('Cambiar mi cita del martes', INTENT.REAGENDAR_CITA, 0.3));
+    test('crear_cita', () => assertIntent('Quiero agendar una cita', INTENT.CREAR_CITA, 0.3));
+    test('cancelar_cita', () => assertIntent('Cancelar mi cita', INTENT.CANCELAR_CITA, 0.3));
+    test('reagendar_cita', () => assertIntent('Cambiar mi cita del martes', INTENT.REAGENDAR_CITA, 0.3));
     
-    test('activate_reminders', () => assertIntent('Activa mis recordatorios', INTENT.ACTIVAR_RECORDATORIOS, 0.3));
-    test('deactivate_reminders', () => assertIntent('Desactiva mis recordatorios', INTENT.DESACTIVAR_RECORDATORIOS, 0.3));
-    test('reminder_prefs: "No quiero recordatorios"', () => assertIntent('No quiero recordatorios', INTENT.DESACTIVAR_RECORDATORIOS));
+    test('activar_recordatorios', () => assertIntent('Activa mis recordatorios', INTENT.ACTIVAR_RECORDATORIOS, 0.3));
+    test('desactivar_recordatorios', () => assertIntent('Desactiva mis recordatorios', INTENT.DESACTIVAR_RECORDATORIOS, 0.3));
+    test('preferencias_recordatorio', () => assertIntent('No quiero recordatorios', INTENT.DESACTIVAR_RECORDATORIOS));
   });
 
   describe('Context detection', () => {
