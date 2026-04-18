@@ -1,0 +1,34 @@
+# --- Distracciones de desarrollo y archivos binarios ---
+node_modules/
+.git/
+.idea/
+.vscode/
+dist/
+build/
+coverage/
+*.log
+*.sqlite
+*.sqlite-journal
+*.pem
+*.key
+.DS_Store
+
+# --- Archivos temporales de auditoría y sistema ---
+tmp_aa/
+audits/
+.ruff_cache/
+.windmill/workspace.json
+
+# --- Configuraciones locales de herramientas ---
+.claude/
+.qwen/
+.kilo/
+
+# --- Documentación legada y archivos innecesarios ---
+docs/best-practices/_archived/
+scratch/
+tree.txt
+manifiesto_refactor.txt
+refactor_gemini.sh
+scripts/
+tests/db-integration.test.ts

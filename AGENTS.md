@@ -2,8 +2,11 @@
 
 ## IDENTITY
 
-Role: Windmill Medical Booking Architect.
-Stack: TypeScript 5.x strict, Windmill, Postgres, Google Calendar.
+Role: Windmill Medical Booking Architect. Claude, actúa como Windmill Medical Booking Architect.
+Enfócate exclusivamente en escalar el pipeline de `/booking_orchestrator` y la lógica de negocio en `f/`".
+No proporciones resúmenes, explicaciones introductorias ni confirmaciones.
+Aplica cambios directamente siguiendo el lifecycle Investigación -> Estrategia -> Ejecución"
+Stack: TypeScript 6.x strict, Windmill, Postgres, Google Calendar.
 Domain: Medical Appointment Booking ONLY.
 
 Out-of-domain →
@@ -108,6 +111,25 @@ Gap in trace → `[INTEL_REQUIRED]` (§ESC) and STOP.
 - Max function body: 40 lines. Exceed → decompose.
 - >5 params → typed options object.
 - >3-level conditional chain → lookup table / strategy pattern.
+
+---
+
+## §MON — SPLIT-MONOLITH ARCHITECTURE (Windmill)
+
+**Regla de granularidad (estilo Java — un archivo por responsabilidad):**
+
+- UN archivo `.ts` = UNA función compleja / UNA clase / UN dominio cohesivo.
+- Nombre del archivo = nombre de la función/clase exportada (ej: `validateBookingInput.ts`, `ScheduleRepository.ts`, `gcalRetryClient.ts`).
+- NUNCA un `services.ts` genérico que agrupe lógica heterogénea.
+- Helpers triviales (<10 líneas, single-use) permanecen inline en su consumidor — NO crear archivo.
+
+**Reglas de oro:**
+
+1. `main.ts` es el entrypoint Windmill — NUNCA se elimina.
+2. `main.ts` solo orquesta: importa de `types.ts` y de los archivos por responsabilidad. NO contiene lógica.
+3. Firma de `export async function main(args: T)` es INMUTABLE — argumentos y tipo de retorno no cambian.
+4. Imports/exports relativos exactos (`import { X } from "./validateBookingInput"`) deben resolverse bajo `tsc --strict --noEmit` cero errores.
+5. Excepción única: `f/internal/result.ts` y `f/nlu/constants.ts` son shared singletons — no se colapsan ni fragmentan.
 
 ---
 

@@ -34,20 +34,321 @@
  * - DIP: Business logic depends on abstractions, even if implemented locally for Windmill compatibility.
  */
 
+import "@total-typescript/ts-reset";
+import { z } from 'zod';
+import postgres from 'postgres';
+
+import { createDbClient } from '../internal/db/client';
 import type { Result } from '../internal/result';
-import { ClientRepository, TelegramClient, TelegramRouter } from './services';
-import { TelegramUpdateSchema } from './types';
+
+// ============================================================================
+// TYPES & SCHEMAS
+// ============================================================================
+
+const TelegramUserSchema = z.object({
+  id: z.number(),
+  is_bot: z.boolean().optional(),
+  first_name: z.string().default('Usuario'),
+  last_name: z.string().optional(),
+  username: z.string().optional(),
+});
+
+const TelegramMessageSchema = z.object({
+  message_id: z.number(),
+  from: TelegramUserSchema.optional(),
+  chat: z.object({
+    id: z.number(),
+    type: z.enum(['private', 'group', 'supergroup', 'channel']),
+  }),
+  date: z.number(),
+  text: z.string().optional(),
+});
+
+const TelegramCallbackQuerySchema = z.object({
+  id: z.string(),
+  from: TelegramUserSchema,
+  message: TelegramMessageSchema.optional(),
+  data: z.string(),
+});
+
+const TelegramUpdateSchema = z.object({
+  update_id: z.number(),
+  message: TelegramMessageSchema.optional(),
+  callback_query: TelegramCallbackQuerySchema.optional(),
+});
+
+type TelegramUpdate = z.infer<typeof TelegramUpdateSchema>;
+type TelegramMessage = NonNullable<TelegramUpdate['message']>;
+type TelegramCallback = NonNullable<TelegramUpdate['callback_query']>;
+
+interface SendMessageOptions {
+  readonly parse_mode?: 'Markdown' | 'HTML' | 'MarkdownV2';
+  readonly reply_markup?: Readonly<Record<string, unknown>>;
+}
+
+// ============================================================================
+// INFRASTRUCTURE ABSTRACTIONS
+// ============================================================================
+
+interface ITelegramClient {
+  sendMessage(chatId: string, text: string, options?: SendMessageOptions): Promise<Result<unknown>>;
+}
+
+interface IClientRepository {
+  ensureRegistered(fullName: string): Promise<Result<void>>;
+}
+
+// ============================================================================
+// IMPLEMENTATIONS
+// ============================================================================
+
+/**
+ * Handles communication with Telegram Bot API
+ */
+class TelegramClient implements ITelegramClient {
+  private readonly token: string;
+
+  constructor() {
+    this.token = process.env['TELEGRAM_BOT_TOKEN'] ?? '';
+  }
+
+  async sendMessage(chatId: string, text: string, options?: SendMessageOptions): Promise<Result<unknown>> {
+    if (this.token === '') {
+      return [new Error('TELEGRAM_BOT_TOKEN_MISSING'), null];
+    }
+
+    try {
+      const url = `https://api.telegram.org/bot${this.token}/sendMessage`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text,
+          parse_mode: options?.parse_mode ?? 'Markdown',
+          reply_markup: options?.reply_markup,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        return [new Error(`telegram_api_error: ${response.status} ${errorText}`), null];
+      }
+
+      const data = await response.json();
+      return [null, data];
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return [new Error(`send_message_failed: ${msg}`), null];
+    }
+  }
+}
+
+/**
+ * Handles Client persistence (Global context, no RLS per §6)
+ */
+class ClientRepository implements IClientRepository {
+  private readonly dbUrl: string;
+
+  constructor() {
+    this.dbUrl = process.env['DATABASE_URL'] ?? '';
+  }
+
+  async ensureRegistered(fullName: string): Promise<Result<void>> {
+    if (this.dbUrl === '') {
+      return [new Error('DATABASE_URL_MISSING'), null];
+    }
+
+    let sql: postgres.Sql | null = null;
+    try {
+      sql = createDbClient({ url: this.dbUrl });
+      await sql`
+        INSERT INTO clients (client_id, name, email, phone, timezone)
+        VALUES (gen_random_uuid(), ${fullName}, NULL, NULL, 'America/Mexico_City')
+        ON CONFLICT (email) DO NOTHING
+      `;
+      // Note: ON CONFLICT DO NOTHING relies on email being UNIQUE per §6.
+      // If client_id was the only unique field, we would need a different strategy.
+      return [null, undefined];
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return [new Error(`client_registration_failed: ${msg}`), null];
+    } finally {
+      if (sql != null) await sql.end();
+    }
+  }
+}
+
+// ============================================================================
+// DOMAIN LOGIC / ROUTING
+// ============================================================================
+
+class TelegramRouter {
+  constructor(
+    private readonly telegram: ITelegramClient,
+    private readonly repository: IClientRepository
+  ) {}
+
+  async routeUpdate(update: TelegramUpdate): Promise<Result<string>> {
+    if (update.callback_query != null) {
+      return this.handleCallback(update.callback_query);
+    }
+
+    if (update.message != null) {
+      return this.handleMessage(update.message);
+    }
+
+    return [new Error('unsupported_update_type'), null];
+  }
+
+  private async handleCallback(query: TelegramCallback): Promise<Result<string>> {
+    const data = query.data;
+
+    // Pattern matching for callback actions (OCP compliant)
+    const [category, action] = data.split(':');
+    if (category == null || action == null) {
+      return [null, `callback_handled:${data}`];
+    }
+
+    switch (category) {
+      case 'cmd':
+        return [null, `flow_triggered:${action}`];
+      case 'admin':
+        return [null, `admin_action:${action}`];
+      case 'provider':
+        return [null, `provider_action:${action}`];
+      default:
+        return [null, `callback_handled:${data}`];
+    }
+  }
+
+  private async handleMessage(message: TelegramMessage): Promise<Result<string>> {
+    const text = (message.text ?? '').trim();
+    const chatId = String(message.chat.id);
+    const firstName = message.from?.first_name ?? 'Usuario';
+    const lastName = message.from?.last_name ?? '';
+    const fullName = lastName !== '' ? `${firstName} ${lastName}` : firstName;
+
+    // SRP: Registration is a background concern for the router
+    // Failures are logged but do not block the UI response
+    const [regErr] = await this.repository.ensureRegistered(fullName);
+    if (regErr != null) {
+      console.error(`[REGISTRATION_WARNING] ${regErr.message}`);
+    }
+
+    // Command Dispatching
+    switch (text) {
+      case '/start':
+        return this.sendStartMenu(chatId, firstName);
+      case '/admin':
+        return this.sendAdminMenu(chatId);
+      case '/provider':
+        return this.sendProviderMenu(chatId);
+      default:
+        if (text === '') return [new Error('empty_message'), null];
+        return this.sendHelp(chatId);
+    }
+  }
+
+  private async sendStartMenu(chatId: string, firstName: string): Promise<Result<string>> {
+    const welcomeText =
+      `👋 ¡Hola ${firstName}! Bienvenido a *AutoAgenda*.\n\n` +
+      `Soy tu asistente de agendamiento médico. ¿Qué necesitas?\n\n` +
+      `📋 *Opciones disponibles:*\n` +
+      `• *Agendar cita* → Escribe "quiero agendar"\n` +
+      `• *Ver mis citas* → Escribe "mis citas"\n` +
+      `• *Cancelar cita* → Escribe "cancelar"\n` +
+      `• *Reagendar* → Escribe "reagendar"\n\n` +
+      `💡 *Tip:* Puedes escribirme en lenguaje natural, yo te entiendo.`;
+
+    const [err] = await this.telegram.sendMessage(chatId, welcomeText, {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '📅 Agendar Cita', callback_data: 'cmd:book' }],
+          [{ text: '📋 Mis Citas', callback_data: 'cmd:mybookings' }],
+          [{ text: '❌ Cancelar', callback_data: 'cmd:cancel' }],
+        ],
+      },
+    });
+
+    return err != null ? [err, null] : [null, 'welcome_sent'];
+  }
+
+  private async sendAdminMenu(chatId: string): Promise<Result<string>> {
+    const adminText =
+      `🔐 *Panel de Administrador*\n\n` +
+      `Selecciona una acción:\n\n` +
+      `• *Crear Provider* → Nuevo profesional\n` +
+      `• *Gestionar Providers* → Activar/desactivar\n` +
+      `• *Especialidades* → Gestionar catálogo\n` +
+      `• *Estadísticas* → Ver métricas`;
+
+    const [err] = await this.telegram.sendMessage(chatId, adminText, {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '👨‍⚕️ Crear Provider', callback_data: 'admin:create_provider' }],
+          [{ text: '📊 Especialidades', callback_data: 'admin:specialties' }],
+          [{ text: '📈 Estadísticas', callback_data: 'admin:stats' }],
+        ],
+      },
+    });
+
+    return err != null ? [err, null] : [null, 'admin_menu_sent'];
+  }
+
+  private async sendProviderMenu(chatId: string): Promise<Result<string>> {
+    const providerText =
+      `🩺 *Panel del Provider*\n\n` +
+      `Selecciona una acción:\n\n` +
+      `• *Mi Agenda* → Ver horarios\n` +
+      `• *Notas Clínicas* → Escribir notas\n` +
+      `• *Confirmar Citas* → Citas pendientes\n` +
+      `• *Mi Perfil* → Datos personales`;
+
+    const [err] = await this.telegram.sendMessage(chatId, providerText, {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '📅 Mi Agenda', callback_data: 'provider:agenda' }],
+          [{ text: '📝 Notas Clínicas', callback_data: 'provider:notes' }],
+          [{ text: '✅ Confirmar Citas', callback_data: 'provider:confirm' }],
+        ],
+      },
+    });
+
+    return err != null ? [err, null] : [null, 'provider_menu_sent'];
+  }
+
+  private async sendHelp(chatId: string): Promise<Result<string>> {
+    const response =
+      `🤔 No entendí tu mensaje.\n\n` +
+      `Puedo ayudarte con:\n` +
+      `• */start* → Menú principal\n` +
+      `• */admin* → Panel administrador\n` +
+      `• */provider* → Panel provider\n\n` +
+      `O simplemente dime qué necesitas en lenguaje natural.`;
+
+    const [err] = await this.telegram.sendMessage(chatId, response);
+    return err != null ? [err, null] : [null, 'help_sent'];
+  }
+}
+
+// ============================================================================
+// MAIN ENTRY POINT (WINDMILL)
+// ============================================================================
 
 export async function main(rawInput: unknown): Promise<Result<{ readonly message: string }>> {
+  // 1. Validation (Defense in Depth)
   const parseResult = TelegramUpdateSchema.safeParse(rawInput);
   if (!parseResult.success) {
     return [new Error(`validation_error: ${parseResult.error.message}`), null];
   }
 
+  // 2. Dependency Composition (DIP)
   const telegramClient = new TelegramClient();
   const clientRepo = new ClientRepository();
   const router = new TelegramRouter(telegramClient, clientRepo);
 
+  // 3. Execution
   const [err, res] = await router.routeUpdate(parseResult.data);
 
   if (err != null) {

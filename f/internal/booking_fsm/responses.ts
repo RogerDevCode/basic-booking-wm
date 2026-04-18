@@ -99,27 +99,27 @@ const buttons = {
 export function buildSpecialtyKeyboard(
   items: readonly { readonly id: string; readonly name: string }[]
 ): InlineButton[][] {
-  const list = items.map((it, i) => buttons.make(it.name, `spec:${(i + 1).toString()}`));
+  const list = items.map((it) => buttons.make(it.name, `client:spec:${it.id}`));
   return chunkButtons([...list, buttons.cancel()]);
 }
 
 export function buildDoctorKeyboard(
   items: readonly { readonly id: string; readonly name: string }[]
 ): InlineButton[][] {
-  const list = items.map((it, i) => buttons.make(it.name, `doc:${(i + 1).toString()}`));
+  const list = items.map((it) => buttons.make(it.name, `client:doc:${it.id}`));
   return chunkButtons([...list, buttons.back(), buttons.cancel()]);
 }
 
 export function buildTimeSlotKeyboard(
   items: readonly { readonly id: string; readonly label: string; readonly start_time: string }[]
 ): InlineButton[][] {
-  const list = items.map((it, i) => buttons.make(it.label, `time:${(i + 1).toString()}`));
+  const list = items.map((it) => buttons.make(it.label, `client:time:${it.id}`));
   return chunkButtons([...list, buttons.back(), buttons.cancel()]);
 }
 
 export function buildConfirmationKeyboard(): InlineButton[][] {
   return [
-    [buttons.make('✅ Sí, confirmar', 'cfm:yes'), buttons.make('❌ No, volver', 'cfm:no')],
+    [buttons.make('✅ Sí, confirmar', 'client:cfm:yes'), buttons.make('❌ No, volver', 'client:cfm:no')],
   ];
 }
 

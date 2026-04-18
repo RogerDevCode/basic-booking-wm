@@ -1,15 +1,9 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
----
-
 ## 📌 Quick Reference
 
 ### What is this?
 **Booking Titanium** — Medical appointment booking system running on Windmill (TypeScript strict mode). Telegram webhook → AI intent detection → atomic DB transactions → Google Calendar sync.
-
-**Status:** Production-ready, §MON refactored (90.6% compliance), all 344 tests passing.
 
 ### Key Files
 - **AGENTS.md** — Mandatory architecture rules (§MON, §SOLID, §RLS, §DB schema)
@@ -103,7 +97,7 @@ Before ANY code change, read these sections in AGENTS.md:
 1. **§LAW — Inviolable Laws**
    - ❌ `any`, `as Type`, `throw` in business logic
    - ✅ `unknown` + Zod validation, `[error, null]` Result pattern, `Readonly<T>`
-   
+
 2. **§MON — Split-Monolith**
    - One responsibility per `.ts` file
    - `main.ts` = orchestrator only (imports + validation + dispatch)
@@ -195,8 +189,6 @@ Before ANY code change, read these sections in AGENTS.md:
 - **ESLint:** ✅ Clean
 
 **Recent Fixes:**
-- ✅ reminder_cron: Split 273-line services.ts → 4 atomic files (formatters, communicators, repository, services orchestrator)
-- ✅ web_booking_api: Split 287-line main.ts → 4 files (service, repository, utils, main orchestrator)
 - ✅ wizard-bubble tests: Fixed Result tuple API (7 tests)
 
 ---
@@ -205,8 +197,7 @@ Before ANY code change, read these sections in AGENTS.md:
 
 - **AGENTS.md** — Complete architecture law
 - **README.md** — Feature overview + diagrams
-- **docs/monolit_trace.md** — §MON refactoring progress tracker
-- **audits/audit_mon_compliance_2026-04-17.md** — Latest compliance audit (2 violations fixed)
+- **audits/** — Latest compliance audit
 - **vitest.config.ts** — Test configuration (TestContainers PostgreSQL)
 - **tsconfig.json** + **tsconfig.strict.json** — TypeScript configuration
 
