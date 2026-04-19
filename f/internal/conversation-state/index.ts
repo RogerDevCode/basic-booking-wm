@@ -116,6 +116,7 @@ function mergeEntities(
 ): Record<string, string | null> {
   const merged: Record<string, string | null> = { ...existing };
   for (const [key, value] of Object.entries(incoming)) {
+    if (value === undefined) continue;
     if (value !== null) {
       merged[key] = value;
     } else if (merged[key] === undefined) {
