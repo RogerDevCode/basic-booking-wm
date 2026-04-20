@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import type postgres from 'postgres';
-import type { Result } from '../internal/result';
+import type { Result } from '../internal/result/index';
 
 /**
  * Validates Chilean RUT format and checksum (modulo 11).

@@ -1,5 +1,5 @@
-import type { BookingRow } from '../internal/db-types';
-import type { Result } from '../internal/result';
+import type { BookingRow } from '../internal/db-types/index';
+import type { Result } from '../internal/result/index';
 import { type Input } from "./types";
 
 export function authorize(input: Input, booking: BookingRow): Result<true> {

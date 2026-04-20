@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { DEFAULT_TIMEZONE } from '../internal/config';
+import { DEFAULT_TIMEZONE } from '../internal/config/index';
 
 export const InputSchema = z.object({
   dry_run: z.boolean().optional().default(false),

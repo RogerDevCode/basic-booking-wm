@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import type { Result } from '../internal/result';
+import type { Result } from '../internal/result/index';
 
 export function deriveIdempotencyKey(prefix: string, parts: readonly string[]): string {
   return createHash('sha256')

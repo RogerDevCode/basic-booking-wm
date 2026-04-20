@@ -45,7 +45,7 @@
 // ============================================================================
 
 import { createDbClient } from '../internal/db/client';
-import { withTenantContext } from '../internal/tenant-context';
+import { withTenantContext } from '../internal/tenant-context/index';
 import { InputSchema, type UserInfo, type UsersListResult } from "./types";
 
 export async function main(rawInput: unknown): Promise<[Error | null, UserInfo | UsersListResult | null]> {

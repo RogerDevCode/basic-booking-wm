@@ -157,7 +157,20 @@ export default tseslint.config(
     },
   },
 
-  // Overrides for test files
+  // Overrides for Windmill scripts (f/) - More relaxed for runtime scripts
+  {
+    files: ['f/**/*.ts'],
+    rules: {
+      'unicorn/prefer-module': 'off',
+      '@typescript-eslint/no-unused-vars': 'off',
+      '@typescript-eslint/explicit-function-return-type': 'off',
+      '@typescript-eslint/explicit-module-boundary-types': 'off',
+      '@typescript-eslint/no-non-null-assertion': 'warn',
+    },
+  },
+
+  // Overrides for test files (named *.test.ts / *.spec.ts)
+  // Must come AFTER f/**/*.ts override to take precedence
   {
     files: ['*.test.ts', '*.spec.ts'],
     rules: {
@@ -168,15 +181,21 @@ export default tseslint.config(
     },
   },
 
-  // Overrides for Windmill scripts (f/) - More relaxed for runtime scripts
+  // Overrides for integration/red-team test files not suffixed .test.ts
+  // Must come AFTER f/**/*.ts override to take precedence
   {
-    files: ['f/**/*.ts'],
+    files: [
+      '**/*integration*.ts',
+      '**/redis-production.ts',
+      '**/context-adjustment.ts',
+      '**/redteam.ts',
+    ],
     rules: {
-      'unicorn/prefer-module': 'off',
-      '@typescript-eslint/no-unused-vars': 'off',
-      '@typescript-eslint/explicit-function-return-type': 'off', // Windmill infers return types
+      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-unsafe-argument': 'off',
+      '@typescript-eslint/no-non-null-assertion': 'off',
+      '@typescript-eslint/explicit-function-return-type': 'off',
       '@typescript-eslint/explicit-module-boundary-types': 'off',
-      '@typescript-eslint/no-non-null-assertion': 'warn', // Allow ! assertions where necessary for DB/GCal IDs
     },
   },
 );

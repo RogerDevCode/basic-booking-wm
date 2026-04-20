@@ -2,9 +2,9 @@ import {
   createConversationRedis,
   getConversationState,
   updateConversationState,
-} from '../conversation-state';
+} from '../conversation-state/index';
 import { InputSchema, type UpdateInput, type UpdateOutput } from './types';
-import type { Result } from '../result';
+import type { Result } from '../result/index';
 
 export function validateInput(rawInput: unknown): Result<UpdateInput> {
   const parsed = InputSchema.safeParse(rawInput);

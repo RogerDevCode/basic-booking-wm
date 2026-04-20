@@ -48,7 +48,7 @@
 // ============================================================================
 
 import { createDbClient } from '../internal/db/client';
-import { withTenantContext } from '../internal/tenant-context';
+import { withTenantContext } from '../internal/tenant-context/index';
 import { buildConfigMessage } from "./buildConfigMessage";
 import { buildWindowConfig } from "./buildWindowConfig";
 import { loadPreferences } from "./loadPreferences";

@@ -41,5 +41,10 @@ locks:
   f/get_services/main: e31230fe1cba4afb489f8356532f272d86cbfdde302465f1dfacf43246f69e37
   f/gmail_send/main: 38fb45fbc6fe97c7d4b2f03180b248940cb3f39dd0d4f95dda18dc057c3b7d3e
   f/internal/ai_agent/main: 3e2f60745d23738181fa0f86bae2aca8eead4655fcb84d15b8139d3e47f4b8f4
-  f/internal/message_parser/main: 003cbb32239d8eae58c2d7603ef8bbe4f6a1b2a8c5072d33761e3a271e9a80d4
+  f/internal/booking_fsm/index: 265ec2a313f9982a5232207f053e886f17d6333de70235b050e1c369dd746cc1
+  f/internal/booking_fsm/types: 797404377ccb94214a19974c0031e979a6fae83f1c086d0e8676189f5352a21e
+  f/internal/conversation_get/main: f5f548c834b2b58bd1ff0ea82680f1de75d65ace1fd0d73f5499030be571de9c
+  f/internal/conversation_get/services: 6d35ae9e3d7c21a1010561ef259220b652122f6b7db51cf7731c43da1c1b643b
+  f/internal/conversation-state/index: c30892babd038b3b572c1161be2f0e97ccf83243bf10880d9e1fb1f7308ccf85
+  f/internal/message_parser/main: 4c3f769458eb53449d2cedf393451eb765c09dabe33faa8d0188fa2dd4b975cf
   f/telegram_send/main: f116b57f515d68c2f03b569658f03d0d7994ed413b1541cd856e4e3234f96e49

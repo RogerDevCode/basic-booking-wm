@@ -1,5 +1,5 @@
 import { createDbClient } from '../../internal/db/client';
-import { withTenantContext } from '../../internal/tenant-context';
+import { withTenantContext } from '../../internal/tenant-context/index';
 import { confirmBooking } from '../confirmBooking';
 import type { ActionContext, ActionHandler, ActionResult } from '../types';
 
@@ -11,8 +11,8 @@ export class ConfirmHandler implements ActionHandler {
     });
     await sql.end();
 
-    let responseText = '';
-    let followUpText: string | null = null;
+    let responseText: string;
+    let followUpText: string | null;
 
     if (txErr) {
       responseText = '❌ No se pudo confirmar';

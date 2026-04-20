@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { DEFAULT_TIMEZONE } from '../internal/config';
+import { DEFAULT_TIMEZONE } from '../internal/config/index';
 
 export const WizardStateSchema = z.object({
   step: z.coerce.number().int().min(0),

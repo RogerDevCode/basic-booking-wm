@@ -1,5 +1,5 @@
 import postgres from 'postgres';
-import type { Result } from '../internal/result';
+import type { Result } from '../internal/result/index';
 import { type Input, type LockRow } from "./types";
 
 export async function tryInsertLock(tx: postgres.Sql, input: Input, expiresAt: Date): Promise<Result<LockRow>> {

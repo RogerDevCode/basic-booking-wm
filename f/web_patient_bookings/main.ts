@@ -44,9 +44,9 @@
  */
 
 import { createDbClient } from '../internal/db/client';
-import type { Result } from '../internal/result';
-import type { TxClient } from '../internal/tenant-context';
-import { withTenantContext } from '../internal/tenant-context';
+import type { Result } from '../internal/result/index';
+import type { TxClient } from '../internal/tenant-context/index';
+import { withTenantContext } from '../internal/tenant-context/index';
 import { fetchBookingsData } from "./fetchBookingsData";
 import { resolveClientId } from "./resolveClientId";
 import { type BookingInfo, type BookingsResult, type InputParams, InputSchema } from "./types";

@@ -1,6 +1,6 @@
 import postgres from 'postgres';
-import { getAvailability, validateOverride } from '../internal/scheduling-engine';
-import type { Result } from '../internal/result';
+import { getAvailability, validateOverride } from '../internal/scheduling-engine/index';
+import type { Result } from '../internal/result/index';
 import { type Input } from './types';
 
 export async function getProvider(tx: postgres.Sql, input: Input): Promise<Result<unknown>> {

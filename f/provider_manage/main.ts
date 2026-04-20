@@ -9,10 +9,10 @@
  * Zod Schemas     : YES — InputSchema validates action and entity-specific fields
  */
 
-import { withTenantContext } from '../internal/tenant-context';
+import { withTenantContext } from '../internal/tenant-context/index';
 import { createDbClient } from '../internal/db/client';
-import { requireDatabaseUrl } from '../internal/config';
-import type { Result } from '../internal/result';
+import { requireDatabaseUrl } from '../internal/config/index';
+import type { Result } from '../internal/result/index';
 import { InputSchema } from './types';
 import {
   handleProviderActions,

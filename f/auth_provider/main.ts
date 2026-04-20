@@ -50,7 +50,7 @@
 
 import "@total-typescript/ts-reset";
 import { createDbClient } from '../internal/db/client';
-import type { Result } from '../internal/result';
+import type { Result } from '../internal/result/index';
 import { InputSchema } from './types';
 import type { AuthInput } from './types';
 import { dispatchAction } from './services';

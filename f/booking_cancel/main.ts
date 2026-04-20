@@ -42,12 +42,12 @@
  * → CLEARED FOR CODE GENERATION
  */
 
-import { toUUID } from '../internal/db-types';
-import { withTenantContext } from '../internal/tenant-context';
-import { validateTransition } from '../internal/state-machine';
+import { toUUID } from '../internal/db-types/index';
+import { withTenantContext } from '../internal/tenant-context/index';
+import { validateTransition } from '../internal/state-machine/index';
 import { createDbClient } from '../internal/db/client';
-import { logger } from '../internal/logger';
-import type { Result } from '../internal/result';
+import { logger } from '../internal/logger/index';
+import type { Result } from '../internal/result/index';
 import { InputSchema } from './types';
 import type { CancelBookingInput, CancelResult, UpdatedBooking } from './types';
 import { authorizeActor, fetchBooking } from './services';

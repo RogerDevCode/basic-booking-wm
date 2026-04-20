@@ -1,6 +1,6 @@
 import postgres from 'postgres';
-import type { Result } from '../internal/result';
-import { type TxClient } from '../internal/tenant-context';
+import type { Result } from '../internal/result/index';
+import { type TxClient } from '../internal/tenant-context/index';
 import { type Input } from "./types";
 
 /**

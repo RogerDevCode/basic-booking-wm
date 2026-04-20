@@ -45,9 +45,9 @@
 // Returns real data from PostgreSQL via Windmill
 // ============================================================================
 
-import type { Result } from '../internal/result';
+import type { Result } from '../internal/result/index';
 import { createDbClient } from '../internal/db/client';
-import { withTenantContext } from '../internal/tenant-context';
+import { withTenantContext } from '../internal/tenant-context/index';
 import { InputSchema } from "./types";
 import { getProvider, getWeek, getDaySlots, blockDate, unblockDate, saveSchedule, listServices, listOverrides, listSchedules } from './services';
 

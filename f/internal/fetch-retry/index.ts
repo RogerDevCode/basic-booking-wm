@@ -32,8 +32,8 @@
  * → CLEARED FOR CODE GENERATION
  */
 
-import { RETRY_BACKOFF_BASE_MS, RETRY_BACKOFF_MULTIPLIER } from '../config';
-import type { Result } from '../result';
+import { RETRY_BACKOFF_BASE_MS, RETRY_BACKOFF_MULTIPLIER } from '../config/index';
+import type { Result } from '../result/index';
 
 export interface FetchWithRetryOptions extends RequestInit {
   readonly maxRetries?: number;

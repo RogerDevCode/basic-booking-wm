@@ -9,10 +9,10 @@
  * Zod Schemas     : YES — InputSchema validates all inputs
  */
 
-import { getAvailability } from '../internal/scheduling-engine';
-import { withTenantContext } from '../internal/tenant-context';
+import { getAvailability } from '../internal/scheduling-engine/index';
+import { withTenantContext } from '../internal/tenant-context/index';
 import { createDbClient } from '../internal/db/client';
-import type { Result } from '../internal/result';
+import type { Result } from '../internal/result/index';
 import { InputSchema, type Input, type AvailabilityResult } from './types';
 import { getProviderServiceId, getProvider } from './services';
 

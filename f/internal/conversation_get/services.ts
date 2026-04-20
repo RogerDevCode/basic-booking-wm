@@ -1,5 +1,5 @@
-import { createConversationRedis, getConversationState, type ConversationState } from '../conversation-state';
-import type { Result } from '../result';
+import { createConversationRedis, getConversationState, type ConversationState } from '../conversation-state/index';
+import type { Result } from '../result/index';
 import { InputSchema, type ChatId, type GetStateOutput, type FetchResult } from './types';
 
 export function validateInput(rawInput: unknown): Result<ChatId> {

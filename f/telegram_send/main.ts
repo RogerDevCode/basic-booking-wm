@@ -19,8 +19,8 @@
  * Zod Schemas     : YES — Discriminated union validates all modes
  */
 
-import type { Result } from '../internal/result';
-import { requireTelegramBotToken } from '../internal/config';
+import type { Result } from '../internal/result/index';
+import { requireTelegramBotToken } from '../internal/config/index';
 import { InputSchema } from './types';
 import type { TelegramSendData } from './types';
 import { TelegramService } from './services';

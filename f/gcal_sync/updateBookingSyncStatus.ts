@@ -1,5 +1,5 @@
-import type { Result } from '../internal/result';
-import { withTenantContext } from '../internal/tenant-context';
+import type { Result } from '../internal/result/index';
+import { withTenantContext } from '../internal/tenant-context/index';
 import { type Sql } from "./types";
 
 export async function updateBookingSyncStatus(sql: Sql, tenantId: string, bookingId: string, update: {

@@ -1,5 +1,5 @@
 import { MessageParserInputSchema, type MessageParserInput, type MessageParserResponse } from './types';
-import type { Result } from '../result';
+import type { Result } from '../result/index';
 
 export const CONSTANTS = {
   SOURCE: "NN_02_Message_Parser",

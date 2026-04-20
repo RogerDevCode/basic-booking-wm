@@ -55,7 +55,7 @@ export async function main(rawInput: unknown): Promise<{ readonly success: boole
 
   // Step 2: Intent detection
   let intent: IntentType = INTENT.DESCONOCIDO;
-  let confidence = 0.0;
+  let confidence: number;
   let provider: "groq" | "openai" | "openrouter" | "fallback" | "fast-path" = "fallback";
   let cot_reasoning = "Fallback to rules-based detection";
 
@@ -76,7 +76,6 @@ export async function main(rawInput: unknown): Promise<{ readonly success: boole
       const tfidfIntent = tfidfResult.intent as IntentType;
       if (isIntentType(tfidfIntent)) {
         intent = tfidfIntent;
-        confidence = Math.max(tfidfResult.confidence, 0.5);
         provider = "fallback";
         cot_reasoning = `TF-IDF semantic match (${tfidfResult.scores[0]?.intent ?? 'unknown'})`;
       }

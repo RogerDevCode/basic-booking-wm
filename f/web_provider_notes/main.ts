@@ -41,8 +41,8 @@
 
 import postgres from 'postgres';
 import { createDbClient } from '../internal/db/client';
-import type { Result } from '../internal/result';
-import { withTenantContext } from '../internal/tenant-context';
+import type { Result } from '../internal/result/index';
+import { withTenantContext } from '../internal/tenant-context/index';
 import { encryptContent } from "./encryptContent";
 import { mapRowToNote } from "./mapRowToNote";
 import { type HandlerResult, type Input, InputSchema, type NoteRow, type Tag } from "./types";

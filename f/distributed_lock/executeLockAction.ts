@@ -1,5 +1,5 @@
 import postgres from 'postgres';
-import type { Result } from '../internal/result';
+import type { Result } from '../internal/result/index';
 import { acquireLock } from "./acquireLock";
 import { checkLock } from "./checkLock";
 import { cleanupLocks } from "./cleanupLocks";

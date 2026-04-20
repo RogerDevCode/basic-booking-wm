@@ -45,7 +45,7 @@
 
 import { z } from 'zod';
 import { createDbClient } from '../internal/db/client';
-import { withTenantContext } from '../internal/tenant-context';
+import { withTenantContext } from '../internal/tenant-context/index';
 import { fetchCalendarEvents } from "./fetchCalendarEvents";
 import { InputSchema, type WebhookResult } from "./types";
 

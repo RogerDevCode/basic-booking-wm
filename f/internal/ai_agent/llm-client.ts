@@ -65,7 +65,7 @@ const CONFIG = {
 // IMPORTS
 // ============================================================================
 
-import { cacheGet, cacheSet } from '../cache';
+import { cacheGet, cacheSet } from '../cache/index';
 import { INTENT } from './constants';
 import { LLMRawAPIResponseSchema } from './types';
 

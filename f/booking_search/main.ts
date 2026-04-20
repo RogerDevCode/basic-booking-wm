@@ -10,7 +10,7 @@
  */
 
 import { createDbClient } from '../internal/db/client';
-import type { Result } from '../internal/result';
+import type { Result } from '../internal/result/index';
 import { InputSchema, type Input, type BookingSearchResult } from './types';
 
 export async function main(rawInput: unknown): Promise<Result<BookingSearchResult>> {

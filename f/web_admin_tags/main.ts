@@ -37,9 +37,9 @@
  * → CLEARED FOR EXECUTION
  */
 
-import { withTenantContext } from '../internal/tenant-context';
+import { withTenantContext } from '../internal/tenant-context/index';
 import { createDbClient } from '../internal/db/client';
-import type { Result } from '../internal/result';
+import type { Result } from '../internal/result/index';
 import { InputSchema, type TagInput } from './types';
 import { handleAction } from './services';
 

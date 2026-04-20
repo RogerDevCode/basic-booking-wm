@@ -10,8 +10,8 @@
  */
 
 import { createDbClient } from '../internal/db/client';
-import type { Result } from '../internal/result';
-import { withTenantContext } from '../internal/tenant-context';
+import type { Result } from '../internal/result/index';
+import { withTenantContext } from '../internal/tenant-context/index';
 import { type BookingResult, InputSchema } from './types';
 import * as Repository from './repository';
 import * as Service from './service';

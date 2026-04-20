@@ -1,6 +1,6 @@
-import { DEFAULT_TIMEZONE } from '../internal/config';
-import type { Result } from '../internal/result';
-import type { TxClient } from '../internal/tenant-context';
+import { DEFAULT_TIMEZONE } from '../internal/config/index';
+import type { Result } from '../internal/result/index';
+import type { TxClient } from '../internal/tenant-context/index';
 import type { Input } from './types';
 
 /** Handles provider-related CRUD operations */

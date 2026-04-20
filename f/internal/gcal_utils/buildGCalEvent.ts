@@ -1,4 +1,4 @@
-import { DEFAULT_TIMEZONE } from '../config';
+import { DEFAULT_TIMEZONE } from '../config/index';
 // ============================================================================
 // GCAL UTILS — Shared Google Calendar utilities
 // ============================================================================

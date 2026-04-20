@@ -21,8 +21,8 @@
 
 import postgres from 'postgres';
 
-import type { Result } from '../result';
-export type { Result } from '../result';
+import type { Result } from '../result/index';
+export type { Result } from '../result/index';
 
 
 /**

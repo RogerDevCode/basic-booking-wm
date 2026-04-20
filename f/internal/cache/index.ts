@@ -8,7 +8,7 @@
 
 import Redis from "ioredis";
 import { createHash } from "node:crypto";
-import type { Result } from '../result';
+import type { Result } from '../result/index';
 import type { IntentType } from '../ai_agent/constants';
 
 interface CacheEntry {

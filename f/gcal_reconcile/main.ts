@@ -42,7 +42,7 @@
 // and retries GCal sync with exponential backoff.
 // ============================================================================
 
-import { withTenantContext } from '../internal/tenant-context';
+import { withTenantContext } from '../internal/tenant-context/index';
 import { createDbClient } from '../internal/db/client';
 import { InputSchema } from './types';
 import type { ReconcileResult, BookingRow } from './types';

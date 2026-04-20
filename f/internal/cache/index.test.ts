@@ -1,34 +1,49 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
 import { INTENT } from '../ai_agent/constants';
 
+// Vitest 4: vi.hoisted shares state between vi.mock factory and test code
+const { mockRedis } = vi.hoisted(() => {
+  const mockRedis = {
+    get: vi.fn(),
+    set: vi.fn(),
+    del: vi.fn(),
+    keys: vi.fn(),
+    quit: vi.fn(),
+  };
+  return { mockRedis };
+});
+
+vi.mock("ioredis", () => ({
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+  default: vi.fn(function MockRedis() { return mockRedis; }),
+}));
+
+import { cacheGet, cacheSet, cacheInvalidate, cacheStats, cacheClear } from "./index";
+
 describe("Semantic Cache", () => {
   beforeEach(() => {
-    vi.resetModules();
+    vi.clearAllMocks();
     process.env["REDIS_URL"] = "redis://localhost:6379";
+    mockRedis.get.mockResolvedValue(null);
+    mockRedis.set.mockResolvedValue("OK");
+    mockRedis.del.mockResolvedValue(1);
+    mockRedis.keys.mockResolvedValue([]);
+    mockRedis.quit.mockResolvedValue(undefined);
   });
 
   test("Debe fallar sin REDIS_URL", async () => {
+    const savedUrl = process.env["REDIS_URL"];
     delete process.env["REDIS_URL"];
-    const { cacheGet } = await import("./index");
-    const [err, data] = await cacheGet("test query");
-    expect(err).not.toBeNull();
-    expect(data).toBeNull();
+    try {
+      const [err, data] = await cacheGet("test query");
+      expect(err).not.toBeNull();
+      expect(data).toBeNull();
+    } finally {
+      if (savedUrl !== undefined) process.env["REDIS_URL"] = savedUrl;
+    }
   });
 
   test("Debe retornar null para cache miss", async () => {
-    vi.doMock("ioredis", () => {
-      return {
-        default: vi.fn().mockImplementation(() => ({
-          get: vi.fn().mockResolvedValue(null),
-          set: vi.fn().mockResolvedValue("OK"),
-          del: vi.fn().mockResolvedValue(1),
-          keys: vi.fn().mockResolvedValue([]),
-          quit: vi.fn().mockResolvedValue(undefined),
-        })),
-      };
-    });
-
-    const { cacheGet } = await import("./index");
     const [err, data] = await cacheGet("una consulta nueva");
     expect(err).toBeNull();
     expect(data).toBeNull();
@@ -42,22 +57,9 @@ describe("Semantic Cache", () => {
       created_at: "2026-04-04T10:00:00.000Z",
       ttl_seconds: 3600,
     });
+    mockRedis.get.mockResolvedValue(cachedEntry);
 
-    vi.doMock("ioredis", () => {
-      return {
-        default: vi.fn().mockImplementation(() => ({
-          get: vi.fn().mockResolvedValue(cachedEntry),
-          set: vi.fn().mockResolvedValue("OK"),
-          del: vi.fn().mockResolvedValue(1),
-          keys: vi.fn().mockResolvedValue([]),
-          quit: vi.fn().mockResolvedValue(undefined),
-        })),
-      };
-    });
-
-    const { cacheGet } = await import("./index");
     const [err, data] = await cacheGet("hola");
-
     expect(err).toBeNull();
     expect(data).not.toBeNull();
     expect(data?.intent).toBe(INTENT.SALUDO);
@@ -65,79 +67,28 @@ describe("Semantic Cache", () => {
   });
 
   test("Debe guardar entry en cache", async () => {
-    vi.doMock("ioredis", () => {
-      return {
-        default: vi.fn().mockImplementation(() => ({
-          get: vi.fn().mockResolvedValue(null),
-          set: vi.fn().mockResolvedValue("OK"),
-          del: vi.fn().mockResolvedValue(1),
-          keys: vi.fn().mockResolvedValue([]),
-          quit: vi.fn().mockResolvedValue(undefined),
-        })),
-      };
-    });
-
-    const { cacheSet } = await import("./index");
     const [err] = await cacheSet("hola", "Hola! ¿Cómo puedo ayudarte?", INTENT.SALUDO, 1800);
-
     expect(err).toBeNull();
   });
 
   test("Debe invalidar entry de cache", async () => {
-    vi.doMock("ioredis", () => {
-      return {
-        default: vi.fn().mockImplementation(() => ({
-          get: vi.fn().mockResolvedValue(null),
-          set: vi.fn().mockResolvedValue("OK"),
-          del: vi.fn().mockResolvedValue(1),
-          keys: vi.fn().mockResolvedValue([]),
-          quit: vi.fn().mockResolvedValue(undefined),
-        })),
-      };
-    });
-
-    const { cacheInvalidate } = await import("./index");
     const [err] = await cacheInvalidate("hola");
-
     expect(err).toBeNull();
   });
 
   test("Debe retornar stats de cache", async () => {
-    vi.doMock("ioredis", () => {
-      return {
-        default: vi.fn().mockImplementation(() => ({
-          get: vi.fn().mockResolvedValue(null),
-          set: vi.fn().mockResolvedValue("OK"),
-          del: vi.fn().mockResolvedValue(1),
-          keys: vi.fn().mockResolvedValue(["booking:llm_cache:abc", "booking:llm_cache:def"]),
-          quit: vi.fn().mockResolvedValue(undefined),
-        })),
-      };
-    });
+    mockRedis.keys.mockResolvedValue(["booking:llm_cache:abc", "booking:llm_cache:def"]);
 
-    const { cacheStats } = await import("./index");
     const [err, stats] = await cacheStats();
-
     expect(err).toBeNull();
     expect(stats?.keys).toBe(2);
   });
 
   test("Debe limpiar cache", async () => {
-    vi.doMock("ioredis", () => {
-      return {
-        default: vi.fn().mockImplementation(() => ({
-          get: vi.fn().mockResolvedValue(null),
-          set: vi.fn().mockResolvedValue("OK"),
-          del: vi.fn().mockResolvedValue(1),
-          keys: vi.fn().mockResolvedValue(["booking:llm_cache:abc"]),
-          quit: vi.fn().mockResolvedValue(undefined),
-        })),
-      };
-    });
+    mockRedis.keys.mockResolvedValue(["booking:llm_cache:abc"]);
+    mockRedis.del.mockResolvedValue(1);
 
-    const { cacheClear } = await import("./index");
     const [err, deleted] = await cacheClear();
-
     expect(err).toBeNull();
     expect(deleted).toBe(1);
   });

@@ -11,7 +11,7 @@
 
 import { InputSchema, type Input, type WebhookSetupResult } from './types';
 import { setupWebhook } from './services';
-import type { Result } from '../internal/result';
+import type { Result } from '../internal/result/index';
 
 export async function main(rawInput: unknown): Promise<Result<WebhookSetupResult>> {
   const parsed = InputSchema.safeParse(rawInput);

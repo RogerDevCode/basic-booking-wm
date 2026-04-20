@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { BookingStateSchema, DraftBookingSchema } from '../booking_fsm';
+import { BookingStateSchema, DraftBookingSchema } from '../booking_fsm/index.ts';
 
 export const InputSchema = z.object({
   chat_id: z.string().min(1),

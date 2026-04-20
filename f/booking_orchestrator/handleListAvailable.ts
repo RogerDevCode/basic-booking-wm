@@ -1,5 +1,6 @@
-import type { Result } from '../internal/result';
+import type { Result } from '../internal/result/index';
 import type { InputType, OrchestratorResult, AvailabilityData } from './types';
+import { main as checkAvailability } from '../availability_check/main';
 
 export async function handleListAvailable(
   input: Readonly<InputType>
@@ -15,7 +16,6 @@ export async function handleListAvailable(
     }];
   }
 
-  const { main: checkAvailability } = await import('../availability_check/main');
   const [err, data] = await checkAvailability({
     provider_id,
     date,

@@ -19,7 +19,7 @@ import {
   type BookingState,
   type BookingAction,
   type TransitionResult,
-} from '../booking_fsm';
+} from '../booking_fsm/index';
 
 // ============================================================================
 // HELPERS & MOCKS

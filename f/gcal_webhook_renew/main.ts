@@ -11,7 +11,7 @@
 
 import { InputSchema, type Input, type RenewResult } from './types';
 import { renewChannel } from './services';
-import type { Result } from '../internal/result';
+import type { Result } from '../internal/result/index';
 
 export async function main(rawInput: unknown): Promise<Result<RenewResult>> {
   const parsed = InputSchema.safeParse(rawInput);

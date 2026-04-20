@@ -41,7 +41,7 @@
  */
 
 import { createDbClient } from '../internal/db/client';
-import { withTenantContext } from '../internal/tenant-context';
+import { withTenantContext } from '../internal/tenant-context/index';
 import { buildBookingDetails, buildInlineButtons, getBookingsForWindow, markReminderSent, sendGmailReminder, sendTelegramReminder } from './services';
 import { InputSchema, type BookingRecord, type CronResult, type ReminderWindow } from './types';
 

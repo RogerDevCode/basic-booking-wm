@@ -18,7 +18,7 @@
 // ============================================================================
 
 import { z } from 'zod';
-import type { Result } from '../result';
+import type { Result } from '../result/index';
 import { formatResponse } from "./formatResponse";
 import { TelegramBubble } from './services';
 import type { BubbleReport } from './types';

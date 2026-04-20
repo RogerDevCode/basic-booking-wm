@@ -1,5 +1,5 @@
 import type { Input, RenewResult } from './types';
-import type { Result } from '../internal/result';
+import type { Result } from '../internal/result/index';
 
 export async function stopChannel(accessToken: string, channelId: string, resourceId: string): Promise<boolean> {
   try {

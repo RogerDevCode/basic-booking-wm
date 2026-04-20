@@ -9,9 +9,9 @@
  * Zod Schemas     : YES — InputSchema validates channel, direction, content
  */
 
-import { withTenantContext } from '../internal/tenant-context';
+import { withTenantContext } from '../internal/tenant-context/index';
 import { createDbClient } from '../internal/db/client';
-import type { Result } from '../internal/result';
+import type { Result } from '../internal/result/index';
 import { InputSchema, type LogResult } from './types';
 import { persistLog } from './services';
 

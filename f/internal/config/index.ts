@@ -8,8 +8,8 @@
 // AGENTS.md §5.3: Retry policy = 500ms * 2^attempt (not 1000ms * 3^attempt).
 // ============================================================================
 
-import type { Result } from '../result';
-export type { Result } from '../result';
+import type { Result } from '../result/index';
+export type { Result } from '../result/index';
 
 // ─── Retry Configuration — AGENTS.md §5.3 compliant ───────────────────────
 // Base: 500ms, multiplier: 2 → 500ms, 1000ms, 2000ms, 4000ms, ...

@@ -26,7 +26,7 @@ import {
   emptyDraft,
   BookingStateSchema,
   buildMainMenuKeyboard,
-} from '../booking_fsm';
+} from '../booking_fsm/index';
 import { handleBookingWizard } from './booking-wizard';
 import {
   InputSchema,

@@ -11,7 +11,7 @@
 
 import { describe, test, expect, beforeEach } from 'vitest';
 import { main } from './main';
-import type { Result } from '../internal/result';
+import type { Result } from '../internal/result/index';
 
 /**
  * REASONING TRACE

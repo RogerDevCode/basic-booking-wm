@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { DEFAULT_TIMEZONE } from '../internal/config';
+import { DEFAULT_TIMEZONE } from '../internal/config/index';
 
 export type Result<T> = [Error | null, T | null];
 

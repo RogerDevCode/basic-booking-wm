@@ -12,8 +12,8 @@ import {
   buildDoctorKeyboard,
   buildTimeSlotKeyboard,
   buildConfirmationKeyboard,
-} from '../booking_fsm';
-import type { Result } from '../result';
+} from '../booking_fsm/index';
+import type { Result } from '../result/index';
 import type { BubbleOutput, ConvState, InlineButton } from './types';
 
 // ============================================================================

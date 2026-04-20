@@ -10,7 +10,7 @@
  */
 
 import { z } from 'zod';
-import type { Result } from '../result';
+import type { Result } from '../result/index';
 
 // ============================================================================
 // CONSTANTS & STEP NAMES (SSOT)
@@ -69,13 +69,13 @@ const DraftCoreSchema = z.object({
 
 export const IdleStateSchema = z.object({
   name: z.literal(BOOKING_STEP.IDLE),
-}).readonly();
+});
 
 export const SelectingSpecialtySchema = z.object({
   name: z.literal(BOOKING_STEP.SELECTING_SPECIALTY),
   error: ErrorSchema,
   items: z.array(NamedItemSchema).default([]),
-}).readonly();
+});
 
 export const SelectingDoctorSchema = z.object({
   name: z.literal(BOOKING_STEP.SELECTING_DOCTOR),
@@ -83,7 +83,7 @@ export const SelectingDoctorSchema = z.object({
   specialtyName: z.string(),
   error: ErrorSchema,
   items: z.array(NamedItemSchema).default([]),
-}).readonly();
+});
 
 export const SelectingTimeSchema = z.object({
   name: z.literal(BOOKING_STEP.SELECTING_TIME),
@@ -93,7 +93,7 @@ export const SelectingTimeSchema = z.object({
   targetDate: z.string().nullable().default(null),
   error: ErrorSchema,
   items: z.array(TimeSlotItemSchema).default([]),
-}).readonly();
+});
 
 export const ConfirmingSchema = z.object({
   name: z.literal(BOOKING_STEP.CONFIRMING),
@@ -102,12 +102,12 @@ export const ConfirmingSchema = z.object({
   doctorName: z.string(),
   timeSlot: z.string(),
   draft: DraftCoreSchema,
-}).readonly();
+});
 
 export const CompletedSchema = z.object({
   name: z.literal(BOOKING_STEP.COMPLETED),
   bookingId: z.string(),
-}).readonly();
+});
 
 // ============================================================================
 // FULL BOOKING STATE (Discriminated Union)

@@ -41,8 +41,8 @@
  */
 
 import { createDbClient } from '../internal/db/client';
-import { validatePasswordPolicy } from '../internal/crypto';
-import type { Result } from '../internal/result';
+import { validatePasswordPolicy } from '../internal/crypto/index';
+import type { Result } from '../internal/result/index';
 import { InputSchema, type CompleteProfileResult, type UserRow } from './types';
 import { validateRut, hashPasswordScrypt, withAdminContext } from './services';
 

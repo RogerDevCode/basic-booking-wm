@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import type { Result } from '../internal/result';
+import type { Result } from '../internal/result/index';
 import type { Input, WebhookSetupResult } from './types';
 
 const WEBHOOK_RECEIVER_PATH = '/api/w/booking-titanium/jobs/run/p/f/gcal_webhook_receiver';

@@ -39,9 +39,9 @@
  */
 
 import { createDbClient } from '../internal/db/client';
-import { logger } from '../internal/logger';
-import type { Result } from '../internal/result';
-import { validateTransition } from '../internal/state-machine';
+import { logger } from '../internal/logger/index';
+import type { Result } from '../internal/result/index';
+import { validateTransition } from '../internal/state-machine/index';
 import { authorize } from "./authorize";
 import { executeReschedule } from "./executeReschedule";
 import { fetchBooking } from "./fetchBooking";

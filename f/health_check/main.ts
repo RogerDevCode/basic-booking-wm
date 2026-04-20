@@ -9,7 +9,7 @@
  * Zod Schemas     : YES — InputSchema validates optional component filter
  */
 
-import type { Result } from '../internal/result';
+import type { Result } from '../internal/result/index';
 import { InputSchema, type Input, type ComponentStatus } from './types';
 import { checkDatabase, checkGCal, checkTelegram } from './services';
 

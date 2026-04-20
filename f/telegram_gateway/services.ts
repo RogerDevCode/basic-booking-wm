@@ -10,7 +10,7 @@
  */
 
 import postgres from 'postgres';
-import type { Result } from '../internal/result';
+import type { Result } from '../internal/result/index';
 import { createDbClient } from '../internal/db/client';
 import type { ITelegramClient, IClientRepository, SendMessageOptions } from './types';
 

@@ -38,8 +38,8 @@
  * → CLEARED FOR CODE GENERATION
  */
 
-import { logger } from '../internal/logger';
-import type { Result } from '../internal/result';
+import { logger } from '../internal/logger/index';
+import type { Result } from '../internal/result/index';
 import { InputSchema, type InputType, type OrchestratorResult, type OrchestratorBookingIntent } from './types';
 import { normalizeIntent } from './normalizeIntent';
 import { resolveContext } from './resolveContext';

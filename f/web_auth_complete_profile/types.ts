@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { DEFAULT_TIMEZONE } from '../internal/config';
+import { DEFAULT_TIMEZONE } from '../internal/config/index';
 
 export const InputSchema = z.object({
   chat_id: z.string().min(1),

@@ -1,5 +1,5 @@
-import { buildMainMenuKeyboard } from '../booking_fsm';
-import type { BookingState, DraftBooking } from '../booking_fsm';
+import { buildMainMenuKeyboard } from '../booking_fsm/index';
+import type { BookingState, DraftBooking } from '../booking_fsm/index';
 import type { RouteResult, RouteType, InlineButton } from './types';
 
 const CALLBACK_PREFIXES = ['cnf:', 'cxl:', 'res:', 'act:', 'dea:'] as const;

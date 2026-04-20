@@ -35,7 +35,7 @@
  */
 
 import "@total-typescript/ts-reset";
-import type { Result } from '../internal/result';
+import type { Result } from '../internal/result/index';
 import { TelegramClient, ClientRepository } from './services';
 import {
   TelegramUpdateSchema,

@@ -41,10 +41,10 @@
 import "@total-typescript/ts-reset";
 import postgres from 'postgres';
 import { z } from 'zod';
-import { hashPassword, validatePasswordPolicy, verifyPassword } from '../internal/crypto';
+import { hashPassword, validatePasswordPolicy, verifyPassword } from '../internal/crypto/index';
 import { createDbClient } from '../internal/db/client';
-import type { Result } from '../internal/result';
-import { withTenantContext } from '../internal/tenant-context';
+import type { Result } from '../internal/result/index';
+import { withTenantContext } from '../internal/tenant-context/index';
 import { InputSchema, type ProfileActionHandler, type ProfileInput, type ProfileRow } from "./types";
 
 // ============================================================================

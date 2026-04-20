@@ -18,7 +18,7 @@
 
 import { z } from 'zod';
 import type postgres from 'postgres';
-import type { Result } from '../result';
+import type { Result } from '../result/index';
 
 const ServiceRowSchema = z.object({
   service_id: z.uuid(),

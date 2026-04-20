@@ -10,7 +10,7 @@
  */
 
 import { describe, test, expect, vi, beforeEach } from 'vitest';
-import type { Result } from '../internal/result';
+import type { Result } from '../internal/result/index';
 import { main } from './main';
 
 // ─── Mocks ──────────────────────────────────────────────────────────────────

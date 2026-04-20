@@ -42,7 +42,7 @@
  */
 
 import { createDbClient } from '../internal/db/client';
-import type { Result } from '../internal/result';
+import type { Result } from '../internal/result/index';
 import { InputSchema, WizardStateSchema, type Input, type StepView, type WizardState } from './types';
 import { WizardRepository } from './WizardRepository';
 import { WizardRouter } from './WizardRouter';

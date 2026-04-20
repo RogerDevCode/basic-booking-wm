@@ -1,6 +1,7 @@
-import type { Result } from '../internal/result';
+import type { Result } from '../internal/result/index';
 import type { InputType, OrchestratorResult } from './types';
 import { getEntity } from './getEntity';
+import { main as createBooking } from '../booking_create/main';
 
 export async function handleCreateBooking(
   input: Readonly<InputType>
@@ -28,7 +29,6 @@ export async function handleCreateBooking(
   }
 
   const startTime = new Date(`${date}T${time}:00`);
-  const { main: createBooking } = await import('../booking_create/main');
   const [err, data] = await createBooking({
     client_id,
     provider_id,

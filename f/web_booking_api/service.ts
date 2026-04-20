@@ -1,4 +1,4 @@
-import type { Result } from '../internal/result';
+import type { Result } from '../internal/result/index';
 import type { BookingResult, DB, Input } from './types';
 import * as Repository from './repository';
 import * as Utils from './utils';

@@ -52,7 +52,7 @@
 // ============================================================================
 
 import { createDbClient } from '../internal/db/client';
-import type { Result } from '../internal/result';
+import type { Result } from '../internal/result/index';
 import { type Input, InputSchema, type LoginResult, type UserRow } from "./types";
 import { verifyPasswordSync } from "./verifyPasswordSync";
 import { withAdminContext } from "./withAdminContext";

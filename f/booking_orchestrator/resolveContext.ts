@@ -1,8 +1,8 @@
 import { createDbClient } from '../internal/db/client';
-import type { Result } from '../internal/result';
+import type { Result } from '../internal/result/index';
 import type { InputType, ResolvedContext } from './types';
 import { getEntity } from './getEntity';
-import { resolveDate, resolveTime } from '../internal/date-resolver';
+import { resolveDate, resolveTime } from '../internal/date-resolver/index';
 
 export async function resolveContext(
   input: Readonly<InputType>

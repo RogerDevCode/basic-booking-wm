@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { Result } from '../internal/result';
+import type { Result } from '../internal/result/index';
 
 export type Input = Readonly<z.infer<typeof InputSchema>>;
 export type HandlerResult = Promise<Result<unknown>>;

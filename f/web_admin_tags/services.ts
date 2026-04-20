@@ -1,5 +1,5 @@
 import postgres from 'postgres';
-import type { Result } from '../internal/result';
+import type { Result } from '../internal/result/index';
 import type { TagInput, CategoryRow, TagRow } from './types';
 
 // ─── Access Control ──────────────────────────────────────────────────────────

@@ -27,8 +27,8 @@ import {
   buildLoadingDoctorsPrompt,
   buildLoadingSlotsPrompt,
 } from './responses';
-import { resolveDate } from '../date-resolver';
-import type { Result } from '../result';
+import { resolveDate } from '../date-resolver/index';
+import type { Result } from '../result/index';
 
 // ============================================================================
 // Internal Types & Constants

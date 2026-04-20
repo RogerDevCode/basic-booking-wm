@@ -11,7 +11,7 @@
 
 import { z } from 'zod';
 import postgres from 'postgres';
-import type { Result } from '../result';
+import type { Result } from '../result/index';
 
 type Sql = postgres.Sql;
 

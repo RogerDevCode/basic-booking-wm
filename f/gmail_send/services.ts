@@ -22,10 +22,10 @@ export function buildEmailContent(
   const customSubject = safeString(details['subject'], '');
   const customHtmlBody = safeString(details['html_body'], '');
 
-  let subject = '';
-  let body = '';
+  let subject: string;
+  let body: string;
   let icon = '';
-  let color = '#4CAF50';
+  let color: string;
 
   switch (messageType) {
     case 'booking_created':

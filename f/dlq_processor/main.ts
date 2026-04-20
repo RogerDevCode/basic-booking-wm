@@ -39,7 +39,7 @@
  */
 
 import { createDbClient } from '../internal/db/client';
-import type { Result } from '../internal/result';
+import type { Result } from '../internal/result/index';
 import { InputSchema, DLQResultSchema } from './types';
 import { 
   withGlobalTx, 

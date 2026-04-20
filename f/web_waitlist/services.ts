@@ -1,5 +1,5 @@
 import type postgres from 'postgres';
-import type { Result } from '../internal/result';
+import type { Result } from '../internal/result/index';
 import type { Input, WaitlistResult, WaitlistEntry } from './types';
 
 /**

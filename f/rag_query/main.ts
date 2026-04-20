@@ -9,9 +9,9 @@
  * Zod Schemas     : YES — InputSchema validates query text and top_k
  */
 
-import { withTenantContext } from '../internal/tenant-context';
+import { withTenantContext } from '../internal/tenant-context/index';
 import { createDbClient } from '../internal/db/client';
-import type { Result } from '../internal/result';
+import type { Result } from '../internal/result/index';
 
 import { InputSchema } from './types';
 import type { Input, RAGResult } from './types';

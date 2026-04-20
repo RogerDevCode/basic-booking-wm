@@ -1,5 +1,5 @@
 import postgres from 'postgres';
-import type { Result } from '../internal/result';
+import type { Result } from '../internal/result/index';
 import type { HonorificRow } from './types';
 
 type HonorificRaw = readonly [string, string, string, string | null, number, boolean, string];

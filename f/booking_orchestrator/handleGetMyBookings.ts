@@ -1,6 +1,6 @@
 import { createDbClient } from '../internal/db/client';
-import { withTenantContext } from '../internal/tenant-context';
-import type { Result } from '../internal/result';
+import { withTenantContext } from '../internal/tenant-context/index';
+import type { Result } from '../internal/result/index';
 import type { InputType, OrchestratorResult, BookingRow } from './types';
 
 export async function handleGetMyBookings(

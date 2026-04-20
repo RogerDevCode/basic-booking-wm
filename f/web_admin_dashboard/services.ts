@@ -1,5 +1,5 @@
-import type { TxClient } from '../internal/tenant-context';
-import type { Result } from '../internal/result';
+import type { TxClient } from '../internal/tenant-context/index';
+import type { Result } from '../internal/result/index';
 import type { Input, AdminDashboardResult } from './types';
 
 export async function fetchDashboardStats(tx: TxClient, input: Input): Promise<Result<AdminDashboardResult>> {

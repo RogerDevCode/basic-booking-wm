@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { MAX_TELEGRAM_CALLBACK_DATA_BYTES } from '../internal/config';
+import { MAX_TELEGRAM_CALLBACK_DATA_BYTES } from '../internal/config/index';
 
 export const InlineButtonSchema = z.object({
   text: z.string().min(1),

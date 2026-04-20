@@ -1,6 +1,6 @@
 import postgres from 'postgres';
-import { withTenantContext } from '../internal/tenant-context';
-import type { Result } from '../internal/result';
+import { withTenantContext } from '../internal/tenant-context/index';
+import type { Result } from '../internal/result/index';
 import { DateUtils } from './DateUtils';
 
 export class WizardRepository {

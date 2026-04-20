@@ -131,7 +131,7 @@ value:
                   return orch.message + (orch.follow_up ? `\n\n${orch.follow_up}` : '');
                 }
               }
-              return results.ai_agent.data?.ai_response || 'Procesado';
+              return results.ai_agent?.data?.ai_response || 'Procesado';
             type: javascript
           chat_id:
             expr: results.webhook_trigger.chat_id
@@ -257,11 +257,13 @@ value:
             expr: results.telegram_router.data?.nextFlowStep || 0
             type: javascript
           booking_state:
-             expr: >
-               results.telegram_router.data?.nextState ||
-               results.execute_action.data?.nextState ||
-               null
+            type: javascript
+            expr: >
+              results.telegram_router.data?.nextState ||
+              results.execute_action.data?.nextState ||
+              null
           booking_draft:
+            type: javascript
             expr: >
               results.telegram_router.data?.nextDraft ||
               results.execute_action.data?.nextDraft ||

@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import type { Result } from '../internal/result';
-import { retryWithBackoff } from '../internal/retry';
-import { MAX_RETRIES, TIMEOUT_TELEGRAM_API_MS } from '../internal/config';
+import type { Result } from '../internal/result/index';
+import { retryWithBackoff } from '../internal/retry/index';
+import { MAX_RETRIES, TIMEOUT_TELEGRAM_API_MS } from '../internal/config/index';
 import {
   InlineButtonSchema,
   TelegramResponseSchema,

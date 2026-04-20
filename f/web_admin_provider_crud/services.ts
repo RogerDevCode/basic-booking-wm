@@ -1,6 +1,6 @@
 import postgres from 'postgres';
-import { generateReadablePassword, hashPassword } from '../internal/crypto';
-import type { Result } from '../internal/result';
+import { generateReadablePassword, hashPassword } from '../internal/crypto/index';
+import type { Result } from '../internal/result/index';
 import type { Input, ProviderRow, CreateProviderResult } from './types';
 
 // ============================================================================

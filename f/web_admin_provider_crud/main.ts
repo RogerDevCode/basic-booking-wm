@@ -46,7 +46,7 @@
 // ============================================================================
 
 import "@total-typescript/ts-reset";
-import { withTenantContext } from '../internal/tenant-context';
+import { withTenantContext } from '../internal/tenant-context/index';
 import { createDbClient } from '../internal/db/client';
 import { InputSchema } from './types';
 import { listProviders, createProvider, updateProvider, resetProviderPassword } from './services';

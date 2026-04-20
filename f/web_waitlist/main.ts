@@ -9,9 +9,9 @@
  * Zod Schemas     : YES — InputSchema validates action and waitlist fields
  */
 
-import { withTenantContext } from '../internal/tenant-context';
+import { withTenantContext } from '../internal/tenant-context/index';
 import { createDbClient } from '../internal/db/client';
-import type { Result } from '../internal/result';
+import type { Result } from '../internal/result/index';
 import { InputSchema, WaitlistResultSchema } from './types';
 import type { WaitlistResult } from './types';
 import {

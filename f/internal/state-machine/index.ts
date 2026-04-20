@@ -7,10 +7,10 @@
 // KISS: function fits in 15 lines, does one thing (SRP).
 // ============================================================================
 
-import type { BookingStatus } from '../db-types';
+import type { BookingStatus } from '../db-types/index';
 
 // Re-export for convenience — consumers import from here or db-types
-export type { BookingStatus } from '../db-types';
+export type { BookingStatus } from '../db-types/index';
 
 // ============================================================================
 // VALID_TRANSITIONS — Authoritative transition map (AGENTS.md §5.2)

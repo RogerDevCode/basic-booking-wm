@@ -33,8 +33,8 @@
 
 import { Redis } from 'ioredis';
 import { z } from 'zod';
-import type { Result } from '../result';
-import { BookingStateSchema, DraftBookingSchema, type BookingState, type DraftBooking } from '../booking_fsm';
+import type { Result } from '../result/index';
+import { BookingStateSchema, DraftBookingSchema, type BookingState, type DraftBooking } from '../booking_fsm/index.ts';
 
 // ── CONSTANTS ─────────────────────────────────────────────────────────────────
 const DEFAULT_CONV_TTL_SECONDS = 30 * 60; // 30 minutes
@@ -58,7 +58,7 @@ function getConvTTL(): number {
  */
 const ConversationStateSchema = z.object({
   chat_id:              z.string().min(1),
-  provider_id:          z.string().uuid().nullable().catch(null),
+  provider_id:          z.uuid().nullable().catch(null),
   previous_intent:      z.string().nullable().catch(null),
   active_flow:          z.enum(['booking_wizard', 'reschedule_flow', 'cancellation_flow', 'reminder_flow', 'selecting_specialty', 'selecting_datetime', 'none']).default('none'),
   flow_step:            z.number().int().min(0).default(0),

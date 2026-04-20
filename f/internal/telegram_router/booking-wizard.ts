@@ -35,11 +35,11 @@ import {
   fetchSpecialties,
   fetchDoctors,
   fetchSlots,
-} from '../booking_fsm';
+} from '../booking_fsm/index';
 import { createDbClient } from '../db/client';
-import { withTenantContext } from '../tenant-context';
-import { todayYMD } from '../date-resolver';
-import { logger } from '../logger';
+import { withTenantContext } from '../tenant-context/index';
+import { todayYMD } from '../date-resolver/index';
+import { logger } from '../logger/index';
 
 const MODULE = 'wizard_handler';
 
@@ -83,7 +83,7 @@ async function getDefaultProviderId(sql: ReturnType<typeof createDbClient>): Pro
     if (row === undefined) {
       return [new Error('no_active_providers'), null];
     }
-    return [null, row['provider_id']];
+    return [null, row.provider_id];
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     return [new Error(`get_default_provider_failed: ${msg}`), null];

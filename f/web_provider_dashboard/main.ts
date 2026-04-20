@@ -9,9 +9,9 @@
  * Zod Schemas     : YES
  */
 
-import { withTenantContext } from '../internal/tenant-context';
+import { withTenantContext } from '../internal/tenant-context/index';
 import { createDbClient } from '../internal/db/client';
-import type { Result } from '../internal/result';
+import type { Result } from '../internal/result/index';
 import { InputSchema, type Input, type DashboardResult } from './types';
 
 export async function main(rawInput: unknown): Promise<Result<DashboardResult>> {

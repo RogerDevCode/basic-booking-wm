@@ -1,7 +1,8 @@
-import type { Result } from '../internal/result';
+import type { Result } from '../internal/result/index';
 import type { InputType, OrchestratorResult } from './types';
 import { getEntity } from './getEntity';
 import { handleGetMyBookings } from './handleGetMyBookings';
+import { main as cancelBooking } from '../booking_cancel/main';
 
 export async function handleCancelBooking(
   input: Readonly<InputType>
@@ -15,7 +16,6 @@ export async function handleCancelBooking(
     });
   }
 
-  const { main: cancelBooking } = await import('../booking_cancel/main');
   const [err, data] = await cancelBooking({
     booking_id: bookingId,
     actor: 'client',

@@ -1,5 +1,26 @@
 # CLAUDE.md
 
+## 🔴 Sesión anterior (2026-04-20) — Retomar aquí
+
+**Problema actual:** `f/flows/telegram_webhook` falla en el último paso `update_conversation_state` (o justo después de que `execute_action`/`booking_orchestrator` ya pasa con éxito).
+
+**Lo que se arregló hoy:**
+- `booking_orchestrator/main.script.lock` creado (faltaba → bun no podía instalar zod)
+- Imports dinámicos (`await import(...)`) en 4 handlers convertidos a estáticos — Windmill/bun no resuelve dynamic imports en build time
+- Lock files + push de: `booking_cancel`, `booking_create`, `booking_reschedule`, `availability_check`
+- Todos empujados a Windmill. `orchestrator_logic` ahora pasa ✅
+
+**Próximo paso:** Correr el flow de prueba y revisar el error de `update_conversation_state`. Comando:
+```bash
+WM_TOKEN="FS0PemZPdKYKXvvgTrAajLODBfOxhc6o"
+# Lanzar flow y revisar logs del último step
+curl -s -X POST "http://localhost:8080/api/w/booking-titanium/jobs/run/f/f/flows/telegram_webhook" \
+  -H "Authorization: Bearer $WM_TOKEN" -H "Content-Type: application/json" \
+  -d '{"message":{"chat":{"id":123456,"type":"private"},"text":"hola","from":{"id":123456,"username":"test","first_name":"Test"},"message_id":1}}'
+```
+
+---
+
 ## 🗺️ Read First — Codebase Index
 
 **Before exploring files**, read these pre-built index files in order:

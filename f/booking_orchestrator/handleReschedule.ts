@@ -1,7 +1,8 @@
-import type { Result } from '../internal/result';
+import type { Result } from '../internal/result/index';
 import type { InputType, OrchestratorResult } from './types';
 import { getEntity } from './getEntity';
 import { handleGetMyBookings } from './handleGetMyBookings';
+import { main as rescheduleBooking } from '../booking_reschedule/main';
 
 export async function handleReschedule(
   input: Readonly<InputType>
@@ -35,7 +36,6 @@ export async function handleReschedule(
     }];
   }
 
-  const { main: rescheduleBooking } = await import('../booking_reschedule/main');
   const [err, data] = await rescheduleBooking({
     booking_id: bookingId,
     new_start_time: new Date(`${date}T${time}:00`).toISOString(),

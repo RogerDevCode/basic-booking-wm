@@ -42,9 +42,9 @@
 
 import type { Sql } from 'postgres';
 import { createDbClient } from '../internal/db/client';
-import type { Result } from '../internal/result';
-import { validateTransition } from '../internal/state-machine';
-import { withTenantContext } from '../internal/tenant-context';
+import type { Result } from '../internal/result/index';
+import { validateTransition } from '../internal/state-machine/index';
+import { withTenantContext } from '../internal/tenant-context/index';
 import { type Input, InputSchema, type NoShowStats, type ProviderRow, ProviderRowSchema } from "./types";
 
 // ============================================================================

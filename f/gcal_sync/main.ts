@@ -42,7 +42,7 @@
 
 import { createDbClient } from '../internal/db/client';
 import { getValidAccessToken } from '../internal/gcal_utils/oauth';
-import type { Result } from '../internal/result';
+import type { Result } from '../internal/result/index';
 import { fetchBookingDetails } from "./fetchBookingDetails";
 import { syncEvent } from "./syncEvent";
 import { type GCalSyncResult, type Input, InputSchema } from "./types";

@@ -49,8 +49,8 @@
 // ============================================================================
 
 import { createDbClient } from '../internal/db/client';
-import type { Result } from '../internal/result';
-import { withTenantContext } from '../internal/tenant-context';
+import type { Result } from '../internal/result/index';
+import { withTenantContext } from '../internal/tenant-context/index';
 import { executeLockAction } from "./executeLockAction";
 import { type Input, InputSchema, type LockResult } from "./types";
 

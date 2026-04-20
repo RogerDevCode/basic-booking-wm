@@ -9,10 +9,10 @@
  * Zod Schemas     : YES
  */
 
-import { DEFAULT_TIMEZONE } from '../internal/config';
-import { withTenantContext } from '../internal/tenant-context';
+import { DEFAULT_TIMEZONE } from '../internal/config/index';
+import { withTenantContext } from '../internal/tenant-context/index';
 import { createDbClient } from '../internal/db/client';
-import type { Result } from '../internal/result';
+import type { Result } from '../internal/result/index';
 import { InputSchema, type Input, type ClientResult } from './types';
 
 export async function main(rawInput: unknown): Promise<Result<ClientResult>> {

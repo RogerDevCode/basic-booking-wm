@@ -1,7 +1,7 @@
 import "@total-typescript/ts-reset";
 import postgres from 'postgres';
 import { z } from 'zod';
-import type { Result } from '../internal/result';
+import type { Result } from '../internal/result/index';
 
 export type ProfileInput = Readonly<z.infer<typeof InputSchema>>;
 export type ProfileActionHandler = (

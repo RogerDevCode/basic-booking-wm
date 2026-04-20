@@ -1,9 +1,9 @@
-import type { TxClient } from '../internal/tenant-context';
-import type { Result } from '../internal/result';
+import type { TxClient } from '../internal/tenant-context/index';
+import type { Result } from '../internal/result/index';
 import type { Input, BookingContext, BookingCreated } from './types';
-import { validateTransition } from '../internal/state-machine';
-import { toUUID } from '../internal/db-types';
-import type { BookingStatus } from '../internal/db-types';
+import { validateTransition } from '../internal/state-machine/index';
+import { toUUID } from '../internal/db-types/index';
+import type { BookingStatus } from '../internal/db-types/index';
 
 export async function fetchBookingContext(
   tx: TxClient,

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { UUID } from '../internal/db-types';
+import type { UUID } from '../internal/db-types/index';
 
 export const InputSchema = z.object({
   client_id: z.uuid(),
