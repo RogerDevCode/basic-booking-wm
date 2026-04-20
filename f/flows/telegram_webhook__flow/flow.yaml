@@ -32,251 +32,247 @@ description: |
 value:
   modules:
     - id: webhook_trigger
+      summary: Telegram Webhook Trigger
       value:
-        lock: "!inline telegram_webhook_trigger.lock"
         type: rawscript
-        content: "!inline telegram_webhook_trigger.ts"
-        language: bun
+        content: '!inline telegram_webhook_trigger.ts'
         input_transforms:
           event:
+            type: javascript
             expr: flow_input
-            type: javascript
-      summary: Telegram Webhook Trigger
+        lock: '!inline telegram_webhook_trigger.lock'
+        language: bun
     - id: get_conversation_state
-      value:
-        path: f/internal/conversation_get
-        type: script
-        input_transforms:
-          chat_id:
-            expr: results.webhook_trigger.chat_id
-            type: javascript
       summary: Obtener estado conversacional de Redis
+      value:
+        type: script
+        input_transforms:
+          chat_id:
+            type: javascript
+            expr: results.webhook_trigger.chat_id
+        path: f/internal/conversation_get
     - id: telegram_router
-      value:
-        path: f/internal/telegram_router
-        type: script
-        input_transforms:
-          text:
-            expr: results.webhook_trigger.text
-            type: javascript
-          chat_id:
-            expr: results.webhook_trigger.chat_id
-            type: javascript
-          callback_data:
-            expr: results.webhook_trigger.callback_data
-            type: javascript
-          callback_query_id:
-            expr: results.webhook_trigger.callback_query_id
-            type: javascript
-          username:
-            expr: results.webhook_trigger.username
-            type: javascript
-          booking_state:
-            expr: results.get_conversation_state.data?.booking_state || null
-            type: javascript
-          booking_draft:
-            expr: results.get_conversation_state.data?.booking_draft || null
-            type: javascript
-          message_id:
-            expr: results.get_conversation_state.data?.message_id || results.webhook_trigger.callback_message_id || null
-            type: javascript
       summary: Router con InlineKeyboard + FSM wizard
-    - id: answer_callback
       value:
-        path: f/telegram_send
         type: script
         input_transforms:
-          mode:
-            expr: "'answer_callback'"
+          booking_draft:
             type: javascript
-          chat_id:
-            expr: results.webhook_trigger.chat_id
+            expr: results.get_conversation_state.data?.booking_draft || null
+          booking_state:
             type: javascript
+            expr: results.get_conversation_state.data?.booking_state || null
+          callback_data:
+            type: javascript
+            expr: results.webhook_trigger.callback_data
           callback_query_id:
-            expr: results.webhook_trigger.callback_query_id || ''
             type: javascript
-          callback_alert:
-            expr: "''"
+            expr: results.webhook_trigger.callback_query_id
+          chat_id:
             type: javascript
+            expr: results.webhook_trigger.chat_id
+          message_id:
+            type: javascript
+            expr: results.get_conversation_state.data?.message_id ||
+              results.webhook_trigger.callback_message_id || null
           text:
-            expr: "''"
             type: javascript
-      skip_if:
-        expr: |
-          results.webhook_trigger.callback_query_id === null || results.webhook_trigger.callback_query_id === undefined
+            expr: results.webhook_trigger.text
+          username:
+            type: javascript
+            expr: results.webhook_trigger.username
+        path: f/internal/telegram_router
+    - id: answer_callback
       summary: AnswerCallbackQuery — quita el "cargando" del botón
-    - id: send_telegram_response
       value:
-        path: f/telegram_send
         type: script
         input_transforms:
-          mode:
-            expr: >
-              const router = results.telegram_router.data;
-              if (router && router.should_edit && router.message_id) {
-                'edit_message';
-              } else {
-                'send_message';
-              }
+          callback_alert:
             type: javascript
-          text:
-            expr: >
-              const router = results.telegram_router.data;
-              if (router && router.response_text && router.response_text.length > 0) {
-                return router.response_text;
-              }
-              const orch = results.execute_action?.data;
-              if (orch) {
-                if (orch.message) {
-                  return orch.message + (orch.follow_up ? `\n\n${orch.follow_up}` : '');
-                }
-              }
-              return results.ai_agent?.data?.ai_response || 'Procesado';
+            expr: "''"
+          callback_query_id:
             type: javascript
+            expr: results.webhook_trigger.callback_query_id || ''
           chat_id:
-            expr: results.webhook_trigger.chat_id
             type: javascript
-          message_id:
+            expr: results.webhook_trigger.chat_id
+          mode:
+            type: javascript
+            expr: "'answer_callback'"
+          text:
+            type: javascript
+            expr: "''"
+        path: f/telegram_send
+      skip_if:
+        expr: >
+          results.webhook_trigger.callback_query_id === null ||
+          results.webhook_trigger.callback_query_id === undefined
+    - id: send_telegram_response
+      summary: Enviar respuesta (sendMessage o editMessageText)
+      value:
+        type: script
+        input_transforms:
+          chat_id:
+            type: javascript
+            expr: results.webhook_trigger.chat_id
+          inline_buttons:
+            type: javascript
             expr: >
-              const router = results.telegram_router.data;
-              if (router && router.should_edit) {
+              const router = results.telegram_router.data; if (router &&
+              router.inline_keyboard && router.inline_keyboard.length > 0) {
+                return router.inline_keyboard.flat();
+              } return [];
+          message_id:
+            type: javascript
+            expr: >
+              const router = results.telegram_router.data; if (router &&
+              router.should_edit) {
                 return (
                   router.message_id ||
                   results.get_conversation_state.data?.message_id ||
                   results.webhook_trigger.callback_message_id ||
                   null
                 );
-              }
-              return null;
+              } return null;
+          mode:
             type: javascript
-          inline_buttons:
             expr: >
-              const router = results.telegram_router.data;
-              if (router && router.inline_keyboard && router.inline_keyboard.length > 0) {
-                return router.inline_keyboard.flat();
+              const router = results.telegram_router.data; if (router &&
+              router.should_edit && router.message_id) {
+                'edit_message';
+              } else {
+                'send_message';
               }
-              return [];
-            type: javascript
           parse_mode:
-            expr: "'Markdown'"
             type: javascript
-      summary: Enviar respuesta (sendMessage o editMessageText)
+            expr: "'Markdown'"
+          text:
+            type: javascript
+            expr: >
+              const router = results.telegram_router.data; if (router &&
+              router.response_text && router.response_text.length > 0) {
+                return router.response_text;
+              } const orch = results.execute_action?.data; if (orch) {
+                if (orch.message) {
+                  return orch.message + (orch.follow_up ? `\n\n${orch.follow_up}` : '');
+                }
+              } return results.ai_agent?.data?.ai_response || 'Procesado';
+        path: f/telegram_send
     - id: gate_skip_if_router_handled
+      summary: Gate — si el router manejó, saltar AI Agent y orchestrator
       value:
-        lock: "!inline skip_if_router_matched.lock"
         type: rawscript
-        content: "!inline skip_if_router_matched.ts"
-        language: bun
+        content: '!inline skip_if_router_matched.ts'
         input_transforms: {}
+        lock: '!inline skip_if_router_matched.lock'
+        language: bun
       skip_if:
         expr: |
           !results.telegram_router.data?.forward_to_ai
-      summary: Gate — si el router manejó, saltar AI Agent y orchestrator
     - id: parse_message
+      summary: Parsear mensaje
       value:
-        path: f/internal/message_parser
         type: script
         input_transforms:
-          text:
-            expr: results.webhook_trigger.text
-            type: javascript
           chat_id:
-            expr: results.webhook_trigger.chat_id
             type: javascript
-      summary: Parsear mensaje
+            expr: results.webhook_trigger.chat_id
+          text:
+            type: javascript
+            expr: results.webhook_trigger.text
+        path: f/internal/message_parser
     - id: gate_parser_error
+      summary: Check parser error
       value:
-        lock: "!inline check_parser_error.lock"
         type: rawscript
-        content: "!inline check_parser_error.ts"
-        language: bun
+        content: '!inline check_parser_error.ts'
         input_transforms: {}
+        lock: '!inline check_parser_error.lock'
+        language: bun
       skip_if:
         expr: |
           !results.parse_message.success
-      summary: Check parser error
     - id: ai_agent
+      summary: AI Agent con contexto conversacional
       value:
-        path: f/internal/ai_agent
         type: script
         input_transforms:
-          text:
-            expr: results.parse_message.data.text
-            type: javascript
           chat_id:
+            type: javascript
             expr: results.parse_message.data.chat_id
-            type: javascript
           conversation_state:
-            expr: results.get_conversation_state.data || null
             type: javascript
-      summary: AI Agent con contexto conversacional
+            expr: results.get_conversation_state.data || null
+          text:
+            type: javascript
+            expr: results.parse_message.data.text
+        path: f/internal/ai_agent
     - id: gate_execute_action
+      summary: Gate — solo ejecuta orchestrator si vino del AI Agent
       value:
-        lock: "!inline skip_if_router_handled.lock"
         type: rawscript
-        content: "!inline skip_if_router_handled.ts"
-        language: bun
+        content: '!inline skip_if_router_handled.ts'
         input_transforms: {}
+        lock: '!inline skip_if_router_handled.lock'
+        language: bun
       skip_if:
         expr: |
           results.telegram_router.data?.forward_to_ai !== true
-      summary: Gate — solo ejecuta orchestrator si vino del AI Agent
     - id: execute_action
+      summary: Ejecutar acción de booking (via orchestrator flow)
       value:
-        path: f/flows/booking_orchestrator__flow
         type: flow
         input_transforms:
-          intent:
-            expr: results.ai_agent.data?.intent || 'duda_general'
-            type: javascript
           entities:
+            type: javascript
             expr: results.ai_agent.data?.entities || {}
+          intent:
             type: javascript
+            expr: results.ai_agent.data?.intent || 'duda_general'
           telegram_chat_id:
+            type: javascript
             expr: results.parse_message.data.chat_id
-            type: javascript
           telegram_name:
-            expr: results.webhook_trigger.username
             type: javascript
-      summary: Ejecutar acción de booking (via orchestrator flow)
+            expr: results.webhook_trigger.username
+        path: f/flows/booking_orchestrator__flow
     - id: update_conversation_state
+      summary: Actualizar estado conversacional en Redis (soporta hand-off de AI a
+        wizard)
       value:
-        path: f/internal/conversation_update
         type: script
         input_transforms:
-          chat_id:
-            expr: results.webhook_trigger.chat_id
-            type: javascript
-          intent:
-            expr: results.telegram_router.data?.route || results.ai_agent.data?.intent || 'desconocido'
-            type: javascript
-          entities:
-            expr: results.ai_agent.data?.entities || {}
-            type: javascript
-          flow_step:
-            expr: results.telegram_router.data?.nextFlowStep || 0
-            type: javascript
-          booking_state:
-            type: javascript
-            expr: >
-              results.telegram_router.data?.nextState ||
-              results.execute_action.data?.nextState ||
-              null
           booking_draft:
             type: javascript
             expr: >
               results.telegram_router.data?.nextDraft ||
-              results.execute_action.data?.nextDraft ||
-              null
+              results.execute_action.data?.nextDraft || null
+          booking_state:
+            type: javascript
+            expr: >
+              results.telegram_router.data?.nextState ||
+              results.execute_action.data?.nextState || null
+          chat_id:
+            type: javascript
+            expr: results.webhook_trigger.chat_id
+          entities:
+            type: javascript
+            expr: results.ai_agent.data?.entities || {}
+          flow_step:
+            type: javascript
+            expr: results.telegram_router.data?.nextFlowStep || 0
+          intent:
+            type: javascript
+            expr: results.telegram_router.data?.route || results.ai_agent.data?.intent ||
+              'desconocido'
           message_id:
+            type: javascript
             expr: >
               const newMsgId = results.send_telegram_response.data?.message_id;
               if (typeof newMsgId === 'number') {
                 return newMsgId;
-              }
-              return results.get_conversation_state.data?.message_id || null;
-            type: javascript
-      summary: Actualizar estado conversacional en Redis (soporta hand-off de AI a wizard)
+              } return results.get_conversation_state.data?.message_id || null;
+        path: f/internal/conversation_update
 schema:
   type: object
   properties:
@@ -289,7 +285,7 @@ schema:
           properties:
             chat:
               type: object
-            text:
-              type: string
             from:
               type: object
+            text:
+              type: string

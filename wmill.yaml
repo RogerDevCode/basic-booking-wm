@@ -1,6 +1,8 @@
 includes:
   - f/**
-excludes: []
+excludes:
+  - "**/*.d.ts"
+  - "f/types.ts"
 defaultTs: bun
 codebases: []
 skipVariables: false
@@ -19,6 +21,7 @@ includeSettings: false
 includeKey: false
 skipWorkspaceDependencies: false
 nonDottedPaths: true
-gitBranches:
-  main:
-    overrides: {}
+workspaces:
+  booking-titanium:
+    baseUrl: https://wm.stax.ink/
+    gitBranch: main

@@ -1,5 +1,5 @@
 // ============================================================================
-// AI AGENT — Hybrid LLM + Rules Intent Classifier (v3.1)
+// AI AGENT — Hybrid LLM + Rules Intent Classifier (v3.1) - Updated
 // Pattern: Precision Architecture, No 'any', Errors as Values
 // ============================================================================
 
