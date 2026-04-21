@@ -1,4 +1,5 @@
-summary: ""
+summary: ''
 display_name: web_auth_register
-owners: []
+default_permissioned_as: []
 extra_perms: {}
+owners: []

@@ -1,4 +1,5 @@
-summary: ""
+summary: ''
 display_name: telegram_debug
-owners: []
+default_permissioned_as: []
 extra_perms: {}
+owners: []

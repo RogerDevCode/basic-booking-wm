@@ -50,7 +50,7 @@ value:
           chat_id:
             type: javascript
             expr: results.webhook_trigger.chat_id
-        path: f/internal/conversation_get/main
+        path: f/internal/conversation_get
     - id: telegram_router
       summary: Router con InlineKeyboard + FSM wizard
       value:
@@ -81,7 +81,7 @@ value:
           username:
             type: javascript
             expr: results.webhook_trigger.username
-        path: f/internal/telegram_router/main
+        path: f/internal/telegram_router
     - id: answer_callback
       summary: AnswerCallbackQuery — quita el "cargando" del botón
       value:
@@ -102,7 +102,7 @@ value:
           text:
             type: javascript
             expr: "''"
-        path: f/telegram_send/main
+        path: f/telegram_send
       skip_if:
         expr: >
           results.webhook_trigger.callback_query_id === null ||
@@ -157,14 +157,14 @@ value:
                   return orch.message + (orch.follow_up ? `\n\n${orch.follow_up}` : '');
                 }
               } return results.ai_agent?.data?.ai_response || 'Procesado';
-        path: f/telegram_send/main
+        path: f/telegram_send
     - id: gate_skip_if_router_handled
       summary: Gate — si el router manejó, saltar AI Agent y orchestrator
       value:
         type: rawscript
-        content: '!inline skip_if_router_matched.ts'
+        content: '!inline gate_—_si_el_router_manejó,_saltar_ai_agent_y_orchestrator.ts'
         input_transforms: {}
-        lock: '!inline skip_if_router_matched.lock'
+        lock: '!inline gate_—_si_el_router_manejó,_saltar_ai_agent_y_orchestrator.lock'
         language: bun
       skip_if:
         expr: |
@@ -180,7 +180,7 @@ value:
           text:
             type: javascript
             expr: results.webhook_trigger.text
-        path: f/internal/message_parser/main
+        path: f/internal/message_parser
     - id: gate_parser_error
       summary: Check parser error
       value:
@@ -206,14 +206,14 @@ value:
           text:
             type: javascript
             expr: results.parse_message.data.text
-        path: f/internal/ai_agent/main
+        path: f/internal/ai_agent
     - id: gate_execute_action
       summary: Gate — solo ejecuta orchestrator si vino del AI Agent
       value:
         type: rawscript
-        content: '!inline skip_if_router_handled.ts'
+        content: '!inline gate_—_solo_ejecuta_orchestrator_si_vino_del_ai_agent.ts'
         input_transforms: {}
-        lock: '!inline skip_if_router_handled.lock'
+        lock: '!inline gate_—_solo_ejecuta_orchestrator_si_vino_del_ai_agent.lock'
         language: bun
       skip_if:
         expr: |
@@ -272,7 +272,7 @@ value:
               if (typeof newMsgId === 'number') {
                 return newMsgId;
               } return results.get_conversation_state.data?.message_id || null;
-        path: f/internal/conversation_update/main
+        path: f/internal/conversation_update
 schema:
   type: object
   properties:
