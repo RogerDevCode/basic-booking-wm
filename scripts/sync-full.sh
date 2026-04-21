@@ -18,7 +18,7 @@ npm run test && echo "✅ Tests pasados"
 
 # 3. SINCRONIZACIÓN WINDMILL (CON REGENERACIÓN DE METADATOS)
 echo "🔄 Sincronizando con Windmill (Modo Integridad)..."
-wmill sync push --workspace "$WORKSPACE_ID" --auto-metadata --yes --parallel 5
+wmill sync push --workspace "$WORKSPACE_ID" --auto-metadata --yes --parallel 10 --no-diff
 
 # 4. GIT PUSH A GITHUB
 if [ $# -gt 0 ]; then
