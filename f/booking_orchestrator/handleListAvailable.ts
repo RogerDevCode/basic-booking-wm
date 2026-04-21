@@ -45,13 +45,27 @@ export async function handleListAvailable(
     }];
   }
 
-  const slotTimes = slots.map((s) => {
+  const morningSlots = slots.filter(s => new Date(s.start).getHours() < 12);
+  const afternoonSlots = slots.filter(s => new Date(s.start).getHours() >= 12);
+
+  const format = (s: typeof slots[0]) => {
     const d = new Date(s.start);
     return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-  }).join(', ');
+  };
+
+  let message = `📅 *Disponibilidad para el ${date}:*\n\n`;
+  
+  if (morningSlots.length > 0) {
+    message += `🌅 *Mañana:*\n${morningSlots.map(format).join(', ')}\n\n`;
+  }
+  
+  if (afternoonSlots.length > 0) {
+    message += `🌇 *Tarde:*\n${afternoonSlots.map(format).join(', ')}\n\n`;
+  }
 
   return [null, {
     action: 'ver_disponibilidad', success: true, data,
-    message: `📅 Horarios disponibles el ${date}:\n${slotTimes}${avail.total_available > 10 ? '...' : ''}`,
+    message,
+    follow_up: '¿Te gustaría agendar alguno de estos horarios?'
   }];
 }

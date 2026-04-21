@@ -19,6 +19,37 @@ export async function resolveContext(
   let resolvedDate = input.date ?? getEntity(input.entities, 'date');
   let resolvedTime = input.time ?? getEntity(input.entities, 'time');
 
+  const providerName = getEntity(input.entities, 'provider_name');
+  const specialtyName = getEntity(input.entities, 'specialty_name');
+
+  // Intelligent Provider Resolution by Name
+  if (!providerId && providerName) {
+    const providers = await sql`
+      SELECT provider_id FROM providers 
+      WHERE name ILIKE ${'%' + providerName + '%'} 
+      LIMIT 1
+    `;
+    const found = providers[0];
+    if (found && typeof found['provider_id'] === 'string') {
+      providerId = found['provider_id'];
+    }
+  }
+
+  // Intelligent Service Resolution by Specialty Name
+  if (!serviceId && specialtyName) {
+    const services = await sql`
+      SELECT s.service_id 
+      FROM services s
+      JOIN specialties sp ON s.specialty_id = sp.specialty_id
+      WHERE sp.name ILIKE ${'%' + specialtyName + '%'}
+      LIMIT 1
+    `;
+    const found = services[0];
+    if (found && typeof found['service_id'] === 'string') {
+      serviceId = found['service_id'];
+    }
+  }
+
   if (resolvedDate) {
     const abs = resolveDate(resolvedDate);
     if (abs) resolvedDate = abs;

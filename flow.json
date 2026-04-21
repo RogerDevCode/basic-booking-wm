@@ -1,0 +1,292 @@
+{
+    "value": {
+        "modules": [
+            {
+                "id": "webhook_trigger",
+                "value": {
+                    "type": "rawscript",
+                    "input_transforms": {
+                        "event": {
+                            "type": "javascript",
+                            "expr": "flow_input"
+                        }
+                    },
+                    "content": "import { z } from \"zod\";\nimport type { Result } from \"../../internal/result\";\nimport { ok, fail } from \"../../internal/result\";\n\n/*\n * PRE-FLIGHT CHECKLIST\n * Mission         : Extract normalized fields from Telegram webhook event (message + callback_query)\n * DB Tables Used  : NONE — pure event parsing\n * Concurrency Risk: NO — stateless\n * GCal Calls      : NO\n * Idempotency Key : NO\n * RLS Tenant ID   : NO\n * Zod Schemas     : YES — for robust payload validation\n */\n\n/**\n * TELEGRAM WEBHOOK TRIGGER — Event normalization\n * \n * This module follows SOLID principles by using Zod for validation (SRP),\n * centralizing shared access logic (DRY), and maintaining a clean, deterministic\n * flow (KISS). Adheres to Go-style Result pattern.\n */\n\n// ============================================================================\n// Schemas & Types\n// ============================================================================\n\nconst TelegramUserSchema = z.object({\n  id: z.union([z.number(), z.string()]).optional(),\n  first_name: z.string().optional(),\n  username: z.string().optional(),\n});\n\nconst TelegramMessageSchema = z.object({\n  message_id: z.number().optional(),\n  chat: z.object({ \n    id: z.union([z.number(), z.string()]).optional() \n  }).optional(),\n  text: z.string().optional(),\n  from: TelegramUserSchema.optional(),\n});\n\nconst CallbackQuerySchema = z.object({\n  id: z.string().optional(),\n  data: z.string().optional(),\n  from: TelegramUserSchema.optional(),\n  message: TelegramMessageSchema.optional(),\n});\n\n/**\n * Validates the incoming Telegram webhook payload.\n */\nconst TelegramEventSchema = z.object({\n  message: TelegramMessageSchema.optional(),\n  channel_post: TelegramMessageSchema.optional(),\n  callback_query: CallbackQuerySchema.optional(),\n}).refine(data => !!(data.message || data.channel_post || data.callback_query), {\n  message: \"event must contain at least one of: message, channel_post, or callback_query\",\n});\n\ntype TelegramEvent = z.infer<typeof TelegramEventSchema>;\n\nexport interface TriggerOutput {\n  readonly chat_id: string;\n  readonly text: string;\n  readonly username: string;\n  readonly callback_data: string | null;\n  readonly callback_query_id: string | null;\n  readonly callback_message_id: number | null;\n  readonly raw_event: TelegramEvent;\n}\n\n// ============================================================================\n// Internal Helpers — Single Responsibility & DRY\n// ============================================================================\n\n/**\n * DRY: Extracts the primary source of conversation data from the event.\n */\nfunction getEventSource(event: Readonly<TelegramEvent>) {\n  return event.message ?? event.channel_post ?? event.callback_query?.message;\n}\n\n/**\n * SRP: Extracts chat_id with falling priority: \n * message -> callback message -> sender ID.\n */\nfunction extractChatId(event: Readonly<TelegramEvent>): string {\n  const source = getEventSource(event);\n  const rawId = source?.chat?.id ?? event.callback_query?.from?.id ?? \"\";\n  return String(rawId);\n}\n\n/**\n * SRP: Extracts the message text if present.\n */\nfunction extractText(event: Readonly<TelegramEvent>): string {\n  return getEventSource(event)?.text ?? \"\";\n}\n\n/**\n * SRP: Extracts the sender's display name or username.\n */\nfunction extractUsername(event: Readonly<TelegramEvent>): string {\n  const source = event.message?.from \n    ?? event.channel_post?.from \n    ?? event.callback_query?.from;\n\n  return source?.first_name ?? source?.username ?? \"User\";\n}\n\n/**\n * SRP: Extracts metadata specifically for callback interactions.\n */\nfunction extractCallbackInfo(event: Readonly<TelegramEvent>) {\n  const cb = event.callback_query;\n  return {\n    data: cb?.data ?? null,\n    id: cb?.id ?? null,\n    messageId: cb?.message?.message_id ?? null,\n  };\n}\n\n// ============================================================================\n// Main Entry Point\n// ============================================================================\n\n/**\n * Normalizes Telegram webhook events into a consistent internal format.\n */\nexport async function main(\n  rawInput: unknown,\n): Promise<Result<TriggerOutput>> {\n  // 1. Validate Input Payload (Fail-Fast)\n  const parseResult = TelegramEventSchema.safeParse(rawInput);\n  if (!parseResult.success) {\n    const errorMsg = parseResult.error.issues.map((e: z.ZodIssue) => e.message).join(\", \");\n    return fail(`invalid_telegram_payload: ${errorMsg}`);\n  }\n\n  const event = parseResult.data;\n\n  // 2. Extract and Normalize Fields (SRP/DRY)\n  const callbackInfo = extractCallbackInfo(event);\n\n  const output: TriggerOutput = {\n    chat_id: extractChatId(event),\n    text: extractText(event),\n    username: extractUsername(event),\n    callback_data: callbackInfo.data,\n    callback_query_id: callbackInfo.id,\n    callback_message_id: callbackInfo.messageId,\n    raw_event: event,\n  };\n\n  // 3. Final Immutability Check\n  return ok(Object.freeze(output));\n}\n",
+                    "lock": "{\n  \"dependencies\": {\n    \"zod\": \"latest\"\n  }\n}\n//bun.lock\n{\n  \"lockfileVersion\": 1,\n  \"configVersion\": 1,\n  \"workspaces\": {\n    \"\": {\n      \"dependencies\": {\n        \"zod\": \"latest\",\n      },\n    },\n  },\n  \"packages\": {\n    \"zod\": [\"zod@4.3.6\", \"\", {}, \"sha512-rftlrkhHZOcjDwkGlnUtZZkvaPHCsDATp4pGpuOOMDaTdDDXF91wuVDJoWoPsKX/3YPQ5fHuF3STjcYyKr+Qhg==\"],\n  }\n}\n",
+                    "language": "bun"
+                },
+                "summary": "Telegram Webhook Trigger"
+            },
+            {
+                "id": "get_conversation_state",
+                "value": {
+                    "type": "script",
+                    "input_transforms": {
+                        "chat_id": {
+                            "type": "javascript",
+                            "expr": "results.webhook_trigger.chat_id"
+                        }
+                    },
+                    "path": "f/internal/conversation_get/main"
+                },
+                "summary": "Obtener estado conversacional de Redis"
+            },
+            {
+                "id": "telegram_router",
+                "value": {
+                    "type": "script",
+                    "input_transforms": {
+                        "text": {
+                            "type": "javascript",
+                            "expr": "results.webhook_trigger.text"
+                        },
+                        "username": {
+                            "type": "javascript",
+                            "expr": "results.webhook_trigger.username"
+                        },
+                        "booking_state": {
+                            "type": "javascript",
+                            "expr": "results.get_conversation_state.data?.booking_state || null"
+                        },
+                        "callback_data": {
+                            "type": "javascript",
+                            "expr": "results.webhook_trigger.callback_data"
+                        },
+                        "booking_draft": {
+                            "type": "javascript",
+                            "expr": "results.get_conversation_state.data?.booking_draft || null"
+                        },
+                        "callback_query_id": {
+                            "type": "javascript",
+                            "expr": "results.webhook_trigger.callback_query_id"
+                        },
+                        "chat_id": {
+                            "type": "javascript",
+                            "expr": "results.webhook_trigger.chat_id"
+                        },
+                        "message_id": {
+                            "type": "javascript",
+                            "expr": "results.get_conversation_state.data?.message_id || results.webhook_trigger.callback_message_id || null"
+                        }
+                    },
+                    "path": "f/internal/telegram_router/main"
+                },
+                "summary": "Router con InlineKeyboard + FSM wizard"
+            },
+            {
+                "id": "answer_callback",
+                "value": {
+                    "type": "script",
+                    "input_transforms": {
+                        "text": {
+                            "type": "javascript",
+                            "expr": "''"
+                        },
+                        "chat_id": {
+                            "type": "javascript",
+                            "expr": "results.webhook_trigger.chat_id"
+                        },
+                        "callback_alert": {
+                            "type": "javascript",
+                            "expr": "''"
+                        },
+                        "callback_query_id": {
+                            "type": "javascript",
+                            "expr": "results.webhook_trigger.callback_query_id || ''"
+                        },
+                        "mode": {
+                            "type": "javascript",
+                            "expr": "'answer_callback'"
+                        }
+                    },
+                    "path": "f/telegram_send/main"
+                },
+                "summary": "AnswerCallbackQuery — quita el \"cargando\" del botón",
+                "skip_if": {
+                    "expr": "results.webhook_trigger.callback_query_id === null || results.webhook_trigger.callback_query_id === undefined\n"
+                }
+            },
+            {
+                "id": "send_telegram_response",
+                "value": {
+                    "type": "script",
+                    "input_transforms": {
+                        "message_id": {
+                            "type": "javascript",
+                            "expr": "const router = results.telegram_router.data; if (router && router.should_edit) {\n  return (\n    router.message_id ||\n    results.get_conversation_state.data?.message_id ||\n    results.webhook_trigger.callback_message_id ||\n    null\n  );\n} return null;\n"
+                        },
+                        "mode": {
+                            "type": "javascript",
+                            "expr": "const router = results.telegram_router.data; if (router && router.should_edit && router.message_id) {\n  'edit_message';\n} else {\n  'send_message';\n}\n"
+                        },
+                        "chat_id": {
+                            "type": "javascript",
+                            "expr": "results.webhook_trigger.chat_id"
+                        },
+                        "parse_mode": {
+                            "type": "javascript",
+                            "expr": "'Markdown'"
+                        },
+                        "text": {
+                            "type": "javascript",
+                            "expr": "const router = results.telegram_router.data; if (router && router.response_text && router.response_text.length > 0) {\n  return router.response_text;\n} const orch = results.execute_action?.data; if (orch) {\n  if (orch.message) {\n    return orch.message + (orch.follow_up ? `\\n\\n${orch.follow_up}` : '');\n  }\n} return results.ai_agent?.data?.ai_response || 'Procesado';\n"
+                        },
+                        "inline_buttons": {
+                            "type": "javascript",
+                            "expr": "const router = results.telegram_router.data; if (router && router.inline_keyboard && router.inline_keyboard.length > 0) {\n  return router.inline_keyboard.flat();\n} return [];\n"
+                        }
+                    },
+                    "path": "f/telegram_send/main"
+                },
+                "summary": "Enviar respuesta (sendMessage o editMessageText)"
+            },
+            {
+                "id": "gate_skip_if_router_handled",
+                "value": {
+                    "type": "rawscript",
+                    "input_transforms": {},
+                    "content": "/*\n * PRE-FLIGHT CHECKLIST\n * Mission         : Gate to skip AI Agent if router matched a deterministic route\n * DB Tables Used  : None\n * Concurrency Risk: NO\n * GCal Calls      : NO\n * Idempotency Key : NO\n * RLS Tenant ID   : NO\n * Zod Schemas     : NO — no inputs in current signature\n */\n\nimport { ok } from \"../../internal/result\";\nimport type { Result } from \"../../internal/result\";\n\n/**\n * REASONING TRACE\n *\n * STEP 1 — DECOMPOSITION:\n * - Return a deterministic GateResult to signal the flow's next steps.\n * - Adhere to Go-style TypeScript Result tuple contract (§12.1).\n *\n * STEP 2 — SCHEMA CROSS-CHECK:\n * - No database tables are accessed by this script.\n *\n * STEP 3 — FAILURE MODE ANALYSIS:\n * - The script is purely deterministic and has no external dependencies.\n * - No identifiable failure modes beyond core runtime failure.\n *\n * STEP 4 — CONCURRENCY THREAT MODEL:\n * - No shared state or concurrent resource access. Concurrency risk is non-existent.\n *\n * STEP 5 — SOLID ARCHITECTURE REVIEW:\n * - SRP: Single responsibility of acting as a flow control marker.\n * - DRY: Uses the centralized 'ok' helper from the internal Result module (§12.2).\n * - KISS: Implementation is reduced to its absolute minimum functional form.\n *\n * STEP 6 — SECURITY AUDIT:\n * - No user-provided inputs are processed.\n * - No sensitive data or tenant context is required.\n */\n\n// ============================================================================\n// Types\n// ============================================================================\n\ninterface GateResult {\n  readonly skip: boolean;\n}\n\n// ============================================================================\n// Main entry point\n// ============================================================================\n\n/**\n * Gate: skip AI Agent if router already matched a deterministic route.\n * Returns success with skip: false when the step is reached, indicating\n * the flow branch should continue execution.\n *\n * @returns A Result tuple with the skip status.\n */\nexport async function main(): Promise<Result<GateResult>> {\n  // If this step is reached in the Windmill flow branch, it implies that\n  // the deterministic router did not consume the message, and we should proceed.\n  return ok(Object.freeze({\n    skip: false,\n  }));\n}\n",
+                    "lock": "{\n  \"dependencies\": {}\n}\n//bun.lock\n<empty>",
+                    "language": "bun"
+                },
+                "summary": "Gate — si el router manejó, saltar AI Agent y orchestrator",
+                "skip_if": {
+                    "expr": "!results.telegram_router.data?.forward_to_ai\n"
+                }
+            },
+            {
+                "id": "parse_message",
+                "value": {
+                    "type": "script",
+                    "input_transforms": {
+                        "text": {
+                            "type": "javascript",
+                            "expr": "results.webhook_trigger.text"
+                        },
+                        "chat_id": {
+                            "type": "javascript",
+                            "expr": "results.webhook_trigger.chat_id"
+                        }
+                    },
+                    "path": "f/internal/message_parser/main"
+                },
+                "summary": "Parsear mensaje"
+            },
+            {
+                "id": "gate_parser_error",
+                "value": {
+                    "type": "rawscript",
+                    "input_transforms": {},
+                    "content": "/*\n * PRE-FLIGHT CHECKLIST\n * Mission         : Validate parser result and provide flow control signal\n * DB Tables Used  : NONE\n * Concurrency Risk: NO\n * GCal Calls      : NO\n * Idempotency Key : NO\n * RLS Tenant ID   : NO\n * Zod Schemas     : NO — stateless flow control\n */\n\nimport type { Result } from \"../../internal/result\";\n\n/**\n * REASONING TRACE\n *\n * 1. Mission Decomposition:\n *    - Serve as a checkpoint for message parsing results in the Telegram flow.\n *    - Return a Result tuple conforming to AGENTS.md §4 and §12.\n *\n * 2. SOLID compliance:\n *    - SRP: Single purpose of acting as a flow control point for parser state.\n *    - DRY: Uses centralized Result type for consistent error handling.\n *    - KISS: Minimal implementation that fulfills the flow's architectural requirement.\n *\n * 3. Architecture:\n *    - In the Windmill flow, this node runs only if the parser succeeded (via skip_if).\n *    - Returning { skip: true } maintains compatibility with the existing flow logic.\n */\n\n// ============================================================================\n// Types\n// ============================================================================\n\ninterface GateResult {\n  readonly skip: boolean;\n}\n\n// ============================================================================\n// Main entry point\n// ============================================================================\n\n/**\n * Gate: confirms parser success and signals flow continuation status.\n * \n * @returns A Result tuple with the skip status.\n */\nexport async function main(): Promise<Result<GateResult>> {\n  // If this node is executed, it means results.parse_message.success was true\n  // according to the flow's skip_if logic.\n  const result: GateResult = Object.freeze({\n    skip: true,\n  });\n\n  return [null, result];\n}\n",
+                    "lock": "{\n  \"dependencies\": {}\n}\n//bun.lock\n<empty>",
+                    "language": "bun"
+                },
+                "summary": "Check parser error",
+                "skip_if": {
+                    "expr": "!results.parse_message.success\n"
+                }
+            },
+            {
+                "id": "ai_agent",
+                "value": {
+                    "type": "script",
+                    "input_transforms": {
+                        "conversation_state": {
+                            "type": "javascript",
+                            "expr": "results.get_conversation_state.data || null"
+                        },
+                        "text": {
+                            "type": "javascript",
+                            "expr": "results.parse_message.data.text"
+                        },
+                        "chat_id": {
+                            "type": "javascript",
+                            "expr": "results.parse_message.data.chat_id"
+                        }
+                    },
+                    "path": "f/internal/ai_agent/main"
+                },
+                "summary": "AI Agent con contexto conversacional"
+            },
+            {
+                "id": "gate_execute_action",
+                "value": {
+                    "type": "rawscript",
+                    "input_transforms": {},
+                    "content": "/*\n * PRE-FLIGHT CHECKLIST\n * Mission         : Gate to skip booking orchestrator if router handled the message deterministically\n * DB Tables Used  : None\n * Concurrency Risk: NO\n * GCal Calls      : NO\n * Idempotency Key : NO\n * RLS Tenant ID   : NO\n * Zod Schemas     : NO — no inputs in current signature\n */\n\nimport type { Result } from \"../../internal/result\";\n\n/**\n * REASONING TRACE\n *\n * 1. Mission Decomposition:\n *    - Act as a flow control gate for the booking orchestrator.\n *    - Ensure the orchestrator is only executed when the AI Agent has extracted a booking intent.\n *    - Adhere to AGENTS.md §4 and §12 standards for Result tuples and error handling.\n *\n * 2. SOLID compliance:\n *    - SRP: Single responsibility of providing a flow control signal.\n *    - DRY: Utilizes centralized Result type from internal/result.\n *    - KISS: Minimal and deterministic implementation.\n *\n * 3. Architecture:\n *    - The logic for conditional execution is primarily managed by Windmill's YAML 'skip_if' layer.\n *    - This script provides a consistent return value when the step is reached in the flow.\n */\n\n// ============================================================================\n// Types\n// ============================================================================\n\ninterface GateResult {\n  readonly skip: boolean;\n}\n\n// ============================================================================\n// Main entry point\n// ============================================================================\n\n/**\n * Gate: skip booking orchestrator if router handled the message deterministically.\n * The orchestrator is only needed when the AI Agent extracted a booking intent.\n *\n * @returns A Result tuple with the skip status.\n */\nexport async function main(): Promise<Result<GateResult>> {\n  // If this script is executed (i.e., not skipped by the flow engine's YAML expr),\n  // it means we intend to proceed with the next step in this branch.\n  const result: GateResult = Object.freeze({\n    skip: false,\n  });\n\n  return [null, result];\n}\n",
+                    "lock": "{\n  \"dependencies\": {}\n}\n//bun.lock\n<empty>",
+                    "language": "bun"
+                },
+                "summary": "Gate — solo ejecuta orchestrator si vino del AI Agent",
+                "skip_if": {
+                    "expr": "results.telegram_router.data?.forward_to_ai !== true\n"
+                }
+            },
+            {
+                "id": "execute_action",
+                "value": {
+                    "type": "flow",
+                    "input_transforms": {
+                        "intent": {
+                            "type": "javascript",
+                            "expr": "results.ai_agent.data?.intent || 'duda_general'"
+                        },
+                        "telegram_chat_id": {
+                            "type": "javascript",
+                            "expr": "results.parse_message.data.chat_id"
+                        },
+                        "telegram_name": {
+                            "type": "javascript",
+                            "expr": "results.webhook_trigger.username"
+                        },
+                        "entities": {
+                            "type": "javascript",
+                            "expr": "results.ai_agent.data?.entities || {}"
+                        }
+                    },
+                    "path": "f/flows/booking_orchestrator__flow"
+                },
+                "summary": "Ejecutar acción de booking (via orchestrator flow)"
+            },
+            {
+                "id": "update_conversation_state",
+                "value": {
+                    "type": "script",
+                    "input_transforms": {
+                        "entities": {
+                            "type": "javascript",
+                            "expr": "results.ai_agent.data?.entities || {}"
+                        },
+                        "booking_draft": {
+                            "type": "javascript",
+                            "expr": "results.telegram_router.data?.nextDraft || results.execute_action.data?.nextDraft || null\n"
+                        },
+                        "flow_step": {
+                            "type": "javascript",
+                            "expr": "results.telegram_router.data?.nextFlowStep || 0"
+                        },
+                        "booking_state": {
+                            "type": "javascript",
+                            "expr": "results.telegram_router.data?.nextState || results.execute_action.data?.nextState || null\n"
+                        },
+                        "chat_id": {
+                            "type": "javascript",
+                            "expr": "results.webhook_trigger.chat_id"
+                        },
+                        "intent": {
+                            "type": "javascript",
+                            "expr": "results.telegram_router.data?.route || results.ai_agent.data?.intent || 'desconocido'"
+                        },
+                        "message_id": {
+                            "type": "javascript",
+                            "expr": "const newMsgId = results.send_telegram_response.data?.message_id; if (typeof newMsgId === 'number') {\n  return newMsgId;\n} return results.get_conversation_state.data?.message_id || null;\n"
+                        }
+                    },
+                    "path": "f/internal/conversation_update/main"
+                },
+                "summary": "Actualizar estado conversacional en Redis (soporta hand-off de AI a wizard)"
+            }
+        ]
+    },
+    "summary": ""
+}
