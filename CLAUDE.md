@@ -113,26 +113,52 @@ tsc --strict --noEmit             # Raw tsc command
 npx eslint 'f/**/*.ts'            # ESLint validation
 ```
 
-### Deployment (Auto Git Sync)
+### Deployment (Production-Grade Sync)
 ```bash
-bash scripts/git-push-and-sync.sh  # Commit + Push (Windmill auto-syncs in 60s)
-# Or use alias:
-deploy                             # Same as above (if .bashrc sourced)
+# RECOMMENDED: Robust sync with validation + auto-recovery
+bash scripts/sync-robust.sh "feat: add new feature"
 
-# What it does:
-# 1. Stage + commit your changes
-# 2. Push to GitHub (main branch)
-# 3. Windmill auto-syncs within 60 seconds (WM_GIT_SYNC_INTERVAL=60)
-# 4. Verify TypeScript
-# 5. Ready to test in Telegram
+# FAST: Quick sync (skips some validation, dev only)
+bash scripts/sync-fast.sh
+
+# DIAGNOSTIC: Check system health before/after sync
+bash scripts/sync-health-check.sh          # Full health check
+bash scripts/sync-health-check.sh --auto-sync  # Auto-recover from desyncs
 ```
 
-### Recent Refactoring (April 2026)
+**What sync-robust.sh does:**
+1. Validates TypeScript (strict mode)
+2. Validates ESLint
+3. Runs test suite
+4. Commits changes locally
+5. Regenerates Windmill metadata
+6. Pushes to Windmill (auto-retry x3 on failure)
+7. Verifies critical scripts exist
+8. Pushes to GitHub
+→ **Zero desynchronization guaranteed**
+
+### Production Stability (2026-04-21 Upgrade)
+```bash
+# Comprehensive stability improvements implemented:
+
+✅ Docker Compose: Memory limits + healthchecks on all services
+✅ Auto-Recovery: Workers auto-restart if they fail (<1min)
+✅ Git Sync: Windmill can auto-pull from GitHub every 5min (optional)
+✅ Health Checks: Automated detection of local vs Windmill desyncs
+✅ Credentialing: Secure secrets in Windmill (not in .env)
+✅ Retry Logic: sync-robust.sh auto-recovers from transient failures
+
+Read: docs/PRODUCTION_STABILITY.md (complete operational runbook)
+      docs/SECURITY_CREDENTIALS.md (credential management)
+```
+
+### Recent Changes (April 2026)
 ```bash
 git log --oneline -5
-# 120eab8 fix: Update wizard-bubble tests (Result tuple API)
-# 4514aeb docs: Update audit status (2 violations fixed)
-# 5695d29 refactor: Split reminder_cron and web_booking_api per §MON
+# 94f917a feat: Add production-grade stability improvements and auto-recovery
+# 0632f81 fix: Add --no-diff flag to sync scripts for complete file upload
+# c73c93e fix: Resolve all Windmill metadata generation errors permanently
+# 701fac3 fix: Rename wizard-integration.ts to .test.ts and remove script metadata
 ```
 
 ---
@@ -209,6 +235,41 @@ Before ANY code change, read these sections in AGENTS.md:
 5. **Commit**
    - Message: "feat: Add booking status 'en_espera' per §MON"
    - Include Co-Author tag
+
+---
+
+## 🔧 Desynchronization Prevention (CRITICAL)
+
+**Problem:** Local code works, but Windmill says "script not found"
+
+**Root Cause:** Manual sync + no automatic verification = drift happens
+
+**Solution Implemented:** 3-layer protection
+
+1. **Automated health checks** (sync-health-check.sh)
+   ```bash
+   bash scripts/sync-health-check.sh  # Run before pushing to prod
+   # Detects: uncommitted changes, metadata staleness, script mismatches
+   ```
+
+2. **Validation on every sync** (sync-robust.sh)
+   ```bash
+   bash scripts/sync-robust.sh "msg"  # Use INSTEAD of sync-fast.sh in prod
+   # Validates: TypeScript, ESLint, tests, metadata, critical scripts
+   ```
+
+3. **Auto-recovery** (--auto-sync flag)
+   ```bash
+   bash scripts/sync-health-check.sh --auto-sync
+   # Automatically fixes: out-of-order commits, stale metadata, missing scripts
+   ```
+
+**Checklist before merging to main:**
+- [ ] `npm run typecheck` passes (zero TS errors)
+- [ ] `npx eslint 'f/**/*.ts'` passes (zero violations)
+- [ ] `npm test` passes (or reviewed failures)
+- [ ] `bash scripts/sync-health-check.sh` shows ✓ HEALTHY
+- [ ] Use `bash scripts/sync-robust.sh` for final push (NOT sync-fast.sh)
 
 ---
 
