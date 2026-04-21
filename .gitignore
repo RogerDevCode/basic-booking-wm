@@ -39,9 +39,8 @@ bin/
 *.tsbuildinfo
 
 # Generated Windmill metadata (auto-created on sync)
-*.script.yaml
-*.script.lock
-wmll-lock.yaml
+# NOTE: .script.yaml and .script.lock MUST be tracked in git for Windmill to sync correctly
+# wmll-lock.yaml should still be ignored (contains local lock state)
 
 # =============================================================================
 # ENVIRONMENT & SECRETS (NEVER COMMIT)
