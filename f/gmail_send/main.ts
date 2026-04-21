@@ -45,8 +45,8 @@
 
 import { z } from 'zod';
 import * as nodemailer from 'nodemailer';
-import { InputSchema, type GmailSendData } from './types.js';
-import { buildEmailContent, sendWithRetry } from './services.js';
+import { InputSchema, type GmailSendData } from './types';
+import { buildEmailContent, sendWithRetry } from './services';
 
 export async function main(rawInput: unknown): Promise<[Error | null, GmailSendData | null]> {
   const parsed = InputSchema.safeParse(rawInput);
