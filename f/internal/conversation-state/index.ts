@@ -34,7 +34,7 @@
 import { Redis } from 'ioredis';
 import { z } from 'zod';
 import type { Result } from '../result/index';
-import { BookingStateSchema, DraftBookingSchema, type BookingState, type DraftBooking } from '../booking_fsm';
+import { BookingStateSchema, DraftBookingSchema, type BookingState, type DraftBooking } from '../booking_fsm/index';
 
 // ── CONSTANTS ─────────────────────────────────────────────────────────────────
 const DEFAULT_CONV_TTL_SECONDS = 30 * 60; // 30 minutes
