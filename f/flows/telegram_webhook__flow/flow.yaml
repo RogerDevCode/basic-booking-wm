@@ -235,7 +235,7 @@ value:
           telegram_name:
             type: javascript
             expr: results.webhook_trigger.username
-        path: f/flows/booking_orchestrator__flow
+        path: f/flows/booking_orchestrator
     - id: update_conversation_state
       summary: Actualizar estado conversacional en Redis (soporta hand-off de AI a
         wizard)
