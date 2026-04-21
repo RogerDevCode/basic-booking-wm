@@ -2,6 +2,8 @@ includes:
   - f/**
 excludes:
   - "**/*.d.ts"
+  - "**/*.test.ts"
+  - "**/*.spec.ts"
   - "f/types.ts"
 defaultTs: bun
 codebases: []
