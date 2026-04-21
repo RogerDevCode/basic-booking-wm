@@ -10,24 +10,14 @@ export async function handleCreateBooking(
 
   // 1. SMART HANDOFF: Detect missing required fields for a direct booking
   if (!client_id || !provider_id || !service_id || !date || !time) {
-    let nextStep: 'selecting_specialty' | 'selecting_doctor' | 'selecting_date' | 'selecting_time' = 'selecting_specialty';
-    
-    if (provider_id && !date) {
-      nextStep = 'selecting_date';
-    } else if (service_id && !provider_id) {
-      nextStep = 'selecting_doctor';
-    } else if (date && !time) {
-      nextStep = 'selecting_time';
-    }
-
     return [null, {
       action: 'crear_cita',
       success: false,
       data: null,
       message: `He capturado parte de tu solicitud, pero para agendar necesito que completemos unos detalles en el asistente.`,
-      nextState: { name: nextStep, error: null, items: [] },
+      nextState: { name: 'selecting_specialty' as const, error: null, items: [] },
       nextDraft: {
-        specialty_id: null, // Should be resolved in context if possible
+        specialty_id: null,
         specialty_name: getEntity(input.entities, 'specialty_name') ?? null,
         doctor_id: provider_id ?? null,
         doctor_name: getEntity(input.entities, 'provider_name') ?? null,

@@ -16,6 +16,6 @@ fi
 
 # 2. PUSH INCREMENTAL A WINDMILL
 echo "🔄 Subiendo cambios a Windmill (Modo paralelo)..."
-wmill sync push --workspace "$WORKSPACE_ID" --parallel 10 --no-diff
+wmill sync push --workspace "$WORKSPACE_ID" --parallel 10
 
 echo "✅ Sincronizado en segundos."
