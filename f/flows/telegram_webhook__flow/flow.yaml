@@ -50,7 +50,7 @@ value:
           chat_id:
             type: javascript
             expr: results.webhook_trigger.chat_id
-        path: f/internal/conversation_get
+        path: f/internal/conversation_get/main
     - id: telegram_router
       summary: Router con InlineKeyboard + FSM wizard
       value:
@@ -81,7 +81,7 @@ value:
           username:
             type: javascript
             expr: results.webhook_trigger.username
-        path: f/internal/telegram_router
+        path: f/internal/telegram_router/main
     - id: answer_callback
       summary: AnswerCallbackQuery — quita el "cargando" del botón
       value:
@@ -102,7 +102,7 @@ value:
           text:
             type: javascript
             expr: "''"
-        path: f/telegram_send
+        path: f/telegram_send/main
       skip_if:
         expr: >
           results.webhook_trigger.callback_query_id === null ||
@@ -157,7 +157,7 @@ value:
                   return orch.message + (orch.follow_up ? `\n\n${orch.follow_up}` : '');
                 }
               } return results.ai_agent?.data?.ai_response || 'Procesado';
-        path: f/telegram_send
+        path: f/telegram_send/main
     - id: gate_skip_if_router_handled
       summary: Gate — si el router manejó, saltar AI Agent y orchestrator
       value:
@@ -180,7 +180,7 @@ value:
           text:
             type: javascript
             expr: results.webhook_trigger.text
-        path: f/internal/message_parser
+        path: f/internal/message_parser/main
     - id: gate_parser_error
       summary: Check parser error
       value:
@@ -206,7 +206,7 @@ value:
           text:
             type: javascript
             expr: results.parse_message.data.text
-        path: f/internal/ai_agent
+        path: f/internal/ai_agent/main
     - id: gate_execute_action
       summary: Gate — solo ejecuta orchestrator si vino del AI Agent
       value:
@@ -272,7 +272,7 @@ value:
               if (typeof newMsgId === 'number') {
                 return newMsgId;
               } return results.get_conversation_state.data?.message_id || null;
-        path: f/internal/conversation_update
+        path: f/internal/conversation_update/main
 schema:
   type: object
   properties:
