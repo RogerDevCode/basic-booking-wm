@@ -63,7 +63,7 @@ describe('Telegram Router — wizard delegation (requires DATABASE_URL)', () => 
     const bookingState = {
       name: 'selecting_specialty' as const,
       error: null,
-      items: [] as Array<{ id: string; name: string }>,
+      items: [] as { id: string; name: string }[],
     };
 
     const result = await main({
@@ -84,7 +84,7 @@ describe('Telegram Router — wizard delegation (requires DATABASE_URL)', () => 
     const bookingState = {
       name: 'selecting_specialty' as const,
       error: null,
-      items: [] as Array<{ id: string; name: string }>,
+      items: [] as { id: string; name: string }[],
     };
 
     const result = await main({
