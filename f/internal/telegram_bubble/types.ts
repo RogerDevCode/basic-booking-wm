@@ -1,4 +1,4 @@
-import { type BookingState, type DraftBooking } from '../booking_fsm/index.ts';
+import { type BookingState, type DraftBooking } from '../booking_fsm';
 
 export interface InlineButton {
   readonly text: string;

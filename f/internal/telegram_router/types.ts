@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { BookingState, DraftBooking } from '../booking_fsm/index.ts';
+import type { BookingState, DraftBooking } from '../booking_fsm';
 
 export type RouteType = 'callback' | 'command' | 'menu' | 'submenu' | 'wizard' | 'ai_agent';
 
