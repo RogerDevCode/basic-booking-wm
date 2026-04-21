@@ -1,2 +1,0 @@
-language: bun
-skip_if: '!results.telegram_router.data?.forward_to_ai'
