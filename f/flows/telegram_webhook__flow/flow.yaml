@@ -139,9 +139,9 @@ value:
             expr: >
               const router = results.telegram_router.data; if (router &&
               router.should_edit && router.message_id) {
-                'edit_message';
+                return 'edit_message';
               } else {
-                'send_message';
+                return 'send_message';
               }
           parse_mode:
             type: javascript
