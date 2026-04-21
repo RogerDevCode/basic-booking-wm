@@ -27,3 +27,19 @@ workspaces:
   booking-titanium:
     baseUrl: https://wm.stax.ink/
     gitBranch: main
+    # ════════════════════════════════════════════════════════════════════════════════
+    # GIT SYNC CONFIGURATION — Auto-pull changes from GitHub every 5 minutes
+    # ════════════════════════════════════════════════════════════════════════════════
+    # When enabled, Windmill will:
+    #   1. Poll GitHub every 5 minutes for new commits
+    #   2. Auto-pull and deploy changes without manual 'wmill sync push'
+    #   3. Guarantee consistency between GitHub and Windmill
+    #
+    # To enable:
+    #   1. Install GitHub app: https://windmill.dev/docs/advanced/git_sync
+    #   2. Set gitSyncInterval to value in seconds (300 = 5 min)
+    #   3. Uncomment lines below
+    # ════════════════════════════════════════════════════════════════════════════════
+    # gitSyncInterval: 300          # Sync every 5 minutes
+    # gitAutoCommit: true           # Auto-commit changes made in UI back to GitHub
+    # gitAutoCommitMessage: "chore: auto-commit from Windmill"

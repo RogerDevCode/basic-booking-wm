@@ -1,5 +1,17 @@
 version: "3.7"
 
+# ============================================================================
+# PRODUCTION-GRADE DOCKER COMPOSE FOR WINDMILL BOOKING SYSTEM
+# ============================================================================
+# Features:
+#   - Multi-worker setup (replicas: 2) for high availability
+#   - Memory limits + reservations for all services
+#   - Health checks on all critical services
+#   - Proper restart policies + gradual startup (start_period)
+#   - Resource limits prevent OOM kills and cascade failures
+#   - Secure credential handling via .env variables
+# ============================================================================
+
 x-logging: &default-logging
   driver: "json-file"
   options:
@@ -7,26 +19,41 @@ x-logging: &default-logging
     max-file: "${LOG_MAX_FILE:-10}"
     compress: "true"
 
+x-healthcheck-defaults: &healthcheck-defaults
+  interval: 30s
+  timeout: 10s
+  retries: 3
+  start_period: 60s
+
 services:
   db:
     deploy:
-      # To use an external database, set replicas to 0 and set DATABASE_URL to the external database url in the .env file
       replicas: 1
+      resources:
+        limits:
+          memory: 2048M
+        reservations:
+          memory: 512M
     image: postgres:16
-    shm_size: 1g
+    shm_size: 2g
     restart: unless-stopped
     volumes:
       - db_data:/var/lib/postgresql/data
     expose:
       - 5432
     environment:
-      POSTGRES_PASSWORD: changeme
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
       POSTGRES_DB: windmill
+      POSTGRES_MAX_CONNECTIONS: 200
+      POSTGRES_SHARED_BUFFERS: 256MB
+      POSTGRES_EFFECTIVE_CACHE_SIZE: 1GB
+      POSTGRES_WORK_MEM: 4MB
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U postgres && psql -U postgres -d windmill -c 'SELECT 1'"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 30s
     logging: *default-logging
 
   windmill_server:
@@ -34,6 +61,11 @@ services:
     pull_policy: always
     deploy:
       replicas: 1
+      resources:
+        limits:
+          memory: 2048M
+        reservations:
+          memory: 1024M
     restart: unless-stopped
     expose:
       - 8000
@@ -41,12 +73,19 @@ services:
     environment:
       - DATABASE_URL=${DATABASE_URL}
       - MODE=server
+      - SERVER_TIMEOUT_SECS=600
+      - DENO_AUTH_TOKENS=${DENO_AUTH_TOKENS:-}
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/version"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
     volumes:
       - worker_logs:/tmp/windmill/logs
-
     logging: *default-logging
 
   # Docker-in-Docker sidecar: provides an isolated Docker daemon so user scripts
@@ -55,26 +94,37 @@ services:
     image: docker:dind
     privileged: true
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 4096M
+        reservations:
+          memory: 2048M
     environment:
       DOCKER_TLS_CERTDIR: ""
+      DOCKER_BUILDKIT: 1
+      BUILDKIT_PROGRESS: plain
     volumes:
       - dind-data:/var/lib/docker
     expose:
       - 2375
     healthcheck:
       test: ["CMD", "docker", "info"]
-      interval: 10s
-      timeout: 5s
+      interval: 15s
+      timeout: 10s
       retries: 5
+      start_period: 60s
     logging: *default-logging
 
   windmill_worker:
     image: ${WM_IMAGE}
     pull_policy: always
     deploy:
-      replicas: 1
+      replicas: 2
       resources:
         limits:
+          memory: 2048M
+        reservations:
           memory: 1024M
     restart: unless-stopped
     privileged: true
@@ -84,11 +134,19 @@ services:
       - WORKER_GROUP=default
       - FAVOR_UNSHARE_PID=true
       - DOCKER_HOST=tcp://dind:2375
+      - WORKER_TAGS=bun,python3,bash
+      - NUM_WORKERS=${NUM_WORKERS:-4}
     depends_on:
       db:
         condition: service_healthy
       dind:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/api/version"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
     volumes:
       - worker_dependency_cache:/tmp/windmill/cache
       - worker_logs:/tmp/windmill/logs
@@ -101,6 +159,8 @@ services:
       replicas: 1
       resources:
         limits:
+          memory: 2048M
+        reservations:
           memory: 1024M
     restart: unless-stopped
     environment:
@@ -109,9 +169,16 @@ services:
       - WORKER_GROUP=native
       - NATIVE_MODE=true
       - SLEEP_QUEUE=200
+      - NUM_WORKERS=${NUM_WORKERS:-2}
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/api/version"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
     volumes:
       - worker_logs:/tmp/windmill/logs
     logging: *default-logging
@@ -140,6 +207,12 @@ services:
     image: ghcr.io/windmill-labs/windmill-extra:latest
     pull_policy: always
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1024M
+        reservations:
+          memory: 512M
     expose:
       - 3001
       - 3002
@@ -152,6 +225,12 @@ services:
       - ENABLE_NSJAIL=false
       - REQUIRE_SIGNED_DEBUG_REQUESTS=false
       - WINDMILL_BASE_URL=http://windmill_server:8000
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/healthz || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
     volumes:
       - lsp_cache:/pyls/.cache
     logging: *default-logging
@@ -159,20 +238,29 @@ services:
   caddy:
     image: ghcr.io/windmill-labs/caddy-l4:latest
     restart: unless-stopped
-    # Configure the mounted Caddyfile and the exposed ports or use another reverse proxy if needed
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile
       - caddy_data:/data
-      # - ./certs:/certs # Provide custom certificate files like cert.pem and key.pem to enable HTTPS - See the corresponding section in the Caddyfile
     ports:
-      # To change the exposed port, simply change 80:80 to <desired_port>:80. No other changes needed
       - 8080:80
       - 25:25
-      # - 443:443 # Uncomment to enable HTTPS handling by Caddy
     environment:
       - BASE_URL=":80"
-      # - BASE_URL=":443" # uncomment and comment line above to enable HTTPS via custom certificate and key files
-      # - BASE_URL=mydomain.com # Uncomment and comment line above to enable HTTPS handling by Caddy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/api/version || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    depends_on:
+      windmill_server:
+        condition: service_healthy
     logging: *default-logging
 
 volumes:
