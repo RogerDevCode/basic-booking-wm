@@ -54,21 +54,21 @@ describe('Telegram Flow — /start command (deterministic, no LLM)', () => {
     // Step 1: Webhook trigger
     const { main: triggerMain } = await import('../../flows/telegram_webhook__flow/telegram_webhook_trigger');
     const triggerInput = buildMessagePayload('/start');
-    const [triggerErr, triggerData] = await triggerMain(triggerInput);
+    const triggerData = await triggerMain(triggerInput);
 
-    expect(triggerErr).toBeNull();
+    expect(triggerData.error).toBeNull();
     expect(triggerData).not.toBeNull();
-    expect(triggerData!.chat_id).toBe('12345');
-    expect(triggerData!.text).toBe('/start');
-    expect(triggerData!.callback_data).toBeNull();
+    expect(triggerData.chat_id).toBe('12345');
+    expect(triggerData.text).toBe('/start');
+    expect(triggerData.callback_data).toBeNull();
 
     // Step 2: Router — should match /start command
     const { main: routerMain } = await import('./main');
     const routerResult = await routerMain({
-      chat_id: triggerData!.chat_id,
-      text: triggerData!.text,
-      callback_data: triggerData!.callback_data,
-      username: triggerData!.username,
+      chat_id: triggerData.chat_id,
+      text: triggerData.text,
+      callback_data: triggerData.callback_data,
+      username: triggerData.username,
     });
 
     expect(routerResult.error).toBeNull();
@@ -76,7 +76,7 @@ describe('Telegram Flow — /start command (deterministic, no LLM)', () => {
     expect(routerResult.data!.route).toBe('command');
     expect(routerResult.data!.forward_to_ai).toBe(false);
     expect(routerResult.data!.response_text).toContain('Bienvenido');
-    expect(routerResult.data!.response_text).toContain('1️⃣');
+    expect(routerResult.data!.response_text).toContain('¿Qué deseas hacer?');
     expect(routerResult.data!.menu_action).toBe('welcome');
 
     // Verify: AI Agent was NOT called (forward_to_ai = false)
@@ -88,15 +88,15 @@ describe('Telegram Flow — Menu selection (deterministic)', () => {
   test('full flow: "1" → book_appointment response (no AI Agent)', async () => {
     const { main: triggerMain } = await import('../../flows/telegram_webhook__flow/telegram_webhook_trigger');
     const triggerInput = buildMessagePayload('1');
-    const [triggerErr, triggerData] = await triggerMain(triggerInput);
-    expect(triggerErr).toBeNull();
+    const triggerData = await triggerMain(triggerInput);
+    expect(triggerData.error).toBeNull();
 
     const { main: routerMain } = await import('./main');
     const routerResult = await routerMain({
-      chat_id: triggerData!.chat_id,
-      text: triggerData!.text,
-      callback_data: triggerData!.callback_data,
-      username: triggerData!.username,
+      chat_id: triggerData.chat_id,
+      text: triggerData.text,
+      callback_data: triggerData.callback_data,
+      username: triggerData.username,
     });
 
     expect(routerResult.error).toBeNull();
@@ -108,15 +108,15 @@ describe('Telegram Flow — Menu selection (deterministic)', () => {
   test('full flow: "Mis citas" → my_bookings response', async () => {
     const { main: triggerMain } = await import('../../flows/telegram_webhook__flow/telegram_webhook_trigger');
     const triggerInput = buildMessagePayload('Mis citas');
-    const [triggerErr, triggerData] = await triggerMain(triggerInput);
-    expect(triggerErr).toBeNull();
+    const triggerData = await triggerMain(triggerInput);
+    expect(triggerData.error).toBeNull();
 
     const { main: routerMain } = await import('./main');
     const routerResult = await routerMain({
-      chat_id: triggerData!.chat_id,
-      text: triggerData!.text,
-      callback_data: triggerData!.callback_data,
-      username: triggerData!.username,
+      chat_id: triggerData.chat_id,
+      text: triggerData.text,
+      callback_data: triggerData.callback_data,
+      username: triggerData.username,
     });
 
     expect(routerResult.data!.route).toBe('menu');
@@ -127,15 +127,15 @@ describe('Telegram Flow — Menu selection (deterministic)', () => {
   test('full flow: "Recordatorios" → reminders submenu', async () => {
     const { main: triggerMain } = await import('../../flows/telegram_webhook__flow/telegram_webhook_trigger');
     const triggerInput = buildMessagePayload('Recordatorios');
-    const [triggerErr, triggerData] = await triggerMain(triggerInput);
-    expect(triggerErr).toBeNull();
+    const triggerData = await triggerMain(triggerInput);
+    expect(triggerData.error).toBeNull();
 
     const { main: routerMain } = await import('./main');
     const routerResult = await routerMain({
-      chat_id: triggerData!.chat_id,
-      text: triggerData!.text,
-      callback_data: triggerData!.callback_data,
-      username: triggerData!.username,
+      chat_id: triggerData.chat_id,
+      text: triggerData.text,
+      callback_data: triggerData.callback_data,
+      username: triggerData.username,
     });
 
     expect(routerResult.data!.route).toBe('menu');
@@ -148,18 +148,18 @@ describe('Telegram Flow — Callback queries (inline buttons)', () => {
   test('full flow: callback cnf:booking-uuid → confirmation', async () => {
     const { main: triggerMain } = await import('../../flows/telegram_webhook__flow/telegram_webhook_trigger');
     const triggerInput = buildCallbackPayload('cnf:abc-123-def');
-    const [triggerErr, triggerData] = await triggerMain(triggerInput);
+    const triggerData = await triggerMain(triggerInput);
 
-    expect(triggerErr).toBeNull();
-    expect(triggerData!.callback_data).toBe('cnf:abc-123-def');
-    expect(triggerData!.text).toBe('');
+    expect(triggerData.error).toBeNull();
+    expect(triggerData.callback_data).toBe('cnf:abc-123-def');
+    expect(triggerData.text).toBe('');
 
     const { main: routerMain } = await import('./main');
     const routerResult = await routerMain({
-      chat_id: triggerData!.chat_id,
-      text: triggerData!.text,
-      callback_data: triggerData!.callback_data,
-      username: triggerData!.username,
+      chat_id: triggerData.chat_id,
+      text: triggerData.text,
+      callback_data: triggerData.callback_data,
+      username: triggerData.username,
     });
 
     expect(routerResult.data!.route).toBe('callback');
@@ -172,15 +172,15 @@ describe('Telegram Flow — Callback queries (inline buttons)', () => {
   test('full flow: callback cxl:booking-uuid → cancellation', async () => {
     const { main: triggerMain } = await import('../../flows/telegram_webhook__flow/telegram_webhook_trigger');
     const triggerInput = buildCallbackPayload('cxl:xyz-789');
-    const [triggerErr, triggerData] = await triggerMain(triggerInput);
-    expect(triggerErr).toBeNull();
+    const triggerData = await triggerMain(triggerInput);
+    expect(triggerData.error).toBeNull();
 
     const { main: routerMain } = await import('./main');
     const routerResult = await routerMain({
-      chat_id: triggerData!.chat_id,
-      text: triggerData!.text,
-      callback_data: triggerData!.callback_data,
-      username: triggerData!.username,
+      chat_id: triggerData.chat_id,
+      text: triggerData.text,
+      callback_data: triggerData.callback_data,
+      username: triggerData.username,
     });
 
     expect(routerResult.data!.callback_action).toBe('cxl');
@@ -190,15 +190,15 @@ describe('Telegram Flow — Callback queries (inline buttons)', () => {
   test('full flow: callback res: → reschedule prompt', async () => {
     const { main: triggerMain } = await import('../../flows/telegram_webhook__flow/telegram_webhook_trigger');
     const triggerInput = buildCallbackPayload('res:');
-    const [triggerErr, triggerData] = await triggerMain(triggerInput);
-    expect(triggerErr).toBeNull();
+    const triggerData = await triggerMain(triggerInput);
+    expect(triggerData.error).toBeNull();
 
     const { main: routerMain } = await import('./main');
     const routerResult = await routerMain({
-      chat_id: triggerData!.chat_id,
-      text: triggerData!.text,
-      callback_data: triggerData!.callback_data,
-      username: triggerData!.username,
+      chat_id: triggerData.chat_id,
+      text: triggerData.text,
+      callback_data: triggerData.callback_data,
+      username: triggerData.username,
     });
 
     expect(routerResult.data!.callback_action).toBe('res');
@@ -210,15 +210,15 @@ describe('Telegram Flow — Free text (goes to AI Agent)', () => {
   test('full flow: "Hola necesito una cita" → AI Agent → crear_cita', async () => {
     const { main: triggerMain } = await import('../../flows/telegram_webhook__flow/telegram_webhook_trigger');
     const triggerInput = buildMessagePayload('Hola necesito una cita para mañana');
-    const [triggerErr, triggerData] = await triggerMain(triggerInput);
-    expect(triggerErr).toBeNull();
+    const triggerData = await triggerMain(triggerInput);
+    expect(triggerData.error).toBeNull();
 
     const { main: routerMain } = await import('./main');
     const routerResult = await routerMain({
-      chat_id: triggerData!.chat_id,
-      text: triggerData!.text,
-      callback_data: triggerData!.callback_data,
-      username: triggerData!.username,
+      chat_id: triggerData.chat_id,
+      text: triggerData.text,
+      callback_data: triggerData.callback_data,
+      username: triggerData.username,
     });
 
     expect(routerResult.data!.route).toBe('ai_agent');
@@ -231,15 +231,15 @@ describe('Telegram Flow — Free text (goes to AI Agent)', () => {
   test('full flow: "quiero cancelar mi cita" → AI Agent → cancelar_cita', async () => {
     const { main: triggerMain } = await import('../../flows/telegram_webhook__flow/telegram_webhook_trigger');
     const triggerInput = buildMessagePayload('quiero cancelar mi cita del martes');
-    const [triggerErr, triggerData] = await triggerMain(triggerInput);
-    expect(triggerErr).toBeNull();
+    const triggerData = await triggerMain(triggerInput);
+    expect(triggerData.error).toBeNull();
 
     const { main: routerMain } = await import('./main');
     const routerResult = await routerMain({
-      chat_id: triggerData!.chat_id,
-      text: triggerData!.text,
-      callback_data: triggerData!.callback_data,
-      username: triggerData!.username,
+      chat_id: triggerData.chat_id,
+      text: triggerData.text,
+      callback_data: triggerData.callback_data,
+      username: triggerData.username,
     });
 
     expect(routerResult.data!.route).toBe('ai_agent');
@@ -252,27 +252,27 @@ describe('Telegram Flow — Multi-turn conversation with state', () => {
     // Turn 1: /start → welcome
     const { main: triggerMain } = await import('../../flows/telegram_webhook__flow/telegram_webhook_trigger');
     const turn1 = await triggerMain(buildMessagePayload('/start'));
-    expect(turn1[0]).toBeNull();
+    expect(turn1.error).toBeNull();
 
     const { main: routerMain } = await import('./main');
     const router1 = await routerMain({
-      chat_id: turn1[1]!.chat_id,
-      text: turn1[1]!.text,
-      callback_data: turn1[1]!.callback_data,
-      username: turn1[1]!.username,
+      chat_id: turn1.chat_id,
+      text: turn1.text,
+      callback_data: turn1.callback_data,
+      username: turn1.username,
     });
     expect(router1.data!.route).toBe('command');
 
     // Simulate: user selects "1" (Pedir hora)
     // In real flow, bot sends specialty menu, then user responds "1"
     const turn2 = await triggerMain(buildMessagePayload('1'));
-    expect(turn2[0]).toBeNull();
+    expect(turn2.error).toBeNull();
 
     const router2 = await routerMain({
-      chat_id: turn2[1]!.chat_id,
-      text: turn2[1]!.text,
-      callback_data: turn2[1]!.callback_data,
-      username: turn2[1]!.username,
+      chat_id: turn2.chat_id,
+      text: turn2.text,
+      callback_data: turn2.callback_data,
+      username: turn2.username,
     });
     expect(['wizard', 'menu']).toContain(router2.data!.route);
   });
@@ -286,16 +286,16 @@ describe('Telegram Flow — Multi-turn conversation with state', () => {
       ...(payload as Record<string, unknown>).callback_query as Record<string, unknown>
     } as Record<string, unknown>;
 
-    const [triggerErr, triggerData] = await triggerMain(payload);
-    expect(triggerErr).toBeNull();
-    expect(triggerData!.callback_data).toBe('cnf:booking-123');
+    const triggerData = await triggerMain(payload);
+    expect(triggerData.error).toBeNull();
+    expect(triggerData.callback_data).toBe('cnf:booking-123');
 
     const { main: routerMain } = await import('./main');
     const routerResult = await routerMain({
-      chat_id: triggerData!.chat_id,
-      text: triggerData!.text,
-      callback_data: triggerData!.callback_data,
-      username: triggerData!.username,
+      chat_id: triggerData.chat_id,
+      text: triggerData.text,
+      callback_data: triggerData.callback_data,
+      username: triggerData.username,
     });
 
     expect(routerResult.data!.route).toBe('callback');
@@ -306,16 +306,16 @@ describe('Telegram Flow — Edge cases', () => {
   test('empty message → ai_agent (not matched)', async () => {
     const { main: triggerMain } = await import('../../flows/telegram_webhook__flow/telegram_webhook_trigger');
     const triggerInput = buildMessagePayload('');
-    const [triggerErr, triggerData] = await triggerMain(triggerInput);
-    expect(triggerErr).toBeNull();
-    expect(triggerData!.text).toBe('');
+    const triggerData = await triggerMain(triggerInput);
+    expect(triggerData.error).toBeNull();
+    expect(triggerData.text).toBe('');
 
     const { main: routerMain } = await import('./main');
     const routerResult = await routerMain({
-      chat_id: triggerData!.chat_id,
-      text: triggerData!.text,
-      callback_data: triggerData!.callback_data,
-      username: triggerData!.username,
+      chat_id: triggerData.chat_id,
+      text: triggerData.text,
+      callback_data: triggerData.callback_data,
+      username: triggerData.username,
     });
 
     // Empty text + no callback → ai_agent fallback
@@ -325,15 +325,15 @@ describe('Telegram Flow — Edge cases', () => {
   test('whitespace-only message → ai_agent', async () => {
     const { main: triggerMain } = await import('../../flows/telegram_webhook__flow/telegram_webhook_trigger');
     const triggerInput = buildMessagePayload('   ');
-    const [triggerErr, triggerData] = await triggerMain(triggerInput);
-    expect(triggerErr).toBeNull();
+    const triggerData = await triggerMain(triggerInput);
+    expect(triggerData.error).toBeNull();
 
     const { main: routerMain } = await import('./main');
     const routerResult = await routerMain({
-      chat_id: triggerData!.chat_id,
-      text: triggerData!.text,
-      callback_data: triggerData!.callback_data,
-      username: triggerData!.username,
+      chat_id: triggerData.chat_id,
+      text: triggerData.text,
+      callback_data: triggerData.callback_data,
+      username: triggerData.username,
     });
 
     expect(routerResult.data!.forward_to_ai).toBe(true);
@@ -342,15 +342,15 @@ describe('Telegram Flow — Edge cases', () => {
   test('uppercase command /START → still matches', async () => {
     const { main: triggerMain } = await import('../../flows/telegram_webhook__flow/telegram_webhook_trigger');
     const triggerInput = buildMessagePayload('/START');
-    const [triggerErr, triggerData] = await triggerMain(triggerInput);
-    expect(triggerErr).toBeNull();
+    const triggerData = await triggerMain(triggerInput);
+    expect(triggerData.error).toBeNull();
 
     const { main: routerMain } = await import('./main');
     const routerResult = await routerMain({
-      chat_id: triggerData!.chat_id,
-      text: triggerData!.text,
-      callback_data: triggerData!.callback_data,
-      username: triggerData!.username,
+      chat_id: triggerData.chat_id,
+      text: triggerData.text,
+      callback_data: triggerData.callback_data,
+      username: triggerData.username,
     });
 
     expect(routerResult.data!.route).toBe('command');

@@ -26,6 +26,7 @@ export default tseslint.config(
       'f/flows/**/*.ts',
       'f/internal/message_parser/**/*.ts',
       'internal/cache/**/*.ts',
+      '**/redteam.ts',
     ],
   },
 

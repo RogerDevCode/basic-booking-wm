@@ -37,20 +37,17 @@ import {
 // ============================================================================
 
 export async function main(
-  chat_id: string,
-  text: string,
-  conversation_state?: unknown,
-  provider_id?: string,
-  user_profile?: unknown,
+  rawInput: unknown,
 ): Promise<{ readonly success: boolean; readonly data: IntentResult | null; readonly error_message: string | null; readonly error_code?: string }> {
   const startMs = Date.now();
 
-  const inputResult = AIAgentInputSchema.safeParse({ chat_id, text, conversation_state, provider_id, user_profile });
+  const inputResult = AIAgentInputSchema.safeParse(rawInput);
   if (!inputResult.success) {
     return { success: false, data: null, error_code: 'VALIDATION_ERROR', error_message: `Invalid input: ${inputResult.error.message}` };
   }
 
   const input = inputResult.data;
+  const { text, chat_id } = input;
 
   // Step 1: Input guardrails
   const inputGuard = validateInput(text);

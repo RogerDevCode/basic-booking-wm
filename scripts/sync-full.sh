@@ -17,6 +17,9 @@ echo "🧪 Ejecutando suite de pruebas..."
 npm run test && echo "✅ Tests pasados"
 
 # 3. SINCRONIZACIÓN WINDMILL (CON REGENERACIÓN DE METADATOS)
+echo "🔄 Regenerando metadatos..."
+wmill generate-metadata --workspace "$WORKSPACE_ID"
+
 echo "🔄 Sincronizando con Windmill (Modo Integridad)..."
 wmill sync push --workspace "$WORKSPACE_ID" --auto-metadata --yes --parallel 10
 

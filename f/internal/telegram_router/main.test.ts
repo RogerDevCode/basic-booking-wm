@@ -52,7 +52,7 @@ describe('Telegram Router — Command routing', () => {
     expect(result.data!.route).toBe('command');
     expect(result.data!.forward_to_ai).toBe(false);
     expect(result.data!.response_text).toContain('Bienvenido');
-    expect(result.data!.response_text).toContain('1️⃣');
+    expect(result.data!.response_text).toContain('¿Qué deseas hacer?');
   });
 
   test('/admin command', async () => {

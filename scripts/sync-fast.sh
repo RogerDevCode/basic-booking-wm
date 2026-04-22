@@ -15,7 +15,10 @@ if [ $# -gt 0 ]; then
 fi
 
 # 2. PUSH INCREMENTAL A WINDMILL
+echo "🔄 Regenerando metadatos..."
+wmill generate-metadata --workspace "$WORKSPACE_ID"
+
 echo "🔄 Subiendo cambios a Windmill (Modo paralelo)..."
-wmill sync push --workspace "$WORKSPACE_ID" --parallel 10
+wmill sync push --workspace "$WORKSPACE_ID" --parallel 10 --yes
 
 echo "✅ Sincronizado en segundos."
