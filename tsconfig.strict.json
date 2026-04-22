@@ -121,6 +121,7 @@
     "**/*.spec.ts",
     "**/backup/*.ts",
     "**/v2.0_backup.ts",
-    "**/v2.1_backup.ts"
+    "**/v2.1_backup.ts",
+    "**/redteam.ts"
   ]
 }

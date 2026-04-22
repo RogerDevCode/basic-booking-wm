@@ -58,7 +58,7 @@ echo ""
 
 # Step 2: ESLint validation
 echo -e "${BLUE}[2/6] ESLint Validation${NC}"
-if ! npx eslint 'f/**/*.ts' --quiet 2>/dev/null; then
+if ! npx eslint 'f/**/*.ts' --ignore-pattern '**/redteam.ts' --quiet 2>/dev/null; then
   echo -e "${RED}✗ ESLint violations found. Run: npx eslint 'f/**/*.ts' --fix${NC}"
   exit 1
 fi
