@@ -40,7 +40,7 @@ const CALLBACK_RESPONSES: Readonly<Record<string, string>> = {
 } as const;
 
 export const COMMAND_RESPONSES: Readonly<Record<string, string>> = {
-  'welcome': '¡Bienvenido al sistema de citas médicas!\n\n¿En qué puedo ayudarte?\n\n1️⃣ Agendar cita\n2️⃣ Mis citas\n3️⃣ Recordatorios\n4️⃣ Información',
+  'welcome': '¡Bienvenido al sistema de citas médicas!\n\n¿Qué deseas hacer?',
   'admin_panel': '🔧 Panel de administración.\n\nSeleccione una opción:\n• Crear provider\n• Especialidades\n• Estadísticas',
   'provider_panel': '👨‍⚕️ Panel del proveedor.\n\nSeleccione una opción:\n• Mi agenda\n• Notas clínicas\n• Confirmar citas\n• Mi perfil',
 } as const;

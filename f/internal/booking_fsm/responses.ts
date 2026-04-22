@@ -27,33 +27,29 @@ const fmt = {
 };
 
 export function buildSpecialtyPrompt(
-  items: readonly { readonly id: string; readonly name: string }[],
+  _items: readonly { readonly id: string; readonly name: string }[],
   error?: string | null
 ): string {
   const header = fmt.header(error);
-  const list = fmt.list(items);
-  return `${header}📅 *Pedir hora*\n\nEspecialidades disponibles:\n\n${list}\n\nEscribe el número de la especialidad que necesitas.`;
+  return `${header}Selecciona la especialidad que necesitas:`;
 }
 
 export function buildDoctorsPrompt(
-  specialtyName: string,
-  items: readonly { readonly id: string; readonly name: string }[],
+  _specialtyName: string,
+  _items: readonly { readonly id: string; readonly name: string }[],
   error?: string | null
 ): string {
   const header = fmt.header(error);
-  const list = fmt.list(items);
-  const specialty = specialtyName ? ` en *${specialtyName}*` : '';
-  return `${header}👨‍⚕️ *Doctores disponibles*${specialty}\n\n${list}\n\nEscribe el número del doctor que prefieres.`;
+  return `${header}¿Con qué doctor deseas tu cita?`;
 }
 
 export function buildSlotsPrompt(
-  doctorName: string,
-  items: readonly { readonly id: string; readonly label: string; readonly start_time: string }[],
+  _doctorName: string,
+  _items: readonly { readonly id: string; readonly label: string; readonly start_time: string }[],
   error?: string | null
 ): string {
   const header = fmt.header(error);
-  const list = fmt.list(items);
-  return `${header}🕐 *Horarios disponibles*\n\nDoctor: *${doctorName}*\n\n${list}\n\nEscribe el número del horario que prefieres.`;
+  return `${header}¿Qué horario prefieres?`;
 }
 
 export function buildConfirmationPrompt(timeLabel: string, doctorName: string, extra?: string): string {
