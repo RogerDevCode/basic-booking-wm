@@ -68,6 +68,7 @@
 - **NEVER** assume or guess
 - **ALWAYS** follow logical sequence: check logs → identify root cause → apply solution
 - **Loop detection:** If spinning > 5min without progress → pivot (search docs/community, try different approach)
+- **NO random attempts:** Verify with official docs or programmer community first. Never trial-and-error unless user authorizes
 
 ---
 

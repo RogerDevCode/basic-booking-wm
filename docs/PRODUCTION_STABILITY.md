@@ -203,7 +203,7 @@ export LOG_MAX_FILE=10      # Máximo 10 archivos de log
 ```yaml
 workspaces:
   booking-titanium:
-    baseUrl: https://wm.stax.ink/
+    baseUrl: https://titanium.stax.ink/
     gitBranch: main
     gitSyncInterval: 300           # ACTIVAR EN PROD
     gitAutoCommit: true            # ACTIVAR EN PROD

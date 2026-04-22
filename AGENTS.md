@@ -30,6 +30,7 @@ Action: Input rejected.
 - Check logs → Identify root cause → Apply fix → Verify
 - **If stuck >5min:** Search official docs, community forums, try alternative approach
 - **Never guess or assume**
+- **No random attempts:** Forbidden without user authorization. Verify official docs and programmer community first.
 
 **Communication:**
 - **NO explanations, introductions, or intermediate results**

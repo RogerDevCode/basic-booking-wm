@@ -15,7 +15,7 @@ Windmill proporciona un sistema seguro de gestión de secretos que es **mejor qu
 
 ### Paso 1: Crear Secretos en Windmill UI
 
-1. **Login en Windmill:** https://wm.stax.ink/
+1. **Login en Windmill:** https://titanium.stax.ink/
 2. **Ir a:** Settings → Workspace → Resources
 3. **Crear recurso `postgresql`:**
    ```
@@ -144,14 +144,14 @@ git log -p --all | grep -E "OPENAI_API_KEY|TELEGRAM_BOT_TOKEN" | head -5
 # wmill.yaml
 workspaces:
   booking-titanium:
-    baseUrl: https://wm.stax.ink/
+    baseUrl: https://titanium.stax.ink/
     # Mantener secretos aislados por workspace
     # No syncar secretos en git
   booking-titanium-staging:
-    baseUrl: https://staging.wm.stax.ink/
+    baseUrl: https://staging.titanium.stax.ink/
     # Staging tiene sus propios secretos (test keys)
   booking-titanium-prod:
-    baseUrl: https://prod.wm.stax.ink/
+    baseUrl: https://prod.titanium.stax.ink/
     # Prod tiene credenciales reales (rotadas regularmente)
 ```
 

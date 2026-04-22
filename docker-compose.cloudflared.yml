@@ -1,24 +1,30 @@
-# Cloudflare Tunnel Overlay — add to docker-compose.windmill.yml for external test access
-# Usage: docker-compose -f docker-compose.windmill.yml -f docker-compose.cloudflared.yml up -d
+# Cloudflare Tunnel Overlay — exposes Windmill via titanium.stax.ink
+# Usage: docker compose -f docker-compose.windmill.yml -f docker-compose.cloudflared.yml up -d
 # Requires: .env.cloudflared with CLOUDFLARE_TUNNEL_TOKEN set
-
-version: "3.7"
+#
+# Cloudflare Dashboard config:
+#   Subdomain: titanium
+#   Domain:    stax.ink
+#   Type:      HTTP
+#   URL:       caddy:80
 
 services:
-  # Expose Windmill to internet via Cloudflare Tunnel
-  # Token: https://dash.cloudflare.com/profile/api-tokens (create "Cloudflare Tunnel" token)
   cloudflared:
     container_name: cloudflared_tunnel
     image: cloudflare/cloudflared:latest
     restart: unless-stopped
-    env_file:
-      - .env.cloudflared
-    command: tunnel run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    command: tunnel --no-autoupdate run --token eyJhIjoiNDM1MWE1ZTk2MGUwYTk2MGQ0ZTg5MjgzODFkYjUxM2YiLCJ0IjoiZjUyNmFkNjUtZjIzNC00YjNmLWEwODUtMDlkYTU0MWEzZmU0IiwicyI6Ik5tRmhOVEl5WWpJdFl6UTFaUzAwT1RRMkxUbGxaR1l0WkdReU5XVm1PR05tTUdObCJ9
     depends_on:
       caddy:
-        condition: service_started
+        condition: service_healthy
     networks:
       - default
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+        reservations:
+          memory: 64M
     logging:
       driver: "json-file"
       options:
@@ -26,8 +32,8 @@ services:
         max-file: "3"
         compress: "true"
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/"]
+      test: ["CMD", "cloudflared", "tunnel", "info"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 10s
+      start_period: 15s

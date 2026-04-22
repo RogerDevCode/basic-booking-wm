@@ -208,7 +208,7 @@ echo -e "${BLUE}╚════════════════════�
 echo ""
 echo -e "${GREEN}Next steps:${NC}"
 echo "  1. Windmill will auto-deploy within 60 seconds"
-echo "  2. Verify in Windmill UI: https://wm.stax.ink/"
+echo "  2. Verify in Windmill UI: https://titanium.stax.ink/"
 echo "  3. Test in Telegram: send /start to @booking_bot"
 echo ""
 echo -e "${YELLOW}To verify sync health anytime:${NC}"

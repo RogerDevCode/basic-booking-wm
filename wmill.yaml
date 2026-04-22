@@ -25,7 +25,7 @@ skipWorkspaceDependencies: false
 nonDottedPaths: true
 workspaces:
   booking-titanium:
-    baseUrl: https://wm.stax.ink/
+    baseUrl: https://titanium.stax.ink/
     gitBranch: main
     # ════════════════════════════════════════════════════════════════════════════════
     # GIT SYNC CONFIGURATION — Auto-pull changes from GitHub every 5 minutes
