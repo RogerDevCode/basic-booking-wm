@@ -36,16 +36,21 @@ import {
 // MAIN FUNCTION — Hybrid LLM + Rules
 // ============================================================================
 
-export async function main(rawInput: unknown): Promise<{ readonly success: boolean; readonly data: IntentResult | null; readonly error_message: string | null; readonly error_code?: string }> {
+export async function main(
+  chat_id: string,
+  text: string,
+  conversation_state?: unknown,
+  provider_id?: string,
+  user_profile?: unknown,
+): Promise<{ readonly success: boolean; readonly data: IntentResult | null; readonly error_message: string | null; readonly error_code?: string }> {
   const startMs = Date.now();
 
-  const inputResult = AIAgentInputSchema.safeParse(rawInput);
+  const inputResult = AIAgentInputSchema.safeParse({ chat_id, text, conversation_state, provider_id, user_profile });
   if (!inputResult.success) {
     return { success: false, data: null, error_code: 'VALIDATION_ERROR', error_message: `Invalid input: ${inputResult.error.message}` };
   }
 
   const input = inputResult.data;
-  const { text, chat_id, provider_id: _provider_id, conversation_state } = input;
 
   // Step 1: Input guardrails
   const inputGuard = validateInput(text);
@@ -91,7 +96,7 @@ export async function main(rawInput: unknown): Promise<{ readonly success: boole
       // RAG: Build context from knowledge base for general questions
       let ragContext: string | undefined;
       if (intent === INTENT.PREGUNTA_GENERAL || intent === INTENT.DESCONOCIDO) {
-        const ragResult = await buildRAGContext(_provider_id ?? null, text, 3);
+        const ragResult = await buildRAGContext(input.provider_id ?? null, text, 3);
         ragContext = ragResult.context;
         if (ragResult.count > 0) {
           const scope = ragResult.hasProviderSpecific ? 'provider-specific + public' : 'public only';
@@ -124,7 +129,7 @@ export async function main(rawInput: unknown): Promise<{ readonly success: boole
 
   // Step 2.5: Context-aware intent adjustment
   // If the user is in an active flow, adjust intent based on conversation context
-  const contextResult = adjustIntentWithContext(text, intent, confidence, conversation_state ?? null);
+  const contextResult = adjustIntentWithContext(text, intent, confidence, input.conversation_state ?? null);
   if (contextResult.adjusted) {
     intent = contextResult.intent;
     confidence = contextResult.confidence;

@@ -16,8 +16,18 @@
 import { validateInput, processConversationUpdate, formatOutput } from './services';
 import type { UpdateOutput } from './types';
 
-export async function main(rawInput: unknown): Promise<UpdateOutput> {
-  const [valErr, data] = validateInput(rawInput);
+export async function main(
+  chat_id: string,
+  intent: string,
+  entities?: unknown,
+  flow_step?: number,
+  booking_state?: unknown,
+  booking_draft?: unknown,
+  message_id?: number | null,
+): Promise<UpdateOutput> {
+  const [valErr, data] = validateInput({
+    chat_id, intent, entities, flow_step, booking_state, booking_draft, message_id,
+  });
   if (valErr !== null || data === null) {
     return formatOutput(false, false, valErr?.message ?? 'invalid_input');
   }

@@ -52,17 +52,16 @@ import type { MessageParserResponse } from './types';
 /**
  * Normalizes incoming Telegram messages for the booking system pipeline.
  */
-export async function main(rawInput: unknown): Promise<MessageParserResponse> {
-  const [valErr, data] = validateInput(rawInput);
+export async function main(chat_id: string, text: string, user_metadata?: unknown): Promise<MessageParserResponse> {
+  const [valErr, data] = validateInput({ chat_id, text, user_metadata });
   if (valErr !== null || data === null) {
     return createErrorResponse(valErr?.message ?? 'invalid_input');
   }
 
-  const { chat_id, text, user_metadata } = data;
-  const chatIdNum = Number(chat_id);
+  const chatIdNum = Number(data.chat_id);
 
-  const constructedName = constructUsername(user_metadata);
-  const safeText = sanitizeText(text);
+  const constructedName = constructUsername(data.user_metadata);
+  const safeText = sanitizeText(data.text);
 
   return createSuccessResponse(chatIdNum, safeText, constructedName);
 }

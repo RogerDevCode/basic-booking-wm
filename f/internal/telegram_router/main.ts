@@ -47,14 +47,25 @@ import {
 // Main entry point
 // ============================================================================
 
-export async function main(rawInput: unknown): Promise<RouterOutput> {
-  const parsed = InputSchema.safeParse(rawInput);
+export async function main(
+  text: string | null,
+  chat_id: string,
+  callback_data: string | null,
+  callback_query_id: string | null,
+  username: string | null,
+  booking_state: unknown,
+  booking_draft: unknown,
+  message_id: number | null,
+): Promise<RouterOutput> {
+  const parsed = InputSchema.safeParse({
+    text, chat_id, callback_data, callback_query_id, username,
+    booking_state, booking_draft, message_id,
+  });
   if (!parsed.success) {
     return { data: null, error: `Invalid input: ${parsed.error.message}` };
   }
 
   const input: RouterInput = parsed.data;
-  const { text, chat_id, callback_data, booking_state, booking_draft, message_id } = input;
 
   // Parse booking state from raw input
   let parsedState: BookingState | null = null;

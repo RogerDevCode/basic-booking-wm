@@ -26,8 +26,8 @@ import type { GetStateOutput } from './types';
  * SRP: delegates validation, fetching, and response formatting.
  * Go-style TS: uses [Error | null, Result | null] tuples via helper functions.
  */
-export async function main(rawInput: unknown): Promise<GetStateOutput> {
-  const [valErr, chatId] = validateInput(rawInput);
+export async function main(chat_id: string): Promise<GetStateOutput> {
+  const [valErr, chatId] = validateInput({ chat_id });
   if (valErr !== null || chatId === null) {
     return formatOutput(false, null, valErr?.message ?? 'invalid_input', false);
   }

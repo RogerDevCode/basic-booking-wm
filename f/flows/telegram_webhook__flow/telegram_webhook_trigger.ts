@@ -1,6 +1,4 @@
 import { z } from "zod";
-import type { Result } from "../../internal/result";
-import { ok, fail } from "../../internal/result";
 
 /*
  * PRE-FLIGHT CHECKLIST
@@ -67,7 +65,8 @@ export interface TriggerOutput {
   readonly callback_data: string | null;
   readonly callback_query_id: string | null;
   readonly callback_message_id: number | null;
-  readonly raw_event: TelegramEvent;
+  readonly raw_event: TelegramEvent | null;
+  readonly error: string | null;
 }
 
 // ============================================================================
@@ -129,30 +128,34 @@ function extractCallbackInfo(event: Readonly<TelegramEvent>) {
  * Normalizes Telegram webhook events into a consistent internal format.
  */
 export async function main(
-  rawInput: unknown,
-): Promise<Result<TriggerOutput>> {
-  // 1. Validate Input Payload (Fail-Fast)
-  const parseResult = TelegramEventSchema.safeParse(rawInput);
+  event: unknown,
+): Promise<TriggerOutput> {
+  const parseResult = TelegramEventSchema.safeParse(event);
   if (!parseResult.success) {
-    const errorMsg = parseResult.error.issues.map((e: z.ZodIssue) => e.message).join(", ");
-    return fail(`invalid_telegram_payload: ${errorMsg}`);
+    const errorMsg = parseResult.error.issues.map((e) => e.message).join(", ");
+    return Object.freeze({
+      chat_id: "",
+      text: "",
+      username: "",
+      callback_data: null,
+      callback_query_id: null,
+      callback_message_id: null,
+      raw_event: null,
+      error: `invalid_telegram_payload: ${errorMsg}`,
+    });
   }
 
-  const event = parseResult.data;
+  const parsedEvent = parseResult.data;
+  const callbackInfo = extractCallbackInfo(parsedEvent);
 
-  // 2. Extract and Normalize Fields (SRP/DRY)
-  const callbackInfo = extractCallbackInfo(event);
-
-  const output: TriggerOutput = {
-    chat_id: extractChatId(event),
-    text: extractText(event),
-    username: extractUsername(event),
+  return Object.freeze({
+    chat_id: extractChatId(parsedEvent),
+    text: extractText(parsedEvent),
+    username: extractUsername(parsedEvent),
     callback_data: callbackInfo.data,
     callback_query_id: callbackInfo.id,
     callback_message_id: callbackInfo.messageId,
-    raw_event: event,
-  };
-
-  // 3. Final Immutability Check
-  return ok(Object.freeze(output));
+    raw_event: parsedEvent,
+    error: null,
+  });
 }
