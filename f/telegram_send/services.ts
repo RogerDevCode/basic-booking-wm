@@ -45,11 +45,15 @@ export class TelegramService {
     const data = retryResult.data;
     const msgId = data.result?.message_id ?? null;
 
+    const chatId = 'chat_id' in input && typeof input.chat_id === 'string'
+      ? input.chat_id
+      : undefined;
+
     return [null, {
       sent: true,
       message_id: msgId,
       mode: input.mode,
-      ...('chat_id' in input ? { chat_id: input.chat_id } : {}),
+      ...(chatId ? { chat_id: chatId } : {}),
     }];
   }
 

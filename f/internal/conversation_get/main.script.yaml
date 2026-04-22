@@ -6,9 +6,10 @@ schema:
   $schema: https://json-schema.org/draft/2020-12/schema
   type: object
   properties:
-    rawInput:
-      type: ''
+    chat_id:
+      type: string
       description: ''
       default: null
+      originalType: string
   required:
-    - rawInput
+    - chat_id

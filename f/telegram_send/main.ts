@@ -32,7 +32,10 @@ import { TelegramService } from './services';
 export async function main(rawInput: unknown): Promise<Result<TelegramSendData>> {
   const parsed = InputSchema.safeParse(rawInput);
   if (!parsed.success) {
-    return [new Error(`INVALID_INPUT: ${parsed.error.message}`), null];
+    const errorDetail = JSON.stringify(parsed.error.issues);
+    console.error('telegram_send validation error:', errorDetail);
+    console.error('raw input was:', JSON.stringify(rawInput));
+    return [new Error(`INVALID_INPUT: ${parsed.error.message} | Issues: ${errorDetail}`), null];
   }
 
   // 2. Resolve Dependencies — AGENTS.md §2.3 (DIP)
