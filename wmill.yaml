@@ -40,6 +40,6 @@ workspaces:
     #   2. Set gitSyncInterval to value in seconds (300 = 5 min)
     #   3. Uncomment lines below
     # ════════════════════════════════════════════════════════════════════════════════
-    # gitSyncInterval: 300          # Sync every 5 minutes
-    # gitAutoCommit: true           # Auto-commit changes made in UI back to GitHub
-    # gitAutoCommitMessage: "chore: auto-commit from Windmill"
+    gitSyncInterval: 300          # Sync every 5 minutes
+    gitAutoCommit: true           # Auto-commit changes made in UI back to GitHub
+    gitAutoCommitMessage: "chore: auto-commit from Windmill"
