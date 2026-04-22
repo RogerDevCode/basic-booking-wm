@@ -8,7 +8,8 @@
   "parserOptions": {
     "ecmaVersion": "latest",
     "sourceType": "module",
-    "project": ["./tsconfig.json"]
+    "project": ["./tsconfig.json"],
+    "allowDefaultProject": ["./f/internal/ai_agent/redteam.ts"]
   },
   "plugins": [
     "@typescript-eslint",
@@ -92,7 +93,14 @@
         "unicorn/prefer-module": "off",
         "@typescript-eslint/no-unused-vars": "off"
       }
-    }
+    },
+    {
+      "files": ["f/internal/ai_agent/redteam.ts"],
+      "rules": {
+        "unicorn/prefer-module": "off",
+        "@typescript-eslint/no-unused-vars": "off"
+      }
+    },
   ],
   "ignorePatterns": [
     "node_modules/",
@@ -102,6 +110,7 @@
     "*.d.ts",
     "**/*.test.ts",
     "**/*.spec.ts",
-    "**/backup/*.ts"
+    "**/backup/*.ts",
+    "**/redteam.ts"
   ]
 }

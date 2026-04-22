@@ -50,26 +50,26 @@ for c in "${CONTAINERS[@]}"; do
   fi
 done
 
-# 2. Port 8000
-log_info "Checking port 8000..."
-if ss -tlnp | grep -q ':8000'; then
-  log_ok "Port 8000 is listening"
+# 2. Port 8080
+log_info "Checking port 8080..."
+if ss -tlnp | grep -q ':8080'; then
+  log_ok "Port 8080 is listening"
   # Test endpoint
-  HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/api/version 2>/dev/null || echo "000")
+  HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/api/version 2>/dev/null || echo "000")
   if [[ "$HTTP_CODE" == "200" ]]; then
-    VERSION=$(curl -s http://localhost:8000/api/version 2>/dev/null || echo "unknown")
+    VERSION=$(curl -s http://localhost:8080/api/version 2>/dev/null || echo "unknown")
     log_ok "Windmill API responds (version: ${VERSION})"
   else
     log_warn "Windmill API returned HTTP ${HTTP_CODE} (expected 200)"
   fi
 else
-  log_err "Port 8000 is NOT listening"
+  log_err "Port 8080 is NOT listening"
   exit 1
 fi
 
 # 3. MCP endpoint reachable
 log_info "Checking MCP endpoint (unauthorized expected)..."
-HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/api/mcp/gateway 2>/dev/null || echo "000")
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/api/mcp/gateway 2>/dev/null || echo "000")
 if [[ "$HTTP_CODE" == "401" ]]; then
   log_ok "MCP gateway reachable, correctly returns 401 (auth required)"
 elif [[ "$HTTP_CODE" == "200" ]]; then
