@@ -99,7 +99,7 @@ describe('AI Agent — Classifier Accuracy', () => {
     });
 
     test('Generates follow-up when info is missing', async () => {
-      const result = await main({ chat_id: 't', text: 'Quiero agendar' });
+      const result = await main('t', 'Quiero agendar');
       expect(result.success).toBe(true);
       expect(result.data?.needs_more_info).toBe(true);
       expect((result.data?.follow_up?.length ?? 0)).toBeGreaterThan(5);
@@ -107,7 +107,7 @@ describe('AI Agent — Classifier Accuracy', () => {
     });
 
     test('Urgent intent triggers warning_card UI component', async () => {
-      const result = await main({ chat_id: 't', text: '¡Es una emergencia!' });
+      const result = await main('t', '¡Es una emergencia!');
       expect(result.success).toBe(true);
       expect(result.data?.ui_component).toBe('warning_card');
     });
@@ -120,7 +120,7 @@ describe('AI Agent — Classifier Accuracy', () => {
     });
 
     test('Low confidence unknown triggers human_handoff', async () => {
-      const result = await main({ chat_id: 't', text: 'asdfghjkl' });
+      const result = await main('t', 'asdfghjkl');
       expect(result.success).toBe(true);
       expect(result.data?.intent).toBe(INTENT.DESCONOCIDO);
       expect(['none', 'human_handoff']).toContain(result.data?.escalation_level);

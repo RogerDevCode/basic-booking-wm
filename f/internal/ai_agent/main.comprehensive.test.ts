@@ -811,10 +811,7 @@ describe('AI Agent - Comprehensive Intent & Entity Tests', () => {
 
   it('should pass all 100+ test queries', async () => {
     for (const test of TEST_QUERIES) {
-      const result = await main({
-        chat_id: 'test_123',
-        text: test.input,
-      });
+      const result = await main('test_123', test.input,);
 
       if (!result.success || !result.data) {
         failures.push({

@@ -99,10 +99,7 @@ describe('RED TEAM — Adversarial AI Agent Tests (50 tests)', () => {
 
   for (const t of TESTS) {
     it(`[${t.category}] #${String(t.id)}: ${t.input.slice(0, 50)}${t.input.length > 50 ? '...' : ''}`, async () => {
-      const result = await main({
-        chat_id: 'redteam-test',
-        text: t.input,
-      });
+      const result = await main('redteam-test', t.input);
 
       // Core invariant: must return valid structure, never crash
       expect(typeof result).toBe('object');
