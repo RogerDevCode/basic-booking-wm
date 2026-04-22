@@ -45,6 +45,32 @@
 
 ---
 
+## 🐛 Debugging Strategy (Critical)
+
+**First step on any failure:** Check **system logs/errors directly** (Windmill UI, database logs, terminal output). Do NOT assume or explore generally.
+
+**Example:** Script fails → Check Windmill flow execution errors → Error will show exact problem (Zod validation, missing param, etc.). This takes 30 seconds, not hours.
+
+**Never:** Explore code structure, file patterns, or architecture first. Go to **source of truth** (the error message).
+
+---
+
+## 📢 Communication Rules
+
+**AI responses:**
+- **NO** introductions, explanations, or justifications
+- **NO** intermediate results or thought process
+- **ONLY** final solution or explicit failure statement
+- **Direct:** State problem → solution → done
+- **On loop:** Stop, say "BLOCKED: [reason]", suggest alternative sources (official docs, community, different approach)
+
+**AI decisions:**
+- **NEVER** assume or guess
+- **ALWAYS** follow logical sequence: check logs → identify root cause → apply solution
+- **Loop detection:** If spinning > 5min without progress → pivot (search docs/community, try different approach)
+
+---
+
 ## 🏗️ Architecture at a Glance
 
 ### §MON — Split-Monolith (One File = One Responsibility)

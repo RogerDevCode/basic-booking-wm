@@ -19,6 +19,25 @@ Action: Input rejected.
 
 ---
 
+## §DEBUG — Debugging Rules (Mandatory)
+
+**On ANY failure:**
+1. **Consult system logs first** (Windmill UI, DB, stderr) — error message is source of truth
+2. **Never explore code structure** — go directly to error origin
+3. **Example:** Script fails → Windmill shows "Zod validation: expected object, received undefined" → Problem identified immediately. Do NOT read 50 files first.
+
+**Logical sequence ONLY:**
+- Check logs → Identify root cause → Apply fix → Verify
+- **If stuck >5min:** Search official docs, community forums, try alternative approach
+- **Never guess or assume**
+
+**Communication:**
+- **NO explanations, introductions, or intermediate results**
+- **ONLY** final solution or explicit "BLOCKED" with reason
+- **Direct:** Problem → Solution → Done
+
+---
+
 ## §COT — PRE-CODE REASONING TRACE (mandatory)
 
 Emit before ANY code:

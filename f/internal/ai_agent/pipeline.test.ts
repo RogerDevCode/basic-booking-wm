@@ -22,23 +22,23 @@ describe('AI Agent — Full Pipeline', () => {
 
   describe('Input Validation', () => {
     test('Rejects empty chat_id', async () => {
-      const result = await main('', 'Hola');
+      const result = await main({ chat_id: '', text: 'Hola' });
       expect(result.success).toBe(false);
       expect(result.error_code).toBe('VALIDATION_ERROR');
     });
 
     test('Rejects empty text', async () => {
-      const result = await main('t', '');
+      const result = await main({ chat_id: 't', text: '' });
       expect(result.success).toBe(false);
     });
 
     test('Rejects whitespace-only text', async () => {
-      const result = await main('t', '   ');
+      const result = await main({ chat_id: 't', text: '   ' });
       expect(result.success).toBe(false);
     });
 
     test('Rejects text exceeding max length (2000 chars)', async () => {
-      const result = await main('t', 'a'.repeat(2001));
+      const result = await main({ chat_id: 't', text: 'a'.repeat(2001) });
       expect(result.success).toBe(false);
     });
   });
@@ -97,31 +97,31 @@ describe('AI Agent — Full Pipeline', () => {
 
   describe('Entity Extraction', () => {
     test('Extracts date in DD/MM/YYYY format', async () => {
-      const result = await main('t', 'Para el 15/04/2026');
+      const result = await main({ chat_id: 't', text: 'Para el 15/04/2026' });
       expect(result.success).toBe(true);
       expect(result.data?.entities.date).toBe('15/04/2026');
     });
 
     test('Extracts date in YYYY-MM-DD format', async () => {
-      const result = await main('t', 'El 2026-04-20');
+      const result = await main({ chat_id: 't', text: 'El 2026-04-20' });
       expect(result.success).toBe(true);
       expect(result.data?.entities.date).toBe('2026-04-20');
     });
 
     test('Extracts time HH:MM', async () => {
-      const result = await main('t', 'A las 15:30');
+      const result = await main({ chat_id: 't', text: 'A las 15:30' });
       expect(result.success).toBe(true);
       expect(result.data?.entities.time).toBe('15:30');
     });
 
     test('Extracts provider reference number', async () => {
-      const result = await main('t', 'Con el proveedor 5');
+      const result = await main({ chat_id: 't', text: 'Con el proveedor 5' });
       expect(result.success).toBe(true);
       expect(result.data?.entities.provider_id).toBe('5');
     });
 
     test('Extracts service reference number', async () => {
-      const result = await main('t', 'Para el servicio 3');
+      const result = await main({ chat_id: 't', text: 'Para el servicio 3' });
       expect(result.success).toBe(true);
       expect(result.data?.entities.service_id).toBe('3');
     });
@@ -133,49 +133,49 @@ describe('AI Agent — Full Pipeline', () => {
 
   describe('Context Detection', () => {
     test('Detects urgency with explicit keywords', async () => {
-      const result = await main('t', '¡Es una emergencia!');
+      const result = await main({ chat_id: 't', text: '¡Es una emergencia!' });
       expect(result.success).toBe(true);
       expect(result.data?.context.is_urgent).toBe(true);
     });
 
     test('Detects "hoy" as today', async () => {
-      const result = await main('t', '¿Tienen hora para hoy?');
+      const result = await main({ chat_id: 't', text: '¿Tienen hora para hoy?' });
       expect(result.success).toBe(true);
       expect(result.data?.context.is_today).toBe(true);
     });
 
     test('Detects "mañana" as tomorrow', async () => {
-      const result = await main('t', '¿Hay disponibilidad mañana?');
+      const result = await main({ chat_id: 't', text: '¿Hay disponibilidad mañana?' });
       expect(result.success).toBe(true);
       expect(result.data?.context.is_tomorrow).toBe(true);
     });
 
     test('Detects flexibility', async () => {
-      const result = await main('t', 'Me sirve cualquier día');
+      const result = await main({ chat_id: 't', text: 'Me sirve cualquier día' });
       expect(result.success).toBe(true);
       expect(result.data?.context.is_flexible).toBe(true);
     });
 
     test('Detects Monday', async () => {
-      const result = await main('t', 'El lunes por favor');
+      const result = await main({ chat_id: 't', text: 'El lunes por favor' });
       expect(result.success).toBe(true);
       expect(result.data?.context.day_preference).toBe('monday');
     });
 
     test('Detects Wednesday without accent', async () => {
-      const result = await main('t', 'El miercoles');
+      const result = await main({ chat_id: 't', text: 'El miercoles' });
       expect(result.success).toBe(true);
       expect(result.data?.context.day_preference).toBe('wednesday');
     });
 
     test('Detects morning preference', async () => {
-      const result = await main('t', 'Prefiero por la mañana');
+      const result = await main({ chat_id: 't', text: 'Prefiero por la mañana' });
       expect(result.success).toBe(true);
       expect(result.data?.context.time_preference).toBe('morning');
     });
 
     test('Detects afternoon preference', async () => {
-      const result = await main('t', 'Solo puedo por la tarde');
+      const result = await main({ chat_id: 't', text: 'Solo puedo por la tarde' });
       expect(result.success).toBe(true);
       expect(result.data?.context.time_preference).toBe('afternoon');
     });
@@ -187,33 +187,33 @@ describe('AI Agent — Full Pipeline', () => {
 
   describe('Response Generation', () => {
     test('Generates greeting response', async () => {
-      const result = await main('t', 'Hola');
+      const result = await main({ chat_id: 't', text: 'Hola' });
       expect(result.success).toBe(true);
       expect(result.data?.ai_response).toContain('👋');
       expect(result.data?.intent).toBe('saludo');
     });
 
     test('Generates farewell response', async () => {
-      const result = await main('t', 'Chau');
+      const result = await main({ chat_id: 't', text: 'Chau' });
       expect(result.success).toBe(true);
       expect(result.data?.ai_response.length).toBeGreaterThan(0);
     });
 
     test('Generates thank-you response', async () => {
-      const result = await main('t', 'Gracias');
+      const result = await main({ chat_id: 't', text: 'Gracias' });
       expect(result.success).toBe(true);
       expect(result.data?.ai_response.length).toBeGreaterThan(0);
     });
 
     test('Generates follow-up question when info is missing', async () => {
-      const result = await main('t', 'Quiero agendar');
+      const result = await main({ chat_id: 't', text: 'Quiero agendar' });
       expect(result.success).toBe(true);
       expect(result.data?.needs_more_info).toBe(true);
       expect((result.data?.follow_up?.length ?? 0)).toBeGreaterThan(5);
     });
 
     test('Suggests filtered_search with day preference', async () => {
-      const result = await main('t', 'Los martes');
+      const result = await main({ chat_id: 't', text: 'Los martes' });
       expect(result.success).toBe(true);
       expect(result.data?.context.day_preference).toBe('tuesday');
     });
@@ -226,21 +226,21 @@ describe('AI Agent — Full Pipeline', () => {
   describe('Performance', () => {
     test('Responds in <50ms for canonical greeting', async () => {
       const start = Date.now();
-      await main('t', 'Hola');
+      await main({ chat_id: 't', text: 'Hola' });
       const elapsed = Date.now() - start;
       expect(elapsed).toBeLessThan(50);
     });
 
     test('Responds in <50ms for booking intent', async () => {
       const start = Date.now();
-      await main('t', 'Quiero agendar una cita');
+      await main({ chat_id: 't', text: 'Quiero agendar una cita' });
       const elapsed = Date.now() - start;
       expect(elapsed).toBeLessThan(50);
     });
 
     test('Responds in <50ms for cancel intent', async () => {
       const start = Date.now();
-      await main('t', 'Cancelar mi cita');
+      await main({ chat_id: 't', text: 'Cancelar mi cita' });
       const elapsed = Date.now() - start;
       expect(elapsed).toBeLessThan(50);
     });

@@ -38,11 +38,17 @@ describe('Context-Aware Intent Adjustment', () => {
 
   test('number input in selecting_specialty flow → crear_cita', async () => {
     const { main } = await import('./main');
-    const result = await main('test-ctx-1', '1', {
+    const result = await main({
+      chat_id: 'test-ctx-1',
+      text: '1',
+      conversation_state: {
         previous_intent: 'ver_disponibilidad',
         active_flow: 'selecting_specialty',
         flow_step: 1,
-        pending_data: {}, 'Especialidades: 1. Cardiología', undefined);
+        pending_data: {},
+        last_user_utterance: 'Especialidades: 1. Cardiología',
+      },
+    });
 
     expect(result.success).toBe(true);
     expect(result.data?.intent).toBe('crear_cita');
@@ -51,11 +57,17 @@ describe('Context-Aware Intent Adjustment', () => {
 
   test('number input in booking_wizard flow → crear_cita (specialty selection)', async () => {
     const { main } = await import('./main');
-    const result = await main('test-ctx-specialty', '1', {
+    const result = await main({
+      chat_id: 'test-ctx-specialty',
+      text: '1',
+      conversation_state: {
         previous_intent: 'crear_cita',
         active_flow: 'booking_wizard',
         flow_step: 1,
-        pending_data: {}, 'Especialidades: 1. Cardiología', undefined);
+        pending_data: {},
+        last_user_utterance: 'Especialidades: 1. Cardiología',
+      },
+    });
 
     expect(result.success).toBe(true);
     expect(result.data?.intent).toBe('crear_cita');
@@ -64,7 +76,11 @@ describe('Context-Aware Intent Adjustment', () => {
 
   test('number input with no state → stays original intent', async () => {
     const { main } = await import('./main');
-    const result = await main('test-ctx-2', '1', undefined, undefined, undefined);
+    const result = await main({
+      chat_id: 'test-ctx-2',
+      text: '1',
+      // No conversation_state
+    });
 
     expect(result.success).toBe(true);
     // Without context, "1" should NOT be crear_cita
@@ -73,11 +89,17 @@ describe('Context-Aware Intent Adjustment', () => {
 
   test('"volver" in active flow → pregunta_general', async () => {
     const { main } = await import('./main');
-    const result = await main('test-ctx-3', 'volver', {
+    const result = await main({
+      chat_id: 'test-ctx-3',
+      text: 'volver',
+      conversation_state: {
         previous_intent: 'crear_cita',
         active_flow: 'booking_wizard',
         flow_step: 2,
-        pending_data: {}, '¿Qué fecha prefieres?', undefined);
+        pending_data: {},
+        last_user_utterance: '¿Qué fecha prefieres?',
+      },
+    });
 
     expect(result.success).toBe(true);
     expect(result.data?.intent).toBe('pregunta_general');
@@ -85,11 +107,17 @@ describe('Context-Aware Intent Adjustment', () => {
 
   test('"sí" in booking_wizard flow → crear_cita with high confidence', async () => {
     const { main } = await import('./main');
-    const result = await main('test-ctx-4', 'sí', {
+    const result = await main({
+      chat_id: 'test-ctx-4',
+      text: 'sí',
+      conversation_state: {
         previous_intent: 'crear_cita',
         active_flow: 'booking_wizard',
         flow_step: 3,
-        pending_data: { specialty: 'cardiologia', date: '2026-04-15' }, 'Confirmar cita?', undefined);
+        pending_data: { specialty: 'cardiologia', date: '2026-04-15' },
+        last_user_utterance: 'Confirmar cita?',
+      },
+    });
 
     expect(result.success).toBe(true);
     expect(result.data?.intent).toBe('crear_cita');
