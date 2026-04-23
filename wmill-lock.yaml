@@ -135,7 +135,7 @@ locks:
   f/internal/ai_agent/context-adjustment: 97ace27e16db7ff8f0f9f468e4718dbac0842b13a39b468436f817d12f22e7cc
   f/internal/ai_agent/guardrails: 7875ac8fdf28a56398a17e44b6eeb385f504cd4585ff749c6bf9f226c68e2e3b
   f/internal/ai_agent/llm-client: 8bcbc964395687d9b5a570a6a1d3eacd47f840047f6361bb93e0f6f27eb2ec8e
-  f/internal/ai_agent/main: 8e754da9b9cd24df792dcb7ca8325902c2e019f499770614594b897bb654a507
+  f/internal/ai_agent/main: a7019760fd5250a4fdfd7f826e1630440bc584432a3b2ae02f478a20f3632daa
   f/internal/ai_agent/pipeline: 33d6399b3dda522efc9a27da410130c38bceb1f6737bb7a616fa5a35311056d5
   f/internal/ai_agent/prompt-builder: d3484813886660f2cb41356d1f0638636ae1eca0bf4b10e823e6681c3ae9623f
   f/internal/ai_agent/rag-context: 020f081be91f0311669b103c04cf878f44058d7e99d7eca757dc18b47e9adb8a
@@ -248,7 +248,7 @@ locks:
   f/telegram_menu/main: d0435725821b9478be513183e60add1af512b81f7fddf6f6a2712ef985bc8955
   f/telegram_menu/services: 6d04e8e0e4961c1653f36b34df7da5007282d7857114e99368bafa7df87aeea8
   f/telegram_menu/types: a42272e1ee760dc27fa79b50f4f79667cbc925b97e0de03cfa961cda50750f53
-  f/telegram_send/main: 7da753b6ebccb643f436f426da552bd426061ddee3709e611c19c99b07062fef
+  f/telegram_send/main: 2dc5229d1daff27802edbe728d1415bb7d7482a2bc4fa8f5f04b1b5b2de1a3ed
   f/telegram_send/services: 7516db808ea2683b2619fe558e3e4e115c16f39a7f6ad142c049fe697af3f8ae
   f/telegram_send/types: ad22d9f9176c49fa0343a97f96930a013f578e97ea18b89de629e8d851d40e67
   f/web_admin_dashboard/main: ea8018e42f852761fe38edcbb6d304016d09d75d30dfe5ad9178b2d3ab218894

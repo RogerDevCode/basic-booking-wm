@@ -4,21 +4,21 @@
 // ============================================================================
 
 import "@total-typescript/ts-reset";
-import { INTENT, ESCALATION_THRESHOLDS } from './constants';
-import { buildSystemPrompt, buildUserMessage } from './prompt-builder';
+import { INTENT, ESCALATION_THRESHOLDS } from './constants.ts';
+import { buildSystemPrompt, buildUserMessage } from './prompt-builder.ts';
 import {
   validateInput,
   verifyUrgency,
-} from './guardrails';
-import { trace } from './tracing';
-import { classifyIntent } from './tfidf-classifier';
-import { buildRAGContext } from './rag-context';
+} from './guardrails.ts';
+import { trace } from './tracing.ts';
+import { classifyIntent } from './tfidf-classifier.ts';
+import { buildRAGContext } from './rag-context.ts';
 import {
   AIAgentInputSchema,
   type IntentResult,
   type IntentType,
   isIntentType
-} from './types';
+} from './types.ts';
 import {
   adjustIntentWithContext,
   extractEntities,
@@ -30,16 +30,27 @@ import {
   detectIntentRules,
   detectSocial,
   runLLMInquiryWithPrompt
-} from './services';
+} from './services.ts';
 
 // ============================================================================
 // MAIN FUNCTION — Hybrid LLM + Rules
 // ============================================================================
 
-export async function main(
-  rawInput: unknown,
-): Promise<{ readonly success: boolean; readonly data: IntentResult | null; readonly error_message: string | null; readonly error_code?: string }> {
+export async function main({
+  chat_id,
+  text,
+  conversation_state,
+  provider_id,
+  user_profile
+}: {
+  chat_id: string;
+  text: string;
+  conversation_state?: unknown;
+  provider_id?: string;
+  user_profile?: unknown;
+}): Promise<{ readonly success: boolean; readonly data: IntentResult | null; readonly error_message: string | null; readonly error_code?: string }> {
   const startMs = Date.now();
+  const rawInput = { chat_id, text, conversation_state, provider_id, user_profile };
 
   const inputResult = AIAgentInputSchema.safeParse(rawInput);
   if (!inputResult.success) {
@@ -47,7 +58,6 @@ export async function main(
   }
 
   const input = inputResult.data;
-  const { text, chat_id } = input;
 
   // Step 1: Input guardrails
   const inputGuard = validateInput(text);

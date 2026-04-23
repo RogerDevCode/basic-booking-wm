@@ -6,9 +6,28 @@ schema:
   $schema: https://json-schema.org/draft/2020-12/schema
   type: object
   properties:
-    rawInput:
-      type: ''
+    anon1:
+      type: object
       description: ''
       default: null
+      properties:
+        chat_id:
+          type: string
+          description: ''
+          originalType: string
+        conversation_state:
+          type: ''
+          description: ''
+        provider_id:
+          type: string
+          description: ''
+          originalType: string
+        text:
+          type: string
+          description: ''
+          originalType: string
+        user_profile:
+          type: ''
+          description: ''
   required:
-    - rawInput
+    - anon1

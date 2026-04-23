@@ -6,9 +6,23 @@ schema:
   $schema: https://json-schema.org/draft/2020-12/schema
   type: object
   properties:
-    rawInput:
-      type: ''
-      description: ''
-      default: null
+    chat_id:
+      type: string
+    text:
+      type: string
+    mode:
+      type: string
+    message_id:
+      type: integer
+    inline_buttons:
+      type: array
+      items:
+        type: object
+    parse_mode:
+      type: string
+    callback_query_id:
+      type: string
+    callback_alert:
+      type: string
   required:
-    - rawInput
+    - chat_id

@@ -29,7 +29,35 @@ import { TelegramService } from './services';
 // MAIN — Entry Point Orchestrator
 // ============================================================================
 
-export async function main(rawInput: unknown): Promise<Result<TelegramSendData>> {
+export async function main({
+  chat_id,
+  text,
+  mode,
+  message_id,
+  inline_buttons,
+  parse_mode,
+  callback_query_id,
+  callback_alert,
+}: {
+  chat_id: string;
+  text?: string;
+  mode?: string;
+  message_id?: number | null;
+  inline_buttons?: any[];
+  parse_mode?: string;
+  callback_query_id?: string | null;
+  callback_alert?: string;
+}): Promise<Result<TelegramSendData>> {
+  const rawInput = {
+    chat_id,
+    text,
+    mode,
+    message_id,
+    inline_buttons,
+    parse_mode,
+    callback_query_id,
+    callback_alert,
+  };
   const parsed = InputSchema.safeParse(rawInput);
   if (!parsed.success) {
     const errorDetail = JSON.stringify(parsed.error.issues);
@@ -46,5 +74,10 @@ export async function main(rawInput: unknown): Promise<Result<TelegramSendData>>
 
   // 3. Execute Mission — SRP: Dispatch to service
   const service = new TelegramService(botToken);
-  return await service.execute(parsed.data);
+  const [err, result] = await service.execute(parsed.data);
+  if (err !== null) {
+    console.error('Telegram Service Error:', err instanceof Error ? err.message : String(err));
+    return [err, null];
+  }
+  return [null, result];
 }

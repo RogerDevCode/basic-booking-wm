@@ -35,11 +35,11 @@ import {
   fetchSpecialties,
   fetchDoctors,
   fetchSlots,
-} from '../booking_fsm/index';
-import { createDbClient } from '../db/client';
-import { withTenantContext } from '../tenant-context/index';
-import { todayYMD } from '../date-resolver/index';
-import { logger } from '../logger/index';
+} from '../booking_fsm/index.ts';
+import { createDbClient } from '../db/client.ts';
+import { withTenantContext } from '../tenant-context/index.ts';
+import { todayYMD } from '../date-resolver/index.ts';
+import { logger } from '../logger/index.ts';
 
 const MODULE = 'wizard_handler';
 

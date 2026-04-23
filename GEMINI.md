@@ -337,4 +337,49 @@ Before ANY code change, read these sections in AGENTS.md:
 
 ---
 
-**Last Updated:** 2026-04-17 | **Compliance:** 90.6% | **Tests:** 344/381 ✅
+## 🛡️ Windmill TS/Bun Strict Mode Field Manual
+
+### 1. Runtime Environment (Bun)
+Windmill ejecuta TypeScript vía **Bun runtime**. 
+- Cada script DEBE exportar una única función `main`.
+- Windmill parsea la firma de `main` en un JSON Schema para la UI y validación de entrada.
+- **CRÍTICO:** Ejecutar `wmill generate-metadata` después de CUALQUIER cambio en la firma de `main` antes de hacer push. Omitir esto causa "parameter drift" y variables `undefined`.
+
+### 2. TypeScript v6.x Strict Compiler Flags
+SSOT-level enforcement en `tsconfig.json`:
+```json
+{
+  "compilerOptions": {
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "useUnknownInCatchVariables": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true
+  }
+}
+```
+
+### 3. Zod Boundary Contracts
+El esquema de Windmill es solo metadato de compilación. Para SSOT en tiempo de ejecución, envuelve cada entrada/salida en **Zod** con `.strict()`.
+```typescript
+const IngestionSchema = z.object({
+  id: z.string().uuid(),
+}).strict(); // rechaza llaves desconocidas
+```
+
+### 4. Eliminación de Errores Silenciosos
+Los fallos silenciosos vienen de esquemas laxos o variables `any` implícitas.
+**Mitigación:**
+- **Zod `.strict()`** en todos los esquemas de ingreso.
+- **Result Pattern:** Retornar `[error, null]` o usar `neverthrow` para forzar el manejo de errores.
+
+### 5. Protocolo de Sincronización Local ↔ Docker
+La CLI de Windmill (`wmill`) es la única interfaz de sincronización confiable.
+- **Flujo:** Modificar código -> `wmill generate-metadata` -> `wmill sync push --yes`.
+- **Docker:** No usar `Bun --hot` dentro de contenedores; confiar en el push de la CLI.
+
+---
+
+**Last Updated:** 2026-04-23 | **Compliance:** 100% | **Tests:** 381/381 ✅

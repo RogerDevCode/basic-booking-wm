@@ -26,14 +26,14 @@ import {
   emptyDraft,
   BookingStateSchema,
   buildMainMenuKeyboard,
-} from '../booking_fsm/index';
-import { handleBookingWizard } from './booking-wizard';
+} from '../booking_fsm/index.ts';
+import { handleBookingWizard } from './booking-wizard.ts';
 import {
   InputSchema,
   type RouterOutput,
   type RouterInput,
   type InlineButton
-} from './types';
+} from './types.ts';
 import {
   isWizardCallback,
   buildRouteResult,
@@ -41,41 +41,48 @@ import {
   matchCommand,
   matchMenu,
   COMMAND_RESPONSES
-} from './services';
+} from './services.ts';
 
 // ============================================================================
 // Main entry point
 // ============================================================================
 
-export async function main(
-  rawInput: unknown,
-): Promise<RouterOutput> {
+export async function main({
+  text,
+  chat_id,
+  callback_data,
+  callback_query_id,
+  username,
+  booking_state,
+  booking_draft,
+  message_id,
+}: RouterInput): Promise<RouterOutput> {
+  const rawInput = { text, chat_id, callback_data, callback_query_id, username, booking_state, booking_draft, message_id };
   const parsed = InputSchema.safeParse(rawInput);
   if (!parsed.success) {
     return { data: null, error: `Invalid input: ${parsed.error.message}` };
   }
 
   const input: RouterInput = parsed.data;
-  const { text, chat_id, callback_data, booking_state, booking_draft, message_id } = input;
 
   // Parse booking state from raw input
   let parsedState: BookingState | null = null;
-  if (booking_state !== null && booking_state !== undefined) {
-    const parseResult = BookingStateSchema.safeParse(booking_state);
+  if (input.booking_state !== null && input.booking_state !== undefined) {
+    const parseResult = BookingStateSchema.safeParse(input.booking_state);
     if (parseResult.success) parsedState = parseResult.data;
   }
-  const parsedDraft: DraftBooking | null = (booking_draft !== null && booking_draft !== undefined && typeof booking_draft === 'object')
-    ? booking_draft as DraftBooking
+  const parsedDraft: DraftBooking | null = (input.booking_draft !== null && input.booking_draft !== undefined && typeof input.booking_draft === 'object')
+    ? input.booking_draft as DraftBooking
     : null;
 
   // Priority 1: Callback data — wizard patterns
-  if (callback_data !== null && isWizardCallback(callback_data) && parsedState !== null && parsedState.name !== 'idle') {
+  if (input.callback_data !== null && isWizardCallback(input.callback_data) && parsedState !== null && parsedState.name !== 'idle') {
     const [wizardErr, wizardResult] = await handleBookingWizard({
-      text: text ?? '',
-      callbackData: callback_data,
+      text: input.text ?? '',
+      callbackData: input.callback_data,
       currentState: parsedState,
       draft: parsedDraft ?? emptyDraft(),
-      chatId: chat_id,
+      chatId: input.chat_id,
       userName: input.username ?? 'Usuario',
     });
 
@@ -93,7 +100,7 @@ export async function main(
       should_edit: true,
     };
 
-    const shouldEdit = result.should_edit && message_id !== null;
+    const shouldEdit = result.should_edit && input.message_id !== null;
 
     return { data: buildRouteResult('wizard', result.response_text, {
       inlineKeyboard: result.inline_keyboard as InlineButton[][],
@@ -101,18 +108,18 @@ export async function main(
       nextDraft: result.nextDraft,
       nextFlowStep: result.nextFlowStep,
       shouldEdit,
-      messageId: message_id,
+      messageId: input.message_id,
     }), error: wizardErr?.message ?? null };
   }
 
   // Priority 1b: Text input when active booking state (text-based wizard fallback)
-  if (callback_data === null && parsedState !== null && parsedState.name !== 'idle' && text !== null) {
+  if (input.callback_data === null && parsedState !== null && parsedState.name !== 'idle' && input.text !== null) {
     const [wizardErr, wizardResult] = await handleBookingWizard({
-      text,
+      text: input.text,
       callbackData: null,
       currentState: parsedState,
       draft: parsedDraft ?? emptyDraft(),
-      chatId: chat_id,
+      chatId: input.chat_id,
       userName: input.username ?? 'Usuario',
     });
 
@@ -129,7 +136,7 @@ export async function main(
       should_edit: true,
     };
 
-    const shouldEdit = result.should_edit && message_id !== null;
+    const shouldEdit = result.should_edit && input.message_id !== null;
 
     return { data: buildRouteResult('wizard', result.response_text, {
       inlineKeyboard: result.inline_keyboard as InlineButton[][],
@@ -137,22 +144,22 @@ export async function main(
       nextDraft: result.nextDraft,
       nextFlowStep: result.nextFlowStep,
       shouldEdit,
-      messageId: message_id,
+      messageId: input.message_id,
     }), error: wizardErr?.message ?? null };
   }
 
   // Priority 2: Callback data — system patterns (cnf:, cxl:, etc.)
-  const callbackMatch = matchCallback(callback_data);
+  const callbackMatch = matchCallback(input.callback_data);
   if (callbackMatch !== null) return { data: callbackMatch, error: null };
 
   // Priority 3: Slash commands
-  const commandMatch = matchCommand(text);
+  const commandMatch = matchCommand(input.text);
   if (commandMatch !== null) return { data: commandMatch, error: null };
 
   // Priority 4: Menu & submenu (only if not in active wizard)
   // "1" or "agendar cita" when idle → start wizard with specialties
   if (parsedState === null || parsedState.name === 'idle') {
-    const lowerText = text?.trim().toLowerCase();
+    const lowerText = input.text?.trim().toLowerCase();
     if (lowerText === '1' || lowerText === 'agendar cita') {
       // Start wizard — fetch specialties and return inline keyboard
       const [wizardErr, wizardResult] = await handleBookingWizard({
@@ -160,7 +167,7 @@ export async function main(
         callbackData: null,
         currentState: null, // Start from idle
         draft: emptyDraft(),
-        chatId: chat_id,
+        chatId: input.chat_id,
         userName: input.username ?? 'Usuario',
       });
       // ALWAYS return result with nextState, even if error
@@ -184,13 +191,13 @@ export async function main(
       }), error: wizardErr?.message ?? null };
     }
     // Handle "menu:back" callback → return to main menu
-    if (callback_data === 'menu:back') {
+    if (input.callback_data === 'menu:back') {
       return { data: buildRouteResult('command', COMMAND_RESPONSES['welcome'] ?? 'Comando procesado.', {
         inlineKeyboard: buildMainMenuKeyboard(),
         menuAction: 'welcome',
       }), error: null };
     }
-    const menuMatch = matchMenu(text);
+    const menuMatch = matchMenu(input.text);
     if (menuMatch !== null) return { data: menuMatch, error: null };
   }
 

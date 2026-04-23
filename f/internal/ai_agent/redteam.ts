@@ -10,7 +10,7 @@
  */
 
 import { describe, it, expect, beforeAll } from 'vitest';
-import { main } from './main';
+import { main } from './main.ts';
 
 
 interface RedTeamTest {
