@@ -1,3 +1,4 @@
+//nobundling
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : Deterministic Telegram router with InlineKeyboard callback support (Refactored split monolith)

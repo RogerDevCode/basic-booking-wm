@@ -248,7 +248,7 @@ locks:
   f/telegram_menu/main: d0435725821b9478be513183e60add1af512b81f7fddf6f6a2712ef985bc8955
   f/telegram_menu/services: 6d04e8e0e4961c1653f36b34df7da5007282d7857114e99368bafa7df87aeea8
   f/telegram_menu/types: a42272e1ee760dc27fa79b50f4f79667cbc925b97e0de03cfa961cda50750f53
-  f/telegram_send/main: 2dc5229d1daff27802edbe728d1415bb7d7482a2bc4fa8f5f04b1b5b2de1a3ed
+  f/telegram_send/main: eb648477aade9dc650d0bb89558f7e3e087702ad605c56368b8167a169c6cdf4
   f/telegram_send/services: 7516db808ea2683b2619fe558e3e4e115c16f39a7f6ad142c049fe697af3f8ae
   f/telegram_send/types: ad22d9f9176c49fa0343a97f96930a013f578e97ea18b89de629e8d851d40e67
   f/web_admin_dashboard/main: ea8018e42f852761fe38edcbb6d304016d09d75d30dfe5ad9178b2d3ab218894

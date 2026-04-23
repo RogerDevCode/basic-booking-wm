@@ -16,9 +16,9 @@ fi
 
 # 2. PUSH INCREMENTAL A WINDMILL
 echo "🔄 Regenerando metadatos..."
-wmill generate-metadata --workspace "$WORKSPACE_ID" --yes
+wmill generate-metadata --workspace "$WORKSPACE_ID" --yes || echo "⚠️ Advertencia: Error en metadatos, intentando push de todas formas..."
 
 echo "🔄 Subiendo cambios a Windmill (Modo paralelo)..."
-wmill sync push --workspace "$WORKSPACE_ID" --parallel 10 --yes
+wmill sync push --workspace "$WORKSPACE_ID" --parallel 10 --yes --auto-metadata
 
 echo "✅ Sincronizado en segundos."

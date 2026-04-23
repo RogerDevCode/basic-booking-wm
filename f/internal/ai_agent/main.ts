@@ -3,6 +3,7 @@
 // Pattern: Precision Architecture, No 'any', Errors as Values
 // ============================================================================
 
+//nobundling
 import "@total-typescript/ts-reset";
 import { INTENT, ESCALATION_THRESHOLDS } from './constants.ts';
 import { buildSystemPrompt, buildUserMessage } from './prompt-builder.ts';
