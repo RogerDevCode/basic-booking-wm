@@ -106,6 +106,8 @@ value:
             type: javascript
             expr: results.webhook_trigger.text
         path: f/internal/message_parser/main
+      skip_if:
+        expr: results.telegram_router.data?.forward_to_ai !== true
     - id: gate_parser_error
       summary: Check parser error
       value:
@@ -131,6 +133,8 @@ value:
             type: javascript
             expr: results.parse_message.data.text
         path: f/internal/ai_agent/main
+      skip_if:
+        expr: results.telegram_router.data?.forward_to_ai !== true
     - id: gate_execute_action
       summary: Gate — solo ejecuta orchestrator si vino del AI Agent
       value:
