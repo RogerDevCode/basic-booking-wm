@@ -16,12 +16,18 @@ npm run typecheck && echo "✅ Tipado OK"
 echo "🧪 Ejecutando suite de pruebas..."
 npm run test && echo "✅ Tests pasados"
 
-# 3. SINCRONIZACIÓN WINDMILL (CON REGENERACIÓN DE METADATOS)
+# 3. SANEAMIENTO DE METADATA WINDMILL
+echo "🩺 Saneando referencias lock rotas en todo f/..."
+bash scripts/verify-broken-lock-refs.sh --fix --repo
+
 echo "🔄 Regenerando metadatos..."
-wmill generate-metadata --workspace "$WORKSPACE_ID" --yes || echo "⚠️ Advertencia: Error en metadatos, intentando push de todas formas..."
+wmill generate-metadata --workspace "$WORKSPACE_ID" --yes
+
+echo "🩺 Verificación final de locks en todo f/..."
+bash scripts/verify-broken-lock-refs.sh --check --repo >/dev/null
 
 echo "🔄 Sincronizando con Windmill (Modo Integridad)..."
-wmill sync push --workspace "$WORKSPACE_ID" --auto-metadata --yes --parallel 10
+wmill sync push --workspace "$WORKSPACE_ID" --yes --parallel 10
 
 # 4. GIT PUSH A GITHUB
 if [ $# -gt 0 ]; then

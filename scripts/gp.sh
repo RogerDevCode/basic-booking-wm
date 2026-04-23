@@ -10,15 +10,31 @@ ENV_FILE=".env"
 TARGET_REMOTE="origin"
 TARGET_BRANCH="main"
 
+require_command() {
+    local cmd="$1"
+    command -v "$cmd" >/dev/null 2>&1 || {
+        echo "❌ Falta el comando requerido: $cmd"
+        exit 1
+    }
+}
+
 setup_remote() {
     [ ! -f "$ENV_FILE" ] && { echo "❌ Falta $ENV_FILE en $(pwd)"; exit 1; }
     
-    # Extraer URL del .env de forma robusta
-    local line
-    line=$(grep '^GIT_REMOTE_URL=' "$ENV_FILE" 2>/dev/null | head -1 | sed 's/^GIT_REMOTE_URL=//' | xargs)
-    
-    [ -z "$line" ] && { echo "❌ GIT_REMOTE_URL no definida en $ENV_FILE"; exit 1; }
-    
+    # Acepta GIT_REMOTE_URL legacy o WM_GIT_REPO actual.
+    local line=""
+    line="$(
+        awk -F= '
+            /^GIT_REMOTE_URL=/ { sub(/^[^=]*=/, "", $0); print; exit }
+            /^WM_GIT_REPO=/    { sub(/^[^=]*=/, "", $0); print; exit }
+        ' "$ENV_FILE" | xargs || true
+    )"
+
+    [ -z "$line" ] && {
+        echo "❌ Ni GIT_REMOTE_URL ni WM_GIT_REPO están definidas en $ENV_FILE"
+        exit 1
+    }
+
     GIT_REMOTE_URL="$line"
     echo "✅ Remoto configurado: $GIT_REMOTE_URL"
 }
@@ -28,6 +44,7 @@ setup_remote() {
 COMMIT_MSG="$1"
 
 ! git rev-parse --git-dir > /dev/null 2>&1 && { echo "❌ No es un repositorio Git"; exit 1; }
+require_command git
 
 setup_remote
 
@@ -43,7 +60,7 @@ fi
 
 # --- FLUJO GIT ---
 echo "📦 Preparando cambios para $TARGET_REMOTE/$TARGET_BRANCH..."
-git add .
+git add -A
 
 if ! git diff-index --quiet HEAD --; then
     echo "📝 Creando commit: $COMMIT_MSG"
@@ -52,12 +69,8 @@ else
     echo "⚠️  Sin cambios nuevos para commit."
 fi
 
-echo "🚀 Ejecutando FORCE PUSH a $TARGET_REMOTE/$TARGET_BRANCH..."
-# Forzamos el push a la rama main del origin
-git push "$TARGET_REMOTE" "HEAD:$TARGET_BRANCH" --force-with-lease || {
-    echo "⚠️  Push con lease falló, intentando force total..."
-    git push "$TARGET_REMOTE" "HEAD:$TARGET_BRANCH" --force
-}
+echo "🚀 Ejecutando push a $TARGET_REMOTE/$TARGET_BRANCH..."
+git push "$TARGET_REMOTE" "HEAD:$TARGET_BRANCH"
 
 # --- FLUJO WINDMILL ---
 echo "🔄 Sincronizando con Windmill (Workspace: $WORKSPACE_ID)..."

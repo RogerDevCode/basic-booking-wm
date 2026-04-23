@@ -1,6 +1,5 @@
 summary: ''
 description: ''
-lock: '!inline f/web_auth_register/getGlobalTx.script.lock'
 kind: script
 schema:
   $schema: https://json-schema.org/draft/2020-12/schema
