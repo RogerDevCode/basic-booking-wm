@@ -275,3 +275,4 @@ docs/report_*.md
 docs/audit-*.md
 docs/temp-*.md
 docs/draft-*.md
+.codebase-index-cache.pkl

@@ -1,6 +1,0 @@
-f/admin_honorifics/main.ts(171,35): error TS2345: Argument of type 'string' is not assignable to parameter of type 'TemplateStringsArray'.
-f/booking_search/main.ts(100,7): error TS2345: Argument of type 'string' is not assignable to parameter of type 'TemplateStringsArray'.
-f/booking_search/main.ts(108,7): error TS2345: Argument of type 'string' is not assignable to parameter of type 'TemplateStringsArray'.
-f/web_admin_provider_crud/main.ts(272,35): error TS2345: Argument of type 'string' is not assignable to parameter of type 'TemplateStringsArray'.
-f/web_patient_bookings/main.ts(126,9): error TS2345: Argument of type 'string' is not assignable to parameter of type 'TemplateStringsArray'.
-f/web_patient_bookings/main.ts(160,9): error TS2345: Argument of type 'string' is not assignable to parameter of type 'TemplateStringsArray'.
