@@ -1,6 +1,6 @@
 import postgres from 'postgres';
 import { z } from 'zod';
-import type { BookingEventData } from '../internal/gcal_utils/buildGCalEvent';
+import type { BookingEventData } from '../internal/gcal_utils/buildGCalEvent.ts';
 
 export type Sql = postgres.Sql;
 export type Input = Readonly<z.infer<typeof InputSchema>>;

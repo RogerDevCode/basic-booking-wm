@@ -10,9 +10,9 @@
  */
 
 import postgres from 'postgres';
-import type { Result } from '../internal/result/index';
-import { createDbClient } from '../internal/db/client';
-import type { ITelegramClient, IClientRepository, SendMessageOptions } from './types';
+import type { Result } from '../internal/result/index.ts';
+import { createDbClient } from '../internal/db/client.ts';
+import type { ITelegramClient, IClientRepository, SendMessageOptions } from './types.ts';
 
 /**
  * Handles communication with Telegram Bot API

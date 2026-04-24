@@ -1,6 +1,6 @@
 import postgres from 'postgres';
-import type { Result } from '../internal/result/index';
-import { type LockResult, type LockRow } from "./types";
+import type { Result } from '../internal/result/index.ts';
+import { type LockResult, type LockRow } from "./types.ts";
 
 /**
  * cleanupLocks removes all expired locks from the table.

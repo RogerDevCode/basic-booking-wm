@@ -1,7 +1,7 @@
 import type postgres from 'postgres';
-import type { Result } from '../internal/result/index';
-import { DLQRowSchema } from './types';
-import type { DLQEntry, TxClient } from './types';
+import type { Result } from '../internal/result/index.ts';
+import { DLQRowSchema } from './types.ts';
+import type { DLQEntry, TxClient } from './types.ts';
 
 /**
  * Executes DB logic within a global transaction.

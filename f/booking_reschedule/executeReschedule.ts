@@ -1,7 +1,7 @@
-import type { BookingRow, ServiceRow } from '../internal/db-types/index';
-import type { Result } from '../internal/result/index';
-import { withTenantContext } from '../internal/tenant-context/index';
-import { type Input, type RescheduleWriteResult, type Sql } from "./types";
+import type { BookingRow, ServiceRow } from '../internal/db-types/index.ts';
+import type { Result } from '../internal/result/index.ts';
+import { withTenantContext } from '../internal/tenant-context/index.ts';
+import { type Input, type RescheduleWriteResult, type Sql } from "./types.ts";
 
 export async function executeReschedule(sql: Sql, input: Input, oldBooking: BookingRow, service: ServiceRow): Promise<Result<RescheduleWriteResult>> {
     const newStart = input.new_start_time;

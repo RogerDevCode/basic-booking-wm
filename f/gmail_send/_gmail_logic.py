@@ -1,0 +1,149 @@
+import smtplib
+import asyncio
+import time
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from typing import List, Optional, Dict, Any, Tuple
+from ._gmail_models import ActionLink
+
+def safe_string(value: Any, fallback: str = '') -> str:
+    if value is None: return fallback
+    if isinstance(value, (str, int, float, bool)): return str(value)
+    return fallback
+
+def build_email_content(
+    message_type: str,
+    details: Dict[str, Any],
+    action_links: List[ActionLink]
+) -> Tuple[str, str]:
+    date = safe_string(details.get('date'), 'Por confirmar')
+    time_val = safe_string(details.get('time'), 'Por confirmar')
+    provider_name = safe_string(details.get('provider_name'), 'Tu doctor')
+    service = safe_string(details.get('service'), 'Consulta')
+    booking_id = safe_string(details.get('booking_id'), '')
+    reason = safe_string(details.get('cancellation_reason'), '')
+    custom_subject = safe_string(details.get('subject'), '')
+    custom_body = safe_string(details.get('html_body'), '')
+
+    subject = ""
+    body = ""
+    icon = ""
+    color = "#4CAF50"
+
+    if message_type == 'booking_created':
+        subject = '✅ Cita Médica Agendada'
+        icon = '✅'
+        color = '#4CAF50'
+        body = f"""<h2 style="color: {color};">Cita Agendada Exitosamente</h2>
+            <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+              <tr><td style="padding: 8px 0; font-weight: bold;">📅 Fecha:</td><td>{date}</td></tr>
+              <tr><td style="padding: 8px 0; font-weight: bold;">🕐 Hora:</td><td>{time_val}</td></tr>
+              <tr><td style="padding: 8px 0; font-weight: bold;">👨‍⚕️ Doctor:</td><td>{provider_name}</td></tr>
+              <tr><td style="padding: 8px 0; font-weight: bold;">📋 Servicio:</td><td>{service}</td></tr>
+              {"<tr><td style='padding: 8px 0; font-weight: bold;'>🆔 ID:</td><td><code>" + booking_id + "</code></td></tr>" if booking_id else ""}
+            </table>
+            <p style="color: #666;">Para cancelar o reagendar, usa los botones de abajo o responde a este correo.</p>"""
+
+    elif message_type == 'booking_confirmed':
+        subject = '✅ Cita Confirmada'
+        icon = '✅'
+        body = f"""<h2 style="color: {color};">Tu Cita Ha Sido Confirmada</h2>
+            <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+              <tr><td style="padding: 8px 0; font-weight: bold;">📅 Fecha:</td><td>{date}</td></tr>
+              <tr><td style="padding: 8px 0; font-weight: bold;">🕐 Hora:</td><td>{time_val}</td></tr>
+              <tr><td style="padding: 8px 0; font-weight: bold;">👨‍⚕️ Doctor:</td><td>{provider_name}</td></tr>
+            </table>
+            <p style="color: #666;">Te esperamos. Recuerda llegar 10 minutos antes.</p>"""
+
+    elif message_type == 'booking_cancelled':
+        subject = '❌ Cita Cancelada'
+        icon = '❌'
+        color = '#F44336'
+        body = f"""<h2 style="color: {color};">Cita Cancelada</h2>
+            <p>Tu cita ha sido cancelada:</p>
+            <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+              <tr><td style="padding: 8px 0; font-weight: bold;">📅 Fecha:</td><td>{date}</td></tr>
+              <tr><td style="padding: 8px 0; font-weight: bold;">🕐 Hora:</td><td>{time_val}</td></tr>
+              <tr><td style="padding: 8px 0; font-weight: bold;">👨‍⚕️ Doctor:</td><td>{provider_name}</td></tr>
+            </table>
+            {"<p><strong>Motivo:</strong> " + reason + "</p>" if reason else ""}
+            <p style="color: #666;">Si deseas agendar una nueva cita, contáctanos por Telegram o responde a este correo.</p>"""
+
+    elif message_type == 'reminder_24h':
+        subject = '⏰ Recordatorio: Tu cita es mañana'
+        icon = '⏰'
+        color = '#2196F3'
+        body = f"""<h2 style="color: {color};">Recordatorio de Cita</h2>
+            <p style="font-size: 18px;">Tu cita es <strong>mañana</strong>:</p>
+            <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+              <tr><td style="padding: 8px 0; font-weight: bold;">📅 Fecha:</td><td>{date}</td></tr>
+              <tr><td style="padding: 8px 0; font-weight: bold;">🕐 Hora:</td><td>{time_val}</td></tr>
+              <tr><td style="padding: 8px 0; font-weight: bold;">👨‍⚕️ Doctor:</td><td>{provider_name}</td></tr>
+            </table>"""
+
+    elif message_type == 'custom':
+        subject = custom_subject or 'Notificación del Sistema'
+        body = custom_body or '<p>Tienes una notificación.</p>'
+        
+    else:
+        subject = 'Notificación del Sistema'
+        body = f'<p>Tienes una notificación: {message_type}</p>'
+
+    buttons_html = ""
+    if action_links:
+        links_html = []
+        for link in action_links:
+            bg = '#F44336' if link.style == 'danger' else '#757575' if link.style == 'secondary' else '#4CAF50'
+            links_html.append(f'<a href="{link.url}" style="display: inline-block; padding: 12px 24px; margin: 0 8px 8px 0; background-color: {bg}; color: white; text-decoration: none; border-radius: 4px; font-weight: bold;">{link.text}</a>')
+        buttons_html = f'<div style="margin: 30px 0;">{"".join(links_html)}</div>'
+
+    html = f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8"></head>
+<body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #333;">
+  <div style="text-align: center; font-size: 48px; margin-bottom: 20px;">{icon}</div>
+  {body}
+  {buttons_html}
+  <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+  <p style="color: #999; font-size: 12px;">Este es un mensaje automático del sistema de citas médicas. No respondas directamente a este correo.</p>
+</body></html>"""
+
+    return subject, html
+
+async def send_with_retry(
+    smtp_config: Dict[str, Any],
+    from_addr: str,
+    to_addr: str,
+    subject: str,
+    html: str,
+    max_retries: int = 3
+) -> Tuple[Optional[Exception], Optional[str]]:
+    
+    last_err = None
+    for attempt in range(max_retries):
+        try:
+            # Sync wrapper for SMTP
+            def do_send():
+                msg = MIMEMultipart('alternative')
+                msg['Subject'] = subject
+                msg['From'] = from_addr
+                msg['To'] = to_addr
+                msg.attach(MIMEText(html, 'html'))
+
+                with smtplib.SMTP(smtp_config['host'], smtp_config['port']) as server:
+                    if smtp_config['port'] == 587:
+                        server.starttls()
+                    server.login(smtp_config['user'], smtp_config['password'])
+                    server.send_message(msg)
+                return "sent"
+
+            # Execute in thread pool to not block event loop
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(None, do_send)
+            return None, f"msg-{int(time.time())}"
+
+        except Exception as e:
+            last_err = e
+            if attempt < max_retries - 1:
+                await asyncio.sleep(2 ** attempt)
+                
+    return last_err, None

@@ -10,8 +10,8 @@
  */
 
 import { describe, it, expect, beforeAll } from 'vitest';
-import { main } from './main';
-import { INTENT } from './constants';
+import { main } from './main.ts';
+import { INTENT } from './constants.ts';
 
 interface RedTeamTest {
   readonly id: number;

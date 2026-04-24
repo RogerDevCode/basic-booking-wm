@@ -18,7 +18,7 @@ import {
   type TransitionOutcome,
   isNamedItemArray,
   isTimeItemArray,
-} from './types';
+} from './types.ts';
 import {
   buildSpecialtyPrompt,
   buildDoctorsPrompt,
@@ -26,9 +26,9 @@ import {
   buildConfirmationPrompt,
   buildLoadingDoctorsPrompt,
   buildLoadingSlotsPrompt,
-} from './responses';
-import { resolveDate } from '../date-resolver/index';
-import type { Result } from '../result/index';
+} from './responses.ts';
+import { resolveDate } from '../date-resolver/index.ts';
+import type { Result } from '../result/index.ts';
 
 // ============================================================================
 // Internal Types & Constants

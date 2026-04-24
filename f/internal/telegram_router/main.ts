@@ -48,16 +48,17 @@ import {
 // Main entry point
 // ============================================================================
 
-export async function main({
-  text,
-  chat_id,
-  callback_data,
-  callback_query_id,
-  username,
-  booking_state,
-  booking_draft,
-  message_id,
-}: RouterInput): Promise<RouterOutput> {
+export async function main(args: any) : Promise<RouterOutput> {
+// Manual extraction to avoid wrapper destructuring bugs
+  const text = args?.text ?? null;
+  const chat_id = args?.chat_id ?? '';
+  const callback_data = args?.callback_data ?? null;
+  const callback_query_id = args?.callback_query_id ?? null;
+  const username = args?.username ?? null;
+  const booking_state = args?.booking_state ?? null;
+  const booking_draft = args?.booking_draft ?? null;
+  const message_id = args?.message_id ?? null;
+
   const rawInput = { text, chat_id, callback_data, callback_query_id, username, booking_state, booking_draft, message_id };
   const parsed = InputSchema.safeParse(rawInput);
   if (!parsed.success) {

@@ -1,3 +1,4 @@
+//nobundling
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : Register Google Calendar push notification channel
@@ -9,11 +10,12 @@
  * Zod Schemas     : YES — InputSchema validation
  */
 
-import { InputSchema, type Input, type WebhookSetupResult } from './types';
-import { setupWebhook } from './services';
-import type { Result } from '../internal/result/index';
+import { InputSchema, type Input, type WebhookSetupResult } from './types.ts';
+import { setupWebhook } from './services.ts';
+import type { Result } from '../internal/result/index.ts';
 
-export async function main(rawInput: unknown): Promise<Result<WebhookSetupResult>> {
+export async function main(args: any) : Promise<Result<WebhookSetupResult>> {
+const rawInput: unknown = args;
   const parsed = InputSchema.safeParse(rawInput);
   if (!parsed.success) {
     return [new Error(`validation_error: ${parsed.error.message}`), null];

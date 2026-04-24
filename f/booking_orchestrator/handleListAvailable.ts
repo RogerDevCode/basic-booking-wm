@@ -1,6 +1,6 @@
-import type { Result } from '../internal/result/index';
-import type { InputType, OrchestratorResult, AvailabilityData } from './types';
-import { main as checkAvailability } from '../availability_check/main';
+import type { Result } from '../internal/result/index.ts';
+import type { InputType, OrchestratorResult, AvailabilityData } from './types.ts';
+import { main as checkAvailability } from '../availability_check/main.ts';
 
 export async function handleListAvailable(
   input: Readonly<InputType>

@@ -1,4 +1,4 @@
-import { type ReminderPrefs } from "./types";
+import { type ReminderPrefs } from "./types.ts";
 
 export function setAll(_prefs: ReminderPrefs, value: boolean): ReminderPrefs {
     return {

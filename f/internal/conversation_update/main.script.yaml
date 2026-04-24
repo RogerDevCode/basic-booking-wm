@@ -1,40 +1,14 @@
 summary: ''
 description: ''
+lock: '!inline f/internal/conversation_update/main.script.lock'
 kind: script
 schema:
   $schema: https://json-schema.org/draft/2020-12/schema
   type: object
   properties:
-    booking_draft:
+    args:
       type: ''
-      description: ''
-      default: null
-    booking_state:
-      type: ''
-      description: ''
-      default: null
-    chat_id:
-      type: string
-      description: ''
-      default: null
-      originalType: string
-    entities:
-      type: ''
-      description: ''
-      default: null
-    flow_step:
-      type: number
-      description: ''
-      default: null
-    intent:
-      type: string
-      description: ''
-      default: null
-      originalType: string
-    message_id:
-      type: number
       description: ''
       default: null
   required:
-    - chat_id
-    - intent
+    - args

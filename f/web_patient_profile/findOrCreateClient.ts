@@ -1,6 +1,6 @@
 import postgres from 'postgres';
-import type { Result } from '../internal/result/index';
-import { type TxClient } from '../internal/tenant-context/index';
+import type { Result } from '../internal/result/index.ts';
+import { type TxClient } from '../internal/tenant-context/index.ts';
 
 /**
  * Ensures a client record exists, either by finding it or creating from user data.

@@ -10,7 +10,7 @@
 // ============================================================================
 
 import { z } from "zod";
-import { INTENT, CONFIDENCE_BOUNDARIES } from "./constants";
+import { INTENT, CONFIDENCE_BOUNDARIES } from "./constants.ts";
 
 // ============================================================================
 // ZOD SCHEMAS — Single Source of Truth

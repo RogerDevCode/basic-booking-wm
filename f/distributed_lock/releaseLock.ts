@@ -1,6 +1,6 @@
 import postgres from 'postgres';
-import type { Result } from '../internal/result/index';
-import { type Input, type LockResult, type LockRow } from "./types";
+import type { Result } from '../internal/result/index.ts';
+import { type Input, type LockResult, type LockRow } from "./types.ts";
 
 /**
  * releaseLock removes a lock matching the key and owner token.

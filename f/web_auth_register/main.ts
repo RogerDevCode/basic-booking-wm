@@ -1,3 +1,4 @@
+//nobundling
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : Register new user via web (hash password, validate RUT)
@@ -44,14 +45,15 @@
 // Default role: 'client'.
 // ============================================================================
 
-import { createDbClient } from '../internal/db/client';
-import { getGlobalTx } from "./getGlobalTx";
-import { hashPasswordSync } from "./hashPasswordSync";
-import { InputSchema, type RegisterResult } from "./types";
-import { validatePasswordStrength } from "./validatePasswordStrength";
-import { validateRut } from "./validateRut";
+import { createDbClient } from '../internal/db/client.ts';
+import { getGlobalTx } from "./getGlobalTx.ts";
+import { hashPasswordSync } from "./hashPasswordSync.ts";
+import { InputSchema, type RegisterResult } from "./types.ts";
+import { validatePasswordStrength } from "./validatePasswordStrength.ts";
+import { validateRut } from "./validateRut.ts";
 
-export async function main(rawInput: unknown): Promise<[Error | null, RegisterResult | null]> {
+export async function main(args: any) : Promise<[Error | null, RegisterResult | null]> {
+const rawInput: unknown = args;
   const parsed = InputSchema.safeParse(rawInput);
   if (!parsed.success) {
     return [new Error('Validation error: ' + parsed.error.message), null];

@@ -1,6 +1,6 @@
-import type { Result } from '../internal/result/index';
-import type { TxClient } from '../internal/tenant-context/index';
-import type { KBRow, KBEntry } from './types';
+import type { Result } from '../internal/result/index.ts';
+import type { TxClient } from '../internal/tenant-context/index.ts';
+import type { KBRow, KBEntry } from './types.ts';
 
 // ============================================================================
 // REPOSITORY LAYER (SRP: Data Access)

@@ -1,3 +1,4 @@
+//nobundling
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : Create a new medical appointment (SOLID Refactor)
@@ -9,14 +10,15 @@
  * Zod Schemas     : YES — InputSchema validates all inputs
  */
 
-import { withTenantContext } from '../internal/tenant-context/index';
-import { createDbClient } from '../internal/db/client';
-import { logger } from '../internal/logger/index';
-import type { Result } from '../internal/result/index';
-import { InputSchema, type Input, type BookingCreated } from './types';
-import { fetchBookingContext, checkAvailability, persistBooking } from './services';
+import { withTenantContext } from '../internal/tenant-context/index.ts';
+import { createDbClient } from '../internal/db/client.ts';
+import { logger } from '../internal/logger/index.ts';
+import type { Result } from '../internal/result/index.ts';
+import { InputSchema, type Input, type BookingCreated } from './types.ts';
+import { fetchBookingContext, checkAvailability, persistBooking } from './services.ts';
 
-export async function main(rawInput: unknown): Promise<Result<BookingCreated>> {
+export async function main(args: any) : Promise<Result<BookingCreated>> {
+const rawInput: unknown = args;
   const MODULE = 'booking_create';
 
   const parsed = InputSchema.safeParse(rawInput);

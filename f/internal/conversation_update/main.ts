@@ -1,3 +1,4 @@
+//nobundling
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : Persist conversation state to Redis after AI Agent classification
@@ -13,18 +14,19 @@
 // CONVERSATION STATE UPDATE — Persist per-chat state to Redis
 // ============================================================================
 
-import { validateInput, processConversationUpdate, formatOutput } from './services';
-import type { UpdateOutput } from './types';
+import { validateInput, processConversationUpdate, formatOutput } from './services.ts';
+import type { UpdateOutput } from './types.ts';
 
-export async function main(
-  chat_id: string,
-  intent: string,
-  entities?: unknown,
-  flow_step?: number,
-  booking_state?: unknown,
-  booking_draft?: unknown,
-  message_id?: number | null,
-): Promise<UpdateOutput> {
+export async function main(args: any): Promise<UpdateOutput> {
+  const {
+    chat_id,
+    intent,
+    entities,
+    flow_step,
+    booking_state,
+    booking_draft,
+    message_id
+  } = args || {};
   const [valErr, data] = validateInput({
     chat_id, intent, entities, flow_step, booking_state, booking_draft, message_id,
   });

@@ -9,7 +9,7 @@
  * Zod Schemas     : NO — stateless flow control
  */
 
-import type { Result } from "../../internal/result";
+import type { Result } from "../../internal/result.ts";
 
 /**
  * REASONING TRACE

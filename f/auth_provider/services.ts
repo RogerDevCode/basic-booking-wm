@@ -1,19 +1,19 @@
 import postgres from 'postgres';
-import { withTenantContext } from '../internal/tenant-context/index';
-import type { Result } from '../internal/result/index';
+import { withTenantContext } from '../internal/tenant-context/index.ts';
+import type { Result } from '../internal/result/index.ts';
 import {
   hashPassword,
   verifyPassword,
   generateReadablePassword,
   validatePasswordPolicy,
-} from '../internal/crypto/index';
+} from '../internal/crypto/index.ts';
 import type {
   AuthInput,
   TempPasswordResult,
   PasswordChangeResult,
   VerifyResult,
   AuthAction
-} from './types';
+} from './types.ts';
 
 // ============================================================
 // HANDLERS

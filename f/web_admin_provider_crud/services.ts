@@ -1,7 +1,7 @@
 import postgres from 'postgres';
-import { generateReadablePassword, hashPassword } from '../internal/crypto/index';
-import type { Result } from '../internal/result/index';
-import type { Input, ProviderRow, CreateProviderResult } from './types';
+import { generateReadablePassword, hashPassword } from '../internal/crypto/index.ts';
+import type { Result } from '../internal/result/index.ts';
+import type { Input, ProviderRow, CreateProviderResult } from './types.ts';
 
 // ============================================================================
 // LIST providers with joins

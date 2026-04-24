@@ -1,6 +1,6 @@
-import { DateUtils } from '../DateUtils';
-import { WizardUI } from '../WizardUI';
-import type { ActionContext, ActionHandler, StepView } from '../types';
+import { DateUtils } from '../DateUtils.ts';
+import { WizardUI } from '../WizardUI.ts';
+import type { ActionContext, ActionHandler, StepView } from '../types.ts';
 
 export class BackHandler implements ActionHandler {
   async handle(context: ActionContext): Promise<[Error | null, StepView | null]> {

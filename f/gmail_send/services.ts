@@ -1,5 +1,5 @@
 import * as nodemailer from 'nodemailer';
-import type { ActionLink, EmailDetails } from './types';
+import type { ActionLink, EmailDetails } from './types.ts';
 
 export function safeString(value: unknown, fallback = ''): string {
   if (value === null || value === undefined) return fallback;

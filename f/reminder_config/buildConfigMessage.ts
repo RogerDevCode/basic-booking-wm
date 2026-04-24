@@ -1,5 +1,5 @@
-import { formatPrefs } from "./formatPrefs";
-import { type ReminderPrefs } from "./types";
+import { formatPrefs } from "./formatPrefs.ts";
+import { type ReminderPrefs } from "./types.ts";
 
 export function buildConfigMessage(prefs: ReminderPrefs): { message: string; reply_keyboard: string[][] } {
     const status = formatPrefs(prefs);

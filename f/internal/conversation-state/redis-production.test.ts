@@ -20,7 +20,7 @@ import {
   updateConversationState,
   clearConversationState,
   type ConversationState,
-} from '.';
+} from './index.ts';
 
 // ============================================================================
 // Redis Test Infrastructure (SOLID: SRP & Abstraction)

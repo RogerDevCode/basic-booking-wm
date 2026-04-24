@@ -1,4 +1,4 @@
-import type { BookingRecord, ReminderWindow, ReminderPrefs } from './types';
+import type { BookingRecord, ReminderWindow, ReminderPrefs } from './types.ts';
 
 export function formatDate(date: Date, tz: string): string {
   return date.toLocaleDateString('es-AR', {

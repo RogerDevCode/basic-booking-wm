@@ -1,3 +1,4 @@
+//nobundling
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : Telegram webhook message normalization
@@ -46,13 +47,14 @@ import {
   sanitizeText, 
   createErrorResponse, 
   createSuccessResponse 
-} from './services';
-import type { MessageParserResponse } from './types';
+} from './services.ts';
+import type { MessageParserResponse } from './types.ts';
 
 /**
  * Normalizes incoming Telegram messages for the booking system pipeline.
  */
-export async function main(chat_id: string, text: string, user_metadata?: unknown): Promise<MessageParserResponse> {
+export async function main(args: any) : Promise<MessageParserResponse> {
+const { chat_id, text, user_metadata } = args || {};
   const [valErr, data] = validateInput({ chat_id, text, user_metadata });
   if (valErr !== null || data === null) {
     return createErrorResponse(valErr?.message ?? 'invalid_input');

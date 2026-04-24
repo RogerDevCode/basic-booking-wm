@@ -1,5 +1,14 @@
 # CLAUDE.md
 
+## 🐍 Python Migration — Trace Activo
+
+> **Leer al inicio de toda sesión Python:**
+> [`docs/PYTHON_MIGRATION_TRACE.md`](docs/PYTHON_MIGRATION_TRACE.md)
+> Reglas §PY completas en `AGENTS.md §PY` (secciones §PY.1–§PY.12).
+> Secuencia obligatoria: FASE 0 → 1 → 2 → ... → 9. Verificar con `mypy + pyright + pytest` antes de marcar ✅.
+
+---
+
 ## ✅ Status — Auditoría Completada (2026-04-20)
 
 **Resumen de verificación:**

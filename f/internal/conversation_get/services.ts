@@ -1,6 +1,6 @@
-import { createConversationRedis, getConversationState, type ConversationState } from '../conversation-state/index';
-import type { Result } from '../result/index';
-import { InputSchema, type ChatId, type GetStateOutput, type FetchResult } from './types';
+import { createConversationRedis, getConversationState, type ConversationState } from '../conversation-state/index.ts';
+import type { Result } from '../result/index.ts';
+import { InputSchema, type ChatId, type GetStateOutput, type FetchResult } from './types.ts';
 
 export function validateInput(rawInput: unknown): Result<ChatId> {
   const parsed = InputSchema.safeParse(rawInput);

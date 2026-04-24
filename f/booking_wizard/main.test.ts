@@ -10,8 +10,8 @@
  */
 
 import { describe, test, expect, beforeEach } from 'vitest';
-import { main } from './main';
-import type { Result } from '../internal/result/index';
+import { main } from './main.ts';
+import type { Result } from '../internal/result/index.ts';
 
 /**
  * REASONING TRACE

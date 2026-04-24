@@ -1,4 +1,4 @@
-import type { Result } from '../internal/result/index';
+import type { Result } from '../internal/result/index.ts';
 
 const GCAL_BASE = 'https://www.googleapis.com/calendar/v3';
 

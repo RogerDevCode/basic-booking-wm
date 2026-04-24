@@ -1,9 +1,9 @@
 import postgres from 'postgres';
-import type { Result } from '../internal/result/index';
-import { mapRowToLockInfo } from "./mapRowToLockInfo";
-import { tryInsertLock } from "./tryInsertLock";
-import { tryStealExpiredLock } from "./tryStealExpiredLock";
-import { type Input, type LockResult } from "./types";
+import type { Result } from '../internal/result/index.ts';
+import { mapRowToLockInfo } from "./mapRowToLockInfo.ts";
+import { tryInsertLock } from "./tryInsertLock.ts";
+import { tryStealExpiredLock } from "./tryStealExpiredLock.ts";
+import { type Input, type LockResult } from "./types.ts";
 
 /**
  * acquireLock attempts to create a new lock or steal an expired one.

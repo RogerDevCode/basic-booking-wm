@@ -1,3 +1,4 @@
+//nobundling
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : Clinical notes CRUD with AES-256-GCM encryption at rest
@@ -40,12 +41,12 @@
  */
 
 import postgres from 'postgres';
-import { createDbClient } from '../internal/db/client';
-import type { Result } from '../internal/result/index';
-import { withTenantContext } from '../internal/tenant-context/index';
-import { encryptContent } from "./encryptContent";
-import { mapRowToNote } from "./mapRowToNote";
-import { type HandlerResult, type Input, InputSchema, type NoteRow, type Tag } from "./types";
+import { createDbClient } from '../internal/db/client.ts';
+import type { Result } from '../internal/result/index.ts';
+import { withTenantContext } from '../internal/tenant-context/index.ts';
+import { encryptContent } from "./encryptContent.ts";
+import { mapRowToNote } from "./mapRowToNote.ts";
+import { type HandlerResult, type Input, InputSchema, type NoteRow, type Tag } from "./types.ts";
 
 // ============================================================================
 // TYPES & SCHEMAS
@@ -232,7 +233,8 @@ const ACTION_HANDLERS: Record<string, (tx: postgres.Sql, input: Input) => Handle
 // MAIN ORCHESTRATOR
 // ============================================================================
 
-export async function main(rawInput: unknown): Promise<Result<unknown>> {
+export async function main(args: any) : Promise<Result<unknown>> {
+const rawInput: unknown = args;
   const parsed = InputSchema.safeParse(rawInput);
   if (!parsed.success) {
     return [new Error(`Validation error: ${parsed.error.message}`), null];

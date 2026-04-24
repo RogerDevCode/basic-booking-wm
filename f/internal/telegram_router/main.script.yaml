@@ -1,49 +1,9 @@
 summary: ''
 description: ''
+lock: '!inline f/internal/telegram_router/main.script.lock'
 kind: script
 schema:
   $schema: https://json-schema.org/draft/2020-12/schema
   type: object
-  properties:
-    text:
-      type: string
-      description: ''
-      default: null
-      originalType: string
-    chat_id:
-      type: string
-      description: ''
-      default: null
-      originalType: string
-    callback_data:
-      type: string
-      description: ''
-      default: null
-      originalType: string
-    callback_query_id:
-      type: string
-      description: ''
-      default: null
-      originalType: string
-    username:
-      type: string
-      description: ''
-      default: null
-      originalType: string
-    booking_state:
-      type: object
-      description: ''
-      default: null
-      originalType: unknown
-    booking_draft:
-      type: object
-      description: ''
-      default: null
-      originalType: unknown
-    message_id:
-      type: integer
-      description: ''
-      default: null
-      originalType: number
-  required:
-    - chat_id
+  properties: {}
+  required: []

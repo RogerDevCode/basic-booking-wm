@@ -1,3 +1,4 @@
+//nobundling
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : Handle Telegram inline keyboard button actions (confirm, cancel, reschedule)
@@ -50,20 +51,21 @@
 // ============================================================================
 
 import { z } from 'zod';
-import { answerCallbackQuery } from "./answerCallbackQuery";
-import { parseCallbackData } from "./parseCallbackData";
-import { sendFollowUpMessage } from "./sendFollowUpMessage";
-import { InputSchema } from "./types";
-import { ConfirmHandler } from "./handlers/ConfirmHandler";
-import { RescheduleHandler } from "./handlers/RescheduleHandler";
-import { ActivateRemindersHandler } from "./handlers/ActivateRemindersHandler";
-import { DeactivateRemindersHandler } from "./handlers/DeactivateRemindersHandler";
-import { AcknowledgeHandler } from "./handlers/AcknowledgeHandler";
-import { TelegramRouter } from "./TelegramRouter";
-import { CancelHandler } from "./handlers/CancelHandler";
+import { answerCallbackQuery } from "./answerCallbackQuery.ts";
+import { parseCallbackData } from "./parseCallbackData.ts";
+import { sendFollowUpMessage } from "./sendFollowUpMessage.ts";
+import { InputSchema } from "./types.ts";
+import { ConfirmHandler } from "./handlers/ConfirmHandler.ts";
+import { RescheduleHandler } from "./handlers/RescheduleHandler.ts";
+import { ActivateRemindersHandler } from "./handlers/ActivateRemindersHandler.ts";
+import { DeactivateRemindersHandler } from "./handlers/DeactivateRemindersHandler.ts";
+import { AcknowledgeHandler } from "./handlers/AcknowledgeHandler.ts";
+import { TelegramRouter } from "./TelegramRouter.ts";
+import { CancelHandler } from "./handlers/CancelHandler.ts";
 
 
-export async function main(rawInput: unknown): Promise<[Error | null, Record<string, unknown> | null]> {
+export async function main(args: any) : Promise<[Error | null, Record<string, unknown> | null]> {
+const rawInput: unknown = args;
   const parsed = InputSchema.safeParse(rawInput);
   if (!parsed.success) {
     return [new Error(`Invalid input: ${parsed.error.message}`), null];

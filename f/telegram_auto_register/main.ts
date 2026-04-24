@@ -1,3 +1,4 @@
+//nobundling
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : Auto-register user from Telegram webhook payload
@@ -9,12 +10,13 @@
  * Zod Schemas     : YES — InputSchema validates Telegram webhook structure
  */
 
-import { createDbClient } from '../internal/db/client';
-import type { Result } from '../internal/result/index';
-import { InputSchema, type Input, type RegisterResult } from './types';
-import { registerTelegramUser } from './services';
+import { createDbClient } from '../internal/db/client.ts';
+import type { Result } from '../internal/result/index.ts';
+import { InputSchema, type Input, type RegisterResult } from './types.ts';
+import { registerTelegramUser } from './services.ts';
 
-export async function main(rawInput: unknown): Promise<Result<RegisterResult>> {
+export async function main(args: any) : Promise<Result<RegisterResult>> {
+const rawInput: unknown = args;
   const parsed = InputSchema.safeParse(rawInput);
   if (!parsed.success) {
     return [new Error('Validation error: ' + parsed.error.message), null];

@@ -8,8 +8,8 @@
 
 import Redis from "ioredis";
 import { createHash } from "node:crypto";
-import type { Result } from '../result/index';
-import type { IntentType } from '../ai_agent/constants';
+import type { Result } from '../result/index.ts';
+import type { IntentType } from '../ai_agent/constants.ts';
 
 interface CacheEntry {
   readonly query_hash: string;

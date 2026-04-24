@@ -1,6 +1,6 @@
-import type { BookingRow } from '../internal/db-types/index';
-import type { Result } from '../internal/result/index';
-import { type Input } from "./types";
+import type { BookingRow } from '../internal/db-types/index.ts';
+import type { Result } from '../internal/result/index.ts';
+import { type Input } from "./types.ts";
 
 export function authorize(input: Input, booking: BookingRow): Result<true> {
     if (input.actor === 'client' && booking.client_id !== input.actor_id) {

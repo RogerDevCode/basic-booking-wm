@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
-import { INTENT } from '../ai_agent/constants';
+import { INTENT } from '../ai_agent/constants.ts';
 
 // Vitest 4: vi.hoisted shares state between vi.mock factory and test code
 const { mockRedis } = vi.hoisted(() => {
@@ -18,7 +18,7 @@ vi.mock("ioredis", () => ({
   default: vi.fn(function MockRedis() { return mockRedis; }),
 }));
 
-import { cacheGet, cacheSet, cacheInvalidate, cacheStats, cacheClear } from "./index";
+import { cacheGet, cacheSet, cacheInvalidate, cacheStats, cacheClear } from "./index.ts";
 
 describe("Semantic Cache", () => {
   beforeEach(() => {

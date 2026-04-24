@@ -1,7 +1,7 @@
-import type { Result } from '../internal/result/index';
-import type { BookingResult, DB, Input } from './types';
-import * as Repository from './repository';
-import * as Utils from './utils';
+import type { Result } from '../internal/result/index.ts';
+import type { BookingResult, DB, Input } from './types.ts';
+import * as Repository from './repository.ts';
+import * as Utils from './utils.ts';
 
 export async function crear(tx: DB, tenantId: string, clientId: string, input: Input): Promise<Result<BookingResult>> {
   const { service_id, start_time } = input;

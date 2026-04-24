@@ -1,8 +1,8 @@
-import type { BookingEventData } from '../internal/gcal_utils/buildGCalEvent';
-import { buildGCalEvent } from '../internal/gcal_utils/buildGCalEvent';
-import type { Result } from '../internal/result/index';
-import { isPermanentError, retryWithBackoff } from '../internal/retry/index';
-import { callGCalAPI } from "./callGCalAPI";
+import type { BookingEventData } from '../internal/gcal_utils/buildGCalEvent.ts';
+import { buildGCalEvent } from '../internal/gcal_utils/buildGCalEvent.ts';
+import type { Result } from '../internal/result/index.ts';
+import { isPermanentError, retryWithBackoff } from '../internal/retry/index.ts';
+import { callGCalAPI } from "./callGCalAPI.ts";
 
 export async function syncEvent(action: 'create' | 'update' | 'delete', calendarId: string | null, eventId: string | null, accessToken: string, eventData: BookingEventData, maxRetries: number): Promise<Result<string | null>> {
     if (!calendarId) return [null, null];

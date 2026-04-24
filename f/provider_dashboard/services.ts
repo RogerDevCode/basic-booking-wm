@@ -1,7 +1,7 @@
 import postgres from 'postgres';
-import { getAvailability, validateOverride } from '../internal/scheduling-engine/index';
-import type { Result } from '../internal/result/index';
-import { type Input } from './types';
+import { getAvailability, validateOverride } from '../internal/scheduling-engine/index.ts';
+import type { Result } from '../internal/result/index.ts';
+import { type Input } from './types.ts';
 
 export async function getProvider(tx: postgres.Sql, input: Input): Promise<Result<unknown>> {
   const pid = input.provider_id;

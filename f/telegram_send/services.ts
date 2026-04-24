@@ -1,16 +1,16 @@
 import { z } from 'zod';
-import type { Result } from '../internal/result/index';
-import { retryWithBackoff } from '../internal/retry/index';
-import { MAX_RETRIES, TIMEOUT_TELEGRAM_API_MS } from '../internal/config/index';
+import type { Result } from '../internal/result/index.ts';
+import { retryWithBackoff } from '../internal/retry/index.ts';
+import { MAX_RETRIES, TIMEOUT_TELEGRAM_API_MS } from '../internal/config/index.ts';
 import {
   InlineButtonSchema,
   TelegramResponseSchema,
-} from './types';
+} from './types.ts';
 import type {
   Input,
   TelegramResponse,
   TelegramSendData,
-} from './types';
+} from './types.ts';
 
 // ============================================================================
 // TELEGRAM SERVICE — SRP: API Communication & Logic

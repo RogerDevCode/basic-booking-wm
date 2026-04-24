@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { ConversationState } from '../conversation-state/index';
+import type { ConversationState } from '../conversation-state/index.ts';
 
 export const InputSchema = z.object({
   chat_id: z.string().min(1),

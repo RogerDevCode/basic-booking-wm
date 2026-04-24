@@ -10,7 +10,7 @@
  */
 
 import { describe, test, expect } from 'vitest';
-import { main } from './main';
+import { main } from './main.ts';
 
 // ============================================================================
 // Router without state — deterministic routes

@@ -5,7 +5,7 @@
 // No duplicated retry code anywhere else.
 // ============================================================================
 
-import { MAX_RETRIES, RETRY_BACKOFF_BASE_MS, RETRY_BACKOFF_MULTIPLIER } from '../config/index';
+import { MAX_RETRIES, RETRY_BACKOFF_BASE_MS, RETRY_BACKOFF_MULTIPLIER } from '../config/index.ts';
 
 export interface RetryOptions {
   maxAttempts?: number;

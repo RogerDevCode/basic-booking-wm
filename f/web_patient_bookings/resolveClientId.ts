@@ -1,5 +1,5 @@
-import type { Result } from '../internal/result/index';
-import type { TxClient } from '../internal/tenant-context/index';
+import type { Result } from '../internal/result/index.ts';
+import type { TxClient } from '../internal/tenant-context/index.ts';
 
 /**
  * Resolves a client_id from a user_id, with a fallback to email match

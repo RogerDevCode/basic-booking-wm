@@ -15,7 +15,7 @@ import {
   emptyDraft,
   type BookingState,
   BOOKING_STEP,
-} from '../booking_fsm/index';
+} from '../booking_fsm/index.ts';
 
 describe('Telegram Bubble — wizard back navigation', () => {
   test('selecting_specialty → back → idle', () => {

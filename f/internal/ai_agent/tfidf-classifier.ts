@@ -4,7 +4,7 @@
 // Improves rule-based fallback from ~83% → ~97% accuracy
 // ============================================================================
 
-import { INTENT } from './constants';
+import { INTENT } from './constants.ts';
 
 // ============================================================================
 // REFERENCE CORPUS — Real-world examples per intent

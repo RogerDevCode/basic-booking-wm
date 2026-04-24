@@ -1,3 +1,4 @@
+//nobundling
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : Send email notifications with HTML action links (confirm/cancel/reschedule)
@@ -45,10 +46,11 @@
 
 import { z } from 'zod';
 import * as nodemailer from 'nodemailer';
-import { InputSchema, type GmailSendData } from './types';
-import { buildEmailContent, sendWithRetry } from './services';
+import { InputSchema, type GmailSendData } from './types.ts';
+import { buildEmailContent, sendWithRetry } from './services.ts';
 
-export async function main(rawInput: unknown): Promise<[Error | null, GmailSendData | null]> {
+export async function main(args: any) : Promise<[Error | null, GmailSendData | null]> {
+const rawInput: unknown = args;
   const parsed = InputSchema.safeParse(rawInput);
   if (!parsed.success) {
     return [new Error(`Invalid input: ${parsed.error.message}`), null];

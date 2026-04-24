@@ -1,4 +1,4 @@
-import type { ActionContext, ActionHandler, ActionResult } from './types';
+import type { ActionContext, ActionHandler, ActionResult } from './types.ts';
 
 export class TelegramRouter {
   private readonly handlers = new Map<string, ActionHandler>();

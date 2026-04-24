@@ -1,3 +1,4 @@
+//nobundling
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : Admin CRUD for tag categories and tags
@@ -37,18 +38,19 @@
  * → CLEARED FOR EXECUTION
  */
 
-import { withTenantContext } from '../internal/tenant-context/index';
-import { createDbClient } from '../internal/db/client';
-import type { Result } from '../internal/result/index';
-import { InputSchema, type TagInput } from './types';
-import { handleAction } from './services';
+import { withTenantContext } from '../internal/tenant-context/index.ts';
+import { createDbClient } from '../internal/db/client.ts';
+import type { Result } from '../internal/result/index.ts';
+import { InputSchema, type TagInput } from './types.ts';
+import { handleAction } from './services.ts';
 
 // ─── Entry Point ──────────────────────────────────────────────────────────────
 
 /**
  * Main Windmill entry point for web_admin_tags.
  */
-export async function main(rawInput: unknown): Promise<Result<unknown>> {
+export async function main(args: any) : Promise<Result<unknown>> {
+const rawInput: unknown = args;
   // 1. Validate Input (Zod)
   const parsed = InputSchema.safeParse(rawInput);
   if (!parsed.success) {

@@ -1,6 +1,6 @@
-import type { TxClient } from '../internal/tenant-context/index';
-import type { Result } from '../internal/result/index';
-import type { Input, AdminDashboardResult } from './types';
+import type { TxClient } from '../internal/tenant-context/index.ts';
+import type { Result } from '../internal/result/index.ts';
+import type { Input, AdminDashboardResult } from './types.ts';
 
 export async function fetchDashboardStats(tx: TxClient, input: Input): Promise<Result<AdminDashboardResult>> {
   const { admin_user_id } = input;

@@ -10,15 +10,19 @@
 
 {$BASE_URL} {
         bind {$ADDRESS}
+        log {
+                output stdout
+                format json
+        }
 
         # Extra services: LSP, Multiplayer, Debugger (windmill_extra gateway)
-        reverse_proxy /ws/* /ws_mp/* /ws_debug/* http://windmill_extra:3000
+        reverse_proxy /ws/* /ws_mp/* /ws_debug/* http://booking-titanium-wm-windmill_extra-1:3000
 
         # Search indexer, Enterprise Edition (windmill_indexer:8002)
         # reverse_proxy /api/srch/* http://windmill_indexer:8002
 
         # Default: Windmill server
-        reverse_proxy /* http://windmill_server:8000
+        reverse_proxy /* http://booking-titanium-wm-windmill_server-1:8000
 
         # TLS with custom certificates
         # tls /certs/cert.pem /certs/key.pem

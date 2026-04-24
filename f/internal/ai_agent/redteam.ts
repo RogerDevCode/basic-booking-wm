@@ -1,6 +1,8 @@
+//nobundling
+//nobundling
 /**
  * RED TEAM — Adversarial AI Agent Tests (50 tests)
- *
+...
  * Purpose: Actively try to break the AI Agent and booking system.
  * Categories: Prompt injection, data manipulation, XSS, encoding,
  *             privilege escalation, data exfiltration, logic manipulation.

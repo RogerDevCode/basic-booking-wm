@@ -1,5 +1,5 @@
-import { isGCalEventsResponse } from "./isGCalEventsResponse";
-import { type GCalFetchResult } from "./types";
+import { isGCalEventsResponse } from "./isGCalEventsResponse.ts";
+import { type GCalFetchResult } from "./types.ts";
 
 const GCAL_BASE = 'https://www.googleapis.com/calendar/v3';
 

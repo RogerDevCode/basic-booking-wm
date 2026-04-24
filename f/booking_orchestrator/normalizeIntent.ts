@@ -1,4 +1,4 @@
-import type { OrchestratorBookingIntent } from './types';
+import type { OrchestratorBookingIntent } from './types.ts';
 
 const LEGACY_INTENT_MAP: Readonly<Record<string, OrchestratorBookingIntent>> = {
   reagendar: 'reagendar_cita',

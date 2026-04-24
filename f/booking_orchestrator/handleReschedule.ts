@@ -1,8 +1,8 @@
-import type { Result } from '../internal/result/index';
-import type { InputType, OrchestratorResult } from './types';
-import { getEntity } from './getEntity';
-import { handleGetMyBookings } from './handleGetMyBookings';
-import { main as rescheduleBooking } from '../booking_reschedule/main';
+import type { Result } from '../internal/result/index.ts';
+import type { InputType, OrchestratorResult } from './types.ts';
+import { getEntity } from './getEntity.ts';
+import { handleGetMyBookings } from './handleGetMyBookings.ts';
+import { main as rescheduleBooking } from '../booking_reschedule/main.ts';
 
 export async function handleReschedule(
   input: Readonly<InputType>

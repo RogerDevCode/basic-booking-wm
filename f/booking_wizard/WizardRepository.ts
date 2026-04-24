@@ -1,7 +1,7 @@
 import postgres from 'postgres';
-import { withTenantContext } from '../internal/tenant-context/index';
-import type { Result } from '../internal/result/index';
-import { DateUtils } from './DateUtils';
+import { withTenantContext } from '../internal/tenant-context/index.ts';
+import type { Result } from '../internal/result/index.ts';
+import { DateUtils } from './DateUtils.ts';
 
 export class WizardRepository {
   constructor(private readonly sql: postgres.Sql, private readonly tenantId: string) {}

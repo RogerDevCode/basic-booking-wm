@@ -1,0 +1,61 @@
+from typing import Optional, Literal, List
+from ..internal._result import Result, DBClient, ok, fail
+from ..internal.gcal_utils import build_gcal_event, get_valid_access_token, TokenInfo
+from ._gcal_sync_models import BookingDetails
+from ._gcal_api_adapter import call_gcal_api
+
+async def sync_event(
+    db: DBClient,
+    details: BookingDetails,
+    target: Literal['provider', 'client'],
+    action: Literal['create', 'update', 'delete']
+) -> Result[str]:
+    calendar_id = details["provider_calendar_id"] if target == 'provider' else details["client_calendar_id"]
+    event_id = details["gcal_provider_event_id"] if target == 'provider' else details["gcal_client_event_id"]
+
+    if not calendar_id:
+        return ok(None) # type: ignore[return-value]
+
+    # 1. Get valid access token
+    token_info: TokenInfo = {
+        "accessToken": details["provider_gcal_access_token"] or "",
+        "clientId": details["provider_gcal_client_id"],
+        "clientSecret": details["provider_gcal_client_secret"],
+        "refreshToken": details["provider_gcal_refresh_token"]
+    }
+    
+    err_token, access_token = await get_valid_access_token(details["provider_id"], token_info, db)
+    if err_token or not access_token:
+        return fail(err_token or "Could not get access token")
+
+    # 2. Build event payload
+    event_body = build_gcal_event(details, target)
+
+    # 3. Determine API Method and Path
+    method = "POST"
+    path = "events"
+    
+    if action == 'delete' and event_id:
+        method = "DELETE"
+        path = f"events/{event_id}"
+        event_body = None # type: ignore[assignment]
+    elif (action == 'update' or action == 'create') and event_id:
+        # If we have an ID, we update even if action was 'create' (idempotency)
+        method = "PUT"
+        path = f"events/{event_id}"
+
+    # 4. Call GCal API
+    err_api, api_res = await call_gcal_api(method, path, calendar_id, access_token, event_body)
+    if err_api:
+        # If update/delete fails with 404, maybe event was deleted manually, retry as create?
+        # For now, just return error
+        return fail(err_api)
+
+    if method == "DELETE":
+        return ok(None) # type: ignore[return-value]
+    
+    new_event_id = str(api_res.get("id")) if api_res else None
+    if not new_event_id:
+        return fail("GCal API did not return event ID")
+
+    return ok(new_event_id)

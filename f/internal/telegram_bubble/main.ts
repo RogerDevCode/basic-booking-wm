@@ -1,3 +1,4 @@
+//nobundling
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : Telegram bubble — conversational test harness using real Redis + FSM
@@ -18,16 +19,17 @@
 // ============================================================================
 
 import { z } from 'zod';
-import type { Result } from '../result/index';
-import { formatResponse } from "./formatResponse";
-import { TelegramBubble } from './services';
-import type { BubbleReport } from './types';
+import type { Result } from '../result/index.ts';
+import { formatResponse } from "./formatResponse.ts";
+import { TelegramBubble } from './services.ts';
+import type { BubbleReport } from './types.ts';
 
 // ============================================================================
 // CLI
 // ============================================================================
 
-export async function main(rawInput: unknown): Promise<Result<BubbleReport>> {
+export async function main(args: any) : Promise<Result<BubbleReport>> {
+const rawInput: unknown = args;
   const parsed = z.object({
     chat_id: z.string().default('bubble-test'),
     text: z.string().nullable().default(null),

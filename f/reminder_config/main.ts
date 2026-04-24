@@ -1,3 +1,4 @@
+//nobundling
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : Configure reminder preferences (channel toggles, time windows)
@@ -47,17 +48,18 @@
 // Uses reply_keyboard for selection and force_reply for custom input.
 // ============================================================================
 
-import { createDbClient } from '../internal/db/client';
-import { withTenantContext } from '../internal/tenant-context/index';
-import { buildConfigMessage } from "./buildConfigMessage";
-import { buildWindowConfig } from "./buildWindowConfig";
-import { loadPreferences } from "./loadPreferences";
-import { savePreferences } from "./savePreferences";
-import { setAll } from "./setAll";
-import { toggleValue } from "./toggleValue";
-import { InputSchema, type ReminderConfigResult, type ReminderPrefs } from "./types";
+import { createDbClient } from '../internal/db/client.ts';
+import { withTenantContext } from '../internal/tenant-context/index.ts';
+import { buildConfigMessage } from "./buildConfigMessage.ts";
+import { buildWindowConfig } from "./buildWindowConfig.ts";
+import { loadPreferences } from "./loadPreferences.ts";
+import { savePreferences } from "./savePreferences.ts";
+import { setAll } from "./setAll.ts";
+import { toggleValue } from "./toggleValue.ts";
+import { InputSchema, type ReminderConfigResult, type ReminderPrefs } from "./types.ts";
 
-export async function main(rawInput: unknown): Promise<[Error | null, ReminderConfigResult | null]> {
+export async function main(args: any) : Promise<[Error | null, ReminderConfigResult | null]> {
+const rawInput: unknown = args;
   try {
     const parsed = InputSchema.safeParse(rawInput);
     if (!parsed.success) {

@@ -1,7 +1,7 @@
 import postgres from 'postgres';
-import type { Result } from '../internal/result/index';
-import { type TxClient } from '../internal/tenant-context/index';
-import { type Input } from "./types";
+import type { Result } from '../internal/result/index.ts';
+import { type TxClient } from '../internal/tenant-context/index.ts';
+import { type Input } from "./types.ts";
 
 /**
  * Performs a dynamic update on the client profile.

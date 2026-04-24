@@ -1,3 +1,4 @@
+//nobundling
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : Cancel old booking + create new one atomically (reschedule)
@@ -38,15 +39,15 @@
  * → CLEARED FOR EXECUTION
  */
 
-import { createDbClient } from '../internal/db/client';
-import { logger } from '../internal/logger/index';
-import type { Result } from '../internal/result/index';
-import { validateTransition } from '../internal/state-machine/index';
-import { authorize } from "./authorize";
-import { executeReschedule } from "./executeReschedule";
-import { fetchBooking } from "./fetchBooking";
-import { fetchService } from "./fetchService";
-import { type Input, InputSchema, type RescheduleResult } from "./types";
+import { createDbClient } from '../internal/db/client.ts';
+import { logger } from '../internal/logger/index.ts';
+import type { Result } from '../internal/result/index.ts';
+import { validateTransition } from '../internal/state-machine/index.ts';
+import { authorize } from "./authorize.ts";
+import { executeReschedule } from "./executeReschedule.ts";
+import { fetchBooking } from "./fetchBooking.ts";
+import { fetchService } from "./fetchService.ts";
+import { type Input, InputSchema, type RescheduleResult } from "./types.ts";
 
 // --- Input Validation ---
 // --- Output Types ---
@@ -55,7 +56,8 @@ import { type Input, InputSchema, type RescheduleResult } from "./types";
 // --- Command Logic: Atomic Transaction (SOLID) ---
 // --- Main entry point (Windmill Handler) ---
 
-export async function main(rawInput: unknown): Promise<Result<RescheduleResult>> {
+export async function main(args: any) : Promise<Result<RescheduleResult>> {
+const rawInput: unknown = args;
   const MODULE = 'booking_reschedule';
 
   // 1. Input Validation
@@ -122,4 +124,3 @@ export async function main(rawInput: unknown): Promise<Result<RescheduleResult>>
     await sql.end();
   }
 }
-

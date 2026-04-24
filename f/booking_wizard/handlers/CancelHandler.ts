@@ -1,4 +1,4 @@
-import type { ActionContext, ActionHandler, StepView } from '../types';
+import type { ActionContext, ActionHandler, StepView } from '../types.ts';
 
 export class CancelHandler implements ActionHandler {
   handle(context: ActionContext): Promise<[Error | null, StepView | null]> {

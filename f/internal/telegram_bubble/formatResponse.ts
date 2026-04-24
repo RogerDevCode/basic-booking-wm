@@ -1,4 +1,4 @@
-import type { BubbleOutput } from './types';
+import type { BubbleOutput } from './types.ts';
 
 const stepIcons: Record<string, string> = {
   idle: '📱', selecting_specialty: '📅', selecting_doctor: '👨‍⚕️',

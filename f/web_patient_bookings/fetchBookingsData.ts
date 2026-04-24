@@ -1,6 +1,6 @@
-import type { Result } from '../internal/result/index';
-import type { TxClient } from '../internal/tenant-context/index';
-import { type InputParams, type RawBookingRow } from "./types";
+import type { Result } from '../internal/result/index.ts';
+import type { TxClient } from '../internal/tenant-context/index.ts';
+import { type InputParams, type RawBookingRow } from "./types.ts";
 
 /**
  * Fetches raw booking data and total count for a client.

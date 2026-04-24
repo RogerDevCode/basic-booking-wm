@@ -1,3 +1,4 @@
+//nobundling
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : Test Gemini 2.5 Flash connectivity and basic Q&A via Google AI Studio
@@ -14,7 +15,7 @@
 // ============================================================================
 
 import { z } from 'zod';
-import type { Result } from '../internal/result/index';
+import type { Result } from '../internal/result/index.ts';
 
 // ============================================================================
 // Types & Schemas
@@ -287,7 +288,7 @@ async function runSingleTest(testCase: TestCase, apiKey: string): Promise<Result
 // Main Orchestrator
 // ============================================================================
 
-export async function main(_rawInput: unknown = {}): Promise<Result<TestReport>> {
+export async function main(_args: any = {}): Promise<Result<TestReport>> {
   const [keyErr, apiKey] = getApiKey();
   if (keyErr !== null) {
     return [new Error(`CONFIG_ERROR: ${keyErr.message}`), null];

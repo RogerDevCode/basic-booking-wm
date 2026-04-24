@@ -1,3 +1,4 @@
+//nobundling
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : Client profile CRUD (get/update)
@@ -9,14 +10,14 @@
  * Zod Schemas     : YES — InputSchema validates user_id and profile fields
  */
 
-import { createDbClient } from '../internal/db/client';
-import type { Result } from '../internal/result/index';
-import { withTenantContext } from '../internal/tenant-context/index';
-import { findOrCreateClient } from "./findOrCreateClient";
-import { findUser } from "./findUser";
-import { mapToProfileResult } from "./mapToProfileResult";
-import { InputSchema, type ProfileResult } from "./types";
-import { updateProfile } from "./updateProfile";
+import { createDbClient } from '../internal/db/client.ts';
+import type { Result } from '../internal/result/index.ts';
+import { withTenantContext } from '../internal/tenant-context/index.ts';
+import { findOrCreateClient } from "./findOrCreateClient.ts";
+import { findUser } from "./findUser.ts";
+import { mapToProfileResult } from "./mapToProfileResult.ts";
+import { InputSchema, type ProfileResult } from "./types.ts";
+import { updateProfile } from "./updateProfile.ts";
 
 // ============================================================================
 // WEB PATIENT PROFILE — Client profile CRUD
@@ -26,7 +27,8 @@ import { updateProfile } from "./updateProfile";
  * Main entry point for patient profile operations.
  * Orchestrates user lookup, client creation/retrieval, and updates.
  */
-export async function main(rawInput: unknown): Promise<Result<ProfileResult>> {
+export async function main(args: any) : Promise<Result<ProfileResult>> {
+const rawInput: unknown = args;
   /*
    * ## REASONING TRACE
    * ### Mission Decomposition

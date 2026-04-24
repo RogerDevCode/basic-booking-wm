@@ -9,7 +9,7 @@
  * Zod Schemas     : NO (Uses existing types)
  */
 
-import type { IntentType } from './types';
+import type { IntentType } from './types.ts';
 
 // ============================================================================
 // TYPES & INTERFACES

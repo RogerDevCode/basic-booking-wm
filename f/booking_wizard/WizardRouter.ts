@@ -1,4 +1,4 @@
-import type { ActionContext, ActionHandler, StepView } from './types';
+import type { ActionContext, ActionHandler, StepView } from './types.ts';
 
 export class WizardRouter {
   private readonly handlers = new Map<string, ActionHandler>();

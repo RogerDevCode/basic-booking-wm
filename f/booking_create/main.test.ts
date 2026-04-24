@@ -10,8 +10,8 @@
  */
 
 import { describe, test, expect, vi, beforeEach } from 'vitest';
-import type { Result } from '../internal/result/index';
-import { main } from './main';
+import type { Result } from '../internal/result/index.ts';
+import { main } from './main.ts';
 
 // ─── Mocks ──────────────────────────────────────────────────────────────────
 

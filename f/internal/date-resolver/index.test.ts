@@ -18,7 +18,7 @@
 // ============================================================================
 
 import { describe, test, expect } from 'vitest';
-import { resolveDate, todayYMD } from './index';
+import { resolveDate, todayYMD } from './index.ts';
 
 const REF = '2026-04-14'; // Tuesday
 const OPTS = { referenceDate: REF, timezone: 'America/Mexico_City' };

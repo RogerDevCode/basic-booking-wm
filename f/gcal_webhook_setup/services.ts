@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
-import type { Result } from '../internal/result/index';
-import type { Input, WebhookSetupResult } from './types';
+import type { Result } from '../internal/result/index.ts';
+import type { Input, WebhookSetupResult } from './types.ts';
 
 const WEBHOOK_RECEIVER_PATH = '/api/w/booking-titanium/jobs/run/p/f/gcal_webhook_receiver';
 const GCAL_WATCH_TIMEOUT_MS = 15000;

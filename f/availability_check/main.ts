@@ -1,3 +1,4 @@
+//nobundling
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : Get available time slots for a provider on a given date
@@ -9,14 +10,15 @@
  * Zod Schemas     : YES — InputSchema validates all inputs
  */
 
-import { getAvailability } from '../internal/scheduling-engine/index';
-import { withTenantContext } from '../internal/tenant-context/index';
-import { createDbClient } from '../internal/db/client';
-import type { Result } from '../internal/result/index';
-import { InputSchema, type Input, type AvailabilityResult } from './types';
-import { getProviderServiceId, getProvider } from './services';
+import { getAvailability } from '../internal/scheduling-engine/index.ts';
+import { withTenantContext } from '../internal/tenant-context/index.ts';
+import { createDbClient } from '../internal/db/client.ts';
+import type { Result } from '../internal/result/index.ts';
+import { InputSchema, type Input, type AvailabilityResult } from './types.ts';
+import { getProviderServiceId, getProvider } from './services.ts';
 
-export async function main(rawInput: unknown): Promise<Result<AvailabilityResult>> {
+export async function main(args: any) : Promise<Result<AvailabilityResult>> {
+const rawInput: unknown = args;
   const parsed = InputSchema.safeParse(rawInput);
   if (!parsed.success) {
     return [new Error(`Validation error: ${parsed.error.message}`), null];

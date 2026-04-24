@@ -1,0 +1,192 @@
+import json
+from datetime import datetime, date
+from typing import Protocol
+from ._booking_create_models import (
+    ClientContext,
+    ProviderContext,
+    ServiceContext,
+    InputSchema,
+    BookingCreated,
+)
+from ..internal._result import DBClient
+
+class BookingCreateRepository(Protocol):
+    async def get_client_context(self, client_id: str) -> ClientContext | None: ...
+    async def get_provider_context(self, provider_id: str) -> ProviderContext | None: ...
+    async def get_service_context(self, service_id: str, provider_id: str) -> ServiceContext | None: ...
+    async def is_provider_blocked(self, provider_id: str, target_date: date) -> bool: ...
+    async def is_provider_scheduled(self, provider_id: str, day_of_week: int) -> bool: ...
+    async def has_overlapping_booking(self, provider_id: str, start_time: datetime, end_time: datetime) -> bool: ...
+    async def insert_booking(
+        self, 
+        input_data: InputSchema, 
+        end_time: datetime, 
+        target_status: str,
+        provider_name: str,
+        service_name: str,
+        client_name: str
+    ) -> BookingCreated: ...
+
+class PostgresBookingCreateRepository:
+    def __init__(self, client: DBClient) -> None:
+        self._client = client
+
+    async def get_client_context(self, client_id: str) -> ClientContext | None:
+        row = await self._client.fetchrow(
+            "SELECT client_id, name FROM clients WHERE client_id = $1::uuid LIMIT 1",
+            client_id
+        )
+        if not row:
+            return None
+        return {"id": str(row["client_id"]), "name": str(row["name"])}
+
+    async def get_provider_context(self, provider_id: str) -> ProviderContext | None:
+        row = await self._client.fetchrow(
+            """
+            SELECT provider_id, name, timezone FROM providers
+            WHERE provider_id = $1::uuid AND is_active = true
+            LIMIT 1
+            FOR UPDATE
+            """,
+            provider_id
+        )
+        if not row:
+            return None
+        return {
+            "id": str(row["provider_id"]), 
+            "name": str(row["name"]), 
+            "timezone": str(row["timezone"])
+        }
+
+    async def get_service_context(self, service_id: str, provider_id: str) -> ServiceContext | None:
+        row = await self._client.fetchrow(
+            """
+            SELECT service_id, name, duration_minutes FROM services
+            WHERE service_id = $1::uuid
+              AND provider_id = $2::uuid
+              AND is_active = true
+            LIMIT 1
+            """,
+            service_id,
+            provider_id
+        )
+        if not row:
+            return None
+        return {
+            "id": str(row["service_id"]),
+            "name": str(row["name"]),
+            "duration": int(str(row["duration_minutes"]))
+        }
+
+    async def is_provider_blocked(self, provider_id: str, target_date: date) -> bool:
+        row = await self._client.fetchrow(
+            """
+            SELECT is_blocked FROM schedule_overrides
+            WHERE provider_id = $1::uuid
+              AND override_date = $2::date
+              AND is_blocked = true
+            LIMIT 1
+            """,
+            provider_id,
+            target_date
+        )
+        return row is not None
+
+    async def is_provider_scheduled(self, provider_id: str, day_of_week: int) -> bool:
+        row = await self._client.fetchrow(
+            """
+            SELECT schedule_id FROM provider_schedules
+            WHERE provider_id = $1::uuid
+              AND day_of_week = $2
+              AND is_active = true
+            LIMIT 1
+            """,
+            provider_id,
+            day_of_week
+        )
+        return row is not None
+
+    async def has_overlapping_booking(self, provider_id: str, start_time: datetime, end_time: datetime) -> bool:
+        row = await self._client.fetchrow(
+            """
+            SELECT booking_id FROM bookings
+            WHERE provider_id = $1::uuid
+              AND status NOT IN ('cancelled', 'no_show', 'rescheduled')
+              AND start_time < $2::timestamptz
+              AND end_time > $3::timestamptz
+            LIMIT 1
+            """,
+            provider_id,
+            end_time,
+            start_time
+        )
+        return row is not None
+
+    async def insert_booking(
+        self, 
+        input_data: InputSchema, 
+        end_time: datetime, 
+        target_status: str,
+        provider_name: str,
+        service_name: str,
+        client_name: str
+    ) -> BookingCreated:
+        row = await self._client.fetchrow(
+            """
+            INSERT INTO bookings (
+              client_id, provider_id, service_id,
+              start_time, end_time, status, idempotency_key, notes,
+              gcal_sync_status, notification_sent,
+              reminder_24h_sent, reminder_2h_sent, reminder_30min_sent
+            ) VALUES (
+              $1::uuid, $2::uuid, $3::uuid,
+              $4::timestamptz, $5::timestamptz,
+              $6, $7, $8,
+              'pending', false,
+              false, false, false
+            )
+            ON CONFLICT (idempotency_key)
+            DO UPDATE SET updated_at = NOW(), status = EXCLUDED.status
+            RETURNING booking_id, status, start_time, end_time
+            """,
+            input_data.client_id,
+            input_data.provider_id,
+            input_data.service_id,
+            input_data.start_time,
+            end_time,
+            target_status,
+            input_data.idempotency_key,
+            input_data.notes
+        )
+
+        if not row:
+            raise RuntimeError('INSERT returned no rows')
+
+        booking_id_str = str(row["booking_id"])
+
+        await self._client.execute(
+            """
+            INSERT INTO booking_audit (
+              booking_id, from_status, to_status, changed_by, actor_id, reason, metadata
+            ) VALUES (
+              $1::uuid, $2, $3, $4, $5::uuid, $6, $7::jsonb
+            )
+            """,
+            booking_id_str,
+            "pending",
+            target_status,
+            input_data.actor,
+            input_data.client_id,
+            "Booking created",
+            json.dumps({"channel": input_data.channel})
+        )
+
+        return {
+            "booking_id": booking_id_str,
+            "status": str(row["status"]),
+            "start_time": str(row["start_time"]),
+            "end_time": str(row["end_time"]),
+            "provider_name": provider_name,
+            "service_name": service_name,
+            "client_name": client_name,
+        }

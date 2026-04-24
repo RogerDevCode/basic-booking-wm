@@ -1,3 +1,4 @@
+//nobundling
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : Process incoming Google Calendar push notifications
@@ -44,12 +45,13 @@
 // ============================================================================
 
 import { z } from 'zod';
-import { createDbClient } from '../internal/db/client';
-import { withTenantContext } from '../internal/tenant-context/index';
-import { fetchCalendarEvents } from "./fetchCalendarEvents";
-import { InputSchema, type WebhookResult } from "./types";
+import { createDbClient } from '../internal/db/client.ts';
+import { withTenantContext } from '../internal/tenant-context/index.ts';
+import { fetchCalendarEvents } from "./fetchCalendarEvents.ts";
+import { InputSchema, type WebhookResult } from "./types.ts";
 
-export async function main(rawInput: unknown): Promise<[Error | null, WebhookResult | null]> {
+export async function main(args: any) : Promise<[Error | null, WebhookResult | null]> {
+const rawInput: unknown = args;
   const parsed = InputSchema.safeParse(rawInput);
   if (!parsed.success) {
     return [new Error('Validation error: ' + parsed.error.message), null];

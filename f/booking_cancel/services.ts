@@ -1,7 +1,7 @@
 import postgres from 'postgres';
-import { isBookingStatus } from '../internal/db-types/index';
-import type { Result } from '../internal/result/index';
-import type { CancelBookingInput, BookingLookup } from './types';
+import { isBookingStatus } from '../internal/db-types/index.ts';
+import type { Result } from '../internal/result/index.ts';
+import type { CancelBookingInput, BookingLookup } from './types.ts';
 
 // ─── Authorization ──────────────────────────────────────────────────────────
 /**

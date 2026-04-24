@@ -1,0 +1,91 @@
+# ============================================================================
+# PRE-FLIGHT CHECKLIST
+# Mission         : Configure reminder preferences (UI-driven)
+# DB Tables Used  : clients
+# Concurrency Risk: NO
+# GCal Calls      : NO
+# Idempotency Key : N/A
+# RLS Tenant ID   : YES — with_tenant_context wraps DB ops
+# Pydantic Schemas: YES — InputSchema validates action and client_id
+# ============================================================================
+
+from typing import Any, Dict, List, Optional, Tuple
+from ..internal._wmill_adapter import log
+from ..internal._db_client import create_db_client
+from ..internal._result import Result, ok, fail, with_tenant_context
+from ._config_models import InputSchema, ReminderConfigResult, ReminderPrefs
+from ._config_logic import (
+    load_preferences, save_preferences, build_config_message, 
+    build_window_config, set_all
+)
+
+MODULE = "reminder_config"
+
+async def main(args: dict[str, Any]) -> Result[ReminderConfigResult]:
+    # 1. Validate Input
+    try:
+        input_data = InputSchema.model_validate(args)
+    except Exception as e:
+        return fail(f"Invalid input: {e}")
+
+    conn = await create_db_client()
+    try:
+        # 2. Execute within Tenant Context
+        async def operation() -> Result[ReminderConfigResult]:
+            prefs = await load_preferences(conn, input_data.client_id)
+            
+            message = ""
+            reply_keyboard: Optional[List[List[str]]] = None
+
+            # Mutators
+            if input_data.action == 'toggle_channel':
+                if input_data.channel == 'telegram':
+                    all_on = prefs["telegram_24h"] and prefs["telegram_2h"] and prefs["telegram_30min"]
+                    prefs = {**prefs, "telegram_24h": not all_on, "telegram_2h": not all_on, "telegram_30min": not all_on}
+                elif input_data.channel == 'gmail':
+                    prefs = {**prefs, "gmail_24h": not prefs["gmail_24h"]}
+                await save_preferences(conn, input_data.client_id, prefs)
+
+            elif input_data.action == 'toggle_window':
+                if input_data.window:
+                    key = f"telegram_{input_data.window}"
+                    if key in prefs:
+                        prefs[key] = not prefs[key] # type: ignore[literal-required]
+                        await save_preferences(conn, input_data.client_id, prefs)
+
+            elif input_data.action == 'deactivate_all':
+                prefs = set_all(prefs, False)
+                await save_preferences(conn, input_data.client_id, prefs)
+            
+            elif input_data.action == 'activate_all':
+                prefs = set_all(prefs, True)
+                await save_preferences(conn, input_data.client_id, prefs)
+
+            # View Builders
+            if input_data.action in ['show', 'toggle_channel']:
+                message, reply_keyboard = build_config_message(prefs)
+            elif input_data.action == 'toggle_window':
+                message, reply_keyboard = build_window_config(prefs)
+            elif input_data.action == 'deactivate_all':
+                message = "🔕 *Recordatorios desactivados*\n\nNo recibirás avisos automáticos."
+                reply_keyboard = [['✅ Activar todo', '« Volver al menú']]
+            elif input_data.action == 'activate_all':
+                message = "🔔 *Recordatorios activados*\n\nRecibirás avisos en todos los canales y ventanas."
+                reply_keyboard = [['⚙️ Configurar', '« Volver al menú']]
+            elif input_data.action == 'back':
+                message = "📋 Menú principal. ¿En qué puedo ayudarte?"
+                reply_keyboard = [['📅 Agendar cita', '📋 Mis citas'], ['🔔 Recordatorios', '❓ Información']]
+
+            return ok({
+                "message": message,
+                "reply_keyboard": reply_keyboard,
+                "preferences": prefs
+            })
+
+        return await with_tenant_context(conn, input_data.client_id, operation)
+
+    except Exception as e:
+        log("Reminder Config Internal Error", error=str(e), module=MODULE)
+        return fail(f"internal_error: {e}")
+    finally:
+        await conn.close() # pyright: ignore[reportUnknownMemberType]

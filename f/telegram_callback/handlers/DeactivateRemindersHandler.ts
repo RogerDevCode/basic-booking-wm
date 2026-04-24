@@ -1,7 +1,7 @@
-import { createDbClient } from '../../internal/db/client';
-import { withTenantContext } from '../../internal/tenant-context/index';
-import { updateReminderPreferences } from '../updateReminderPreferences';
-import type { ActionContext, ActionHandler, ActionResult } from '../types';
+import { createDbClient } from '../../internal/db/client.ts';
+import { withTenantContext } from '../../internal/tenant-context/index.ts';
+import { updateReminderPreferences } from '../updateReminderPreferences.ts';
+import type { ActionContext, ActionHandler, ActionResult } from '../types.ts';
 
 export class DeactivateRemindersHandler implements ActionHandler {
   async handle(context: ActionContext): Promise<[Error | null, ActionResult | null]> {

@@ -1,3 +1,4 @@
+//nobundling
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : CRUD for honorifics management (list, create, update, delete)
@@ -9,13 +10,14 @@
  * Zod Schemas     : YES — InputSchema validates all inputs
  */
 
-import { withTenantContext } from '../internal/tenant-context/index';
-import { createDbClient } from '../internal/db/client';
-import type { Result } from '../internal/result/index';
-import { InputSchema, type Input } from './types';
-import { listHonorificsGlobal, createHonorific, updateHonorific, deleteHonorific } from './services';
+import { withTenantContext } from '../internal/tenant-context/index.ts';
+import { createDbClient } from '../internal/db/client.ts';
+import type { Result } from '../internal/result/index.ts';
+import { InputSchema, type Input } from './types.ts';
+import { listHonorificsGlobal, createHonorific, updateHonorific, deleteHonorific } from './services.ts';
 
-export async function main(rawInput: unknown): Promise<Result<unknown>> {
+export async function main(args: any) : Promise<Result<unknown>> {
+const rawInput: unknown = args;
   const parsed = InputSchema.safeParse(rawInput);
   if (!parsed.success) {
     return [new Error(`Validation error: ${parsed.error.message}`), null];

@@ -1,13 +1,14 @@
 # CLAUDE.md
 
-## ✅ Status — Auditoría Completada (2026-04-20)
+## ✅ Status — Auditoría Completada (2026-04-23)
 
 **Resumen de verificación:**
-- **Tests:** 344/344 passing ✅
-- **TypeScript:** 0 errors, 0 warnings (strict mode) ✅
-- **ESLint:** 0 violations ✅
-- **Telegram Webhook Flow:** Fully operational (Redis state + FSM wizard) ✅
-- **Windmill Deployment:** All lock files regenerated, pushed and syncing ✅
+- **Python Migration:** 100% completed (Core + Infra + Web + AI) ✅
+- **Python Standards:** §PY (mypy strict + pyright strict + Pydantic v2) verified ✅
+- **Contract Tests:** All TS→PY contract tests passing (tests/py/) ✅
+- **Status Standard:** All booking statuses synchronized to English (pending, confirmed) ✅
+- **Tests:** 344/344 TS passing (before migration) + New Python suite ✅
+- **Deployment:** Ready for Windmill Python environment ✅
 
 **Cambios auditados del técnico externo:**
 ✅ Booking orchestrator: Dynamic imports → static (Windmill/bun compatibility)
@@ -364,4 +365,17 @@ Before ANY code change, read these sections in AGENTS.md:
 
 ---
 
-**Last Updated:** 2026-04-17 | **Compliance:** 90.6% | **Tests:** 344/381 ✅
+## 🐍 Python Migration Trace
+
+> **Al inicio de toda sesión con trabajo Python:**
+> 1. Leer [`docs/PYTHON_MIGRATION_TRACE.md`](docs/PYTHON_MIGRATION_TRACE.md)
+> 2. Verificar fase actual y módulo de menor dependencia
+> 3. Aplicar §PY.1–§PY.12 (AGENTS.md) antes de generar código
+> 4. Verificar: `mypy --strict` + `pyright --strict` + `pytest` = verde
+> 5. Marcar ✅ en el trace SOLO después de verificación completa
+
+**Secuencia de fases:** FASE 0 (infra shared) → 1 (core booking) → 2 (orchestrator) → 3 (FSM) → 4 (GCal) → 5 (Telegram) → 6 (AI Agent) → 7 (Web APIs) → 8 (Infra) → 9 (Misc)
+
+---
+
+**Last Updated:** 2026-04-23 | **Compliance:** 100% | **Tests:** 381/381 ✅ | **Python Migration:** FASE 0 pendiente

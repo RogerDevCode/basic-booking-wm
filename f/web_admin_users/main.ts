@@ -1,3 +1,4 @@
+//nobundling
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : User management CRUD + role change (admin-only)
@@ -44,11 +45,12 @@
 // List, get, update, deactivate users. Admin-only.
 // ============================================================================
 
-import { createDbClient } from '../internal/db/client';
-import { withTenantContext } from '../internal/tenant-context/index';
-import { InputSchema, type UserInfo, type UsersListResult } from "./types";
+import { createDbClient } from '../internal/db/client.ts';
+import { withTenantContext } from '../internal/tenant-context/index.ts';
+import { InputSchema, type UserInfo, type UsersListResult } from "./types.ts";
 
-export async function main(rawInput: unknown): Promise<[Error | null, UserInfo | UsersListResult | null]> {
+export async function main(args: any) : Promise<[Error | null, UserInfo | UsersListResult | null]> {
+const rawInput: unknown = args;
   const parsed = InputSchema.safeParse(rawInput);
   if (!parsed.success) {
     return [new Error('Validation error: ' + parsed.error.message), null];

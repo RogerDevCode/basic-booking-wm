@@ -1,5 +1,5 @@
 import postgres from 'postgres';
-import { type ClientMetadataRow, type ReminderPrefs, type SqlClient } from "./types";
+import { type ClientMetadataRow, type ReminderPrefs, type SqlClient } from "./types.ts";
 
 export async function loadPreferences(sql: SqlClient, clientId: string): Promise<ReminderPrefs> {
     const defaults: ReminderPrefs = {

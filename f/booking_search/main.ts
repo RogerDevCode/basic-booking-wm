@@ -1,3 +1,4 @@
+//nobundling
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : Search and filter bookings
@@ -9,11 +10,12 @@
  * Zod Schemas     : YES
  */
 
-import { createDbClient } from '../internal/db/client';
-import type { Result } from '../internal/result/index';
-import { InputSchema, type Input, type BookingSearchResult } from './types';
+import { createDbClient } from '../internal/db/client.ts';
+import type { Result } from '../internal/result/index.ts';
+import { InputSchema, type Input, type BookingSearchResult } from './types.ts';
 
-export async function main(rawInput: unknown): Promise<Result<BookingSearchResult>> {
+export async function main(args: any) : Promise<Result<BookingSearchResult>> {
+const rawInput: unknown = args;
   const parsed = InputSchema.safeParse(rawInput);
   if (!parsed.success) {
     return [new Error('Validation error: ' + parsed.error.message), null];

@@ -1,5 +1,5 @@
-import type { Result } from '../internal/result/index';
-import type { DB } from './types';
+import type { Result } from '../internal/result/index.ts';
+import type { DB } from './types.ts';
 
 export async function resolveTenantForBooking(sql: DB, bookingId: string): Promise<Result<string>> {
   try {

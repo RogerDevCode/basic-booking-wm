@@ -1,5 +1,5 @@
-import type { WizardState, StepView } from './types';
-import { DateUtils } from './DateUtils';
+import type { WizardState, StepView } from './types.ts';
+import { DateUtils } from './DateUtils.ts';
 
 export const WizardUI = {
   buildDateSelection(state: WizardState, weekOffset: number): StepView {

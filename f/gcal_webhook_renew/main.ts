@@ -1,3 +1,4 @@
+//nobundling
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : Renew expiring Google Calendar push notification channel
@@ -9,11 +10,12 @@
  * Zod Schemas     : YES — InputSchema validates channel_id and resource_id
  */
 
-import { InputSchema, type Input, type RenewResult } from './types';
-import { renewChannel } from './services';
-import type { Result } from '../internal/result/index';
+import { InputSchema, type Input, type RenewResult } from './types.ts';
+import { renewChannel } from './services.ts';
+import type { Result } from '../internal/result/index.ts';
 
-export async function main(rawInput: unknown): Promise<Result<RenewResult>> {
+export async function main(args: any) : Promise<Result<RenewResult>> {
+const rawInput: unknown = args;
   const parsed = InputSchema.safeParse(rawInput);
   if (!parsed.success) {
     return [new Error(`Validation error: ${parsed.error.message}`), null];

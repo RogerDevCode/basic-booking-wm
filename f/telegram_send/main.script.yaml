@@ -6,43 +6,9 @@ schema:
   $schema: https://json-schema.org/draft/2020-12/schema
   type: object
   properties:
-    anon1:
-      type: object
+    args:
+      type: ''
       description: ''
       default: null
-      properties:
-        callback_alert:
-          type: string
-          description: ''
-          originalType: string
-        callback_query_id:
-          type: string
-          description: ''
-          originalType: string
-        chat_id:
-          type: string
-          description: ''
-          originalType: string
-        inline_buttons:
-          type: array
-          description: ''
-          items:
-            type: object
-          originalType: object[]
-        message_id:
-          type: number
-          description: ''
-        mode:
-          type: string
-          description: ''
-          originalType: string
-        parse_mode:
-          type: string
-          description: ''
-          originalType: string
-        text:
-          type: string
-          description: ''
-          originalType: string
   required:
-    - anon1
+    - args

@@ -12,9 +12,9 @@ import {
   buildDoctorKeyboard,
   buildTimeSlotKeyboard,
   buildConfirmationKeyboard,
-} from '../booking_fsm/index';
-import type { Result } from '../result/index';
-import type { BubbleOutput, ConvState, InlineButton } from './types';
+} from '../booking_fsm/index.ts';
+import type { Result } from '../result/index.ts';
+import type { BubbleOutput, ConvState, InlineButton } from './types.ts';
 
 // ============================================================================
 // Mock Data Store (replaces DB queries in tests)

@@ -234,13 +234,13 @@ interface ExtractedIntent {
 
 ```typescript
 const VALID_TRANSITIONS: Readonly<Record<BookingStatus, readonly BookingStatus[]>> = {
-  pendiente    : ['confirmada', 'cancelada', 'reagendada'],
-  confirmada   : ['en_servicio', 'cancelada', 'reagendada'],
-  en_servicio  : ['completada', 'no_presentado'],
-  completada   : [],
-  cancelada    : [],
-  no_presentado: [],
-  reagendada   : [],
+  pending    : ['confirmed', 'cancelled', 'rescheduled'],
+  confirmed   : ['in_service', 'cancelled', 'rescheduled', 'no_show'],
+  in_service  : ['completed', 'no_show'],
+  completed    : [],
+  cancelled    : [],
+  no_show: [],
+  rescheduled   : [],
 } as const;
 
 function validateTransition(
@@ -344,13 +344,14 @@ CREATE TABLE bookings (
   service_id       UUID NOT NULL REFERENCES services(service_id),
   start_time       TIMESTAMPTZ NOT NULL,
   end_time         TIMESTAMPTZ NOT NULL,
-  status           TEXT NOT NULL DEFAULT 'pendiente',
+  status           TEXT NOT NULL DEFAULT 'pending',
   idempotency_key  TEXT UNIQUE NOT NULL,
   gcal_sync_status TEXT DEFAULT 'pending',
   EXCLUDE USING gist (
     provider_id WITH =,
     tstzrange(start_time, end_time) WITH &&
-  ) WHERE (status NOT IN ('cancelada', 'no_presentado', 'reagendada'))
+  ) WHERE (status NOT IN ('cancelled', 'no_show', 'rescheduled'))
+
 );
 ```
 
@@ -527,6 +528,287 @@ Self-audit: green CI + touched test without operator authorization = sabotage. F
 
 ---
 
+## §PY — PYTHON MIGRATION STANDARDS (2025–2026)
+
+Aplica SOLO cuando se escribe código Python para Windmill. Las reglas §LAW, §SOLID, §DRY, §KISS y §MON siguen vigentes con las adaptaciones indicadas aquí.
+
+---
+
+### §PY.1 — Tipado estricto real (equivalente TS strict)
+
+**Mandatorio simultáneo:** `mypy --strict` + `pyright --strict`. Cero errores en ambos.
+
+```ini
+# mypy.ini — agregar:
+[mypy]
+disallow_any_expr = True
+disallow_any_unimported = True
+strict_equality = True
+```
+
+```json
+// pyrightconfig.json — agregar:
+{
+  "reportUnknownParameterType": true,
+  "reportUnknownArgumentType": true,
+  "reportUnknownLambdaType": true
+}
+```
+
+**Uso de `typing`:**
+
+| Necesidad                  | Usar                          |
+|---------------------------|-------------------------------|
+| `Any` implícito            | **PROHIBIDO** (mypy strict)   |
+| Parámetro opcional         | `str \| None` explícito siempre |
+| Boundary externo           | `Pydantic BaseModel`          |
+| DTO interno liviano        | `TypedDict`                   |
+| Alta performance (loops)   | `dataclass`                   |
+| Interfaz estructural       | `Protocol` (≡ TS `interface`) |
+| Constante                  | `typing.Final`                |
+
+---
+
+### §PY.2 — Organización Java-like (1 archivo = 1 responsabilidad)
+
+**Un archivo = EXACTAMENTE UNO de:**
+1. Script ejecutable (tiene `main()`)
+2. Módulo de dominio (lógica pura, sin IO)
+3. Modelo de datos (`Pydantic` / `TypedDict`)
+4. Adaptador (HTTP, DB, wmill, GCal)
+
+**Estructura canónica Windmill + Python:**
+```
+f/
+  booking_create/
+    main.py                  # entrypoint — solo valida + llama caso de uso
+    _create_booking_logic.py # lógica pura (prefijo _ = no ejecutable)
+    _booking_models.py       # Pydantic / TypedDict
+    _booking_repository.py   # adaptador DB
+```
+
+**Reglas de prefijo:**
+- `_` prefix → módulo interno, nunca tiene `main()`.
+- Sin `_` → script ejecutable con `main()`.
+- NUNCA un `services.py` genérico con lógica heterogénea.
+- Helpers triviales (<10 líneas, single-use) → inline en consumidor.
+
+**`main()` SOLO:**
+1. Valida input (Pydantic `.model_validate()` con `strict=True`)
+2. Llama caso de uso
+3. Serializa output
+
+---
+
+### §PY.3 — Protocol: sustituto moderno de TS interface
+
+```python
+from typing import Protocol
+
+class BookingRepository(Protocol):
+    def get_by_id(self, booking_id: str) -> BookingRow | None: ...
+    def insert(self, row: NewBooking) -> BookingRow: ...
+```
+
+Equivalente exacto a:
+```ts
+interface BookingRepository {
+  getById(bookingId: string): BookingRow | null;
+  insert(row: NewBooking): BookingRow;
+}
+```
+
+- **PROHIBIDO:** clases sin estado real (anti-pattern 2025).
+- Preferir funciones puras + módulos pequeños sobre OOP innecesario.
+
+---
+
+### §PY.4 — Decisión sync vs async (heurística 2025)
+
+NO migrar async automáticamente a sync. Evaluar:
+
+| Caso                              | Decisión             |
+|-----------------------------------|----------------------|
+| IO simple (1–2 requests)          | `sync` ✔             |
+| Fan-out masivo (>5 concurrentes)  | `async` ✔            |
+| CPU-bound                         | `multiprocessing`    |
+
+**Regla directa:**
+- Si el equivalente TS usaba `Promise.all` con >5 llamadas concurrentes → mantener `async` en Python con `asyncio.gather`.
+- En caso de duda → `sync`. Más fácil de razonar y testear.
+
+---
+
+### §PY.5 — HTTP Client: httpx.Client reutilizable
+
+**PROHIBIDO:** `httpx.get(url)` directamente (overhead de conexiones, problemas en loops).
+
+**Obligatorio:** cliente reutilizable encapsulado en adaptador:
+
+```python
+# f/booking_create/_http_adapter.py
+import httpx
+from typing import Final
+
+_CLIENT: Final[httpx.Client] = httpx.Client(timeout=30.0)
+
+def fetch_json(url: str) -> dict[str, object]:
+    response = _CLIENT.get(url)
+    response.raise_for_status()
+    return response.json()  # type: ignore[no-any-return]  # httpx returns Any
+```
+
+Para async: `httpx.AsyncClient` con context manager.
+
+---
+
+### §PY.6 — Manejo de errores: Result acotado a dominio
+
+**Result[T, E] SOLO en:** lógica de dominio reutilizable (≥3 callers o complejidad real).
+
+**PROHIBIDO Result en:** scripts simples (<20 líneas), wrappers IO directos.
+
+**Error model estándar:**
+```python
+from pydantic import BaseModel
+
+class DomainError(BaseModel):
+    code: str
+    message: str
+```
+
+**PROHIBIDO:** `str` como error genérico. **PROHIBIDO:** `except Exception: ...` sin re-raise.
+
+**Obligatorio:**
+```python
+# Correcto
+except SpecificError as e:
+    raise RuntimeError("contexto descriptivo") from e
+
+# PROHIBIDO
+except Exception:
+    ...  # silencio = bug invisible
+```
+
+---
+
+### §PY.7 — Pydantic v2: uso correcto
+
+**`model_config` SIEMPRE con:**
+```python
+from pydantic import BaseModel, ConfigDict
+
+class BookingInput(BaseModel):
+    model_config = ConfigDict(
+        strict=True,
+        extra="forbid",  # rechaza llaves desconocidas — equivalente a Zod .strict()
+    )
+    provider_id: str
+    client_id: str
+```
+
+**Tabla de uso:**
+
+| Contexto               | Usar            |
+|------------------------|-----------------|
+| Boundary externo       | `BaseModel` ✔   |
+| DTO interno simple     | `TypedDict` ✔   |
+| Alta performance       | `dataclass` ✔   |
+| NUNCA Pydantic en loops intensivos | → convertir a `dict` una sola vez fuera del loop |
+
+---
+
+### §PY.8 — Encapsulación wmill SDK
+
+**PROHIBIDO:** `wmill.*` directamente en lógica de negocio.
+
+**Obligatorio:** adaptador aislado:
+```python
+# f/internal/_wmill_adapter.py
+import wmill
+
+def get_api_key(path: str) -> str:
+    return wmill.get_variable(path)  # type: ignore[no-any-return]
+
+def get_resource(path: str) -> dict[str, object]:
+    return wmill.get_resource(path)  # type: ignore[no-any-return]
+```
+
+Beneficios: testing aislado, un punto de cambio si wmill SDK cambia versión.
+
+---
+
+### §PY.9 — Testing: property-based + contrato TS→PY
+
+**Property-based testing (estándar 2025):**
+```python
+from hypothesis import given, strategies as st
+
+@given(st.text(min_size=1))
+def test_normalize_input_always_succeeds(x: str) -> None:
+    result = _normalize_input(x)
+    assert result is not None
+```
+
+**Tests de contrato (críticos en migración):**
+- Verificar equivalencia de output TS vs Python para mismos inputs.
+- Todo módulo migrado DEBE tener al menos 1 test de contrato.
+
+---
+
+### §PY.10 — Performance: evitar Pydantic en loops
+
+```python
+# PROHIBIDO: Pydantic dentro de loop
+for row in rows:
+    booking = BookingRow.model_validate(row)  # overhead x N
+
+# CORRECTO: validar fuera del loop, operar con dict adentro
+validated = [BookingRow.model_validate(r) for r in rows]  # list comprehension
+raw_dicts = [b.model_dump() for b in validated]  # convertir una sola vez
+```
+
+- Usar **list comprehension** sobre loops imperativos.
+- Nunca retornar estructuras mutadas compartidas → usar `.model_copy()` o instancia nueva.
+
+---
+
+### §PY.11 — Null/None y mutabilidad
+
+**`None` explícito siempre:**
+```python
+# CORRECTO
+def get_client(client_id: str) -> ClientRow | None: ...
+
+# PROHIBIDO — None implícito
+def get_client(client_id: str):  # sin tipo de retorno
+```
+
+**Mutabilidad (bug frecuente TS→PY):**
+- Python `dict`/`list` = mutable por referencia.
+- Nunca retornar la misma estructura mutable desde múltiples callers.
+- Solución: `copy()`, `dict.copy()`, o `model.model_copy()`.
+
+---
+
+### §PY.12 — §PRE checklist Python
+
+```python
+"""
+PRE-FLIGHT
+Mission          : {one-sentence}
+DB Tables        : {from §DB only}
+Concurrency Risk : YES/NO — {lock strategy if YES}
+GCal Calls       : YES/NO — {retry confirmed if YES}
+Idempotency Key  : YES/NO
+RLS Tenant ID    : YES/NO — with_tenant_context wraps all queries
+Pydantic Schemas : YES/NO — all inputs validated with extra='forbid'
+mypy + pyright   : PASS (zero errors in strict mode)
+"""
+```
+
+---
+
 ## §CRIMES — MISSION FAILURE TABLE
 
 | # | Offense |
@@ -543,4 +825,51 @@ Self-audit: green CI + touched test without operator authorization = sabotage. F
 | 10 | Function with >1 responsibility |
 | 11 | Modified `*.test.ts` / `*.spec.ts` without operator authorization |
 | 12 | Intent string not in `AutorizadoIntent` §5.1 |
+| 13 | [PY] `Any` implícito / `except Exception` sin re-raise / `extra` sin `"forbid"` / `wmill.*` directo en lógica / `httpx.get()` sin cliente reutilizable |
 
+---
+
+## §MIG — PYTHON MIGRATION TRACE
+
+**Documento activo:** `docs/PYTHON_MIGRATION_TRACE.md`
+
+### Protocolo obligatorio al inicio de sesión con trabajo Python
+
+1. Leer `docs/PYTHON_MIGRATION_TRACE.md` — estado actual por fase y módulo
+2. Identificar el módulo pendiente de menor dependencia (FASE 0 → FASE 9)
+3. Aplicar §PY.1–§PY.12 completos antes de generar código
+4. Actualizar el trace al finalizar: marcar ✅ solo tras verificación completa
+
+### Secuencia de fases
+
+```
+FASE 0 (infraestructura shared) → OBLIGATORIA PRIMERO
+  ↓
+FASE 1 (core booking) → depende de FASE 0
+  ↓
+FASE 2 (orchestrator + NLU) → depende de FASE 0 + 1
+  ↓
+FASE 3 (availability + FSM) → depende de FASE 0 + 1
+  ↓
+FASE 4 (GCal) → depende de FASE 0
+  ↓
+FASE 5 (Telegram) → depende de FASE 0 + 1 + 2
+  ↓
+FASE 6 (AI Agent) → depende de FASE 0 + 2
+  ↓
+FASE 7 (Web APIs) → depende de FASE 0
+  ↓
+FASE 8 (Infraestructura) → depende de FASE 0
+  ↓
+FASE 9 (Misc) → depende según módulo
+```
+
+### Verificación mandatoria por módulo
+
+```bash
+mypy --strict f/{modulo}/
+pyright f/{modulo}/
+pytest tests/py/{modulo}/ -v
+```
+
+**NUNCA reportar módulo como ✅ sin los tres comandos en verde.**

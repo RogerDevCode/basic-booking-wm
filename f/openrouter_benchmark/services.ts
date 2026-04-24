@@ -4,8 +4,8 @@ import type {
   OpenRouterResponse,
   TaskPrompt,
   ModelTestResult,
-} from './types';
-import { OpenRouterResponseSchema, NLUIntentSchema } from './types';
+} from './types.ts';
+import { OpenRouterResponseSchema, NLUIntentSchema } from './types.ts';
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 

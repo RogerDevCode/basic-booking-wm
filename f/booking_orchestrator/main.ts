@@ -1,3 +1,4 @@
+//nobundling
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : Routes AI intents to booking actions (create, cancel, reschedule, list)
@@ -38,16 +39,16 @@
  * → CLEARED FOR CODE GENERATION
  */
 
-import { logger } from '../internal/logger/index';
-import type { Result } from '../internal/result/index';
-import { InputSchema, type InputType, type OrchestratorResult, type OrchestratorBookingIntent } from './types';
-import { normalizeIntent } from './normalizeIntent';
-import { resolveContext } from './resolveContext';
-import { handleCreateBooking } from './handleCreateBooking';
-import { handleCancelBooking } from './handleCancelBooking';
-import { handleReschedule } from './handleReschedule';
-import { handleListAvailable } from './handleListAvailable';
-import { handleGetMyBookings } from './handleGetMyBookings';
+import { logger } from '../internal/logger/index.ts';
+import type { Result } from '../internal/result/index.ts';
+import { InputSchema, type InputType, type OrchestratorResult, type OrchestratorBookingIntent } from './types.ts';
+import { normalizeIntent } from './normalizeIntent.ts';
+import { resolveContext } from './resolveContext.ts';
+import { handleCreateBooking } from './handleCreateBooking.ts';
+import { handleCancelBooking } from './handleCancelBooking.ts';
+import { handleReschedule } from './handleReschedule.ts';
+import { handleListAvailable } from './handleListAvailable.ts';
+import { handleGetMyBookings } from './handleGetMyBookings.ts';
 
 const MODULE = 'booking_orchestrator';
 
@@ -59,9 +60,8 @@ const HANDLER_MAP: Readonly<Record<OrchestratorBookingIntent, (i: Readonly<Input
   mis_citas: handleGetMyBookings,
 };
 
-export async function main(
-  rawInput: unknown
-): Promise<Result<OrchestratorResult>> {
+export async function main(args: any) : Promise<Result<OrchestratorResult>> {
+const rawInput: unknown = args;
   const parsed = InputSchema.safeParse(rawInput);
   if (!parsed.success) return [new Error(`Invalid input: ${parsed.error.message}`), null];
 

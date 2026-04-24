@@ -1,5 +1,5 @@
 import postgres from 'postgres';
-import { type CircuitBreakerRow, type CircuitState } from "./types";
+import { type CircuitBreakerRow, type CircuitState } from "./types.ts";
 
 export async function getState(tx: postgres.Sql, serviceId: string): Promise<CircuitState | null> {
     const rows = await tx<CircuitBreakerRow[]>`

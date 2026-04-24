@@ -1,4 +1,4 @@
-import type { ScriptResponse } from './types';
+import type { ScriptResponse } from './types.ts';
 
 export async function sendTelegramReminder(
   chatId: string,

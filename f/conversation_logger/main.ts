@@ -1,3 +1,4 @@
+//nobundling
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : Log messages to conversations table (incoming/outgoing)
@@ -9,13 +10,14 @@
  * Zod Schemas     : YES — InputSchema validates channel, direction, content
  */
 
-import { withTenantContext } from '../internal/tenant-context/index';
-import { createDbClient } from '../internal/db/client';
-import type { Result } from '../internal/result/index';
-import { InputSchema, type LogResult } from './types';
-import { persistLog } from './services';
+import { withTenantContext } from '../internal/tenant-context/index.ts';
+import { createDbClient } from '../internal/db/client.ts';
+import type { Result } from '../internal/result/index.ts';
+import { InputSchema, type LogResult } from './types.ts';
+import { persistLog } from './services.ts';
 
-export async function main(rawInput: unknown): Promise<Result<LogResult>> {
+export async function main(args: any) : Promise<Result<LogResult>> {
+const rawInput: unknown = args;
   const parsed = InputSchema.safeParse(rawInput);
   if (!parsed.success) {
     return [new Error(`validation_error: ${parsed.error.message}`), null];

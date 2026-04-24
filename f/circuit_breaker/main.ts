@@ -1,3 +1,4 @@
+//nobundling
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : Service health monitor and failure isolation (circuit breaker pattern)
@@ -48,13 +49,14 @@
 // ============================================================================
 
 import { z } from 'zod';
-import { createDbClient } from '../internal/db/client';
-import { getCircuitBreakerTx } from "./getCircuitBreakerTx";
-import { getState } from "./getState";
-import { initService } from "./initService";
-import { type CircuitBreakerResult, type CircuitState, InputSchema } from "./types";
+import { createDbClient } from '../internal/db/client.ts';
+import { getCircuitBreakerTx } from "./getCircuitBreakerTx.ts";
+import { getState } from "./getState.ts";
+import { initService } from "./initService.ts";
+import { type CircuitBreakerResult, type CircuitState, InputSchema } from "./types.ts";
 
-export async function main(rawInput: unknown): Promise<[Error | null, CircuitBreakerResult | CircuitState | null]> {
+export async function main(args: any) : Promise<[Error | null, CircuitBreakerResult | CircuitState | null]> {
+const rawInput: unknown = args;
   const parsed = InputSchema.safeParse(rawInput);
   if (!parsed.success) {
     return [new Error(`Validation error: ${parsed.error.message}`), null];

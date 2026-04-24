@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import postgres from 'postgres';
-import type { Result } from '../internal/result/index';
-import type { Input, RegisterResult } from './types';
+import type { Result } from '../internal/result/index.ts';
+import type { Input, RegisterResult } from './types.ts';
 
 function hashPasswordSync(password: string): string {
   const salt = crypto.randomBytes(16).toString('hex');

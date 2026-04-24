@@ -1,5 +1,5 @@
 import postgres from 'postgres';
-import { type ProfileResult } from "./types";
+import { type ProfileResult } from "./types.ts";
 
 /**
  * Maps raw database row to strictly typed ProfileResult.

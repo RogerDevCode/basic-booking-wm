@@ -1,3 +1,4 @@
+//nobundling
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : Cancel an existing medical appointment
@@ -42,22 +43,21 @@
  * → CLEARED FOR CODE GENERATION
  */
 
-import { toUUID } from '../internal/db-types/index';
-import { withTenantContext } from '../internal/tenant-context/index';
-import { validateTransition } from '../internal/state-machine/index';
-import { createDbClient } from '../internal/db/client';
-import { logger } from '../internal/logger/index';
-import type { Result } from '../internal/result/index';
-import { InputSchema } from './types';
-import type { CancelBookingInput, CancelResult, UpdatedBooking } from './types';
-import { authorizeActor, fetchBooking } from './services';
+import { toUUID } from '../internal/db-types/index.ts';
+import { withTenantContext } from '../internal/tenant-context/index.ts';
+import { validateTransition } from '../internal/state-machine/index.ts';
+import { createDbClient } from '../internal/db/client.ts';
+import { logger } from '../internal/logger/index.ts';
+import type { Result } from '../internal/result/index.ts';
+import { InputSchema } from './types.ts';
+import type { CancelBookingInput, CancelResult, UpdatedBooking } from './types.ts';
+import { authorizeActor, fetchBooking } from './services.ts';
 
 const MODULE = 'booking_cancel';
 
 // ─── Main Entry Point ───────────────────────────────────────────────────────
-export async function main(
-  rawInput: unknown,
-): Promise<Result<CancelResult>> {
+export async function main(args: any) : Promise<Result<CancelResult>> {
+const { rawInput } = args || {};
   // 1. Input Validation
   const parsed = InputSchema.safeParse(rawInput);
   if (!parsed.success) {

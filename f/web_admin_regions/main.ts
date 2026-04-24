@@ -1,3 +1,4 @@
+//nobundling
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : Read-only reference data for regions and communes
@@ -9,12 +10,13 @@
  * Zod Schemas     : YES — InputSchema validates action and region_id
  */
 
-import { createDbClient } from '../internal/db/client';
-import type { Result } from '../internal/result/index';
-import { InputSchema, type Input } from './types';
-import { listRegions, listCommunes, searchCommunes } from './services';
+import { createDbClient } from '../internal/db/client.ts';
+import type { Result } from '../internal/result/index.ts';
+import { InputSchema, type Input } from './types.ts';
+import { listRegions, listCommunes, searchCommunes } from './services.ts';
 
-export async function main(rawInput: unknown): Promise<Result<unknown>> {
+export async function main(args: any) : Promise<Result<unknown>> {
+const rawInput: unknown = args;
   const parsed = InputSchema.safeParse(rawInput);
   if (!parsed.success) {
     return [new Error(`Validation error: ${parsed.error.message}`), null];

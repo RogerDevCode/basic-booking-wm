@@ -1,3 +1,4 @@
+//nobundling
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : Authenticate email+password, return session + role
@@ -51,11 +52,11 @@
 // Returns user_id, email, role, full_name for session management.
 // ============================================================================
 
-import { createDbClient } from '../internal/db/client';
-import type { Result } from '../internal/result/index';
-import { type Input, InputSchema, type LoginResult, type UserRow } from "./types";
-import { verifyPasswordSync } from "./verifyPasswordSync";
-import { withAdminContext } from "./withAdminContext";
+import { createDbClient } from '../internal/db/client.ts';
+import type { Result } from '../internal/result/index.ts';
+import { type Input, InputSchema, type LoginResult, type UserRow } from "./types.ts";
+import { verifyPasswordSync } from "./verifyPasswordSync.ts";
+import { withAdminContext } from "./withAdminContext.ts";
 
 // ============================================================================
 // SCHEMAS & INTERFACES
@@ -67,7 +68,8 @@ import { withAdminContext } from "./withAdminContext";
 // MAIN EXECUTION
 // ============================================================================
 
-export async function main(rawInput: unknown): Promise<Result<LoginResult>> {
+export async function main(args: any) : Promise<Result<LoginResult>> {
+const rawInput: unknown = args;
   // 1. Validate Input
   const parsed = InputSchema.safeParse(rawInput);
   if (!parsed.success) {

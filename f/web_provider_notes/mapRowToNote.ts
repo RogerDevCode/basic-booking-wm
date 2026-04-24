@@ -1,5 +1,5 @@
-import { decryptContent } from "./decryptContent";
-import { type NoteRow, type Tag } from "./types";
+import { decryptContent } from "./decryptContent.ts";
+import { type NoteRow, type Tag } from "./types.ts";
 
 export function mapRowToNote(row: Record<string, unknown>, tags: readonly Tag[] = []): NoteRow {
     // eslint-disable-next-line @typescript-eslint/no-base-to-string

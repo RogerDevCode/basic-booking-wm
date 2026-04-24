@@ -1,8 +1,8 @@
 // Formatters — date/time/message UI formatting
-export { formatDate, formatTime, getClientPreference, buildBookingDetails, buildInlineButtons } from './formatters';
+export { formatDate, formatTime, getClientPreference, buildBookingDetails, buildInlineButtons } from './formatters.ts';
 
 // Communicators — external API calls (Telegram, Gmail)
-export { sendTelegramReminder, sendGmailReminder } from './communicators';
+export { sendTelegramReminder, sendGmailReminder } from './communicators.ts';
 
 // Repository — data access operations
 export {
@@ -14,4 +14,4 @@ export {
   getBookingsFor2h,
   getBookingsFor30min,
   getBookingsForWindow,
-} from './repository';
+} from './repository.ts';

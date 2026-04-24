@@ -1,6 +1,6 @@
 import postgres from 'postgres';
-import type { Result } from '../internal/result/index';
-import type { HonorificRow } from './types';
+import type { Result } from '../internal/result/index.ts';
+import type { HonorificRow } from './types.ts';
 
 type HonorificRaw = readonly [string, string, string, string | null, number, boolean, string];
 

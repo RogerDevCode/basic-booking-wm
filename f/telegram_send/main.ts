@@ -1,3 +1,4 @@
+//nobundling
 /*
  * REASONING TRACE
  * ### Decomposition: [Split monolith into types, services, and main orchestrator]
@@ -19,35 +20,26 @@
  * Zod Schemas     : YES — Discriminated union validates all modes
  */
 
-import type { Result } from '../internal/result/index';
-import { requireTelegramBotToken } from '../internal/config/index';
-import { InputSchema } from './types';
-import type { TelegramSendData } from './types';
-import { TelegramService } from './services';
+import type { Result } from '../internal/result/index.ts';
+import { requireTelegramBotToken } from '../internal/config/index.ts';
+import { InputSchema } from './types.ts';
+import type { TelegramSendData } from './types.ts';
+import { TelegramService } from './services.ts';
 
 // ============================================================================
 // MAIN — Entry Point Orchestrator
 // ============================================================================
 
-export async function main({
-  chat_id,
-  text,
-  mode,
-  message_id,
-  inline_buttons,
-  parse_mode,
-  callback_query_id,
-  callback_alert,
-}: {
-  chat_id: string;
-  text?: string;
-  mode?: string;
-  message_id?: number | null;
-  inline_buttons?: any[];
-  parse_mode?: string;
-  callback_query_id?: string | null;
-  callback_alert?: string;
-}): Promise<Result<TelegramSendData>> {
+export async function main(args: any) : Promise<Result<TelegramSendData>> {
+const chat_id = args?.chat_id ?? '';
+  const text = args?.text ?? '';
+  const mode = args?.mode ?? 'send_message';
+  const message_id = args?.message_id ?? null;
+  const inline_buttons = args?.inline_buttons ?? [];
+  const parse_mode = args?.parse_mode ?? 'Markdown';
+  const callback_query_id = args?.callback_query_id ?? null;
+  const callback_alert = args?.callback_alert ?? '';
+
   const rawInput = {
     chat_id,
     text,

@@ -1,3 +1,4 @@
+//nobundling
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : Create or update client records
@@ -9,13 +10,14 @@
  * Zod Schemas     : YES
  */
 
-import { DEFAULT_TIMEZONE } from '../internal/config/index';
-import { withTenantContext } from '../internal/tenant-context/index';
-import { createDbClient } from '../internal/db/client';
-import type { Result } from '../internal/result/index';
-import { InputSchema, type Input, type ClientResult } from './types';
+import { DEFAULT_TIMEZONE } from '../internal/config/index.ts';
+import { withTenantContext } from '../internal/tenant-context/index.ts';
+import { createDbClient } from '../internal/db/client.ts';
+import type { Result } from '../internal/result/index.ts';
+import { InputSchema, type Input, type ClientResult } from './types.ts';
 
-export async function main(rawInput: unknown): Promise<Result<ClientResult>> {
+export async function main(args: any) : Promise<Result<ClientResult>> {
+const rawInput: unknown = args;
   const parsed = InputSchema.safeParse(rawInput);
   if (!parsed.success) {
     return [new Error('Validation error: ' + parsed.error.message), null];

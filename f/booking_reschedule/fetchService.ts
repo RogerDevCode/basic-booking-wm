@@ -1,6 +1,6 @@
-import type { ServiceRow } from '../internal/db-types/index';
-import type { Result } from '../internal/result/index';
-import { type Sql } from "./types";
+import type { ServiceRow } from '../internal/db-types/index.ts';
+import type { Result } from '../internal/result/index.ts';
+import { type Sql } from "./types.ts";
 
 export async function fetchService(sql: Sql, id: string): Promise<Result<ServiceRow>> {
     try {

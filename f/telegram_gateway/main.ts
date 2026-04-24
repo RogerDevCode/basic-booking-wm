@@ -1,3 +1,4 @@
+//nobundling
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : Main webhook handler for Telegram messages (routing + commands)
@@ -35,8 +36,8 @@
  */
 
 import "@total-typescript/ts-reset";
-import type { Result } from '../internal/result/index';
-import { TelegramClient, ClientRepository } from './services';
+import type { Result } from '../internal/result/index.ts';
+import { TelegramClient, ClientRepository } from './services.ts';
 import {
   TelegramUpdateSchema,
   type TelegramUpdate,
@@ -44,7 +45,7 @@ import {
   type TelegramCallback,
   type ITelegramClient,
   type IClientRepository,
-} from './types';
+} from './types.ts';
 
 // ============================================================================
 // DOMAIN LOGIC / ROUTING
@@ -203,7 +204,8 @@ class TelegramRouter {
 // MAIN ENTRY POINT (WINDMILL)
 // ============================================================================
 
-export async function main(rawInput: unknown): Promise<Result<{ readonly message: string }>> {
+export async function main(args: any): Promise<Result<{ readonly message: string }>> {
+  const rawInput: unknown = args;
   // 1. Validation (Defense in Depth)
   const parseResult = TelegramUpdateSchema.safeParse(rawInput);
   if (!parseResult.success) {

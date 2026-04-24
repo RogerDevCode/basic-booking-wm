@@ -1,3 +1,4 @@
+//nobundling
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : Complete profile for Telegram-registered user via web
@@ -40,11 +41,11 @@
  * → CLEARED FOR CODE GENERATION
  */
 
-import { createDbClient } from '../internal/db/client';
-import { validatePasswordPolicy } from '../internal/crypto/index';
-import type { Result } from '../internal/result/index';
-import { InputSchema, type CompleteProfileResult, type UserRow } from './types';
-import { validateRut, hashPasswordScrypt, withAdminContext } from './services';
+import { createDbClient } from '../internal/db/client.ts';
+import { validatePasswordPolicy } from '../internal/crypto/index.ts';
+import type { Result } from '../internal/result/index.ts';
+import { InputSchema, type CompleteProfileResult, type UserRow } from './types.ts';
+import { validateRut, hashPasswordScrypt, withAdminContext } from './services.ts';
 
 // ============================================================================
 // WEB AUTH COMPLETE PROFILE — Complete profile for Telegram user
@@ -54,7 +55,8 @@ import { validateRut, hashPasswordScrypt, withAdminContext } from './services';
 // Uses admin_override to bypass RLS for initial user discovery by chat_id.
 // ============================================================================
 
-export async function main(rawInput: unknown): Promise<Result<CompleteProfileResult>> {
+export async function main(args: any) : Promise<Result<CompleteProfileResult>> {
+const rawInput: unknown = args;
   // 1. Parse Input
   const parsed = InputSchema.safeParse(rawInput);
   if (!parsed.success) {

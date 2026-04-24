@@ -1,3 +1,4 @@
+//nobundling
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : Sync booking to Google Calendar (provider + client)
@@ -40,13 +41,13 @@
  * → CLEARED FOR CODE GENERATION
  */
 
-import { createDbClient } from '../internal/db/client';
-import { getValidAccessToken } from '../internal/gcal_utils/oauth';
-import type { Result } from '../internal/result/index';
-import { fetchBookingDetails } from "./fetchBookingDetails";
-import { syncEvent } from "./syncEvent";
-import { type GCalSyncResult, type Input, InputSchema } from "./types";
-import { updateBookingSyncStatus } from "./updateBookingSyncStatus";
+import { createDbClient } from '../internal/db/client.ts';
+import { getValidAccessToken } from '../internal/gcal_utils/oauth.ts';
+import type { Result } from '../internal/result/index.ts';
+import { fetchBookingDetails } from "./fetchBookingDetails.ts";
+import { syncEvent } from "./syncEvent.ts";
+import { type GCalSyncResult, type Input, InputSchema } from "./types.ts";
+import { updateBookingSyncStatus } from "./updateBookingSyncStatus.ts";
 
 // --- Schemas & Types --------------------------------------------------------
 
@@ -55,9 +56,8 @@ import { updateBookingSyncStatus } from "./updateBookingSyncStatus";
 // --- GCal API Operations ----------------------------------------------------
 // --- Main -------------------------------------------------------------------
 
-export async function main(
-  rawInput: unknown
-): Promise<Result<GCalSyncResult>> {
+export async function main(args: any) : Promise<Result<GCalSyncResult>> {
+const rawInput: unknown = args;
   const parsed = InputSchema.safeParse(rawInput);
   if (!parsed.success) {
     return [new Error(`Validation error: ${parsed.error.message}`), null];

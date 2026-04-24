@@ -1,3 +1,4 @@
+//nobundling
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : Get current user profile + role by user_id
@@ -9,13 +10,14 @@
  * Zod Schemas     : YES — InputSchema validates user_id
  */
 
-import { withTenantContext } from '../internal/tenant-context/index';
-import { createDbClient } from '../internal/db/client';
-import type { Result } from '../internal/result/index';
-import { InputSchema, type Input, type UserProfileResult } from './types';
-import { getUserProfile } from './services';
+import { withTenantContext } from '../internal/tenant-context/index.ts';
+import { createDbClient } from '../internal/db/client.ts';
+import type { Result } from '../internal/result/index.ts';
+import { InputSchema, type Input, type UserProfileResult } from './types.ts';
+import { getUserProfile } from './services.ts';
 
-export async function main(rawInput: unknown): Promise<Result<UserProfileResult>> {
+export async function main(args: any) : Promise<Result<UserProfileResult>> {
+const rawInput: unknown = args;
   const parsed = InputSchema.safeParse(rawInput);
   if (!parsed.success) {
     return [new Error('Validation error: ' + parsed.error.message), null];

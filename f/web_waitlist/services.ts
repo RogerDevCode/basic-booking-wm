@@ -1,6 +1,6 @@
 import type postgres from 'postgres';
-import type { Result } from '../internal/result/index';
-import type { Input, WaitlistResult, WaitlistEntry } from './types';
+import type { Result } from '../internal/result/index.ts';
+import type { Input, WaitlistResult, WaitlistEntry } from './types.ts';
 
 /**
  * Resolves the client_id for the given user_id.

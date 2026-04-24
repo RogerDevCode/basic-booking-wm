@@ -1,13 +1,14 @@
 summary: ''
 description: ''
+lock: '!inline f/web_admin_specialties_crud/main.script.lock'
 kind: script
 schema:
   $schema: https://json-schema.org/draft/2020-12/schema
   type: object
   properties:
-    rawInput:
+    args:
       type: ''
       description: ''
       default: null
   required:
-    - rawInput
+    - args

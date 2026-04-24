@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import type { TxClient } from '../internal/tenant-context/index';
-import type { Result } from '../internal/result/index';
-import { ActionSchema, type Input, type SpecialtyRow } from './types';
+import type { TxClient } from '../internal/tenant-context/index.ts';
+import type { Result } from '../internal/result/index.ts';
+import { ActionSchema, type Input, type SpecialtyRow } from './types.ts';
 
 export const SpecialtyRepository = {
   async list(tx: TxClient): Promise<Result<readonly SpecialtyRow[]>> {

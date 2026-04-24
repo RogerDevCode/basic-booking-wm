@@ -1,5 +1,5 @@
-import { createDbClient } from '../internal/db/client';
-import type { ComponentStatus } from './types';
+import { createDbClient } from '../internal/db/client.ts';
+import type { ComponentStatus } from './types.ts';
 
 export async function checkDatabase(dbUrl: string): Promise<ComponentStatus> {
   const start = Date.now();

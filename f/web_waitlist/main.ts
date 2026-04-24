@@ -1,3 +1,4 @@
+//nobundling
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : Waitlist management (join, leave, list, check position)
@@ -9,18 +10,18 @@
  * Zod Schemas     : YES — InputSchema validates action and waitlist fields
  */
 
-import { withTenantContext } from '../internal/tenant-context/index';
-import { createDbClient } from '../internal/db/client';
-import type { Result } from '../internal/result/index';
-import { InputSchema, WaitlistResultSchema } from './types';
-import type { WaitlistResult } from './types';
+import { withTenantContext } from '../internal/tenant-context/index.ts';
+import { createDbClient } from '../internal/db/client.ts';
+import type { Result } from '../internal/result/index.ts';
+import { InputSchema, WaitlistResultSchema } from './types.ts';
+import type { WaitlistResult } from './types.ts';
 import {
   resolveClientId,
   handleJoin,
   handleLeave,
   handleList,
   handleCheckPosition
-} from './services';
+} from './services.ts';
 
 // ============================================================================
 // MAIN ENTRY POINT
@@ -52,7 +53,8 @@ import {
  * - O: New actions can be added by implementing a new handler and adding to the switch.
  * - D: tx (postgres.Sql) injected into all handlers.
  */
-export async function main(rawInput: unknown): Promise<Result<WaitlistResult>> {
+export async function main(args: any) : Promise<Result<WaitlistResult>> {
+const rawInput: unknown = args;
   const parsed = InputSchema.safeParse(rawInput);
   if (!parsed.success) {
     return [new Error(`validation_error: ${parsed.error.message}`), null];

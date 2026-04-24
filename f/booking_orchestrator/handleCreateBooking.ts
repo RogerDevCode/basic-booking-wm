@@ -1,7 +1,7 @@
-import type { Result } from '../internal/result/index';
-import type { InputType, OrchestratorResult } from './types';
-import { getEntity } from './getEntity';
-import { main as createBooking } from '../booking_create/main';
+import type { Result } from '../internal/result/index.ts';
+import type { InputType, OrchestratorResult } from './types.ts';
+import { getEntity } from './getEntity.ts';
+import { main as createBooking } from '../booking_create/main.ts';
 
 export async function handleCreateBooking(
   input: Readonly<InputType>

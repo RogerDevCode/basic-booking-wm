@@ -1,0 +1,9 @@
+{
+  "reportUnknownParameterType": true,
+  "reportUnknownArgumentType": true,
+  "reportUnknownLambdaType": true,
+  "strict": ["f", "tests/py"],
+  "typeCheckingMode": "strict",
+  "venvPath": ".",
+  "venv": ".venv"
+}

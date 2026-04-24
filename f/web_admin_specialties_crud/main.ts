@@ -1,3 +1,4 @@
+//nobundling
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : Manage medical specialties (CRUD + activate/deactivate)
@@ -38,17 +39,18 @@
  */
 
 import "@total-typescript/ts-reset";
-import { createDbClient } from '../internal/db/client';
-import { withTenantContext } from '../internal/tenant-context/index';
-import type { Result } from '../internal/result/index';
-import { InputSchema } from './types';
-import { Handlers } from './services';
+import { createDbClient } from '../internal/db/client.ts';
+import { withTenantContext } from '../internal/tenant-context/index.ts';
+import type { Result } from '../internal/result/index.ts';
+import { InputSchema } from './types.ts';
+import { Handlers } from './services.ts';
 
 // ============================================================================
 // MAIN ENTRY POINT
 // ============================================================================
 
-export async function main(rawInput: unknown): Promise<Result<unknown>> {
+export async function main(args: any) : Promise<Result<unknown>> {
+const rawInput: unknown = args;
   // 1. Validate Input
   const parsed = InputSchema.safeParse(rawInput);
   if (!parsed.success) {

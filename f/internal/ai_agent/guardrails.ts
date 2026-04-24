@@ -3,8 +3,8 @@
 // Pattern: Zero mocks, strict validation, no assertions
 // ============================================================================
 
-import { INTENT, URGENCY_WORDS } from './constants';
-import type { GuardrailResult, IntentResult } from './types';
+import { INTENT, URGENCY_WORDS } from './constants.ts';
+import type { GuardrailResult, IntentResult } from './types.ts';
 
 // Prompt injection patterns
 const INJECTION_PATTERNS: readonly RegExp[] = [

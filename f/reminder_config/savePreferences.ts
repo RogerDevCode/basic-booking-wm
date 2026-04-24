@@ -1,5 +1,5 @@
 import postgres from 'postgres';
-import { type ReminderPrefs, type SqlClient } from "./types";
+import { type ReminderPrefs, type SqlClient } from "./types.ts";
 
 export async function savePreferences(sql: SqlClient, clientId: string, prefs: ReminderPrefs): Promise<boolean> {
     try {

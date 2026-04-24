@@ -1,4 +1,4 @@
-import { type ReminderPrefs } from "./types";
+import { type ReminderPrefs } from "./types.ts";
 
 export function buildWindowConfig(prefs: ReminderPrefs): { message: string; reply_keyboard: string[][] } {
     const check = (v: boolean) => v ? '✅' : '❌';

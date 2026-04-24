@@ -1,6 +1,6 @@
 import postgres from 'postgres';
 import { z } from 'zod';
-import type { UUID } from '../internal/db-types/index';
+import type { UUID } from '../internal/db-types/index.ts';
 
 export type Sql = postgres.Sql;
 export type Input = Readonly<z.infer<typeof InputSchema>>;

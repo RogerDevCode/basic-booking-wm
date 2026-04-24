@@ -65,9 +65,9 @@ const CONFIG = {
 // IMPORTS
 // ============================================================================
 
-import { cacheGet, cacheSet } from '../cache/index';
-import { INTENT } from './constants';
-import { LLMRawAPIResponseSchema } from './types';
+import { cacheGet, cacheSet } from '../cache/index.ts';
+import { INTENT } from './constants.ts';
+import { LLMRawAPIResponseSchema } from './types.ts';
 
 const MAX_RETRIES = 2;
 const BACKOFF_MS = 500;

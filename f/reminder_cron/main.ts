@@ -1,3 +1,4 @@
+//nobundling
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : Send 24h/2h/30min appointment reminders via Telegram + Gmail
@@ -40,12 +41,13 @@
  * → CLEARED FOR CODE GENERATION
  */
 
-import { createDbClient } from '../internal/db/client';
-import { withTenantContext } from '../internal/tenant-context/index';
-import { buildBookingDetails, buildInlineButtons, getBookingsForWindow, markReminderSent, sendGmailReminder, sendTelegramReminder } from './services';
-import { InputSchema, type BookingRecord, type CronResult, type ReminderWindow } from './types';
+import { createDbClient } from '../internal/db/client.ts';
+import { withTenantContext } from '../internal/tenant-context/index.ts';
+import { buildBookingDetails, buildInlineButtons, getBookingsForWindow, markReminderSent, sendGmailReminder, sendTelegramReminder } from './services.ts';
+import { InputSchema, type BookingRecord, type CronResult, type ReminderWindow } from './types.ts';
 
-export async function main(rawInput: unknown): Promise<[Error | null, CronResult | null]> {
+export async function main(args: any) : Promise<[Error | null, CronResult | null]> {
+const rawInput: unknown = args;
   try {
     const parsed = InputSchema.safeParse(rawInput);
     if (!parsed.success) {

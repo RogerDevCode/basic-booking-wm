@@ -1,5 +1,5 @@
 import postgres from 'postgres';
-import type { BookingRecord, ReminderWindow } from './types';
+import type { BookingRecord, ReminderWindow } from './types.ts';
 
 export async function markReminder24hSent(tx: postgres.Sql, bookingId: string): Promise<void> {
   await tx`

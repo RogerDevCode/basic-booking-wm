@@ -1,6 +1,6 @@
 import postgres from 'postgres';
-import type { Result } from '../internal/result/index';
-import { type Input, type LockRow } from "./types";
+import type { Result } from '../internal/result/index.ts';
+import { type Input, type LockRow } from "./types.ts";
 
 export async function tryInsertLock(tx: postgres.Sql, input: Input, expiresAt: Date): Promise<Result<LockRow>> {
     if (!input.owner_token) {

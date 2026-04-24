@@ -1,5 +1,5 @@
 import postgres from 'postgres';
-import type { Result } from '../internal/result/index';
+import type { Result } from '../internal/result/index.ts';
 
 /**
  * withAdminContext — Executes DB logic with app.admin_override = 'true'.

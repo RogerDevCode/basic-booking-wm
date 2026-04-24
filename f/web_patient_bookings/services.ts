@@ -1,6 +1,6 @@
-import type { TxClient } from '../internal/tenant-context/index';
-import type { Result } from '../internal/result/index';
-import type { InputParams, BookingInfo, BookingsResult, RawBookingRow } from './types';
+import type { TxClient } from '../internal/tenant-context/index.ts';
+import type { Result } from '../internal/result/index.ts';
+import type { InputParams, BookingInfo, BookingsResult, RawBookingRow } from './types.ts';
 
 // --- Domain Constants ---
 

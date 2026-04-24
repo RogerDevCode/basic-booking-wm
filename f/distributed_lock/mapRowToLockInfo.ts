@@ -1,4 +1,4 @@
-import { type LockInfo, type LockRow } from "./types";
+import { type LockInfo, type LockRow } from "./types.ts";
 
 /**
  * mapRowToLockInfo converts DB row types to public API types.

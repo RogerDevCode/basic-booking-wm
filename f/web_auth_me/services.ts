@@ -1,6 +1,6 @@
-import type { TxClient } from '../internal/tenant-context/index';
-import type { Result } from '../internal/result/index';
-import type { UserProfileResult } from './types';
+import type { TxClient } from '../internal/tenant-context/index.ts';
+import type { Result } from '../internal/result/index.ts';
+import type { UserProfileResult } from './types.ts';
 
 export async function getUserProfile(tx: TxClient, userId: string): Promise<Result<UserProfileResult>> {
   const userRows = await tx.values<[string, string | null, string, string, string | null, string | null, string | null, string | null, string, boolean, string | null, boolean]>`

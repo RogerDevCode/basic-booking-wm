@@ -17,9 +17,9 @@ import {
   RULE_CONFIDENCE_VALUES,
   SOCIAL_CONFIDENCE_VALUES,
   CONFIDENCE_BOUNDARIES,
-} from './constants';
-import { callLLM } from './llm-client';
-import { sanitizeJSONResponse } from './guardrails';
+} from './constants.ts';
+import { callLLM } from './llm-client.ts';
+import { sanitizeJSONResponse } from './guardrails.ts';
 import {
   type AIAgentInput,
   type ConversationState,
@@ -30,7 +30,7 @@ import {
   type ContextAdjustment,
   type LLMInquiryResult,
   isIntentType
-} from './types';
+} from './types.ts';
 
 // ============================================================================
 // CONTEXT-AWARE INTENT ADJUSTMENT

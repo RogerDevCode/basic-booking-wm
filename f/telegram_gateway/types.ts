@@ -10,7 +10,7 @@
  */
 
 import { z } from 'zod';
-import type { Result } from '../internal/result/index';
+import type { Result } from '../internal/result/index.ts';
 
 // ============================================================================
 // TELEGRAM SCHEMAS (Input Validation)

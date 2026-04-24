@@ -1,5 +1,6 @@
 summary: ''
 description: ''
+lock: '!inline f/web_admin_provider_crud/services.script.lock'
 kind: script
 schema:
   $schema: https://json-schema.org/draft/2020-12/schema

@@ -1,3 +1,4 @@
+//nobundling
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : Provider self-service profile management (get/update/change password)
@@ -41,11 +42,11 @@
 import "@total-typescript/ts-reset";
 import postgres from 'postgres';
 import { z } from 'zod';
-import { hashPassword, validatePasswordPolicy, verifyPassword } from '../internal/crypto/index';
-import { createDbClient } from '../internal/db/client';
-import type { Result } from '../internal/result/index';
-import { withTenantContext } from '../internal/tenant-context/index';
-import { InputSchema, type ProfileActionHandler, type ProfileInput, type ProfileRow } from "./types";
+import { hashPassword, validatePasswordPolicy, verifyPassword } from '../internal/crypto/index.ts';
+import { createDbClient } from '../internal/db/client.ts';
+import type { Result } from '../internal/result/index.ts';
+import { withTenantContext } from '../internal/tenant-context/index.ts';
+import { InputSchema, type ProfileActionHandler, type ProfileInput, type ProfileRow } from "./types.ts";
 
 // ============================================================================
 // SCHEMAS & TYPES
@@ -209,7 +210,8 @@ const HANDLERS: Record<z.infer<typeof InputSchema>['action'], ProfileActionHandl
 // MAIN ENTRY POINT
 // ============================================================================
 
-export async function main(rawInput: unknown): Promise<Result<unknown>> {
+export async function main(args: any) : Promise<Result<unknown>> {
+const rawInput: unknown = args;
   // 1. Validate Input
   const parsed = InputSchema.safeParse(rawInput);
   if (!parsed.success) {

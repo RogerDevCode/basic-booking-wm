@@ -1,7 +1,7 @@
-import { DEFAULT_TIMEZONE } from '../internal/config/index';
-import type { Result } from '../internal/result/index';
-import type { TxClient } from '../internal/tenant-context/index';
-import type { Input } from './types';
+import { DEFAULT_TIMEZONE } from '../internal/config/index.ts';
+import type { Result } from '../internal/result/index.ts';
+import type { TxClient } from '../internal/tenant-context/index.ts';
+import type { Input } from './types.ts';
 
 /** Handles provider-related CRUD operations */
 export async function handleProviderActions(tx: TxClient, input: Input): Promise<Result<Record<string, unknown>>> {

@@ -21,8 +21,8 @@
 // ============================================================================
 
 import type postgres from 'postgres';
-import { getAvailability } from '../scheduling-engine/index';
-import type { Result } from '../result/index';
+import { getAvailability } from '../scheduling-engine/index.ts';
+import type { Result } from '../result/index.ts';
 
 // ─── Output types (wizard-compatible, unchanged) ──────────────────────────────
 

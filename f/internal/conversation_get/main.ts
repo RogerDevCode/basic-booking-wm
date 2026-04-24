@@ -1,3 +1,4 @@
+//nobundling
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : Retrieve conversation state from Redis for the current chat_id
@@ -17,8 +18,8 @@
 // Graceful degradation: returns null state if Redis is unavailable.
 // ============================================================================
 
-import { validateInput, fetchConversationData, formatOutput } from './services';
-import type { GetStateOutput } from './types';
+import { validateInput, fetchConversationData, formatOutput } from './services.ts';
+import type { GetStateOutput } from './types.ts';
 
 /**
  * main — Entry point for Windmill conversation_get.
@@ -26,7 +27,8 @@ import type { GetStateOutput } from './types';
  * SRP: delegates validation, fetching, and response formatting.
  * Go-style TS: uses [Error | null, Result | null] tuples via helper functions.
  */
-export async function main(chat_id: string): Promise<GetStateOutput> {
+export async function main(args: any) : Promise<GetStateOutput> {
+const chat_id: string = args;
   const [valErr, chatId] = validateInput({ chat_id });
   if (valErr !== null || chatId === null) {
     return formatOutput(false, null, valErr?.message ?? 'invalid_input', false);

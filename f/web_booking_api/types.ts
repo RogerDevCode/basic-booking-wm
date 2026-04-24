@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { createDbClient } from '../internal/db/client';
+import { createDbClient } from '../internal/db/client.ts';
 
 export type Input = z.infer<typeof InputSchema>;
 export type DB = ReturnType<typeof createDbClient>;

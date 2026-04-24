@@ -5,7 +5,7 @@
 // ============================================================================
 
 import postgres from 'postgres';
-import { createDbClient } from '../db/client';
+import { createDbClient } from '../db/client.ts';
 
 export interface FAQEntry {
   readonly kb_id: string;

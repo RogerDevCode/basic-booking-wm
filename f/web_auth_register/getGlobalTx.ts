@@ -1,5 +1,5 @@
 import postgres from 'postgres';
-import { type Result } from "./types";
+import { type Result } from "./types.ts";
 
 export async function getGlobalTx<T>(client: postgres.Sql, operation: (tx: postgres.Sql) => Promise<Result<T>>): Promise<Result<T>> {
     const reserved = await client.reserve();

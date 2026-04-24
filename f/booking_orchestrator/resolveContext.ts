@@ -1,8 +1,8 @@
-import { createDbClient } from '../internal/db/client';
-import type { Result } from '../internal/result/index';
-import type { InputType, ResolvedContext } from './types';
-import { getEntity } from './getEntity';
-import { resolveDate, resolveTime } from '../internal/date-resolver/index';
+import { createDbClient } from '../internal/db/client.ts';
+import type { Result } from '../internal/result/index.ts';
+import type { InputType, ResolvedContext } from './types.ts';
+import { getEntity } from './getEntity.ts';
+import { resolveDate, resolveTime } from '../internal/date-resolver/index.ts';
 
 export async function resolveContext(
   input: Readonly<InputType>

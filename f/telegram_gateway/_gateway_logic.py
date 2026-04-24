@@ -1,0 +1,56 @@
+import httpx
+from typing import Optional, List, Dict, Any, Tuple
+from ..internal._result import Result, DBClient, ok, fail
+from ..internal._db_client import create_db_client
+from ._gateway_models import SendMessageOptions
+
+class TelegramClient:
+    def __init__(self, token: str):
+        self.token = token
+        self.base_url = f"https://api.telegram.org/bot{token}"
+
+    async def send_message(self, chat_id: str, text: str, options: Optional[SendMessageOptions] = None) -> Result[Dict[str, Any]]:
+        if not self.token:
+            return fail("TELEGRAM_BOT_TOKEN_MISSING")
+
+        url = f"{self.base_url}/sendMessage"
+        body = {
+            "chat_id": chat_id,
+            "text": text,
+            "parse_mode": options.parse_mode if options else 'Markdown',
+            "reply_markup": options.reply_markup if options else None
+        }
+        
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                res = await client.post(url, json={k: v for k, v in body.items() if v is not None})
+                if res.status_code >= 400:
+                    return fail(f"telegram_api_error: {res.status_code} {res.text[:100]}")
+                return ok(res.json())
+        except Exception as e:
+            return fail(f"send_message_failed: {e}")
+
+class ClientRepository:
+    def __init__(self, db_url: str):
+        self.db_url = db_url
+
+    async def ensure_registered(self, full_name: str) -> Result[None]:
+        if not self.db_url:
+            return fail("DATABASE_URL_MISSING")
+
+        conn = await create_db_client()
+        try:
+            # Global context (no RLS for discovery/registration per §6)
+            await conn.execute(
+                """
+                INSERT INTO clients (client_id, name, email, phone, timezone)
+                VALUES (gen_random_uuid(), $1, NULL, NULL, 'America/Mexico_City')
+                ON CONFLICT (email) DO NOTHING
+                """,
+                full_name
+            )
+            return ok(None)
+        except Exception as e:
+            return fail(f"client_registration_failed: {e}")
+        finally:
+            await conn.close()

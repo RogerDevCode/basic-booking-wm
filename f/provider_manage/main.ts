@@ -1,3 +1,4 @@
+//nobundling
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : CRUD for providers, services, schedules, and schedule overrides
@@ -9,23 +10,24 @@
  * Zod Schemas     : YES — InputSchema validates action and entity-specific fields
  */
 
-import { withTenantContext } from '../internal/tenant-context/index';
-import { createDbClient } from '../internal/db/client';
-import { requireDatabaseUrl } from '../internal/config/index';
-import type { Result } from '../internal/result/index';
-import { InputSchema } from './types';
+import { withTenantContext } from '../internal/tenant-context/index.ts';
+import { createDbClient } from '../internal/db/client.ts';
+import { requireDatabaseUrl } from '../internal/config/index.ts';
+import type { Result } from '../internal/result/index.ts';
+import { InputSchema } from './types.ts';
 import {
   handleProviderActions,
   handleServiceActions,
   handleScheduleActions,
   handleOverrideActions
-} from './services';
+} from './services.ts';
 
 // ============================================================================
 // MAIN ENTRY POINT
 // ============================================================================
 
-export async function main(rawInput: unknown): Promise<Result<Readonly<Record<string, unknown>>>> {
+export async function main(args: any) : Promise<Result<Readonly<Record<string, unknown>>>> {
+const rawInput: unknown = args;
   /*
    * REASONING TRACE
    * ### Mission Decomposition

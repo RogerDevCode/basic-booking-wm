@@ -10,8 +10,8 @@
  */
 
 import { describe, test, expect } from 'vitest';
-import { main } from './main';
-import { INTENT } from './constants';
+import { main } from './main.ts';
+import { INTENT } from './constants.ts';
 
 // ============================================================================
 // HELPERS — SOLID: SRP para aserciones comunes (DRY/KISS)

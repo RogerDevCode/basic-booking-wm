@@ -9,8 +9,8 @@
  * Zod Schemas     : NO — no inputs in current signature
  */
 
-import { ok } from "../../internal/result";
-import type { Result } from "../../internal/result";
+import { ok } from "../../internal/result.ts";
+import type { Result } from "../../internal/result.ts";
 
 /**
  * REASONING TRACE

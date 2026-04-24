@@ -1,6 +1,6 @@
-import type { TxClient } from '../internal/tenant-context/index';
-import type { Result } from '../internal/result/index';
-import type { Input, LogResult } from './types';
+import type { TxClient } from '../internal/tenant-context/index.ts';
+import type { Result } from '../internal/result/index.ts';
+import type { Input, LogResult } from './types.ts';
 
 export async function persistLog(
   tx: TxClient,

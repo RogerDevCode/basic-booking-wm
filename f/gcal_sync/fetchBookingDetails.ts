@@ -1,6 +1,6 @@
-import type { Result } from '../internal/result/index';
-import { withTenantContext } from '../internal/tenant-context/index';
-import { type BookingDetails, type Sql } from "./types";
+import type { Result } from '../internal/result/index.ts';
+import { withTenantContext } from '../internal/tenant-context/index.ts';
+import { type BookingDetails, type Sql } from "./types.ts";
 
 export async function fetchBookingDetails(sql: Sql, tenantId: string, bookingId: string): Promise<Result<BookingDetails>> {
     return withTenantContext(sql, tenantId, async (tx) => {

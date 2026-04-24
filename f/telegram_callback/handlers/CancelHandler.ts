@@ -1,7 +1,7 @@
-import { createDbClient } from '../../internal/db/client';
-import { withTenantContext } from '../../internal/tenant-context/index';
-import { updateBookingStatus } from '../updateBookingStatus';
-import type { ActionContext, ActionHandler, ActionResult } from '../types';
+import { createDbClient } from '../../internal/db/client.ts';
+import { withTenantContext } from '../../internal/tenant-context/index.ts';
+import { updateBookingStatus } from '../updateBookingStatus.ts';
+import type { ActionContext, ActionHandler, ActionResult } from '../types.ts';
 
 export class CancelHandler implements ActionHandler {
   async handle(context: ActionContext): Promise<[Error | null, ActionResult | null]> {

@@ -1,3 +1,4 @@
+//nobundling
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : System health monitoring (DB, GCal, Telegram, Gmail)
@@ -9,11 +10,16 @@
  * Zod Schemas     : YES — InputSchema validates optional component filter
  */
 
-import type { Result } from '../internal/result/index';
-import { InputSchema, type Input, type ComponentStatus } from './types';
-import { checkDatabase, checkGCal, checkTelegram } from './services';
+import type { Result } from '../internal/result/index.ts';
+import { InputSchema, type Input, type ComponentStatus } from './types.ts';
+import { checkDatabase, checkGCal, checkTelegram } from './services.ts';
 
-export async function main(rawInput: unknown): Promise<Result<{ overall: 'healthy' | 'degraded' | 'unhealthy'; timestamp: string; components: ComponentStatus[] }>> {
+export async function main(args: any): Promise<Result<{
+  overall: 'healthy' | 'degraded' | 'unhealthy';
+  timestamp: string;
+  components: ComponentStatus[];
+}>> {
+  const rawInput: unknown = args;
   const parsed = InputSchema.safeParse(rawInput);
   if (!parsed.success) {
     return [new Error('Validation error: ' + parsed.error.message), null];

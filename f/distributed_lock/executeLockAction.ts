@@ -1,10 +1,10 @@
 import postgres from 'postgres';
-import type { Result } from '../internal/result/index';
-import { acquireLock } from "./acquireLock";
-import { checkLock } from "./checkLock";
-import { cleanupLocks } from "./cleanupLocks";
-import { releaseLock } from "./releaseLock";
-import { type Input, type LockResult } from "./types";
+import type { Result } from '../internal/result/index.ts';
+import { acquireLock } from "./acquireLock.ts";
+import { checkLock } from "./checkLock.ts";
+import { cleanupLocks } from "./cleanupLocks.ts";
+import { releaseLock } from "./releaseLock.ts";
+import { type Input, type LockResult } from "./types.ts";
 
 /**
  * executeLockAction routes the request to specialized handlers.

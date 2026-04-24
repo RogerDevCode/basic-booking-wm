@@ -1,3 +1,4 @@
+//nobundling
 // ============================================================================
 // AI AGENT — Hybrid LLM + Rules Intent Classifier (v3.1) - Updated
 // Pattern: Precision Architecture, No 'any', Errors as Values
@@ -37,20 +38,14 @@ import {
 // MAIN FUNCTION — Hybrid LLM + Rules
 // ============================================================================
 
-export async function main({
-  chat_id,
-  text,
-  conversation_state,
-  provider_id,
-  user_profile
-}: {
-  chat_id: string;
-  text: string;
-  conversation_state?: unknown;
-  provider_id?: string;
-  user_profile?: unknown;
-}): Promise<{ readonly success: boolean; readonly data: IntentResult | null; readonly error_message: string | null; readonly error_code?: string }> {
-  const startMs = Date.now();
+export async function main(args: any) : Promise<{ readonly success: boolean; readonly data: IntentResult | null; readonly error_message: string | null; readonly error_code?: string }> {
+const startMs = Date.now();
+  const chat_id = args?.chat_id ?? '';
+  const text = args?.text ?? '';
+  const conversation_state = args?.conversation_state ?? null;
+  const provider_id = args?.provider_id ?? null;
+  const user_profile = args?.user_profile ?? null;
+
   const rawInput = { chat_id, text, conversation_state, provider_id, user_profile };
 
   const inputResult = AIAgentInputSchema.safeParse(rawInput);

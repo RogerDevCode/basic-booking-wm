@@ -1,5 +1,5 @@
 import postgres from 'postgres';
-import { type Result } from "./types";
+import { type Result } from "./types.ts";
 
 /**
  * Circuit breaker state table is system-global (no provider_id column).

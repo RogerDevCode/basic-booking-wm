@@ -1,10 +1,10 @@
 import { describe, test, expect } from "vitest";
-import { INTENT } from './constants';
+import { INTENT } from './constants.ts';
 // AI Agent v2.0 - Tests para las nuevas funcionalidades
 // Test de detección de urgencia, contexto y sugerencia de respuestas
 
-import { main } from './main';
-import { AIAgentInput } from './types';
+import { main } from './main.ts';
+import { AIAgentInput } from './types.ts';
 
 describe('AI Agent v2.0 - Enhanced Availability Context', () => {
 

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { DEFAULT_TIMEZONE } from '../internal/config/index';
+import { DEFAULT_TIMEZONE } from '../internal/config/index.ts';
 
 export const WizardStateSchema = z.object({
   step: z.coerce.number().int().min(0),
@@ -30,7 +30,7 @@ export interface StepView {
   readonly reply_placeholder?: string;
 }
 
-import type { WizardRepository } from './WizardRepository';
+import type { WizardRepository } from './WizardRepository.ts';
 
 export interface ActionContext {
   readonly input: Input;

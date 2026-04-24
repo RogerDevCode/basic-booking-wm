@@ -1,6 +1,6 @@
 import postgres from 'postgres';
-import type { Result } from '../internal/result/index';
-import { type Input, type LockResult, type LockRow } from "./types";
+import type { Result } from '../internal/result/index.ts';
+import { type Input, type LockResult, type LockRow } from "./types.ts";
 
 /**
  * checkLock returns the status of an active (non-expired) lock.

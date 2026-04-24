@@ -1,6 +1,6 @@
-import { buildGCalEvent } from '../internal/gcal_utils/buildGCalEvent';
-import { GCalEventSchema } from './types';
-import type { GCalAPIResult, BookingRow, SyncResult } from './types';
+import { buildGCalEvent } from '../internal/gcal_utils/buildGCalEvent.ts';
+import { GCalEventSchema } from './types.ts';
+import type { GCalAPIResult, BookingRow, SyncResult } from './types.ts';
 
 const GCAL_BASE = 'https://www.googleapis.com/calendar/v3';
 

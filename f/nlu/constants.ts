@@ -19,5 +19,5 @@ export {
   GREETINGS,
   FAREWELLS,
   THANK_YOU_WORDS,
-} from '../internal/ai_agent/constants';
-export type { IntentType } from '../internal/ai_agent/constants';
+} from '../internal/ai_agent/constants.ts';
+export type { IntentType } from '../internal/ai_agent/constants.ts';

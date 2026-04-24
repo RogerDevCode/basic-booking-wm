@@ -1,3 +1,4 @@
+//nobundling
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : Provider dashboard backend (schedule, bookings, overrides, stats)
@@ -45,13 +46,14 @@
 // Returns real data from PostgreSQL via Windmill
 // ============================================================================
 
-import type { Result } from '../internal/result/index';
-import { createDbClient } from '../internal/db/client';
-import { withTenantContext } from '../internal/tenant-context/index';
-import { InputSchema } from "./types";
-import { getProvider, getWeek, getDaySlots, blockDate, unblockDate, saveSchedule, listServices, listOverrides, listSchedules } from './services';
+import type { Result } from '../internal/result/index.ts';
+import { createDbClient } from '../internal/db/client.ts';
+import { withTenantContext } from '../internal/tenant-context/index.ts';
+import { InputSchema } from "./types.ts";
+import { getProvider, getWeek, getDaySlots, blockDate, unblockDate, saveSchedule, listServices, listOverrides, listSchedules } from './services.ts';
 
-export async function main(rawInput: unknown): Promise<[Error | null, Record<string, unknown> | null]> {
+export async function main(args: any) : Promise<[Error | null, Record<string, unknown> | null]> {
+const rawInput: unknown = args;
   const parsed = InputSchema.safeParse(rawInput);
   if (!parsed.success) {
     return [new Error(`Validation error: ${parsed.error.message}`), null];

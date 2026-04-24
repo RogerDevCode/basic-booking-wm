@@ -1,4 +1,4 @@
-import { type ReminderPrefs } from "./types";
+import { type ReminderPrefs } from "./types.ts";
 
 export function formatPrefs(prefs: ReminderPrefs): string {
     const check = (v: boolean) => v ? '✅' : '❌';

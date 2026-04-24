@@ -1,6 +1,6 @@
-import type { BookingRow } from '../internal/db-types/index';
-import type { Result } from '../internal/result/index';
-import { type Sql } from "./types";
+import type { BookingRow } from '../internal/db-types/index.ts';
+import type { Result } from '../internal/result/index.ts';
+import { type Sql } from "./types.ts";
 
 export async function fetchBooking(sql: Sql, id: string): Promise<Result<BookingRow>> {
     try {

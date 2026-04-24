@@ -1,3 +1,4 @@
+//nobundling
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : View provider daily/weekly schedule with bookings
@@ -9,12 +10,13 @@
  * Zod Schemas     : YES — InputSchema validates provider_id, date_range
  */
 
-import { withTenantContext } from '../internal/tenant-context/index';
-import { createDbClient } from '../internal/db/client';
-import type { Result } from '../internal/result/index';
-import { InputSchema, type Input, type AgendaResult } from './types';
+import { withTenantContext } from '../internal/tenant-context/index.ts';
+import { createDbClient } from '../internal/db/client.ts';
+import type { Result } from '../internal/result/index.ts';
+import { InputSchema, type Input, type AgendaResult } from './types.ts';
 
-export async function main(rawInput: unknown): Promise<Result<AgendaResult>> {
+export async function main(args: any) : Promise<Result<AgendaResult>> {
+const rawInput: unknown = args;
   const parsed = InputSchema.safeParse(rawInput);
   if (!parsed.success) {
     return [new Error('Validation error: ' + parsed.error.message), null];

@@ -1,0 +1,82 @@
+import zoneinfo
+from datetime import datetime
+from f.booking_orchestrator._orchestrator_models import OrchestratorInput, OrchestratorResult
+from f.internal._db_client import create_db_client
+from f.internal._result import with_tenant_context, Result
+
+"""
+PRE-FLIGHT
+Mission          : Fetch and format client bookings.
+DB Tables Used   : bookings, providers, services
+Concurrency Risk : NO
+GCal Calls       : NO
+Idempotency Key  : NO
+RLS Tenant ID    : YES
+Zod Schemas      : NO
+"""
+
+async def handle_get_my_bookings(
+    input_data: OrchestratorInput
+) -> Result[OrchestratorResult]:
+    client_id = input_data.client_id
+    tenant_id = input_data.tenant_id
+    
+    if not client_id or not tenant_id:
+        return None, {
+            "action": "mis_citas",
+            "success": False,
+            "data": None,
+            "message": "Falta identificación de paciente o establecimiento."
+        }
+
+    conn = await create_db_client()
+    try:
+        async def operation() -> Result[list[dict]]:
+            rows = await conn.fetch(
+                """
+                SELECT b.booking_id, b.status, b.start_time, p.name as provider_name, p.specialty, s.name as service_name
+                FROM bookings b
+                JOIN providers p ON p.provider_id = b.provider_id
+                JOIN services s ON s.service_id = b.service_id
+                WHERE b.client_id = $1::uuid
+                  AND b.status NOT IN ('cancelled', 'no_show', 'rescheduled')
+                  AND b.start_time >= NOW()
+                ORDER BY b.start_time ASC LIMIT 10
+                """,
+                client_id
+            )
+            # Ensure rows is a list of dicts (asyncpg Record is like a dict)
+            return None, list(rows)
+
+        err, rows = await with_tenant_context(conn, tenant_id, operation)
+        if err or rows is None:
+            return err or Exception("Failed to fetch bookings"), None
+
+        # Formatting
+        tz = zoneinfo.ZoneInfo("America/Mexico_City")
+        lines = []
+        for r in rows:
+            st = r["start_time"]
+            # Handle both datetime objects and ISO strings
+            if isinstance(st, str):
+                # asyncpg usually returns datetime objects for TIMESTAMPTZ, 
+                # but if it was somehow a string, parse it.
+                dt = datetime.fromisoformat(st.replace("Z", "+00:00")).astimezone(tz)
+            elif isinstance(st, datetime):
+                dt = st.astimezone(tz)
+            else:
+                continue
+            
+            fmt_str = dt.strftime("%d/%m %H:%M")
+            lines.append(f"• {fmt_str}hs - {r['provider_name']}: {r['service_name']}")
+
+        msg_body = "\n".join(lines)
+        return None, {
+            "action": "mis_citas",
+            "success": True,
+            "data": rows,
+            "message": f"📋 Tus próximas citas:\n{msg_body}" if lines else "📋 No tienes próximas citas.",
+            "follow_up": input_data.notes
+        }
+    finally:
+        await conn.close()

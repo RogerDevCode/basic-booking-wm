@@ -10,7 +10,7 @@
 // See: docs/future-semantic-sampling.md
 // ============================================================================
 
-import { INTENT, CONFIDENCE_BOUNDARIES, SOCIAL_CONFIDENCE_VALUES, RULE_CONFIDENCE_VALUES } from './constants';
+import { INTENT, CONFIDENCE_BOUNDARIES, SOCIAL_CONFIDENCE_VALUES, RULE_CONFIDENCE_VALUES } from './constants.ts';
 
 const ALL_INTENTS = Object.values(INTENT).join(', ');
 

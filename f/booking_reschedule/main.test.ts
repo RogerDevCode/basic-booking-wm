@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest';
-import type { Result } from '../internal/result/index';
+import type { Result } from '../internal/result/index.ts';
 
 /**
  * Helper: assert that a [Error | null, T | null] result is an error

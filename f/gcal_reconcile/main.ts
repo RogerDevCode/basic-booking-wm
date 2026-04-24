@@ -1,3 +1,4 @@
+//nobundling
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : Cron job to retry pending GCal syncs (every 5 minutes)
@@ -42,13 +43,14 @@
 // and retries GCal sync with exponential backoff.
 // ============================================================================
 
-import { withTenantContext } from '../internal/tenant-context/index';
-import { createDbClient } from '../internal/db/client';
-import { InputSchema } from './types';
-import type { ReconcileResult, BookingRow } from './types';
-import { syncBookingToGCal } from './services';
+import { withTenantContext } from '../internal/tenant-context/index.ts';
+import { createDbClient } from '../internal/db/client.ts';
+import { InputSchema } from './types.ts';
+import type { ReconcileResult, BookingRow } from './types.ts';
+import { syncBookingToGCal } from './services.ts';
 
-export async function main(rawInput: unknown): Promise<[Error | null, ReconcileResult | null]> {
+export async function main(args: any) : Promise<[Error | null, ReconcileResult | null]> {
+const rawInput: unknown = args;
   try {
     const parsed = InputSchema.safeParse(rawInput);
     if (!parsed.success) {

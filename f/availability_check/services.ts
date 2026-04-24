@@ -1,5 +1,5 @@
 import postgres from 'postgres';
-import type { ProviderRow } from './types';
+import type { ProviderRow } from './types.ts';
 
 type ServiceIdRow = readonly [string];
 

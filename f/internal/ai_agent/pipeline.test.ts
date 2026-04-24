@@ -1,7 +1,7 @@
 import { describe, test, expect } from 'vitest';
-import { main } from './main';
-import type { AIAgentInput } from './types';
-import { INTENT } from './constants';
+import { main } from './main.ts';
+import type { AIAgentInput } from './types.ts';
+import { INTENT } from './constants.ts';
 
 /**
  * AI Agent — Full Pipeline Test

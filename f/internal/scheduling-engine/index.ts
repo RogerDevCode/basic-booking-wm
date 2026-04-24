@@ -11,7 +11,7 @@
 // ============================================================================
 
 import postgres from 'postgres';
-import type { Result } from '../result/index';
+import type { Result } from '../result/index.ts';
 
 // ─── Domain Types ───────────────────────────────────────────────────────────
 

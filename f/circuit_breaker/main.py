@@ -1,0 +1,99 @@
+# ============================================================================
+# PRE-FLIGHT CHECKLIST
+# Mission         : Service health monitor and failure isolation
+# DB Tables Used  : circuit_breaker_state
+# Concurrency Risk: YES — atomic updates
+# GCal Calls      : NO
+# Idempotency Key : N/A
+# RLS Tenant ID   : NO — infrastructure table
+# Pydantic Schemas: YES — InputSchema validates actions
+# ============================================================================
+
+import time
+from datetime import datetime, timezone
+from typing import Any, Dict, Union, cast
+from ..internal._wmill_adapter import log
+from ..internal._db_client import create_db_client
+from ..internal._result import Result, ok, fail, with_admin_context
+from ._circuit_models import InputSchema, CircuitState, CircuitBreakerResult
+from ._circuit_logic import get_state, init_service
+
+MODULE = "circuit_breaker"
+
+async def main(args: dict[str, Any]) -> Result[Union[CircuitBreakerResult, CircuitState]]:
+    try:
+        input_data = InputSchema.model_validate(args)
+    except Exception as e:
+        return fail(f"Validation error: {e}")
+
+    conn = await create_db_client()
+    try:
+        async def operation() -> Result[Union[CircuitBreakerResult, CircuitState]]:
+            await init_service(conn, input_data.service_id)
+
+            if input_data.action == 'check':
+                state = await get_state(conn, input_data.service_id)
+                if not state:
+                    return ok({"allowed": True, "state": "closed"})
+
+                if state["state"] == 'open' and state["opened_at"]:
+                    opened_at = datetime.fromisoformat(state["opened_at"].replace("Z", "+00:00"))
+                    elapsed = (datetime.now(timezone.utc) - opened_at).total_seconds()
+                    if elapsed >= state["timeout_seconds"]:
+                        await conn.execute(
+                            "UPDATE circuit_breaker_state SET state = 'half-open', half_open_at = NOW(), failure_count = 0 WHERE service_id = $1",
+                            input_data.service_id
+                        )
+                        return ok({"allowed": True, "state": "half-open"})
+                    return ok({"allowed": False, "state": "open", "retry_after": state["timeout_seconds"] - elapsed})
+
+                return ok({"allowed": state["state"] != 'open', "state": state["state"]})
+
+            elif input_data.action == 'record_success':
+                await conn.execute(
+                    "UPDATE circuit_breaker_state SET success_count = success_count + 1, failure_count = 0, last_success_at = NOW(), updated_at = NOW() WHERE service_id = $1",
+                    input_data.service_id
+                )
+                state = await get_state(conn, input_data.service_id)
+                if state and state["state"] == 'half-open' and state["success_count"] >= state["success_threshold"]:
+                    await conn.execute(
+                        "UPDATE circuit_breaker_state SET state = 'closed', success_count = 0, failure_count = 0, opened_at = null, half_open_at = null, updated_at = NOW() WHERE service_id = $1",
+                        input_data.service_id
+                    )
+                return ok({"state": "success recorded"})
+
+            elif input_data.action == 'record_failure':
+                await conn.execute(
+                    "UPDATE circuit_breaker_state SET failure_count = failure_count + 1, success_count = 0, last_failure_at = NOW(), last_error_message = $1, updated_at = NOW() WHERE service_id = $2",
+                    input_data.error_message, input_data.service_id
+                )
+                state = await get_state(conn, input_data.service_id)
+                if state and state["failure_count"] >= state["failure_threshold"] and state["state"] != 'open':
+                    await conn.execute(
+                        "UPDATE circuit_breaker_state SET state = 'open', opened_at = NOW(), updated_at = NOW() WHERE service_id = $1",
+                        input_data.service_id
+                    )
+                    return ok({"state": "opened", "message": f"Circuit opened for {input_data.service_id}"})
+                return ok({"state": "failure recorded", "failure_count": state["failure_count"] if state else 0})
+
+            elif input_data.action == 'reset':
+                await conn.execute(
+                    "UPDATE circuit_breaker_state SET state = 'closed', failure_count = 0, success_count = 0, opened_at = null, half_open_at = null, last_error_message = null, updated_at = NOW() WHERE service_id = $1",
+                    input_data.service_id
+                )
+                return ok({"state": "reset"})
+
+            elif input_data.action == 'status':
+                state = await get_state(conn, input_data.service_id)
+                if not state: return fail("State not found")
+                return ok(cast(Any, state))
+            
+            return fail(f"Unsupported action: {input_data.action}")
+
+        return await with_admin_context(conn, operation)
+
+    except Exception as e:
+        log("Circuit Breaker Internal Error", error=str(e), module=MODULE)
+        return fail(f"Internal error: {e}")
+    finally:
+        await conn.close() # pyright: ignore[reportUnknownMemberType]

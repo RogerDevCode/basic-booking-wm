@@ -1,4 +1,4 @@
-import type { ActionContext, ActionHandler, ActionResult } from '../types';
+import type { ActionContext, ActionHandler, ActionResult } from '../types.ts';
 
 export class RescheduleHandler implements ActionHandler {
   handle(_context: ActionContext): Promise<[Error | null, ActionResult | null]> {

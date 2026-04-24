@@ -1,3 +1,4 @@
+//nobundling
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : Multi-step appointment booking flow (availability → confirmation → creation)
@@ -41,19 +42,20 @@
  * → CLEARED FOR CODE GENERATION
  */
 
-import { createDbClient } from '../internal/db/client';
-import type { Result } from '../internal/result/index';
-import { InputSchema, WizardStateSchema, type Input, type StepView, type WizardState } from './types';
-import { WizardRepository } from './WizardRepository';
-import { WizardRouter } from './WizardRouter';
-import { StartHandler } from './handlers/StartHandler';
-import { SelectDateHandler } from './handlers/SelectDateHandler';
-import { SelectTimeHandler } from './handlers/SelectTimeHandler';
-import { ConfirmHandler } from './handlers/ConfirmHandler';
-import { BackHandler } from './handlers/BackHandler';
-import { CancelHandler } from './handlers/CancelHandler';
+import { createDbClient } from '../internal/db/client.ts';
+import type { Result } from '../internal/result/index.ts';
+import { InputSchema, WizardStateSchema, type Input, type StepView, type WizardState } from './types.ts';
+import { WizardRepository } from './WizardRepository.ts';
+import { WizardRouter } from './WizardRouter.ts';
+import { StartHandler } from './handlers/StartHandler.ts';
+import { SelectDateHandler } from './handlers/SelectDateHandler.ts';
+import { SelectTimeHandler } from './handlers/SelectTimeHandler.ts';
+import { ConfirmHandler } from './handlers/ConfirmHandler.ts';
+import { BackHandler } from './handlers/BackHandler.ts';
+import { CancelHandler } from './handlers/CancelHandler.ts';
 
-export async function main(rawInput: unknown): Promise<Result<Record<string, unknown>>> {
+export async function main(args: any) : Promise<Result<Record<string, unknown>>> {
+const rawInput: unknown = args;
   const parsed = InputSchema.safeParse(rawInput);
   if (!parsed.success) {
     return [new Error(`invalid_input: ${parsed.error.message}`), null];

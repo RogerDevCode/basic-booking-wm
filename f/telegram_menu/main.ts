@@ -1,3 +1,4 @@
+//nobundling
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : Display main menu with persistent reply keyboard
@@ -9,8 +10,8 @@
  * Zod Schemas     : YES — InputSchema validates chat_id and user_id
  */
 
-import { InputSchema, type Input, type MenuResult } from './types';
-import { handleShowMenu, handleSelectOption } from './services';
+import { InputSchema, type Input, type MenuResult } from './types.ts';
+import { handleShowMenu, handleSelectOption } from './services.ts';
 
 export function main(rawInput: unknown): MenuResult {
   try {

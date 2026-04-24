@@ -1,3 +1,4 @@
+//nobundling
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : Client booking history and upcoming appointments
@@ -43,13 +44,13 @@
  * → CLEARED FOR CODE GENERATION
  */
 
-import { createDbClient } from '../internal/db/client';
-import type { Result } from '../internal/result/index';
-import type { TxClient } from '../internal/tenant-context/index';
-import { withTenantContext } from '../internal/tenant-context/index';
-import { fetchBookingsData } from "./fetchBookingsData";
-import { resolveClientId } from "./resolveClientId";
-import { type BookingInfo, type BookingsResult, type InputParams, InputSchema } from "./types";
+import { createDbClient } from '../internal/db/client.ts';
+import type { Result } from '../internal/result/index.ts';
+import type { TxClient } from '../internal/tenant-context/index.ts';
+import { withTenantContext } from '../internal/tenant-context/index.ts';
+import { fetchBookingsData } from "./fetchBookingsData.ts";
+import { resolveClientId } from "./resolveClientId.ts";
+import { type BookingInfo, type BookingsResult, type InputParams, InputSchema } from "./types.ts";
 
 // --- Domain Constants ---
 
@@ -106,7 +107,8 @@ class PatientBookingService {
  * Main entry point for patient booking history.
  * Decomposes logic into PatientBookingService for SOLID compliance.
  */
-export async function main(rawInput: unknown): Promise<Result<BookingsResult>> {
+export async function main(args: any) : Promise<Result<BookingsResult>> {
+const rawInput: unknown = args;
   // 1. Validate Input
   const parsed = InputSchema.safeParse(rawInput);
   if (!parsed.success) {

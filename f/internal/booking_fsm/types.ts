@@ -10,7 +10,7 @@
  */
 
 import { z } from 'zod';
-import type { Result } from '../result/index';
+import type { Result } from '../result/index.ts';
 
 // ============================================================================
 // CONSTANTS & STEP NAMES (SSOT)

@@ -1,3 +1,4 @@
+//nobundling
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : Advisory lock for race condition prevention (booking_locks table)
@@ -48,11 +49,11 @@
 // Usage: acquire() → do work → release()
 // ============================================================================
 
-import { createDbClient } from '../internal/db/client';
-import type { Result } from '../internal/result/index';
-import { withTenantContext } from '../internal/tenant-context/index';
-import { executeLockAction } from "./executeLockAction";
-import { type Input, InputSchema, type LockResult } from "./types";
+import { createDbClient } from '../internal/db/client.ts';
+import type { Result } from '../internal/result/index.ts';
+import { withTenantContext } from '../internal/tenant-context/index.ts';
+import { executeLockAction } from "./executeLockAction.ts";
+import { type Input, InputSchema, type LockResult } from "./types.ts";
 
 // ─── Types & Schemas ────────────────────────────────────────────────────────
 // ─── Main Entry Point ───────────────────────────────────────────────────────
@@ -61,9 +62,8 @@ import { type Input, InputSchema, type LockResult } from "./types";
  * main serves as the Windmill endpoint for distributed lock operations.
  * Adheres to SRP by handling only entry-level validation and context setup.
  */
-export async function main(
-  rawInput: unknown,
-): Promise<Result<LockResult>> {
+export async function main(args: any) : Promise<Result<LockResult>> {
+const { rawInput } = args || {};
   const parsed = InputSchema.safeParse(rawInput);
   if (!parsed.success) {
     return [new Error(`validation_failed: ${parsed.error.message}`), null];

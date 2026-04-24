@@ -1,3 +1,4 @@
+//nobundling
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : Full provider management for admin dashboard (CRUD + activate/deactivate)
@@ -46,17 +47,18 @@
 // ============================================================================
 
 import "@total-typescript/ts-reset";
-import { withTenantContext } from '../internal/tenant-context/index';
-import { createDbClient } from '../internal/db/client';
-import { InputSchema } from './types';
-import { listProviders, createProvider, updateProvider, resetProviderPassword } from './services';
-import type { Input } from './types';
+import { withTenantContext } from '../internal/tenant-context/index.ts';
+import { createDbClient } from '../internal/db/client.ts';
+import { InputSchema } from './types.ts';
+import { listProviders, createProvider, updateProvider, resetProviderPassword } from './services.ts';
+import type { Input } from './types.ts';
 
 // ============================================================================
 // MAIN
 // ============================================================================
 
-export async function main(rawInput: unknown): Promise<[Error | null, unknown]> {
+export async function main(args: any) : Promise<[Error | null, unknown]> {
+const rawInput: unknown = args;
   const parsed = InputSchema.safeParse(rawInput);
   if (!parsed.success) {
     return [new Error(`Validation error: ${parsed.error.message}`), null];

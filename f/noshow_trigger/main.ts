@@ -1,3 +1,4 @@
+//nobundling
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : Mark expired confirmed bookings as no_show (SOLID Refactor)
@@ -41,11 +42,11 @@
  */
 
 import type { Sql } from 'postgres';
-import { createDbClient } from '../internal/db/client';
-import type { Result } from '../internal/result/index';
-import { validateTransition } from '../internal/state-machine/index';
-import { withTenantContext } from '../internal/tenant-context/index';
-import { type Input, InputSchema, type NoShowStats, type ProviderRow, ProviderRowSchema } from "./types";
+import { createDbClient } from '../internal/db/client.ts';
+import type { Result } from '../internal/result/index.ts';
+import { validateTransition } from '../internal/state-machine/index.ts';
+import { withTenantContext } from '../internal/tenant-context/index.ts';
+import { type Input, InputSchema, type NoShowStats, type ProviderRow, ProviderRowSchema } from "./types.ts";
 
 // ============================================================================
 // SCHEMAS & TYPES
@@ -215,7 +216,8 @@ class NoShowService {
 // MAIN ENTRY POINT — SOLID-D: Dependency Orchestration
 // ============================================================================
 
-export async function main(rawInput: unknown): Promise<[Error | null, NoShowStats | null]> {
+export async function main(args: any) : Promise<[Error | null, NoShowStats | null]> {
+const rawInput: unknown = args;
   // 1. Validation
   const parsed = InputSchema.safeParse(rawInput);
   if (!parsed.success) {

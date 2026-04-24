@@ -1,3 +1,4 @@
+//nobundling
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : Admin stats and system overview KPIs
@@ -9,13 +10,14 @@
  * Zod Schemas     : YES — InputSchema validates admin_user_id
  */
 
-import { withTenantContext } from '../internal/tenant-context/index';
-import { createDbClient } from '../internal/db/client';
-import type { Result } from '../internal/result/index';
-import { InputSchema, type Input, type AdminDashboardResult } from './types';
-import { fetchDashboardStats } from './services';
+import { withTenantContext } from '../internal/tenant-context/index.ts';
+import { createDbClient } from '../internal/db/client.ts';
+import type { Result } from '../internal/result/index.ts';
+import { InputSchema, type Input, type AdminDashboardResult } from './types.ts';
+import { fetchDashboardStats } from './services.ts';
 
-export async function main(rawInput: unknown): Promise<Result<AdminDashboardResult>> {
+export async function main(args: any) : Promise<Result<AdminDashboardResult>> {
+const rawInput: unknown = args;
   const parsed = InputSchema.safeParse(rawInput);
   if (!parsed.success) {
     return [new Error('Validation error: ' + parsed.error.message), null];

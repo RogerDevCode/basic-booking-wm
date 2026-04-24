@@ -50,7 +50,7 @@ export {
   isNamedItemArray,
   isTimeItemArray,
   isGenericItemArray,
-} from './types';
+} from './types.ts';
 
 // ============================================================================
 // 2. STATE MACHINE ENGINE (SRP)
@@ -61,7 +61,7 @@ import {
   flowStepFromState,
   STEP_TO_FLOW_STEP,
   parseCallbackData,
-} from './machine';
+} from './machine.ts';
 
 export {
   parseAction,
@@ -100,7 +100,7 @@ import {
   buildTimeSlotKeyboard,
   buildConfirmationKeyboard,
   buildMainMenuKeyboard,
-} from './responses';
+} from './responses.ts';
 
 export {
   buildSpecialtyPrompt,
@@ -151,16 +151,16 @@ export {
   fetchSpecialties,
   type ServiceRow,
   type FetchSpecialtiesResult,
-} from './data-specialties';
+} from './data-specialties.ts';
 
 export {
   fetchDoctors,
   type ProviderRow,
   type FetchDoctorsResult,
-} from './data-doctors';
+} from './data-doctors.ts';
 
 export {
   fetchSlots,
   type TimeSlot,
   type FetchSlotsResult,
-} from './data-slots';
+} from './data-slots.ts';

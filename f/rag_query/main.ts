@@ -1,3 +1,4 @@
+//nobundling
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : Semantic search against knowledge base using pgvector (fallback to keyword)
@@ -9,19 +10,20 @@
  * Zod Schemas     : YES — InputSchema validates query text and top_k
  */
 
-import { withTenantContext } from '../internal/tenant-context/index';
-import { createDbClient } from '../internal/db/client';
-import type { Result } from '../internal/result/index';
+import { withTenantContext } from '../internal/tenant-context/index.ts';
+import { createDbClient } from '../internal/db/client.ts';
+import type { Result } from '../internal/result/index.ts';
 
-import { InputSchema } from './types';
-import type { Input, RAGResult } from './types';
-import { KBRepository, performKeywordSearch } from './services';
+import { InputSchema } from './types.ts';
+import type { Input, RAGResult } from './types.ts';
+import { KBRepository, performKeywordSearch } from './services.ts';
 
 // ============================================================================
 // MAIN ENTRY POINT (Windmill Endpoint)
 // ============================================================================
 
-export async function main(rawInput: unknown): Promise<Result<RAGResult>> {
+export async function main(args: any) : Promise<Result<RAGResult>> {
+const rawInput: unknown = args;
   /**
    * REASONING TRACE
    * ### Mission Decomposition

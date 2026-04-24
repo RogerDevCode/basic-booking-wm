@@ -1,3 +1,4 @@
+//nobundling
 /*
  * PRE-FLIGHT CHECKLIST
  * Mission         : Dead Letter Queue (DLQ) processor for failed bookings.
@@ -38,9 +39,9 @@
  * → CLEARED FOR CODE GENERATION
  */
 
-import { createDbClient } from '../internal/db/client';
-import type { Result } from '../internal/result/index';
-import { InputSchema, DLQResultSchema } from './types';
+import { createDbClient } from '../internal/db/client.ts';
+import type { Result } from '../internal/result/index.ts';
+import { InputSchema, DLQResultSchema } from './types.ts';
 import { 
   withGlobalTx, 
   listDLQ, 
@@ -48,7 +49,7 @@ import {
   resolveDLQ, 
   discardDLQ, 
   getDLQStatus 
-} from './services';
+} from './services.ts';
 
 // --- Main Entry Point ---
 
@@ -56,7 +57,8 @@ import {
  * Windmill main entry point.
  * Dispatches actions to specialized functions after rigorous validation.
  */
-export async function main(rawInput: unknown): Promise<Result<unknown>> {
+export async function main(args: any) : Promise<Result<unknown>> {
+const rawInput: unknown = args;
   // 1. Input Validation
   const parsed = InputSchema.safeParse(rawInput);
   if (!parsed.success) {

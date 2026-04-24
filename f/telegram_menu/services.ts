@@ -1,4 +1,4 @@
-import type { Input } from './types';
+import type { Input } from './types.ts';
 
 export const MAIN_MENU_KEYBOARD: string[][] = [
   ['📅 Agendar cita', '📋 Mis citas'],

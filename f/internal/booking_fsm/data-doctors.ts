@@ -11,7 +11,7 @@
 
 import { z } from 'zod';
 import type postgres from 'postgres';
-import type { Result } from '../result/index';
+import type { Result } from '../result/index.ts';
 
 // ============================================================================
 // BOOKING FSM — Data: Doctors / Providers

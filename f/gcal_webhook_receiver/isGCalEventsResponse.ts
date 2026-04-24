@@ -1,4 +1,4 @@
-import { type GCalEventsResponse } from "./types";
+import { type GCalEventsResponse } from "./types.ts";
 
 export function isGCalEventsResponse(data: unknown): data is GCalEventsResponse {
     return typeof data === 'object' && data !== null && (

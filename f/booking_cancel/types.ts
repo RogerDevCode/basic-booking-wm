@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { UUID, BookingStatus } from '../internal/db-types/index';
+import type { UUID, BookingStatus } from '../internal/db-types/index.ts';
 
 // ─── Input Validation ───────────────────────────────────────────────────────
 export const InputSchema = z.object({
