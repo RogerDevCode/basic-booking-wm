@@ -13,14 +13,15 @@ echo "🏦 INICIANDO DESPLIEGUE FULL (INTEGRIDAD TOTAL)"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 # 1. VALIDACIÓN TÉCNICA (Fail-Fast)
-echo "🔍 1/6 Ejecutando Typecheck y Lint..."
-npm run typecheck && echo "✅ Tipado OK"
+echo "🔍 1/6 Ejecutando Mypy y Ruff..."
+uv run mypy --strict f/ && echo "✅ Tipado OK"
+uv run ruff check . && echo "✅ Lint OK"
 
 # 2. TESTS
-echo "🧪 2/6 Ejecutando suite de pruebas..."
+echo "🧪 2/6 Ejecutando suite de pruebas Python..."
 # Exponemos el puerto de redis para el test local si no lo está
 docker compose -f docker-compose.windmill.yml up -d redis
-REDIS_URL=redis://127.0.0.1:6379 npm run test && echo "✅ Tests pasados"
+uv run pytest tests/py/ -v && echo "✅ Tests pasados"
 
 # 3. HARD RESET WINDMILL LOCAL
 echo "🧨 3/6 Reiniciando Windmill local desde cero..."
@@ -49,7 +50,8 @@ ON CONFLICT (workspace_id, path) DO UPDATE SET value = EXCLUDED.value;"
 
 # 6. SINCRO DE CÓDIGO Y METADATOS
 echo "🔄 6/6 Regenerando metadatos y Sincronizando..."
-wmill generate-metadata --workspace "$WORKSPACE_ID" --yes || echo "⚠️ Advertencia en metadatos"
+# Regenerar metadatos para todos los main.py
+find f -name "main.py" | xargs -I {} wmill generate-metadata {} > /dev/null
 wmill sync push --workspace "$WORKSPACE_ID" --yes --parallel 10 --auto-metadata
 
 # 7. GIT PUSH A GITHUB

@@ -27,19 +27,13 @@ echo ""
 
 # Check if wmill CLI is installed
 if ! command -v wmill &> /dev/null; then
-  echo -e "${RED}✗ ERROR: wmill CLI not found. Install with: npm install -g @windmill-labs/wmill${NC}"
+  echo -e "${RED}✗ ERROR: wmill CLI not found. Install with: binary from https://github.com/windmill-labs/windmill${NC}"
   exit 1
 fi
 
 # Check if git is available
 if ! command -v git &> /dev/null; then
   echo -e "${RED}✗ ERROR: git not found${NC}"
-  exit 1
-fi
-
-# Check if node/npm are available
-if ! command -v node &> /dev/null; then
-  echo -e "${RED}✗ ERROR: node.js not found${NC}"
   exit 1
 fi
 

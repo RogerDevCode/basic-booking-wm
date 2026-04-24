@@ -1,9 +1,9 @@
 #!/bin/bash
 
 # ==============================================================================
-# LOCAL DEVELOPMENT SETUP SCRIPT
+# LOCAL DEVELOPMENT SETUP SCRIPT (Python Edition)
 # ==============================================================================
-# Configures Docker services (PostgreSQL, Redis) and validates the environment
+# Configures Docker services and validates the Python environment
 # Usage: ./scripts/setup-local.sh
 # ==============================================================================
 
@@ -58,21 +58,21 @@ if ! command -v docker-compose &> /dev/null; then
 fi
 log_success "Docker Compose $(docker-compose --version | awk '{print $3}' | cut -d',' -f1)"
 
-# Check Node.js
-log_info "Checking Node.js..."
-if ! command -v node &> /dev/null; then
-  log_error "Node.js not found. Please install Node.js 18+"
+# Check Python
+log_info "Checking Python..."
+if ! command -v python3 &> /dev/null; then
+  log_error "Python 3 not found. Please install Python 3.11+"
   exit 1
 fi
-log_success "Node.js $(node --version)"
+log_success "Python $(python3 --version)"
 
-# Check npm
-log_info "Checking npm..."
-if ! command -v npm &> /dev/null; then
-  log_error "npm not found. Please install npm."
+# Check uv
+log_info "Checking uv..."
+if ! command -v uv &> /dev/null; then
+  log_error "uv not found. Please install uv: curl -LsSf https://astral.sh/uv/install.sh | sh"
   exit 1
 fi
-log_success "npm $(npm --version)"
+log_success "uv $(uv --version)"
 
 echo ""
 
@@ -82,86 +82,44 @@ echo ""
 
 log_info "Setting up Docker Compose development environment..."
 
-cd docker-compose.dev
+# Note: Adjust directory if it was renamed or remains docker-compose.dev
+if [ -d docker-compose.dev ]; then
+  cd docker-compose.dev
+  
+  # Create .env if it doesn't exist
+  if [ ! -f .env ]; then
+    log_warn ".env not found, creating from .env.example..."
+    cp .env.example .env
+    log_success "Created .env in docker-compose.dev/"
+    echo ""
+    log_warn "⚠️  UPDATE THESE VALUES IN docker-compose.dev/.env:"
+    echo "  - POSTGRES_PASSWORD"
+    echo "  - REDIS_PASSWORD"
+    echo ""
+  fi
 
-# Create .env if it doesn't exist
-if [ ! -f .env ]; then
-  log_warn ".env not found, creating from .env.example..."
-  cp .env.example .env
-  log_success "Created .env in docker-compose.dev/"
-  echo ""
-  log_warn "⚠️  UPDATE THESE VALUES IN docker-compose.dev/.env:"
-  echo "  - POSTGRES_PASSWORD (currently 'your_local_db_password')"
-  echo "  - REDIS_PASSWORD (currently 'your_local_redis_password')"
-  echo ""
-fi
-
-# Check if services are already running
-log_info "Checking for existing containers..."
-POSTGRES_RUNNING=$(docker-compose ps postgres 2>/dev/null | grep -i running || echo "")
-REDIS_RUNNING=$(docker-compose ps redis 2>/dev/null | grep -i running || echo "")
-
-if [ -z "$POSTGRES_RUNNING" ] || [ -z "$REDIS_RUNNING" ]; then
+  # Start services
   log_info "Starting Docker services..."
-  docker-compose up -d --build
+  docker-compose up -d
   log_success "Docker services started"
-  echo ""
-
-  log_info "Waiting for PostgreSQL to be ready..."
-  for i in {1..30}; do
-    if docker-compose exec -T postgres pg_isready -U $(grep POSTGRES_USER .env | cut -d'=' -f2) -d $(grep POSTGRES_DB .env | cut -d'=' -f2) &>/dev/null; then
-      log_success "PostgreSQL is ready"
-      break
-    fi
-    echo -n "."
-    sleep 1
-  done
-  echo ""
+  
+  cd ..
 else
-  log_success "Docker services already running"
+  log_warn "docker-compose.dev directory not found, skipping container start"
 fi
-
-# Get database URL
-POSTGRES_USER=$(grep POSTGRES_USER .env | cut -d'=' -f2)
-POSTGRES_PASSWORD=$(grep POSTGRES_PASSWORD .env | cut -d'=' -f2)
-POSTGRES_DB=$(grep POSTGRES_DB .env | cut -d'=' -f2)
-POSTGRES_PORT=$(grep POSTGRES_PORT .env | cut -d'=' -f2)
-
-DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@127.0.0.1:${POSTGRES_PORT}/${POSTGRES_DB}"
-
-log_info "Database configuration:"
-echo "  Host: 127.0.0.1:${POSTGRES_PORT}"
-echo "  User: ${POSTGRES_USER}"
-echo "  Database: ${POSTGRES_DB}"
-
-cd ..
 
 # ==============================================================================
 # ENVIRONMENT SETUP
 # ==============================================================================
 
 echo ""
-log_info "Setting up Node.js environment..."
+log_info "Setting up Python environment..."
 
-# Create .env if not exists (for tests)
+# Create .env if not exists
 if [ ! -f .env ]; then
   log_warn ".env not found in project root"
-  log_info "Using DATABASE_URL from docker-compose.dev..."
-
-  # For testing, we'll use a minimal .env
-  cat > .env << EOF
-# Local Development Database
-DATABASE_URL=${DATABASE_URL}
-
-# Redis (Local)
-REDIS_URL=redis://127.0.0.1:6379
-
-# LLM (Optional for local testing)
-# GROQ_API_KEY=your_groq_key
-# OPENAI_API_KEY=your_openai_key
-EOF
-
-  log_success "Created minimal .env for local development"
+  cp .env.example .env 2>/dev/null || touch .env
+  log_success "Created .env for local development"
 fi
 
 # ==============================================================================
@@ -169,26 +127,26 @@ fi
 # ==============================================================================
 
 echo ""
-log_info "Installing npm dependencies..."
-npm install --silent
-log_success "Dependencies installed"
+log_info "Installing Python dependencies via uv..."
+uv sync
+log_success "Dependencies synchronized"
 
 # ==============================================================================
 # VALIDATION
 # ==============================================================================
 
 echo ""
-log_info "Validating TypeScript..."
-npx tsc --noEmit --quiet
-log_success "TypeScript validation passed"
+log_info "Validating Codebase (Type checking)..."
+uv run mypy --strict f/
+log_success "Mypy strict check passed"
 
 # ==============================================================================
 # TEST EXECUTION
 # ==============================================================================
 
 echo ""
-log_info "Running test suite..."
-npm test -- --run --reporter=verbose 2>&1 | tail -20
+log_info "Running Python test suite..."
+uv run pytest tests/py/ -v | tail -5
 log_success "Tests completed"
 
 # ==============================================================================
@@ -201,31 +159,14 @@ echo -e "${GREEN}✓ BOOKING TITANIUM LOCAL SETUP COMPLETE${NC}"
 echo -e "${GREEN}═════════════════════════════════════════════════════════════════${NC}"
 echo ""
 
-echo "📊 Services Running:"
-docker-compose -f docker-compose.dev/docker-compose.yml ps
-
-echo ""
-echo "🗄️  Database:"
-echo "  PostgreSQL: postgresql://localhost:${POSTGRES_PORT}/${POSTGRES_DB}"
-echo ""
-
 echo "📦 Quick Start Commands:"
-echo "  npm test              # Run all tests"
-echo "  npm test -- f/booking_create  # Run specific feature tests"
-echo "  npm run typecheck     # TypeScript strict check"
-echo "  npm run test:watch    # Watch mode"
-echo ""
-
-echo "🛠️  Docker Commands:"
-echo "  cd docker-compose.dev"
-echo "  docker-compose logs postgres  # View PostgreSQL logs"
-echo "  docker-compose logs redis     # View Redis logs"
-echo "  docker-compose down           # Stop services"
+echo "  uv run pytest tests/py/  # Run all tests"
+echo "  uv run mypy --strict f/  # Type checking"
+echo "  uv run ruff check .      # Linting"
 echo ""
 
 echo "📚 Documentation:"
-echo "  - CLAUDE.md    → Development guide"
-echo "  - AGENTS.md    → Architecture rules"
+echo "  - AGENTS.md    → Architecture rules (§PY)"
 echo "  - README.md    → Project overview"
 echo ""
 

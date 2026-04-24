@@ -12,7 +12,7 @@
 set -euo pipefail
 
 WORKSPACE="booking-titanium"
-SCRIPT_PATH="f/flows/telegram_webhook"
+SCRIPT_PATH="f/flows/telegram_webhook__flow"
 LIMIT=5
 
 RED='\033[0;31m'

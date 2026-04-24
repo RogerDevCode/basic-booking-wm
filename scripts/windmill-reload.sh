@@ -53,8 +53,8 @@ fi
 
 # 3. VERIFICATION
 echo ""
-echo "✔️ Type check..."
-npm run typecheck >/dev/null 2>&1 && echo "✅ TypeScript OK" || echo "❌ TS errors"
+echo "✔️  Type check (Mypy)..."
+uv run mypy --strict f/ && echo "✅ Python OK" || echo "❌ Mypy errors"
 
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

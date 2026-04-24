@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # ════════════════════════════════════════════════════════════════════════════════
-# ROBUST SYNC WITH AUTO-RECOVERY
+# ROBUST SYNC WITH AUTO-RECOVERY (Python Edition)
 # ════════════════════════════════════════════════════════════════════════════════
 # This script ensures ZERO desynchronization by:
-#   1. Validating local state (TypeScript, ESLint, tests)
+#   1. Validating local state (Mypy, Ruff, Pytest)
 #   2. Regenerating metadata to catch stale files
 #   3. Syncing with automatic retry + fallback
 #   4. Verifying sync was successful
@@ -47,28 +47,28 @@ echo -e "${BLUE}║ 🔄 ROBUST SYNC — Starting (Commit: \"$COMMIT_MSG\")${NC}
 echo -e "${BLUE}╚════════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 
-# Step 1: TypeScript type checking
-echo -e "${BLUE}[1/6] TypeScript Validation${NC}"
-if ! npm run typecheck 2>/dev/null; then
-  echo -e "${RED}✗ TypeScript errors found. Fix and retry.${NC}"
+# Step 1: Mypy type checking
+echo -e "${BLUE}[1/6] Mypy Validation (Strict)${NC}"
+if ! uv run mypy --strict f/ ; then
+  echo -e "${RED}✗ Mypy errors found. Fix and retry.${NC}"
   exit 1
 fi
-echo -e "${GREEN}✓ TypeScript strict mode passed${NC}"
+echo -e "${GREEN}✓ Mypy strict mode passed${NC}"
 echo ""
 
-# Step 2: ESLint validation
-echo -e "${BLUE}[2/6] ESLint Validation${NC}"
-if ! npx eslint 'f/**/*.ts' --ignore-pattern '**/redteam.ts' --quiet 2>/dev/null; then
-  echo -e "${RED}✗ ESLint violations found. Run: npx eslint 'f/**/*.ts' --fix${NC}"
+# Step 2: Ruff validation
+echo -e "${BLUE}[2/6] Ruff Validation (Lint & Format)${NC}"
+if ! uv run ruff check . ; then
+  echo -e "${RED}✗ Ruff violations found. Run: uv run ruff check --fix .${NC}"
   exit 1
 fi
-echo -e "${GREEN}✓ ESLint passed${NC}"
+echo -e "${GREEN}✓ Ruff passed${NC}"
 echo ""
 
 # Step 3: Run tests (if not skipped)
 if [ "$SKIP_TESTS" = false ]; then
-  echo -e "${BLUE}[3/6] Running Tests${NC}"
-  if ! npm test 2>&1 | tail -5; then
+  echo -e "${BLUE}[3/6] Running Pytest${NC}"
+  if ! uv run pytest tests/py/ -q --tb=short; then
     echo -e "${YELLOW}⚠ Tests have failures, but continuing...${NC}"
   fi
   echo -e "${GREEN}✓ Tests completed${NC}"
@@ -108,7 +108,8 @@ echo ""
 
 echo -e "${BLUE}[5/6] Metadata Regeneration${NC}"
 
-wmill generate-metadata --workspace "$WORKSPACE_ID" 2>&1 | tail -1
+# Find all main.py and generate metadata
+find f -name "main.py" | xargs -I {} wmill generate-metadata {} > /dev/null
 echo -e "${GREEN}✓ Metadata up-to-date${NC}"
 echo ""
 
@@ -130,7 +131,7 @@ while [ $ATTEMPT -lt $MAX_RETRIES ]; do
     SUCCESS=true
   else
     # Run sync push with retry on transient errors
-    if echo "y" | wmill sync push --workspace "$WORKSPACE_ID" --parallel 10 2>&1 | tail -3; then
+    if echo "y" | wmill sync push --workspace "$WORKSPACE_ID" --parallel 10 ; then
       SUCCESS=true
       break
     else
@@ -144,11 +145,6 @@ done
 
 if [ "$SUCCESS" = false ]; then
   echo -e "${RED}✗ Sync failed after $MAX_RETRIES attempts${NC}"
-  echo -e "${YELLOW}Troubleshooting:${NC}"
-  echo "  1. Check network connection"
-  echo "  2. Verify Windmill server is running: wmill auth list"
-  echo "  3. Check disk space: df -h"
-  echo "  4. Review logs: docker-compose logs windmill_server | tail -50"
   exit 1
 fi
 
@@ -161,17 +157,16 @@ echo ""
 
 echo -e "${BLUE}[Verification]${NC}"
 
-# Verify critical scripts exist in Windmill
 CRITICAL_SCRIPTS=(
-  "f/internal/conversation_get/main"
-  "f/internal/telegram_router"
-  "f/telegram_send"
+  "f/internal/ai_agent/main.py"
+  "f/booking_orchestrator/main.py"
+  "f/telegram_send/main.py"
 )
 
 VERIFICATION_PASSED=true
 for SCRIPT in "${CRITICAL_SCRIPTS[@]}"; do
-  if [ -d "${SCRIPT%/*}" ]; then
-    echo "  ✓ $SCRIPT"
+  if [ -f "$SCRIPT" ]; then
+    echo "  ✓ $SCRIPT exists"
   else
     echo -e "  ${RED}✗ $SCRIPT missing${NC}"
     VERIFICATION_PASSED=false
@@ -191,7 +186,7 @@ fi
 
 if [ "$DRY_RUN" = false ]; then
   echo -e "${BLUE}[GitHub Push]${NC}"
-  if ! git push origin main 2>&1 | tail -3; then
+  if ! git push origin main ; then
     echo -e "${YELLOW}⚠ GitHub push had warnings, continuing...${NC}"
   fi
   echo -e "${GREEN}✓ Pushed to GitHub${NC}"
@@ -209,10 +204,6 @@ echo ""
 echo -e "${GREEN}Next steps:${NC}"
 echo "  1. Windmill will auto-deploy within 60 seconds"
 echo "  2. Verify in Windmill UI: https://titanium.stax.ink/"
-echo "  3. Test in Telegram: send /start to @booking_bot"
-echo ""
-echo -e "${YELLOW}To verify sync health anytime:${NC}"
-echo "  bash scripts/sync-health-check.sh"
 echo ""
 
 exit 0

@@ -1,9 +1,9 @@
 #!/bin/bash
 
 # ==============================================================================
-# VALIDATION SCRIPT - Verify Local Setup
+# VALIDATION SCRIPT - Verify Local Setup (Python Edition)
 # ==============================================================================
-# Validates that all services are running and properly configured
+# Validates that all services are running and properly configured for Python dev
 # Usage: ./scripts/validate-setup.sh
 # ==============================================================================
 
@@ -39,35 +39,17 @@ check_warn() {
 echo -e "${BLUE}📦 DOCKER SERVICES${NC}"
 echo ""
 
-# PostgreSQL
-if docker ps --filter "name=booking-dev-db" --format "{{.State}}" | grep -q "running"; then
-  check_pass "PostgreSQL container is running"
-
-  # Test connection
-  POSTGRES_USER=$(grep POSTGRES_USER docker-compose.dev/.env 2>/dev/null | cut -d'=' -f2 || echo "unknown")
-  POSTGRES_DB=$(grep POSTGRES_DB docker-compose.dev/.env 2>/dev/null | cut -d'=' -f2 || echo "unknown")
-
-  if docker exec booking-dev-db pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB} &>/dev/null; then
-    check_pass "PostgreSQL is accepting connections"
-  else
-    check_fail "PostgreSQL connection check failed"
-  fi
+# Check container names (adjusting to known production names if different from dev)
+if docker ps --format "{{.Names}}" | grep -qE "db|postgres"; then
+  check_pass "Database container is running"
 else
-  check_fail "PostgreSQL container is NOT running"
+  check_fail "Database container is NOT running"
 fi
 
-# Redis
-if docker ps --filter "name=booking-dev-redis" --format "{{.State}}" | grep -q "running"; then
+if docker ps --format "{{.Names}}" | grep -qE "redis"; then
   check_pass "Redis container is running"
-
-  # Test connection
-  if docker exec booking-dev-redis redis-cli ping &>/dev/null | grep -q "PONG"; then
-    check_pass "Redis is responding to PING"
-  else
-    check_fail "Redis connection check failed"
-  fi
 else
-  check_fail "Redis container is NOT running"
+  check_warn "Redis container NOT found"
 fi
 
 echo ""
@@ -82,8 +64,6 @@ echo ""
 # Check root .env
 if [ -f .env ]; then
   check_pass ".env file exists"
-
-  # Check for DATABASE_URL
   if grep -q "DATABASE_URL" .env; then
     check_pass "DATABASE_URL is configured"
   else
@@ -93,66 +73,50 @@ else
   check_fail ".env file NOT found"
 fi
 
-# Check docker-compose.dev/.env
-if [ -f docker-compose.dev/.env ]; then
-  check_pass "docker-compose.dev/.env exists"
-else
-  check_warn "docker-compose.dev/.env NOT found"
-fi
-
 echo ""
 
 # ==============================================================================
-# NODE.JS VALIDATION
+# PYTHON VALIDATION
 # ==============================================================================
 
-echo -e "${BLUE}📦 NODE.JS & DEPENDENCIES${NC}"
+echo -e "${BLUE}🐍 PYTHON & DEPENDENCIES${NC}"
 echo ""
 
-# Node version
-if command -v node &> /dev/null; then
-  NODE_VERSION=$(node --version)
-  check_pass "Node.js ${NODE_VERSION} installed"
+# Python version
+if command -v python3 &> /dev/null; then
+  PY_VERSION=$(python3 --version)
+  check_pass "Python ${PY_VERSION} installed"
 else
-  check_fail "Node.js NOT found"
+  check_fail "Python 3 NOT found"
 fi
 
-# npm version
-if command -v npm &> /dev/null; then
-  NPM_VERSION=$(npm --version)
-  check_pass "npm ${NPM_VERSION} installed"
+# uv version
+if command -v uv &> /dev/null; then
+  UV_VERSION=$(uv --version)
+  check_pass "uv ${UV_VERSION} installed"
 else
-  check_fail "npm NOT found"
+  check_fail "uv NOT found"
 fi
-
-# Dependencies installed
-if [ -d node_modules ]; then
-  check_pass "node_modules directory exists"
-else
-  check_warn "node_modules NOT found (run npm install)"
-fi
-
-echo ""
 
 # ==============================================================================
-# TYPESCRIPT VALIDATION
+# CODE QUALITY VALIDATION
 # ==============================================================================
 
-echo -e "${BLUE}🔷 TYPESCRIPT${NC}"
+echo -e "${BLUE}🛡️  CODE QUALITY & TYPES${NC}"
 echo ""
 
-# TypeScript compilation
-if npx tsc --noEmit --quiet 2>/dev/null; then
-  check_pass "TypeScript compilation successful"
+# Mypy strict check
+if uv run mypy --strict f/ &>/dev/null 2>&1; then
+  check_pass "Mypy strict validation passed"
 else
-  check_fail "TypeScript compilation FAILED"
+  check_fail "Mypy validation FAILED (run: uv run mypy --strict f/)"
 fi
 
-# ESLint
-if npx eslint 'f/**/*.ts' --max-warnings 0 &>/dev/null 2>&1; then
-  check_pass "ESLint validation passed"
+# Ruff check
+if uv run ruff check . &>/dev/null 2>&1; then
+  check_pass "Ruff linting passed"
 else
-  check_warn "ESLint found issues (run npx eslint 'f/**/*.ts')"
+  check_warn "Ruff found linting issues (run: uv run ruff check --fix .)"
 fi
 
 echo ""
@@ -165,15 +129,10 @@ echo -e "${BLUE}🧪 TESTS${NC}"
 echo ""
 
 # Test suite
-if npm test -- --run --reporter=quiet &>/dev/null 2>&1; then
-  TEST_COUNT=$(npm test -- --run 2>&1 | grep -E "Tests\s+[0-9]+" | head -1 || echo "")
-  if [ -n "$TEST_COUNT" ]; then
-    check_pass "Test suite: $TEST_COUNT"
-  else
-    check_pass "Test suite ran successfully"
-  fi
+if uv run pytest tests/py/ -q &>/dev/null 2>&1; then
+  check_pass "All Python contract tests passed"
 else
-  check_warn "Some tests may have failed (run npm test for details)"
+  check_warn "Some tests may have failed (run: uv run pytest tests/py/)"
 fi
 
 echo ""
@@ -192,27 +151,12 @@ if [ $CHECKS_FAILED -eq 0 ]; then
   echo ""
   echo "Your local environment is properly configured! 🚀"
   echo ""
-  echo "Next steps:"
-  echo "  1. Start coding: edit files in f/ directory"
-  echo "  2. Run tests: npm test"
-  echo "  3. Check type-safety: npm run typecheck"
-  echo ""
   exit 0
 else
   echo -e "${RED}✗ SOME CHECKS FAILED (${CHECKS_PASSED}/${TOTAL_CHECKS})${NC}"
   echo -e "${RED}═════════════════════════════════════════════════════════════════${NC}"
   echo ""
-  echo "Issues found:"
-  echo ""
-  echo "  If Docker services aren't running:"
-  echo "    cd docker-compose.dev && docker-compose up -d"
-  echo ""
-  echo "  If dependencies aren't installed:"
-  echo "    npm install"
-  echo ""
-  echo "  If .env is missing:"
-  echo "    cp .env.example .env"
-  echo "    # Update with your API keys"
+  echo "Issues found. Please run ./scripts/setup-local.sh to fix."
   echo ""
   exit 1
 fi

@@ -48,74 +48,75 @@ while [ $# -gt 0 ]; do
   shift
 done
 
-MODE="$MODE" SCOPE="$SCOPE" FILES_CSV="$FILES_CSV" node - <<'EOF'
-const fs = require('fs');
-const path = require('path');
+export MODE SCOPE FILES_CSV
 
-const mode = process.env.MODE;
-const scope = process.env.SCOPE;
-const filesCsv = process.env.FILES_CSV ?? '';
-const yamlExtensions = new Set(['.script.yaml', '.app.yaml']);
+python3 - <<'EOF'
+import os
+import json
+import re
 
-function isCandidate(filePath) {
-  return filePath.endsWith('.script.yaml') || filePath.endsWith('.app.yaml') || filePath.endsWith('/flow.yaml');
-}
+mode = os.environ.get("MODE", "check")
+scope = os.environ.get("SCOPE", "repo")
+files_csv = os.environ.get("FILES_CSV", "")
 
-function walk(dir, out = []) {
-  if (!fs.existsSync(dir)) return out;
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) walk(full, out);
-    else if (isCandidate(full)) out.push(full);
-  }
-  return out;
-}
+def is_candidate(file_path):
+    return file_path.endswith('.script.yaml') or file_path.endswith('.app.yaml') or file_path.endswith('/flow.yaml')
 
-function getCandidates() {
-  if (scope === 'files') {
-    return filesCsv
-      .split(',')
-      .map((item) => item.trim())
-      .filter(Boolean)
-      .filter((item) => fs.existsSync(item) && isCandidate(item));
-  }
-  return walk('f');
-}
+def get_candidates():
+    if scope == 'files':
+        return [f.strip() for f in files_csv.split(',') if f.strip() and os.path.exists(f.strip()) and is_candidate(f.strip())]
+    
+    candidates = []
+    for root, _, files in os.walk('f'):
+        for f in files:
+            full_path = os.path.join(root, f)
+            if is_candidate(full_path):
+                candidates.append(full_path)
+    return candidates
 
-const candidates = getCandidates();
-const broken = [];
-let changed = 0;
+candidates = get_candidates()
+broken = []
+changed = 0
 
-for (const file of candidates) {
-  const original = fs.readFileSync(file, 'utf8');
-  let fileChanged = false;
-  const updated = original.replace(/^lock: '!inline (.+)'$/mg, (match, lockPath) => {
-    if (fs.existsSync(lockPath)) return match;
-    broken.push({ file, lock: lockPath });
-    if (mode === 'fix') {
-      fileChanged = true;
-      return '';
-    }
-    return match;
-  }).replace(/\n{3,}/g, '\n\n');
+lock_pattern = re.compile(r"^lock: '!inline (.+)'$", re.MULTILINE)
 
-  if (mode === 'fix' && fileChanged) {
-    fs.writeFileSync(file, updated);
-    changed += 1;
-  }
-}
+for file_path in candidates:
+    with open(file_path, 'r', encoding='utf-8') as f:
+        content = f.read()
+    
+    original_content = content
+    
+    def replacer(match):
+        lock_path = match.group(1)
+        if os.path.exists(lock_path):
+            return match.group(0)
+        
+        broken.append({"file": file_path, "lock": lock_path})
+        if mode == 'fix':
+            return ""
+        return match.group(0)
 
-if (broken.length === 0) {
-  console.log(JSON.stringify({ ok: true, changed: 0, broken: 0 }, null, 2));
-  process.exit(0);
-}
+    new_content = lock_pattern.sub(replacer, content)
+    # Cleanup extra newlines if fixed
+    if mode == 'fix':
+        new_content = re.sub(r'\n{3,}', '\n\n', new_content)
 
-console.log(JSON.stringify({
-  ok: mode === 'fix',
-  changed,
-  broken: broken.length,
-  sample: broken.slice(0, 20),
-}, null, 2));
+    if mode == 'fix' and new_content != original_content:
+        with open(file_path, 'w', encoding='utf-8') as f:
+            f.write(new_content)
+        changed += 1
 
-if (mode === 'check') process.exit(1);
+if not broken:
+    print(json.dumps({"ok": True, "changed": 0, "broken": 0}, indent=2))
+    exit(0)
+
+print(json.dumps({
+    "ok": mode == 'fix',
+    "changed": changed,
+    "broken": len(broken),
+    "sample": broken[:20]
+}, indent=2))
+
+if mode == 'check':
+    exit(1)
 EOF

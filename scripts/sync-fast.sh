@@ -7,7 +7,7 @@ WORKSPACE_ID="booking-titanium"
 is_windmill_path() {
   local path="$1"
   [[ "$path" == f/* ]] || return 1
-  [[ "$path" == *.ts || "$path" == *.script.yaml || "$path" == *.flow.yaml || "$path" == */flow.yaml || "$path" == *.lock || "$path" == *.script.lock || "$path" == *.folder.meta.yaml || "$path" == *.app.yaml ]]
+  [[ "$path" == *.py || "$path" == *.script.yaml || "$path" == *.flow.yaml || "$path" == */flow.yaml || "$path" == *.lock || "$path" == *.script.lock || "$path" == *.folder.meta.yaml || "$path" == *.app.yaml ]]
 }
 
 append_unique() {
@@ -29,8 +29,8 @@ collect_targets() {
     [[ -e "$path" ]] || continue
     append_unique "$path"
 
-    if [[ "$path" == *.ts ]]; then
-      local script_yaml="${path%.ts}.script.yaml"
+    if [[ "$path" == *.py ]]; then
+      local script_yaml="${path%.py}.script.yaml"
       [[ -f "$script_yaml" ]] && append_unique "$script_yaml"
     fi
   done < <(
