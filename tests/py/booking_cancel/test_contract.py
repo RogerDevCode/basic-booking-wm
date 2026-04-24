@@ -7,7 +7,7 @@ class MockCancelRepository:
     async def fetch_booking(self, booking_id: str) -> BookingLookup | None:
         return {
             "booking_id": booking_id,
-            "status": "confirmada",
+            "status": "confirmed",
             "client_id": "client_1",
             "provider_id": "provider_1",
             "gcal_provider_event_id": None,
@@ -15,12 +15,12 @@ class MockCancelRepository:
         }
 
     async def lock_booking(self, booking_id: str) -> BookingStatus | None:
-        return "confirmada"
+        return "confirmed"
 
     async def update_booking_status(self, input_data: CancelBookingInput) -> UpdatedBooking | None:
         return {
             "booking_id": input_data.booking_id,
-            "status": "cancelada",
+            "status": "cancelled",
             "cancelled_by": input_data.actor,
             "cancellation_reason": input_data.reason
         }
@@ -49,6 +49,6 @@ async def test_booking_cancel_success() -> None:
     
     assert err is None
     assert result is not None
-    assert result["status"] == "cancelada"
+    assert result["status"] == "cancelled"
     assert result["cancelled_by"] == "client"
     assert result["cancellation_reason"] == "Changed my mind"

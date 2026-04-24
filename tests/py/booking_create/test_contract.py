@@ -58,6 +58,6 @@ async def test_booking_create_success() -> None:
     
     assert err is None
     assert result is not None
-    assert result["status"] == "confirmada"
+    assert result["status"] == "confirmed"
     assert result["provider_name"] == "Dr. Test"
     assert result["client_name"] == "Test Client"

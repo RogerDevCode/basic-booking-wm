@@ -12,6 +12,7 @@ class RescheduleInput(BaseModel):
     actor: Literal['client', 'provider', 'system']
     actor_id: str | None = None
     reason: str | None = Field(default=None, max_length=500)
+    idempotency_key: str | None = None
 
     @field_validator('new_start_time', mode='before')
     @classmethod
