@@ -20,10 +20,12 @@ def _resolve_db_url() -> str | None:
     """Resolves DATABASE_URL from Windmill variables with env fallback."""
     from ._wmill_adapter import get_variable  # local import avoids circular deps
 
-    # Try Windmill variable first (production path)
-    wm_url = get_variable("u/admin/DATABASE_URL")
-    if wm_url:
-        return wm_url
+    # Try Windmill variable first (production paths)
+    for path in ["g/all/DATABASE_URL", "u/admin/DATABASE_URL", "DATABASE_URL"]:
+        wm_url = get_variable(path)
+        if wm_url:
+            return wm_url
+
     # Fallback for local development
     return os.getenv("DATABASE_URL")
 
@@ -46,10 +48,10 @@ async def create_db_client(url: str | None = None, **kwargs: object) -> asyncpg.
 
     is_localhost = "localhost" in db_url or "127.0.0.1" in db_url
 
-    # Configure default SSL based on localhost
+    # Configure default SSL based on localhost or sslmode=disable
     ssl_ctx: object
     if "ssl" not in kwargs:
-        if is_localhost:
+        if is_localhost or "sslmode=disable" in db_url:
             ssl_ctx = False
         else:
             ssl_ctx = ssl.create_default_context()

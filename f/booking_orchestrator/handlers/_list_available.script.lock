@@ -1,5 +1,6 @@
 # py: 3.12
 annotated-types==0.7.0
+asyncpg==0.31.0
 pydantic==2.13.3
 pydantic-core==2.46.3
 typing-extensions==4.15.0

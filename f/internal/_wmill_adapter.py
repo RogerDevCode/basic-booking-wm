@@ -11,12 +11,11 @@ def get_variable(path: str) -> str | None:
         import wmill # type: ignore[import-not-found]
         # cast to object to avoid Any propagation
         val = cast(object, wmill.get_variable(path)) # pyright: ignore[reportUnknownMemberType]
-        if val is not None:
+        if val is not None and str(val).strip():
             return str(val)
     except Exception as e:
         # Log failure so it's not silent
         log("get_variable failed", path=path, error=str(e))
-        pass
 
     # Fallback for local development
     env_name = path.split("/")[-1] if "/" in path else path

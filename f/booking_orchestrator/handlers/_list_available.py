@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import cast, Any
 from f.booking_orchestrator._orchestrator_models import OrchestratorInput, OrchestratorResult, AvailabilityData
 from f.internal._result import Result
-from f.internal._wmill_adapter import run_script
+from f.availability_check.main import main_async as check_availability
 
 """
 PRE-FLIGHT
@@ -17,7 +17,6 @@ Zod Schemas      : NO
 
 async def handle_list_available(
     conn: Any,
-
     input_data: OrchestratorInput
 ) -> Result[OrchestratorResult]:
     provider_id = input_data.provider_id
@@ -32,16 +31,13 @@ async def handle_list_available(
             "message": "Necesito el doctor y la fecha para consultar disponibilidad.",
         }
 
-    # 1. CALL AVAILABILITY MODULE (STILL TS IN FASE 2)
+    # 1. CALL AVAILABILITY MODULE
     try:
-        err_msg, data = run_script(
-            path="f/availability_check/main.ts", 
-            args={
-                "provider_id": provider_id,
-                "date": date,
-                "service_id": service_id,
-            }
-        )
+        err_msg, data = await check_availability({
+            "provider_id": provider_id,
+            "date": date,
+            "service_id": service_id,
+        })
     except Exception as e:
         return Exception(f"Failed to call availability_check: {e}"), None
 
@@ -69,11 +65,11 @@ async def handle_list_available(
         }
 
     # 2. FORMAT RESPONSE
-    morning = []
-    afternoon = []
+    morning: list[str] = []
+    afternoon: list[str] = []
     for s in slots:
         # Parse ISO string (e.g. "2026-04-20T10:00:00Z")
-        start_str = s["start"]
+        start_str = str(s["start"])
         dt = datetime.fromisoformat(start_str.replace("Z", "+00:00"))
         time_str = dt.strftime("%H:%M")
         if dt.hour < 12:

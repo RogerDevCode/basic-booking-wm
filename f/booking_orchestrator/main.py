@@ -1,4 +1,5 @@
 import asyncio
+import wmill
 # ============================================================================
 # PRE-FLIGHT CHECKLIST
 # Mission         : Routes AI intents to booking actions (create, cancel, reschedule, list)
@@ -79,5 +80,15 @@ async def _main_async(args: dict[str, Any]) -> Result[OrchestratorResult]:
         await conn.close() # pyright: ignore[reportUnknownMemberType]
 
 
-def main(telegram_chat_id: str, intent: str, entities: dict[str, Any] | None = None) -> Any:
-    return asyncio.run(_main_async({"telegram_chat_id": telegram_chat_id, "intent": intent, "entities": entities or {}}))
+def main(telegram_chat_id: str, intent: str, entities: dict[str, Any] | None = None) -> dict[str, Any]:
+    """
+    Entrypoint sincrónico para la ejecución en Windmill.
+    """
+    try:
+        return asyncio.run(_main_async({"telegram_chat_id": telegram_chat_id, "intent": intent, "entities": entities or {}}))
+    except Exception as e:
+        import traceback
+        tb = traceback.format_exc()
+        log("CRITICAL_ORCHESTRATOR_ERROR", error=str(e), traceback=tb, module=MODULE)
+        # Raise to let Windmill know it failed
+        raise RuntimeError(f"Orchestrator failed: {e}")

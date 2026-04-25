@@ -2,7 +2,7 @@ from typing import Any
 from f.booking_orchestrator._orchestrator_models import OrchestratorInput, OrchestratorResult
 from f.booking_orchestrator._get_entity import get_entity
 from ._get_my_bookings import handle_get_my_bookings
-from f.booking_reschedule.main import main as reschedule_booking
+from f.booking_reschedule.main import main_async as reschedule_booking
 from f.internal._result import Result
 
 """

@@ -1,7 +1,7 @@
 from typing import Any
 from f.booking_orchestrator._orchestrator_models import OrchestratorInput, OrchestratorResult
 from f.booking_orchestrator._get_entity import get_entity
-from f.booking_create.main import main as create_booking
+from f.booking_create.main import main_async as create_booking
 from f.internal._result import Result
 
 """
