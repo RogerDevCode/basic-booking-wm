@@ -4,6 +4,25 @@
       "command": "uv",
       "args": ["run", "python", "-m", "mcp_codebase_index.server"],
       "env": { "PROJECT_ROOT": "${workspaceFolder}" }
+    },
+    "codebase-index-compressed": {
+      "command": "mcp-compressor",
+      "args": [
+        "--upstream-type", "stdio",
+        "--upstream-command", "uv",
+        "--upstream-args", "run|python|-m|mcp_codebase_index.server",
+        "--compression-level", "high",
+        "--enable-response-filtering"
+      ],
+      "env": { "PROJECT_ROOT": "${workspaceFolder}" }
+    }
+  },
+  "enabledMcpjsonServers": ["codebase-index-compressed"],
+  "pluginConfigs": {
+    "github@claude-plugins-official": {
+      "options": {
+        "personalAccessToken": "${GITHUB_ACTIONS_TOKEN}"
+      }
     }
   }
 }
