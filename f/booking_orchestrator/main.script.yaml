@@ -6,9 +6,20 @@ schema:
   $schema: https://json-schema.org/draft/2020-12/schema
   type: object
   properties:
-    args:
+    entities:
       type: ''
       description: ''
       default: null
+    intent:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    telegram_chat_id:
+      type: string
+      description: ''
+      default: null
+      originalType: string
   required:
-    - args
+    - telegram_chat_id
+    - intent

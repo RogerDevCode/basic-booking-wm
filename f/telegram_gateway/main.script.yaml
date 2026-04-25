@@ -6,9 +6,9 @@ schema:
   $schema: https://json-schema.org/draft/2020-12/schema
   type: object
   properties:
-    args:
+    webhook_payload:
       type: ''
       description: ''
       default: null
   required:
-    - args
+    - webhook_payload

@@ -1,68 +1,50 @@
-from typing import List, Dict, Any, Optional, Tuple
-from ._menu_models import InputSchema, MenuResult
+from typing import List, Dict, Any, Optional
 
-MAIN_MENU_KEYBOARD: List[List[str]] = [
-    ['📅 Agendar cita', '📋 Mis citas'],
-    ['🔔 Recordatorios', '❓ Información'],
+class MenuInput:
+    def __init__(self, action: str, chat_id: str, user_input: Optional[str] = None):
+        self.action = action
+        self.chat_id = chat_id
+        self.user_input = user_input
+
+class MenuResponse:
+    def __init__(self, handled: bool, response_text: str, inline_buttons: List[List[Dict[str, Any]]]):
+        self.handled = handled
+        self.response_text = response_text
+        self.inline_buttons = inline_buttons
+
+MAIN_MENU_INLINE = [
+    [{"text": "📅 Agendar Cita", "callback_data": "cmd:book"}],
+    [{"text": "📋 Mis Citas", "callback_data": "cmd:mybookings"}]
 ]
-
-OPTION_MAP: Dict[str, str] = {
-    'agendar cita': 'book_appointment',
-    'mis citas': 'my_bookings',
-    'recordatorios': 'reminders',
-    'información': 'info',
-    '1': 'book_appointment',
-    '2': 'my_bookings',
-    '3': 'reminders',
-    '4': 'info',
-}
 
 def parse_user_option(text: str) -> Optional[str]:
     lower = text.lower().strip()
-    for key, value in OPTION_MAP.items():
-        if key in lower:
-            return value
+    if lower == "cmd:book" or "agendar" in lower: return "book_appointment"
+    if lower == "cmd:mybookings" or "mis citas" in lower: return "my_bookings"
     return None
 
-def build_main_menu(chat_id: str) -> Dict[str, Any]:
-    return {
-        "text": '🏥 *Menú Principal*\n\nSelecciona una opción:',
-        "reply_markup": {
-            "keyboard": MAIN_MENU_KEYBOARD,
-            "resize_keyboard": True,
-            "one_time_keyboard": False,
-        },
-        "parse_mode": 'Markdown',
-        "chat_id": chat_id,
-    }
-
-def handle_show_menu(input_data: InputSchema) -> MenuResult:
-    result = build_main_menu(input_data.chat_id)
-    return {
-        "success": True,
-        "data": result,
-        "error_message": None
-    }
-
-def handle_select_option(input_data: InputSchema) -> MenuResult:
-    user_input = input_data.user_input or ""
-    action = parse_user_option(user_input)
-    
-    if not action:
-        menu_result = build_main_menu(input_data.chat_id)
-        menu_result["text"] = '⚠️ Opción no reconocida. Por favor selecciona una opción válida.'
-        return {
-            "success": False,
-            "data": menu_result,
-            "error_message": 'Invalid option selected'
-        }
-
-    return {
-        "success": True,
-        "data": {
-            "action": action,
-            "chat_id": input_data.chat_id,
-            "client_id": input_data.client_id
-        },
-        "error_message": None
-    }
+class MenuController:
+    async def handle(self, input_data: MenuInput) -> MenuResponse:
+        if input_data.action in ["start", "show"]:
+            return MenuResponse(
+                handled=True,
+                response_text="🏥 *AutoAgenda - Menú Principal*\n\n¿Cómo podemos ayudarte hoy?",
+                inline_buttons=MAIN_MENU_INLINE
+            )
+            
+        if input_data.action == "select_option":
+            user_input = input_data.user_input or ""
+            parsed = parse_user_option(user_input)
+            
+            if parsed:
+                # Si reconoció la acción, cedemos el control al orquestador
+                return MenuResponse(handled=False, response_text="", inline_buttons=[])
+            else:
+                # Opción inválida, repite el menú
+                return MenuResponse(
+                    handled=True,
+                    response_text="⚠️ Opción no reconocida.\n\n🏥 *AutoAgenda - Menú Principal*\n\nSelecciona una opción:",
+                    inline_buttons=MAIN_MENU_INLINE
+                )
+                
+        return MenuResponse(handled=False, response_text="", inline_buttons=[])

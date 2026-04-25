@@ -8,7 +8,9 @@ def decrypt_content(encrypted: Optional[str]) -> str:
     if not encrypted: return ""
     try:
         return decrypt_data(encrypted)
-    except Exception:
+    except Exception as e:
+        from ..internal._wmill_adapter import log
+        log("SILENT_ERROR_CAUGHT", error=str(e), file="_notes_logic.py")
         return "[ERROR: Unable to decrypt note]"
 
 def map_row_to_note(r: Dict[str, Any], tags: List[Tag] = []) -> NoteRow:

@@ -1,15 +1,19 @@
-from typing import Optional, List, Literal, Dict, Any, TypedDict
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
+from typing import List, Optional, Any, Dict
 
-class MenuResult(TypedDict):
-    success: bool
-    data: Optional[Dict[str, Any]]
-    error_message: Optional[str]
+class InlineButton(BaseModel):
+    text: str
+    callback_data: str
 
-class InputSchema(BaseModel):
-    model_config = ConfigDict(strict=True, extra="forbid")
-    
-    action: Literal['show', 'select_option', 'start']
-    chat_id: str = Field(min_length=1)
+class MenuInput(BaseModel):
+    action: str
+    chat_id: str
     user_input: Optional[str] = None
-    client_id: Optional[str] = None
+
+class MenuResponse(BaseModel):
+    handled: bool
+    response_text: str
+    inline_buttons: List[List[Dict[str, Any]]] = Field(default_factory=list)
+
+class InputSchema(MenuInput): pass
+class MenuResult(MenuResponse): pass

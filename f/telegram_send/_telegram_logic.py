@@ -1,5 +1,6 @@
 import httpx
 import asyncio
+import json
 from typing import Optional, List, Dict, Any, Tuple, cast
 from ..internal._result import Result, ok, fail
 from ..internal._config import MAX_RETRIES, TIMEOUT_TELEGRAM_API_MS
@@ -13,13 +14,11 @@ class TelegramService:
     async def execute(self, input_data: TelegramInput) -> Result[TelegramSendData]:
         endpoint, body = self.prepare_request(input_data)
         
-        # Simple retry loop (SOLID-SRP: retry logic here or in helper)
         last_err = None
         for attempt in range(MAX_RETRIES):
             try:
                 res_data = await self.api_call(endpoint, body)
                 msg_id = res_data.result.message_id if res_data.result else None
-                
                 chat_id = getattr(input_data, "chat_id", None)
                 
                 return ok(TelegramSendData(
@@ -40,21 +39,23 @@ class TelegramService:
         
         if mode == 'send_message':
             inp = cast(Any, input_data)
+            keyboard = self.normalize_keyboard(inp.inline_buttons)
             return f"{self.base_url}/sendMessage", {
                 "chat_id": inp.chat_id,
                 "text": inp.text,
                 "parse_mode": inp.parse_mode,
-                "reply_markup": {"inline_keyboard": self.build_keyboard(inp.inline_buttons)} if inp.inline_buttons else None
+                "reply_markup": {"inline_keyboard": keyboard} if keyboard else None
             }
         
         elif mode == 'edit_message':
             inp = cast(Any, input_data)
+            keyboard = self.normalize_keyboard(inp.inline_buttons)
             return f"{self.base_url}/editMessageText", {
                 "chat_id": inp.chat_id,
                 "message_id": inp.message_id,
                 "text": inp.text,
                 "parse_mode": inp.parse_mode,
-                "reply_markup": {"inline_keyboard": self.build_keyboard(inp.inline_buttons)} if inp.inline_buttons else None
+                "reply_markup": {"inline_keyboard": keyboard} if keyboard else None
             }
             
         elif mode == 'delete_message':
@@ -75,11 +76,8 @@ class TelegramService:
         raise ValueError(f"Unsupported mode: {mode}")
 
     async def api_call(self, url: str, body: Dict[str, Any]) -> TelegramResponse:
+        # Use json parameter in post which automatically sets headers and handles nested dicts
         async with httpx.AsyncClient(timeout=TIMEOUT_TELEGRAM_API_MS / 1000.0) as client:
-            response = await client.post(url, json=body)
-            
-            # Filter out None values from body to avoid Telegram errors
-            # (Handled by httpx/json usually, but Telegram is picky about explicit nulls)
             clean_body = {k: v for k, v in body.items() if v is not None}
             response = await client.post(url, json=clean_body)
 
@@ -93,10 +91,23 @@ class TelegramService:
                 
             return parsed
 
-    def build_keyboard(self, buttons: List[InlineButton]) -> List[List[Dict[str, str]]]:
-        rows: List[List[Dict[str, str]]] = []
-        # Chunk by 2
-        for i in range(0, len(buttons), 2):
-            row = [{"text": b.text, "callback_data": b.callback_data} for b in buttons[i:i+2]]
-            rows.append(row)
-        return rows
+    def normalize_keyboard(self, buttons: Any) -> List[List[Dict[str, str]]]:
+        if not buttons:
+            return []
+        
+        # Caso 1: Ya es una lista de listas (el formato que genera MenuController)
+        if isinstance(buttons, list) and len(buttons) > 0 and isinstance(buttons[0], list):
+            return buttons
+            
+        # Caso 2: Es una lista plana de objetos InlineButton o dicts
+        normalized: List[List[Dict[str, str]]] = []
+        flat_list = list(buttons)
+        for i in range(0, len(flat_list), 2):
+            row = []
+            for b in flat_list[i:i+2]:
+                if hasattr(b, "text"): # Es un objeto InlineButton
+                    row.append({"text": b.text, "callback_data": b.callback_data})
+                elif isinstance(b, dict):
+                    row.append({"text": b.get("text", ""), "callback_data": b.get("callback_data", "")})
+            normalized.append(row)
+        return normalized

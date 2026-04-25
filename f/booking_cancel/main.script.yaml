@@ -10,6 +10,6 @@ schema:
       type: object
       description: ''
       default: null
-      format: resource-object
+      properties: {}
   required:
     - args

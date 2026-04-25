@@ -1,3 +1,4 @@
+import asyncio
 import json
 import time
 from typing import Any, Dict, Optional, Tuple, Literal
@@ -16,7 +17,7 @@ from ._ai_agent_logic import (
 
 MODULE = "ai_agent"
 
-async def main(args: dict[str, Any]) -> Dict[str, Any]:
+async def _main_async(args: dict[str, Any]) -> Dict[str, Any]:
     start_ms = int(time.time() * 1000)
     
     # 0. Validate Input
@@ -118,3 +119,7 @@ async def main(args: dict[str, Any]) -> Dict[str, Any]:
     )
 
     return {"success": True, "data": verified.model_dump(), "error_message": None}
+
+
+def main(chat_id: str, text: str, provider_id: str | None = None) -> dict[str, Any]:
+    return asyncio.run(_main_async({"chat_id": chat_id, "text": text, "provider_id": provider_id}))

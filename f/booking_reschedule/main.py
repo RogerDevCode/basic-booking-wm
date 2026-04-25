@@ -1,3 +1,4 @@
+import asyncio
 # ============================================================================
 # PRE-FLIGHT CHECKLIST
 # Mission         : Cancel old booking + create new one atomically (reschedule)
@@ -21,7 +22,7 @@ from ._reschedule_logic import execute_reschedule_logic, authorize
 
 MODULE = "booking_reschedule"
 
-async def main(args: object) -> tuple[Exception | None, RescheduleResult | None]:
+async def _main_async(args: object) -> tuple[Exception | None, RescheduleResult | None]:
     raw_input: Any
     if isinstance(args, dict) and "rawInput" in args:
         raw_input = args["rawInput"]
@@ -96,3 +97,22 @@ async def main(args: object) -> tuple[Exception | None, RescheduleResult | None]
         return (Exception(str(e)), None)
     finally:
         await conn.close() # pyright: ignore[reportUnknownMemberType]
+
+
+def main(args: dict):
+    import traceback
+    try:
+        return asyncio.run(_main_async(args))
+    except Exception as e:
+        tb = traceback.format_exc()
+        # Intentamos usar el adaptador local si está disponible, si no print
+        try:
+            from ..internal._wmill_adapter import log
+            log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=os.path.basename(os.path.dirname(__file__)))
+        except:
+            from ..internal._wmill_adapter import log
+            log("BARE_EXCEPT_CAUGHT", file="main.py")
+            print(f"CRITICAL ERROR in {__file__}: {e}\n{tb}")
+        
+        # Elevamos para que Windmill marque como FAILED
+        raise RuntimeError(f"Execution failed: {e}")

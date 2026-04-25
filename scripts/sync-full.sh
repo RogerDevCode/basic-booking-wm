@@ -50,6 +50,8 @@ ON CONFLICT (workspace_id, path) DO UPDATE SET value = EXCLUDED.value;"
 
 # 6. SINCRO DE CÓDIGO Y METADATOS
 echo "🔄 6/6 Regenerando metadatos y Sincronizando..."
+# Asegurar que estamos usando el profile de producción antes de subir código
+wmill workspace switch "$WORKSPACE_ID" >/dev/null
 # Regenerar metadatos para todos los main.py
 find f -name "main.py" | xargs -I {} wmill generate-metadata {} > /dev/null
 wmill sync push --workspace "$WORKSPACE_ID" --yes --parallel 10 --auto-metadata

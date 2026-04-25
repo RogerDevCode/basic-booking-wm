@@ -1,3 +1,4 @@
+from typing import Any
 from f.booking_orchestrator._orchestrator_models import OrchestratorInput, OrchestratorResult
 from f.booking_orchestrator._get_entity import get_entity
 from f.booking_create.main import main as create_booking
@@ -15,6 +16,7 @@ Zod Schemas      : NO
 """
 
 async def handle_create_booking(
+    conn: Any,
     input_data: OrchestratorInput
 ) -> Result[OrchestratorResult]:
     client_id = input_data.client_id
@@ -25,11 +27,47 @@ async def handle_create_booking(
 
     # 1. SMART HANDOFF: Detect missing required fields for a direct booking
     if not all([client_id, provider_id, service_id, date, time]):
+        query = """
+        SELECT 
+            s.specialty_id as id,
+            s.name,
+            (SELECT COUNT(*) FROM providers p WHERE p.specialty_id = s.specialty_id AND p.is_active = true) as provider_count
+        FROM specialties s
+        WHERE s.is_active = true
+        ORDER BY s.sort_order ASC, s.name ASC
+        """
+        rows = await conn.fetch(query)
+        
+        inline_buttons = []
+        current_row = []
+        msg_parts = ["🏥 *Selecciona la especialidad que necesitas:*\n"]
+        
+        for r in rows:
+            name = str(r["name"])
+            sp_id = str(r["id"])
+            count = int(r["provider_count"])
+            
+            if count > 0:
+                current_row.append({"text": name, "callback_data": f"spec:{sp_id}"})
+                if len(current_row) == 2:
+                    inline_buttons.append(current_row)
+                    current_row = []
+            else:
+                msg_parts.append(f"• {name} *(temp. no disp.)*")
+                
+        if current_row:
+            inline_buttons.append(current_row)
+            
+        inline_buttons.append([{"text": "❌ Cancelar", "callback_data": "cancel"}])
+        
+        message = "\n".join(msg_parts) if len(msg_parts) > 1 else msg_parts[0]
+
         return None, {
             "action": "crear_cita",
             "success": False,
             "data": None,
-            "message": "He capturado parte de tu solicitud, pero para agendar necesito que completemos unos detalles en el asistente.",
+            "message": message,
+            "inline_buttons": inline_buttons,
             "nextState": {"name": "selecting_specialty", "error": None, "items": []},
             "nextDraft": {
                 "specialty_id": None,

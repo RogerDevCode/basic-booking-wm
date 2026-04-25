@@ -1,5 +1,6 @@
 # mypy: disable-error-code="misc, unused-ignore, import-not-found, import-untyped"
 import os
+import traceback
 from typing import cast
 
 # Encapsulates Windmill SDK to prevent direct dependencies in business logic
@@ -12,9 +13,11 @@ def get_variable(path: str) -> str | None:
         val = cast(object, wmill.get_variable(path)) # pyright: ignore[reportUnknownMemberType]
         if val is not None:
             return str(val)
-    except ImportError:
+    except Exception as e:
+        # Log failure so it's not silent
+        log("get_variable failed", path=path, error=str(e))
         pass
-    
+
     # Fallback for local development
     env_name = path.split("/")[-1] if "/" in path else path
     return os.getenv(env_name)
@@ -25,6 +28,10 @@ def get_env(key: str) -> str | None:
 
 def log(message: str, **kwargs: object) -> None:
     """Structured logging compatible with Windmill."""
+    # Ensure traceback is captured if an exception is passed or in context
+    if "error" in kwargs and "traceback" not in kwargs:
+        kwargs["traceback"] = traceback.format_exc()
+
     try:
         import wmill # type: ignore[import-not-found]
         if hasattr(wmill, "log"):
@@ -47,5 +54,6 @@ def run_script(path: str, args: dict[str, object]) -> tuple[str | None, object |
         if isinstance(result, (list, tuple)) and len(result) == 2:
             return cast(str | None, result[0]), result[1]
         return None, result
-    except ImportError:
-        return f"Windmill environment not available (local mock for {path})", None
+    except Exception as e:
+        log("run_script failed", path=path, error=str(e))
+        return f"Windmill script execution failed: {e}", None

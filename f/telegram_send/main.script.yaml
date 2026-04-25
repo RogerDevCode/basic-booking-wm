@@ -6,9 +6,41 @@ schema:
   $schema: https://json-schema.org/draft/2020-12/schema
   type: object
   properties:
-    args:
-      type: ''
+    bot_token:
+      type: string
       description: ''
       default: null
+      originalType: string
+    chat_id:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    inline_buttons_json:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    message_id:
+      type: integer
+      description: ''
+      default: null
+    mode:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    parse_mode:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    text:
+      type: string
+      description: ''
+      default: null
+      originalType: string
   required:
-    - args
+    - mode
+    - chat_id
+    - text

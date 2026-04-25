@@ -1,50 +1,49 @@
-# ============================================================================
-# PRE-FLIGHT CHECKLIST
-# Mission         : Display main menu with persistent reply keyboard
-# DB Tables Used  : NONE
-# Concurrency Risk: NO
-# GCal Calls      : NO
-# Idempotency Key : N/A
-# RLS Tenant ID   : NO
-# Pydantic Schemas: YES — InputSchema validates chat_id and action
-# ============================================================================
-
-from typing import Any, Dict
+import asyncio
+import os
+import traceback
+from typing import Any, Optional, Dict
 from ..internal._wmill_adapter import log
-from ._menu_models import InputSchema, MenuResult
-from ._menu_logic import handle_show_menu, handle_select_option
+from ._menu_models import MenuInput, MenuResponse
+from ._menu_logic import MenuController
 
 MODULE = "telegram_menu"
 
-def main(args: dict[str, Any]) -> MenuResult:
-    # 1. Validate Input
+async def _main_async(args: dict) -> Dict[str, Any]:
     try:
-        input_data = InputSchema.model_validate(args)
+        input_data = MenuInput(
+            action=args.get("action", "show"),
+            chat_id=str(args.get("chat_id", "")),
+            user_input=args.get("user_input")
+        )
+        
+        controller = MenuController()
+        response = await controller.handle(input_data)
+        
+        return {
+            "success": True,
+            "handled": response.handled,
+            "response_text": response.response_text,
+            "inline_buttons": response.inline_buttons
+        }
     except Exception as e:
+        log("Menu process failed", error=str(e), module=MODULE)
         return {
             "success": False,
-            "data": None,
-            "error_message": f"Validation error: {e}"
+            "handled": False,
+            "response_text": "Error procesando el menú.",
+            "inline_buttons": [],
+            "error_message": str(e)
         }
 
-    # 2. Routing
+def main(action: str, chat_id: str, user_input: Optional[str] = None) -> Any:
+    args = {"action": action, "chat_id": chat_id, "user_input": user_input}
     try:
-        if input_data.action in ['show', 'start']:
-            return handle_show_menu(input_data)
-
-        if input_data.action == 'select_option':
-            return handle_select_option(input_data)
-
-        return {
-            "success": False,
-            "data": None,
-            "error_message": f"Unknown action: {input_data.action}"
-        }
-
+        return asyncio.run(_main_async(args))
     except Exception as e:
-        log("Telegram Menu Error", error=str(e), module=MODULE)
-        return {
-            "success": False,
-            "data": None,
-            "error_message": f"Internal error: {e}"
-        }
+        tb = traceback.format_exc()
+        try:
+            from ..internal._wmill_adapter import log
+            log("CRITICAL_MENU_ERROR", error=str(e), traceback=tb, module=MODULE)
+        except:
+            print(f"CRITICAL ERROR: {e}\n{tb}")
+        raise RuntimeError(f"Menu failed: {e}")

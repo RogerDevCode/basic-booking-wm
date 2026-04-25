@@ -6,9 +6,21 @@ schema:
   $schema: https://json-schema.org/draft/2020-12/schema
   type: object
   properties:
-    args:
-      type: ''
+    chat_id:
+      type: string
       description: ''
       default: null
+      originalType: string
+    provider_id:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    text:
+      type: string
+      description: ''
+      default: null
+      originalType: string
   required:
-    - args
+    - chat_id
+    - text

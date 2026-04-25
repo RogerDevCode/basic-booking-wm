@@ -1,3 +1,4 @@
+import asyncio
 # ============================================================================
 # PRE-FLIGHT CHECKLIST
 # Mission         : Benchmark OpenRouter free models for NLU classification
@@ -19,7 +20,7 @@ from ._benchmark_logic import MODELS, TASKS, run_benchmark_task
 
 MODULE = "openrouter_benchmark"
 
-async def main(args: dict[str, Any] = {}) -> Result[BenchmarkReport]:
+async def _main_async(args: dict[str, Any] = {}) -> Result[BenchmarkReport]:
     api_key = get_variable("OPENROUTER_API_KEY") or os.getenv("OPENROUTER_API_KEY")
     if not api_key:
         return fail("OPENROUTER_API_KEY not configured")
@@ -59,3 +60,22 @@ async def main(args: dict[str, Any] = {}) -> Result[BenchmarkReport]:
     }
 
     return ok(report)
+
+
+def main(args: dict):
+    import traceback
+    try:
+        return asyncio.run(_main_async(args))
+    except Exception as e:
+        tb = traceback.format_exc()
+        # Intentamos usar el adaptador local si está disponible, si no print
+        try:
+            from ..internal._wmill_adapter import log
+            log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=os.path.basename(os.path.dirname(__file__)))
+        except:
+            from ..internal._wmill_adapter import log
+            log("BARE_EXCEPT_CAUGHT", file="main.py")
+            print(f"CRITICAL ERROR in {__file__}: {e}\n{tb}")
+        
+        # Elevamos para que Windmill marque como FAILED
+        raise RuntimeError(f"Execution failed: {e}")

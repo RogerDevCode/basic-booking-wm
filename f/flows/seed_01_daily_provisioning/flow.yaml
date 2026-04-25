@@ -2,7 +2,7 @@
 # SEED_01_DAILY_PROVISIONING - Windmill Flow
 # ============================================================================
 # This flow creates booking slots in sync between DB and Google Calendar
-# Equivalent to n8n workflow: SEED_01_Daily_Provisioning
+# Provisioning flow for daily system tasks
 # 
 # Usage:
 #   - Trigger: Manual, Schedule (daily), or HTTP Webhook

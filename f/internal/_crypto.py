@@ -33,7 +33,9 @@ def verify_password(password: str, stored_hash: str) -> bool:
             n=16384, r=8, p=1, dklen=64
         )
         return binascii.hexlify(key).decode('utf-8') == stored_key
-    except Exception:
+    except Exception as e:
+        from ..internal._wmill_adapter import log
+        log("SILENT_ERROR_CAUGHT", error=str(e), file="_crypto.py")
         return False
 
 class PasswordPolicyResult(TypedDict):

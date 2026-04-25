@@ -2,7 +2,7 @@
 # GCAL_CLEANUP_SYNC - Windmill Flow
 # ============================================================================
 # This flow cleans up orphaned GCal events and syncs with DB
-# Equivalent to n8n workflow: WF4_Sync_Engine_Event_Driven + SEED_CLEANUP
+# Cleanup and synchronization flow for Google Calendar
 # 
 # Usage:
 #   - Trigger: Manual, Schedule (hourly), HTTP Webhook (GCal events), or Event-driven

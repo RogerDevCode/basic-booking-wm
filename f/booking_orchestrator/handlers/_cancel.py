@@ -1,3 +1,4 @@
+from typing import Any
 from f.booking_orchestrator._orchestrator_models import OrchestratorInput, OrchestratorResult
 from f.booking_orchestrator._get_entity import get_entity
 from ._get_my_bookings import handle_get_my_bookings
@@ -16,6 +17,8 @@ Zod Schemas      : NO
 """
 
 async def handle_cancel_booking(
+    conn: Any,
+
     input_data: OrchestratorInput
 ) -> Result[OrchestratorResult]:
     booking_id = input_data.booking_id or get_entity(input_data.entities, "booking_id")

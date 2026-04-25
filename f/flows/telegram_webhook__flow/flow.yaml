@@ -1,287 +1,83 @@
-summary: Telegram Webhook - Single Provider (v9.1)
-description: >
-  Flow corregido: send_telegram_response se ejecuta AL FINAL para capturar
-  respuestas de Router, AI u Orchestrator.
-
-  Se corrigieron los bloques JS con 'return'.
+summary: Telegram Webhook - FULL STACK (Python §PY 2025)
 value:
   modules:
-    - id: webhook_trigger
-      summary: Telegram Webhook Trigger
+    - id: gateway
+      summary: Step 1 Gateway
       value:
-        type: rawscript
-        content: '!inline telegram_webhook_trigger.ts'
+        type: script
         input_transforms:
-          event:
+          webhook_payload:
             type: javascript
             expr: flow_input.webhook_payload ?? flow_input
-        lock: '!inline telegram_webhook_trigger.lock'
-        language: bun
-    - id: get_conversation_state
-      summary: Obtener estado conversacional de Redis
+        path: f/telegram_gateway/main
+
+    - id: telegram_menu
+      summary: Step 2 Menu Router
       value:
         type: script
         input_transforms:
+          action:
+            type: javascript
+            expr: "(results.gateway.text === '/start' || results.gateway.text === '/menu') ? 'start' : (results.gateway.callback_data ? 'select_option' : 'show')"
           chat_id:
             type: javascript
-            expr: results.webhook_trigger.chat_id
-        path: f/internal/conversation_get/main
-    - id: telegram_router
-      summary: Router con InlineKeyboard + FSM wizard
-      value:
-        type: script
-        input_transforms:
-          booking_draft:
+            expr: results.gateway.chat_id
+          user_input:
             type: javascript
-            expr: results.get_conversation_state.data?.booking_draft || null
-          booking_state:
-            type: javascript
-            expr: results.get_conversation_state.data?.booking_state || null
-          callback_data:
-            type: javascript
-            expr: results.webhook_trigger.callback_data
-          callback_query_id:
-            type: javascript
-            expr: results.webhook_trigger.callback_query_id
-          chat_id:
-            type: javascript
-            expr: results.webhook_trigger.chat_id
-          message_id:
-            type: javascript
-            expr: |
-              return results.get_conversation_state.data?.message_id || 
-                     results.webhook_trigger.callback_message_id || 
-                     null;
-          text:
-            type: javascript
-            expr: results.webhook_trigger.text
-          username:
-            type: javascript
-            expr: results.webhook_trigger.username
-        path: f/internal/telegram_router/main
-    - id: answer_callback
-      summary: AnswerCallbackQuery — quita el "cargando" del botón
-      value:
-        type: script
-        input_transforms:
-          callback_alert:
-            type: javascript
-            expr: "''"
-          callback_query_id:
-            type: javascript
-            expr: results.webhook_trigger.callback_query_id || ''
-          chat_id:
-            type: javascript
-            expr: results.webhook_trigger.chat_id
-          mode:
-            type: javascript
-            expr: "'answer_callback'"
-          text:
-            type: javascript
-            expr: "''"
-        path: f/telegram_send/main
-      skip_if:
-        expr: >
-          results.webhook_trigger.callback_query_id === null
-          ||  results.webhook_trigger.callback_query_id === undefined
-    - id: gate_skip_if_router_handled
-      summary: Gate — si el router manejó, saltar AI Agent y orchestrator
-      value:
-        type: rawscript
-        content: '!inline gate_—_si_el_router_manejó,_saltar_ai_agent_y_orchestrator.ts'
-        input_transforms: {}
-        lock: '!inline gate_—_si_el_router_manejó,_saltar_ai_agent_y_orchestrator.lock'
-        language: bun
-      skip_if:
-        expr: '!results.telegram_router.data?.forward_to_ai'
-    - id: parse_message
-      summary: Parsear mensaje
-      value:
-        type: script
-        input_transforms:
-          chat_id:
-            type: javascript
-            expr: results.webhook_trigger.chat_id
-          text:
-            type: javascript
-            expr: results.webhook_trigger.text
-        path: f/internal/message_parser/main
-      skip_if:
-        expr: results.telegram_router.data?.forward_to_ai !== true
-    - id: gate_parser_error
-      summary: Check parser error
-      value:
-        type: rawscript
-        content: '!inline check_parser_error.ts'
-        input_transforms: {}
-        lock: '!inline check_parser_error.lock'
-        language: bun
-      skip_if:
-        expr: '!results.parse_message.success'
+            expr: results.gateway.callback_data || results.gateway.text
+        path: f/telegram_menu/main
+
     - id: ai_agent
-      summary: AI Agent con contexto conversacional
+      summary: Step 3 NLU Pipeline
       value:
         type: script
         input_transforms:
           chat_id:
             type: javascript
-            expr: results.parse_message.data.chat_id
-          conversation_state:
-            type: javascript
-            expr: results.get_conversation_state.data || null
+            expr: results.gateway.chat_id
           text:
             type: javascript
-            expr: results.parse_message.data.text
+            expr: results.gateway.text
         path: f/internal/ai_agent/main
       skip_if:
-        expr: results.telegram_router.data?.forward_to_ai !== true
-    - id: gate_execute_action
-      summary: Gate — solo ejecuta orchestrator si vino del AI Agent
+        expr: results.telegram_menu.handled === true
+
+    - id: orchestrator
+      summary: Step 4 Booking Orchestrator
       value:
-        type: rawscript
-        content: '!inline gate_—_solo_ejecuta_orchestrator_si_vino_del_ai_agent.ts'
-        input_transforms: {}
-        lock: '!inline gate_—_solo_ejecuta_orchestrator_si_vino_del_ai_agent.lock'
-        language: bun
-      skip_if:
-        expr: results.telegram_router.data?.forward_to_ai !== true
-    - id: execute_action
-      summary: Ejecutar acción de booking (via orchestrator flow)
-      value:
-        type: flow
+        type: script
         input_transforms:
           entities:
             type: javascript
-            expr: results.ai_agent.data?.entities || {}
+            expr: "results.ai_agent ? results.ai_agent.entities || {} : {}"
           intent:
             type: javascript
-            expr: results.ai_agent.data?.intent || 'duda_general'
+            expr: "(results.gateway.callback_data === 'cmd:book') ? 'crear_cita' : ((results.gateway.callback_data === 'cmd:mybookings') ? 'mis_citas' : (results.ai_agent ? (results.ai_agent.intent || 'duda_general') : 'duda_general'))"
           telegram_chat_id:
             type: javascript
-            expr: results.parse_message.data.chat_id
-          telegram_name:
-            type: javascript
-            expr: results.webhook_trigger.username
-        path: f/flows/booking_orchestrator
-    - id: send_telegram_response
-      summary: Enviar respuesta (sendMessage o editMessageText)
+            expr: results.gateway.chat_id
+        path: f/booking_orchestrator/main
+      skip_if:
+        expr: "results.telegram_menu.handled ? true : ((results.gateway.callback_data || '').startsWith('cmd:') ? false : (results.ai_agent && results.ai_agent.intent === 'duda_general'))"
+
+    - id: send_response
+      summary: Step 5 Send Telegram
       value:
         type: script
         input_transforms:
+          bot_token:
+            type: javascript
+            expr: variable("u/admin/TELEGRAM_BOT_TOKEN")
           chat_id:
             type: javascript
-            expr: results.webhook_trigger.chat_id
-          inline_buttons:
-            type: javascript
-            expr: >
-              const router = results.telegram_router.data;
-
-              if (router && router.inline_keyboard &&
-              router.inline_keyboard.length > 0) {
-                return router.inline_keyboard.flat();
-              }
-
-              return [];
-          message_id:
-            type: javascript
-            expr: |
-              const router = results.telegram_router.data;
-              if (router && router.should_edit) {
-                return (
-                  router.message_id ||
-                  results.get_conversation_state.data?.message_id ||
-                  results.webhook_trigger.callback_message_id ||
-                  null
-                );
-              }
-              return null;
+            expr: results.gateway.chat_id
           mode:
-            type: javascript
-            expr: |
-              const router = results.telegram_router.data;
-              if (router && router.should_edit && router.message_id) {
-                return 'edit_message';
-              }
-              return 'send_message';
-          parse_mode:
-            type: javascript
-            expr: "'Markdown'"
+            type: static
+            value: send_message
           text:
             type: javascript
-            expr: >
-              const router = results.telegram_router.data;
-
-              if (router && router.response_text && router.response_text.length
-              > 0) {
-                return router.response_text;
-              }
-
-              const orch = results.execute_action?.data;
-
-              if (orch) {
-                if (orch.message) {
-                  return orch.message + (orch.follow_up ? `\n\n${orch.follow_up}` : '');
-                }
-              }
-
-              return results.ai_agent?.data?.ai_response || 'Lo siento, no pude
-              procesar tu mensaje.';
+            expr: "results.telegram_menu.handled ? results.telegram_menu.response_text : ((results.orchestrator && !results.orchestrator.skip) ? results.orchestrator.message : (results.ai_agent ? results.ai_agent.ai_response : 'Lo siento, error de orquestación.'))"
+          inline_buttons_json:
+            type: javascript
+            expr: "JSON.stringify(results.telegram_menu.handled ? (results.telegram_menu.inline_buttons || []) : ((results.orchestrator && results.orchestrator.inline_buttons) ? results.orchestrator.inline_buttons : []))"
         path: f/telegram_send/main
-    - id: update_conversation_state
-      summary: Actualizar estado conversacional en Redis (soporta hand-off de AI a
-        wizard)
-      value:
-        type: script
-        input_transforms:
-          booking_draft:
-            type: javascript
-            expr: |
-              return results.telegram_router.data?.nextDraft || 
-                     results.execute_action.data?.nextDraft || 
-                     null;
-          booking_state:
-            type: javascript
-            expr: |
-              return results.telegram_router.data?.nextState || 
-                     results.execute_action.data?.nextState || 
-                     null;
-          chat_id:
-            type: javascript
-            expr: results.webhook_trigger.chat_id
-          entities:
-            type: javascript
-            expr: results.ai_agent.data?.entities || {}
-          flow_step:
-            type: javascript
-            expr: results.telegram_router.data?.nextFlowStep || 0
-          intent:
-            type: javascript
-            expr: |
-              return results.telegram_router.data?.route || 
-                     results.ai_agent.data?.intent || 
-                     'desconocido';
-          message_id:
-            type: javascript
-            expr: |
-              const newMsgId = results.send_telegram_response.data?.message_id;
-              if (typeof newMsgId === 'number') {
-                return newMsgId;
-              }
-              return results.get_conversation_state.data?.message_id || null;
-        path: f/internal/conversation_update/main
-schema:
-  type: object
-  properties:
-    webhook_payload:
-      type: object
-      description: Payload del webhook de Telegram
-      properties:
-        message:
-          type: object
-          properties:
-            chat:
-              type: object
-            from:
-              type: object
-            text:
-              type: string

@@ -1,3 +1,4 @@
+from typing import Any
 import zoneinfo
 from datetime import datetime
 from f.booking_orchestrator._orchestrator_models import OrchestratorInput, OrchestratorResult
@@ -16,6 +17,8 @@ Zod Schemas      : NO
 """
 
 async def handle_get_my_bookings(
+    conn: Any,
+
     input_data: OrchestratorInput
 ) -> Result[OrchestratorResult]:
     client_id = input_data.client_id

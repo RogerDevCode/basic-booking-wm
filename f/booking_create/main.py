@@ -1,3 +1,4 @@
+import asyncio
 # ============================================================================
 # PRE-FLIGHT CHECKLIST
 # Mission         : Create a new medical appointment (SOLID Refactor)
@@ -19,7 +20,7 @@ from ._create_booking_logic import execute_create_booking
 
 MODULE = "booking_create"
 
-async def main(args: object) -> tuple[Exception | None, BookingCreated | None]:
+async def _main_async(args: object) -> tuple[Exception | None, BookingCreated | None]:
     try:
         if not isinstance(args, dict):
             raise ValueError("Input must be a JSON object")
@@ -70,3 +71,22 @@ async def main(args: object) -> tuple[Exception | None, BookingCreated | None]:
         return (Exception(f"Internal error: {msg}"), None)
     finally:
         await conn.close() # pyright: ignore[reportUnknownMemberType]
+
+
+def main(args: dict):
+    import traceback
+    try:
+        return asyncio.run(_main_async(args))
+    except Exception as e:
+        tb = traceback.format_exc()
+        # Intentamos usar el adaptador local si está disponible, si no print
+        try:
+            from ..internal._wmill_adapter import log
+            log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=os.path.basename(os.path.dirname(__file__)))
+        except:
+            from ..internal._wmill_adapter import log
+            log("BARE_EXCEPT_CAUGHT", file="main.py")
+            print(f"CRITICAL ERROR in {__file__}: {e}\n{tb}")
+        
+        # Elevamos para que Windmill marque como FAILED
+        raise RuntimeError(f"Execution failed: {e}")

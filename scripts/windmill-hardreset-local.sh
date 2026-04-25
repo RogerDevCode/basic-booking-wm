@@ -19,6 +19,7 @@ UP_COMPOSE_ARGS=(-p "$COMPOSE_PROJECT_NAME" -f docker-compose.windmill.yml)
 
 if [ -f docker-compose.cloudflared.yml ]; then
   DOWN_COMPOSE_ARGS+=(-f docker-compose.cloudflared.yml)
+  UP_COMPOSE_ARGS+=(-f docker-compose.cloudflared.yml)
 fi
 
 require_command() {
@@ -96,39 +97,10 @@ remove_project_residue() {
 }
 
 bootstrap_admin_if_missing() {
-  local exists_file
-  local create_file
-  local http_code
-  local exists_body
-  local payload
-
-  exists_file="$(mktemp)"
-  http_code="$(http_request "GET" "${LOCAL_BASE_URL}/api/users/exists/${LOCAL_ADMIN_EMAIL}" "$exists_file")"
-  exists_body="$(read_http_body "$exists_file")"
-  rm -f "$exists_file"
-
-  if [ "$http_code" != "200" ]; then
-    echo "❌ Unable to verify local admin existence (HTTP ${http_code})"
-    exit 1
-  fi
-
-  if [ "$exists_body" = "true" ]; then
-    return 0
-  fi
-
-  payload="$(printf '{"email":"%s","password":"%s","super_admin":true,"name":"Local Admin","skip_email":true}' \
-    "$LOCAL_ADMIN_EMAIL" "$LOCAL_ADMIN_PASSWORD")"
-  create_file="$(mktemp)"
-  http_code="$(http_request "POST" "${LOCAL_BASE_URL}/api/users/create" "$create_file" "$payload")"
-
-  if [ "$http_code" != "201" ]; then
-    echo "❌ Unable to bootstrap local admin (HTTP ${http_code})"
-    sed -n '1,120p' "$create_file"
-    rm -f "$create_file"
-    exit 1
-  fi
-
-  rm -f "$create_file"
+  # Windmill automatically provisions the superadmin based on env vars.
+  # The creation/exists endpoints now require auth and return 401.
+  # We just assume the admin exists and proceed to login.
+  return 0
 }
 
 login_local_admin() {
@@ -164,7 +136,8 @@ configure_local_workspace() {
     --create-username admin \
     >/dev/null
 
-  wmill workspace switch "$LOCAL_PROFILE_NAME" >/dev/null
+  # Profile switch removed to avoid breaking production syncs
+  # wmill workspace switch "$LOCAL_PROFILE_NAME" >/dev/null
 }
 
 main() {

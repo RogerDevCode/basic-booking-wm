@@ -55,6 +55,7 @@ class OrchestratorResult(TypedDict, total=False):
     data: Any
     message: str
     follow_up: Optional[str]
+    inline_buttons: Optional[list[list[dict[str, Any]]]]
     nextState: Optional[Any]  # Placeholder for BookingState
     nextDraft: Optional[Any]  # Placeholder for DraftBooking
 

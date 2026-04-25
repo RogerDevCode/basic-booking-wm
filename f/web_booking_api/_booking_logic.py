@@ -13,7 +13,9 @@ def calculate_end_time(start_time_str: str, duration_minutes: int) -> Result[str
         start = datetime.fromisoformat(start_time_str.replace("Z", "+00:00"))
         end = start + timedelta(minutes=duration_minutes)
         return ok(end.isoformat().replace("+00:00", "Z"))
-    except Exception:
+    except Exception as e:
+        from ..internal._wmill_adapter import log
+        log("SILENT_ERROR_CAUGHT", error=str(e), file="_booking_logic.py")
         return fail("formato_fecha_invalido")
 
 class BookingRepository:

@@ -2,8 +2,52 @@
   "mcpServers": {
     "codebase-index": {
       "command": "uv",
-      "args": ["run", "python", "-m", "mcp_codebase_index.server"],
-      "env": { "PROJECT_ROOT": "${workspaceFolder}" }
+      "args": [
+        "run",
+        "python",
+        "-m",
+        "mcp_codebase_index.server"
+      ],
+      "env": {
+        "PROJECT_ROOT": "${workspaceFolder}"
+      }
+    },
+    "windmill-booking": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "http://localhost:8080/api/mcp/w/booking-titanium/mcp",
+        "--header",
+        "Authorization:Bearer LJipaz08ZSYDSoQtB4IGJiOxLFR86GBz"
+      ]
+    },
+    "redis": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@smithery-ai/redis",
+        "--uri",
+        "redis://localhost:6379"
+      ]
+    },
+    "postgres-local": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-postgres",
+        "postgresql://windmill:windmill@localhost:5432/windmill"
+      ]
+    },
+    "github": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-github"
+      ],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": ""
+      }
     }
   },
   "context": {

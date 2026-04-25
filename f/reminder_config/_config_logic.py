@@ -29,7 +29,9 @@ async def load_preferences(db: DBClient, client_id: str) -> ReminderPrefs:
             "telegram_2h": bool(raw_prefs.get("telegram_2h", True)),
             "telegram_30min": bool(raw_prefs.get("telegram_30min", True)),
         }
-    except Exception:
+    except Exception as e:
+        from ..internal._wmill_adapter import log
+        log("SILENT_ERROR_CAUGHT", error=str(e), file="_config_logic.py")
         return DEFAULTS.copy()
 
 async def save_preferences(db: DBClient, client_id: str, prefs: ReminderPrefs) -> bool:
@@ -48,7 +50,9 @@ async def save_preferences(db: DBClient, client_id: str, prefs: ReminderPrefs) -
             json.dumps(prefs), client_id
         )
         return True
-    except Exception:
+    except Exception as e:
+        from ..internal._wmill_adapter import log
+        log("SILENT_ERROR_CAUGHT", error=str(e), file="_config_logic.py")
         return False
 
 def build_config_message(p: ReminderPrefs) -> Tuple[str, List[List[str]]]:

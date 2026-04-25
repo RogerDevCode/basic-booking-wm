@@ -42,7 +42,9 @@ VALORES VÁLIDOS PARA "intent":
 def extract_json(text: str) -> Optional[Dict[str, Any]]:
     try:
         return cast(Dict[str, Any], json.loads(text))
-    except Exception:
+    except Exception as e:
+        from ..internal._wmill_adapter import log
+        log("SILENT_ERROR_CAUGHT", error=str(e), file="_benchmark_logic.py")
         pass
     
     # Try markdown fences
@@ -50,7 +52,9 @@ def extract_json(text: str) -> Optional[Dict[str, Any]]:
     if match:
         try:
             return cast(Dict[str, Any], json.loads(match.group(1)))
-        except Exception:
+        except Exception as e:
+            from ..internal._wmill_adapter import log
+            log("SILENT_ERROR_CAUGHT", error=str(e), file="_benchmark_logic.py")
             pass
 
     # Try simple brace search
@@ -58,7 +62,9 @@ def extract_json(text: str) -> Optional[Dict[str, Any]]:
     if match:
         try:
             return cast(Dict[str, Any], json.loads(match.group(1)))
-        except Exception:
+        except Exception as e:
+            from ..internal._wmill_adapter import log
+            log("SILENT_ERROR_CAUGHT", error=str(e), file="_benchmark_logic.py")
             pass
             
     return None

@@ -7,8 +7,9 @@ schema:
   type: object
   properties:
     args:
-      type: ''
+      type: object
       description: ''
       default: null
+      properties: {}
   required:
     - args

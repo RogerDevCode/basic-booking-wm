@@ -1,3 +1,4 @@
+import asyncio
 # ============================================================================
 # PRE-FLIGHT CHECKLIST
 # Mission         : Routes AI intents to booking actions (create, cancel, reschedule, list)
@@ -33,7 +34,7 @@ HANDLER_MAP: dict[str, OrchestratorHandler] = {
     "mis_citas": handle_get_my_bookings,
 }
 
-async def main(args: dict[str, Any]) -> Result[OrchestratorResult]:
+async def _main_async(args: dict[str, Any]) -> Result[OrchestratorResult]:
     try:
         input_data = OrchestratorInput.model_validate(args)
     except Exception as e:
@@ -61,7 +62,7 @@ async def main(args: dict[str, Any]) -> Result[OrchestratorResult]:
         })
 
         handler = HANDLER_MAP[intent]
-        exec_err, result = await handler(enriched_input)
+        exec_err, result = await handler(conn, enriched_input)
 
         if exec_err:
             log("Orchestration execution failed", error=str(exec_err), module=MODULE)
@@ -76,3 +77,7 @@ async def main(args: dict[str, Any]) -> Result[OrchestratorResult]:
         return Exception(f"Internal orchestrator error: {e}"), None
     finally:
         await conn.close() # pyright: ignore[reportUnknownMemberType]
+
+
+def main(telegram_chat_id: str, intent: str, entities: dict[str, Any] | None = None) -> Any:
+    return asyncio.run(_main_async({"telegram_chat_id": telegram_chat_id, "intent": intent, "entities": entities or {}}))

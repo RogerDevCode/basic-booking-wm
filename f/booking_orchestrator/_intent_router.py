@@ -1,6 +1,6 @@
 from typing import Optional, Callable, Awaitable
 from ._orchestrator_models import CanonicalIntent, OrchestratorInput, OrchestratorResult
-from f.internal._result import Result
+from ..internal._result import Result, DBClient
 
 """
 PRE-FLIGHT
@@ -38,4 +38,4 @@ def normalize_intent(intent: str) -> Optional[CanonicalIntent]:
     return None
 
 # Type alias for handlers
-OrchestratorHandler = Callable[[OrchestratorInput], Awaitable[Result[OrchestratorResult]]]
+OrchestratorHandler = Callable[[DBClient, OrchestratorInput], Awaitable[Result[OrchestratorResult]]]

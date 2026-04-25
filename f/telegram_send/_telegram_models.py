@@ -1,4 +1,4 @@
-from typing import List, Optional, Literal, Union, Annotated
+from typing import List, Optional, Literal, Union, Annotated, Any
 from pydantic import BaseModel, ConfigDict, Field, RootModel
 
 # ============================================================================
@@ -18,14 +18,14 @@ class BaseTelegramInput(BaseModel):
 class SendMessageInput(BaseTelegramInput):
     mode: Literal['send_message'] = 'send_message'
     text: str = Field(min_length=1)
-    inline_buttons: List[InlineButton] = Field(default_factory=list)
+    inline_buttons: List[Any] = Field(default_factory=list)
     message_id: Optional[int] = None
 
 class EditMessageInput(BaseTelegramInput):
     mode: Literal['edit_message'] = 'edit_message'
     message_id: int
     text: str = Field(min_length=1)
-    inline_buttons: List[InlineButton] = Field(default_factory=list)
+    inline_buttons: List[Any] = Field(default_factory=list)
 
 class DeleteMessageInput(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
@@ -35,7 +35,7 @@ class DeleteMessageInput(BaseModel):
     # Optional fields for compatibility with loose inputs
     text: Optional[str] = None
     parse_mode: Optional[str] = None
-    inline_buttons: Optional[List[InlineButton]] = None
+    inline_buttons: Optional[List[Any]] = None
 
 class AnswerCallbackInput(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
@@ -46,7 +46,7 @@ class AnswerCallbackInput(BaseModel):
     chat_id: Optional[str] = None
     text: Optional[str] = None
     parse_mode: Optional[str] = None
-    inline_buttons: Optional[List[InlineButton]] = None
+    inline_buttons: Optional[List[Any]] = None
     message_id: Optional[int] = None
 
 TelegramInput = Annotated[

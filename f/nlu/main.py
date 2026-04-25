@@ -1,3 +1,4 @@
+import asyncio
 from typing import Any, TypedDict
 from f.nlu._constants import INTENT, CONFIDENCE_BOUNDARIES
 from f.nlu._tfidf_classifier import classify_intent
@@ -19,7 +20,7 @@ class ExtractedIntent(TypedDict):
     entities: dict[str, Any]
     requires_human: bool
 
-async def main(args: Any) -> ExtractedIntent:
+async def _main_async(args: Any) -> ExtractedIntent:
     """
     NLU Motor — Extracts intent and confidence from user text.
     Adheres to AGENTS.md §5.1 and §5.4.
@@ -54,3 +55,22 @@ async def main(args: Any) -> ExtractedIntent:
         "entities": {},  # Entity extraction delegated to specialized modules or next sub-phase
         "requires_human": requires_human
     }
+
+
+def main(args: dict):
+    import traceback
+    try:
+        return asyncio.run(_main_async(args))
+    except Exception as e:
+        tb = traceback.format_exc()
+        # Intentamos usar el adaptador local si está disponible, si no print
+        try:
+            from ..internal._wmill_adapter import log
+            log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=os.path.basename(os.path.dirname(__file__)))
+        except:
+            from ..internal._wmill_adapter import log
+            log("BARE_EXCEPT_CAUGHT", file="main.py")
+            print(f"CRITICAL ERROR in {__file__}: {e}\n{tb}")
+        
+        # Elevamos para que Windmill marque como FAILED
+        raise RuntimeError(f"Execution failed: {e}")

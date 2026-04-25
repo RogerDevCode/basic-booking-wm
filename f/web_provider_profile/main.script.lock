@@ -2,7 +2,7 @@
 annotated-types==0.7.0
 asyncpg==0.31.0
 cffi==2.0.0
-cryptography==46.0.7
+cryptography==47.0.0
 pycparser==3.0
 pydantic==2.13.3
 pydantic-core==2.46.3

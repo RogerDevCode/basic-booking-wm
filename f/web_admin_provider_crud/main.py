@@ -1,3 +1,4 @@
+import asyncio
 # ============================================================================
 # PRE-FLIGHT CHECKLIST
 # Mission         : CRUD for providers management (admin dashboard)
@@ -18,7 +19,7 @@ from ._provider_logic import list_providers, create_provider, update_provider, r
 
 MODULE = "web_admin_provider_crud"
 
-async def main(args: dict[str, Any]) -> Result[Any]:
+async def _main_async(args: dict[str, Any]) -> Result[Any]:
     # 1. Validate Input
     try:
         input_data = InputSchema.model_validate(args)
@@ -59,3 +60,22 @@ async def main(args: dict[str, Any]) -> Result[Any]:
         return fail(f"internal_error: {e}")
     finally:
         await conn.close() # pyright: ignore[reportUnknownMemberType]
+
+
+def main(args: dict):
+    import traceback
+    try:
+        return asyncio.run(_main_async(args))
+    except Exception as e:
+        tb = traceback.format_exc()
+        # Intentamos usar el adaptador local si está disponible, si no print
+        try:
+            from ..internal._wmill_adapter import log
+            log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=os.path.basename(os.path.dirname(__file__)))
+        except:
+            from ..internal._wmill_adapter import log
+            log("BARE_EXCEPT_CAUGHT", file="main.py")
+            print(f"CRITICAL ERROR in {__file__}: {e}\n{tb}")
+        
+        # Elevamos para que Windmill marque como FAILED
+        raise RuntimeError(f"Execution failed: {e}")

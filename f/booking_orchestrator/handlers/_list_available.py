@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import cast
+from typing import cast, Any
 from f.booking_orchestrator._orchestrator_models import OrchestratorInput, OrchestratorResult, AvailabilityData
 from f.internal._result import Result
 from f.internal._wmill_adapter import run_script
@@ -16,6 +16,8 @@ Zod Schemas      : NO
 """
 
 async def handle_list_available(
+    conn: Any,
+
     input_data: OrchestratorInput
 ) -> Result[OrchestratorResult]:
     provider_id = input_data.provider_id

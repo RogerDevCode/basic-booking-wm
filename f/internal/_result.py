@@ -72,7 +72,9 @@ async def with_tenant_context(
     except Exception as error:
         try:
             await client.execute('ROLLBACK')
-        except Exception:
+        except Exception as e:
+            from ..internal._wmill_adapter import log
+            log("SILENT_ERROR_CAUGHT", error=str(e), file="_result.py")
             pass
         return fail(f"transaction_failed: {str(error)}")
 
@@ -99,6 +101,8 @@ async def with_admin_context(
     except Exception as error:
         try:
             await client.execute('ROLLBACK')
-        except Exception:
+        except Exception as e:
+            from ..internal._wmill_adapter import log
+            log("SILENT_ERROR_CAUGHT", error=str(e), file="_result.py")
             pass
         return fail(f"transaction_failed: {str(error)}")
