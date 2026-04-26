@@ -187,10 +187,10 @@
 - [x] `f/reminder_cron/_reminder_repository.py`: 0 errors
 </details>
 
-<details>
-<summary><b>Module: <code>telegram_auto_register</code> (6 errors)</b></summary>
+<details open>
+<summary><b>Module: <code>telegram_auto_register</code> (0 errors) ✅</b></summary>
 
-- [ ] `f/telegram_auto_register/main.py`: 6 errors
+- [x] `f/telegram_auto_register/main.py`: 0 errors
 </details>
 
 <details>
