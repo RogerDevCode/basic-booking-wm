@@ -200,11 +200,11 @@
 - [x] `f/telegram_callback/_callback_logic.py`: 0 errors
 </details>
 
-<details>
-<summary><b>Module: <code>telegram_gateway</code> (15 errors)</b></summary>
+<details open>
+<summary><b>Module: <code>telegram_gateway</code> (0 errors) ✅</b></summary>
 
-- [ ] `f/telegram_gateway/_gateway_logic.py`: 11 errors
-- [ ] `f/telegram_gateway/main.py`: 4 errors
+- [x] `f/telegram_gateway/_gateway_logic.py`: 0 errors
+- [x] `f/telegram_gateway/main.py`: 0 errors
 </details>
 
 <details>
