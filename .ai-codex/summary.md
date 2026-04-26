@@ -1,5 +1,5 @@
 # Codebase Index
-_git:61eb1c50 — 2026-04-26T22:04Z_
+_git:ae4e0cba — 2026-04-26T22:10Z_
 
 > Read this file BEFORE exploring the repository.
 
@@ -366,7 +366,13 @@ _git:61eb1c50 — 2026-04-26T22:04Z_
 - 🔧 `fn` `today_ymd` (L159)
 
 ### `f/internal/_db_client.py`
-- ⚡ `async_fn` `create_db_client` (L29)
+- ⚡ `async_fn` `create_db_client` (L21)
+- 📦 `class` `AsyncpgWrapper` (L31)
+- ⚡ `async_fn` `fetch` (L35)
+- ⚡ `async_fn` `fetchrow` (L41)
+- ⚡ `async_fn` `fetchval` (L46)
+- ⚡ `async_fn` `execute` (L51)
+- ⚡ `async_fn` `close` (L56)
 
 ### `f/internal/_file_lock.py`
 - 📦 `class` `FileLockError` (L17)
@@ -804,8 +810,9 @@ _git:61eb1c50 — 2026-04-26T22:04Z_
 - 📦 `class` `InputSchema` (L36)
 
 ### `f/web_admin_provider_crud/main.py`
-- ⚡ `async_fn` `operation` (L41)
-- 🔧 `fn` `main` (L67)
+- ⚡ `async_fn` `create_op` (L42)
+- ⚡ `async_fn` `operation` (L51)
+- ⚡ `async_fn` `main` (L78)
 
 ### `f/web_admin_regions/_regions_logic.py`
 - ⚡ `async_fn` `list_regions` (L6)
