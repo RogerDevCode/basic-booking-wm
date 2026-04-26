@@ -1,5 +1,5 @@
 # Codebase Index
-_git:730350fb — 2026-04-26T21:25Z_
+_git:66fcd50b — 2026-04-26T21:27Z_
 
 > Read this file BEFORE exploring the repository.
 
@@ -744,21 +744,19 @@ _git:730350fb — 2026-04-26T21:25Z_
 - 🔧 `fn` `main` (L92)
 
 ### `f/telegram_menu/_menu_logic.py`
-- 📦 `class` `MenuInput` (L4)
-- 📦 `class` `MenuResponse` (L10)
-- 🔧 `fn` `parse_user_option` (L21)
-- 📦 `class` `MenuController` (L27)
-- ⚡ `async_fn` `handle` (L28)
+- 🔧 `fn` `parse_user_option` (L10)
+- 📦 `class` `MenuController` (L16)
+- ⚡ `async_fn` `handle` (L17)
 
 ### `f/telegram_menu/_menu_models.py`
 - 📦 `class` `InlineButton` (L5)
-- 📦 `class` `MenuInput` (L9)
-- 📦 `class` `MenuResponse` (L14)
-- 📦 `class` `InputSchema` (L19)
-- 📦 `class` `MenuResult` (L20)
+- 📦 `class` `MenuInput` (L10)
+- 📦 `class` `MenuResponse` (L16)
+- 📦 `class` `InputSchema` (L22)
+- 📦 `class` `MenuResult` (L23)
 
 ### `f/telegram_menu/main.py`
-- 🔧 `fn` `main` (L38)
+- 🔧 `fn` `main` (L39)
 
 ### `f/telegram_send/_telegram_logic.py`
 - 📦 `class` `TelegramService` (L12)
