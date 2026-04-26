@@ -1,11 +1,40 @@
+from typing import Any, TypedDict
 from datetime import datetime
-from typing import List, Optional, Dict, Any, cast
+from typing import List, Optional, Dict, cast
 from ..internal._result import Result, DBClient, ok, fail
 from ..internal._crypto import hash_password
 from ..auth_provider._auth_logic import generate_readable_password
 from ._provider_models import ProviderRow, CreateProviderResult, InputSchema
 
-def map_row(r: Dict[str, Any]) -> ProviderRow:
+class ProviderDBRow(TypedDict, total=False):
+    id: int
+    honorific_id: int | None
+    name: str
+    email: str
+    specialty_id: int | None
+    timezone_id: int | None
+    phone_app: str | None
+    phone_contact: str | None
+    telegram_chat_id: str | None
+    gcal_calendar_id: str | None
+    address_street: str | None
+    address_number: str | None
+    address_complement: str | None
+    address_sector: str | None
+    region_id: int | None
+    commune_id: int | None
+    is_active: bool
+    has_password: bool
+    last_password_change: datetime | None
+    created_at: datetime
+    updated_at: datetime
+    honorific_label: str | None
+    specialty_name: str | None
+    timezone_name: str | None
+    region_name: str | None
+    commune_name: str | None
+
+def map_row(r: ProviderDBRow) -> ProviderRow:
     return {
         "id": str(r["id"]),
         "honorific_id": str(r["honorific_id"]) if r.get("honorific_id") else None,

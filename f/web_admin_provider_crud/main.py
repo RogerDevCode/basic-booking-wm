@@ -1,4 +1,5 @@
 import asyncio
+import os
 # ============================================================================
 # PRE-FLIGHT CHECKLIST
 # Mission         : CRUD for providers management (admin dashboard)
@@ -10,7 +11,7 @@ import asyncio
 # Pydantic Schemas: YES — InputSchema validates all fields
 # ============================================================================
 
-from typing import Any, Dict
+from typing import Any
 from ..internal._wmill_adapter import log
 from ..internal._db_client import create_db_client
 from ..internal._result import Result, ok, fail, with_tenant_context, with_admin_context
@@ -33,14 +34,15 @@ async def _main_async(args: dict[str, Any]) -> Result[Any]:
             return await with_admin_context(conn, lambda: list_providers(conn))
 
         # Other actions require provider_id (tenant context)
-        if not input_data.provider_id:
+        provider_id = input_data.provider_id
+        if not provider_id:
             return fail("provider_id is required for non-list operations")
 
         async def operation() -> Result[Any]:
             if input_data.action == 'create':
                 return await create_provider(conn, input_data)
             elif input_data.action == 'update':
-                return await update_provider(conn, input_data.provider_id, input_data)
+                return await update_provider(conn, provider_id, input_data)
             elif input_data.action == 'activate' or input_data.action == 'deactivate':
                 active = (input_data.action == 'activate')
                 await conn.execute(
@@ -62,20 +64,16 @@ async def _main_async(args: dict[str, Any]) -> Result[Any]:
         await conn.close() # pyright: ignore[reportUnknownMemberType]
 
 
-def main(args: dict):
+def main(args: dict) -> Result[Any]:
     import traceback
     try:
         return asyncio.run(_main_async(args))
     except Exception as e:
         tb = traceback.format_exc()
-        # Intentamos usar el adaptador local si está disponible, si no print
         try:
-            from ..internal._wmill_adapter import log
-            log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=os.path.basename(os.path.dirname(__file__)))
-        except:
-            from ..internal._wmill_adapter import log
-            log("BARE_EXCEPT_CAUGHT", file="main.py")
-            print(f"CRITICAL ERROR in {__file__}: {e}\n{tb}")
+            log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=MODULE)
+        except Exception:
+            print(f"CRITICAL ERROR in web_admin_provider_crud: {e}\n{tb}")
         
         # Elevamos para que Windmill marque como FAILED
         raise RuntimeError(f"Execution failed: {e}")

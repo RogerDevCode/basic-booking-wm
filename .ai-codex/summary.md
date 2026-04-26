@@ -1,5 +1,5 @@
 # Codebase Index
-_git:fc854ded — 2026-04-26T17:52Z_
+_git:314dbb33 — 2026-04-26T20:48Z_
 
 > Read this file BEFORE exploring the repository.
 
@@ -228,8 +228,8 @@ _git:fc854ded — 2026-04-26T17:52Z_
 - 📦 `class` `InputSchema` (L27)
 
 ### `f/circuit_breaker/main.py`
-- ⚡ `async_fn` `operation` (L32)
-- 🔧 `fn` `main` (L103)
+- ⚡ `async_fn` `operation` (L33)
+- 🔧 `fn` `main` (L105)
 
 ### `f/conversation_logger/_logger_logic.py`
 - ⚡ `async_fn` `persist_log` (L6)
@@ -311,7 +311,7 @@ _git:fc854ded — 2026-04-26T17:52Z_
 - ⚡ `async_fn` `operation` (L15)
 
 ### `f/gcal_sync/main.py`
-- 🔧 `fn` `main` (L90)
+- 🔧 `fn` `main` (L88)
 
 ### `f/gmail_send/_gmail_logic.py`
 - 🔧 `fn` `safe_string` (L9)
@@ -782,11 +782,12 @@ _git:fc854ded — 2026-04-26T17:52Z_
 - 🔧 `fn` `main` (L44)
 
 ### `f/web_admin_provider_crud/_provider_logic.py`
-- 🔧 `fn` `map_row` (L8)
-- ⚡ `async_fn` `list_providers` (L38)
-- ⚡ `async_fn` `create_provider` (L63)
-- ⚡ `async_fn` `update_provider` (L105)
-- ⚡ `async_fn` `reset_provider_password` (L143)
+- 📦 `class` `ProviderDBRow` (L9)
+- 🔧 `fn` `map_row` (L37)
+- ⚡ `async_fn` `list_providers` (L67)
+- ⚡ `async_fn` `create_provider` (L92)
+- ⚡ `async_fn` `update_provider` (L134)
+- ⚡ `async_fn` `reset_provider_password` (L172)
 
 ### `f/web_admin_provider_crud/_provider_models.py`
 - 📦 `class` `ProviderRow` (L4)
@@ -794,8 +795,8 @@ _git:fc854ded — 2026-04-26T17:52Z_
 - 📦 `class` `InputSchema` (L35)
 
 ### `f/web_admin_provider_crud/main.py`
-- ⚡ `async_fn` `operation` (L39)
-- 🔧 `fn` `main` (L65)
+- ⚡ `async_fn` `operation` (L41)
+- 🔧 `fn` `main` (L67)
 
 ### `f/web_admin_regions/_regions_logic.py`
 - ⚡ `async_fn` `list_regions` (L5)

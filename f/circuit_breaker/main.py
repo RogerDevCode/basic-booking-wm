@@ -1,4 +1,6 @@
+from __future__ import annotations
 import asyncio
+import os
 # ============================================================================
 # PRE-FLIGHT CHECKLIST
 # Mission         : Service health monitor and failure isolation
@@ -10,9 +12,8 @@ import asyncio
 # Pydantic Schemas: YES — InputSchema validates actions
 # ============================================================================
 
-import time
 from datetime import datetime, timezone
-from typing import Any, Dict, Union, cast
+from typing import Any, Union, cast
 from ..internal._wmill_adapter import log
 from ..internal._db_client import create_db_client
 from ..internal._result import Result, ok, fail, with_admin_context
@@ -21,7 +22,7 @@ from ._circuit_logic import get_state, init_service
 
 MODULE = "circuit_breaker"
 
-async def _main_async(args: dict[str, Any]) -> Result[Union[CircuitBreakerResult, CircuitState]]:
+async def _main_async(args: dict[str, object]) -> Result[CircuitBreakerResult | CircuitState]:
     try:
         input_data = InputSchema.model_validate(args)
     except Exception as e:
@@ -29,7 +30,7 @@ async def _main_async(args: dict[str, Any]) -> Result[Union[CircuitBreakerResult
 
     conn = await create_db_client()
     try:
-        async def operation() -> Result[Union[CircuitBreakerResult, CircuitState]]:
+        async def operation() -> Result[CircuitBreakerResult | CircuitState]:
             await init_service(conn, input_data.service_id)
 
             if input_data.action == 'check':
@@ -86,8 +87,9 @@ async def _main_async(args: dict[str, Any]) -> Result[Union[CircuitBreakerResult
 
             elif input_data.action == 'status':
                 state = await get_state(conn, input_data.service_id)
-                if not state: return fail("State not found")
-                return ok(cast(Any, state))
+                if not state:
+                    return fail("State not found")
+                return ok(state)
             
             return fail(f"Unsupported action: {input_data.action}")
 
@@ -97,23 +99,22 @@ async def _main_async(args: dict[str, Any]) -> Result[Union[CircuitBreakerResult
         log("Circuit Breaker Internal Error", error=str(e), module=MODULE)
         return fail(f"Internal error: {e}")
     finally:
-        await conn.close() # pyright: ignore[reportUnknownMemberType]
+        await conn.close()
 
 
-def main(args: dict):
+def main(args: dict[str, object]) -> dict[str, Any] | None:
     import traceback
     try:
-        return asyncio.run(_main_async(args))
+        err, result = asyncio.run(_main_async(args))
+        if err:
+            raise err
+        return cast(dict[str, Any], result) if result else None
     except Exception as e:
         tb = traceback.format_exc()
-        # Intentamos usar el adaptador local si está disponible, si no print
         try:
-            from ..internal._wmill_adapter import log
-            log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=os.path.basename(os.path.dirname(__file__)))
-        except:
-            from ..internal._wmill_adapter import log
-            log("BARE_EXCEPT_CAUGHT", file="main.py")
-            print(f"CRITICAL ERROR in {__file__}: {e}\n{tb}")
+            log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=MODULE)
+        except Exception:
+            print(f"CRITICAL ERROR in circuit_breaker: {e}\n{tb}")
         
         # Elevamos para que Windmill marque como FAILED
         raise RuntimeError(f"Execution failed: {e}")
