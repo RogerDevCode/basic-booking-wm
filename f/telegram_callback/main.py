@@ -1,4 +1,6 @@
+from __future__ import annotations
 import asyncio
+import os
 # ============================================================================
 # PRE-FLIGHT CHECKLIST
 # Mission         : Handle Telegram inline keyboard button actions
@@ -13,13 +15,13 @@ import asyncio
 from typing import Any, Dict, Optional
 from ..internal._wmill_adapter import log, get_variable
 from ..internal._result import Result
-from ._callback_models import InputSchema, ActionContext
+from ._callback_models import InputSchema, ActionContext, ActionResult
 from ._callback_logic import parse_callback_data, answer_callback_query, send_followup_message
 from ._callback_router import TelegramRouter, ConfirmHandler, CancelHandler, AcknowledgeHandler
 
 MODULE = "telegram_callback"
 
-async def _main_async(args: dict[str, Any]) -> Result[Dict[str, Any]]:
+async def _main_async(args: dict[str, object]) -> Result[Dict[str, object]]:
     # 1. Validate Input
     try:
         input_data = InputSchema.model_validate(args)
@@ -51,8 +53,6 @@ async def _main_async(args: dict[str, Any]) -> Result[Dict[str, Any]]:
     router.register('confirm', ConfirmHandler())
     router.register('cancel', CancelHandler())
     router.register('acknowledge', AcknowledgeHandler())
-    # Note: Reschedule and Reminders handlers omitted for brevity/phase scope 
-    # but would be registered here
 
     context: ActionContext = {
         "botToken": bot_token,
@@ -70,31 +70,31 @@ async def _main_async(args: dict[str, Any]) -> Result[Dict[str, Any]]:
     # 6. Response to Telegram
     await answer_callback_query(bot_token, input_data.callback_query_id, result["responseText"])
 
-    if result["followUpText"]:
-        await send_followup_message(bot_token, input_data.chat_id, result["followUpText"])
+    if result.get("followUpText"):
+        await send_followup_message(bot_token, input_data.chat_id, str(result["followUpText"]))
 
-    return None, {
+    res: Dict[str, object] = {
         "action": action,
         "booking_id": booking_id,
         "callback_query_id": input_data.callback_query_id,
         "response_text": result["responseText"]
     }
+    return None, res
 
 
-def main(args: dict) -> None:
+def main(args: dict[str, object]) -> Dict[str, object] | None:
     import traceback
     try:
-        return asyncio.run(_main_async(args))
+        err, result = asyncio.run(_main_async(args))
+        if err:
+            raise err
+        return result
     except Exception as e:
         tb = traceback.format_exc()
-        # Intentamos usar el adaptador local si está disponible, si no print
         try:
-            from ..internal._wmill_adapter import log
-            log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=os.path.basename(os.path.dirname(__file__)))
-        except:
-            from ..internal._wmill_adapter import log
-            log("BARE_EXCEPT_CAUGHT", file="main.py")
-            print(f"CRITICAL ERROR in {__file__}: {e}\n{tb}")
+            log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=MODULE)
+        except Exception:
+            print(f"CRITICAL ERROR in telegram_callback: {e}\n{tb}")
         
         # Elevamos para que Windmill marque como FAILED
         raise RuntimeError(f"Execution failed: {e}")

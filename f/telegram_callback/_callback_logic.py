@@ -1,6 +1,9 @@
+from __future__ import annotations
 import re
-from typing import Optional, Dict, cast
+import httpx
+from typing import Optional, Dict, cast, Any
 from ..internal._result import Result, DBClient, ok, fail
+from ..internal._wmill_adapter import log
 
 ACTION_MAP: Dict[str, str] = {
     'cnf': 'confirm',
@@ -101,18 +104,16 @@ async def update_booking_status(
     )
     return ok(True)
 
-import httpx
-from ..internal._wmill_adapter import log
-
 async def answer_callback_query(bot_token: str, callback_query_id: str, text: str, show_alert: bool = False) -> bool:
     url = f"https://api.telegram.org/bot{bot_token}/answerCallbackQuery"
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
-            res = await client.post(url, json={
+            payload: dict[str, object] = {
                 "callback_query_id": callback_query_id,
                 "text": text,
                 "show_alert": show_alert
-            })
+            }
+            res = await client.post(url, json=payload)
             return res.status_code == 200
     except Exception as e:
         log("answer_callback_query failed", error=str(e), module="telegram_callback")
@@ -122,11 +123,12 @@ async def send_followup_message(bot_token: str, chat_id: str, text: str) -> bool
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            res = await client.post(url, json={
+            payload: dict[str, object] = {
                 "chat_id": chat_id,
                 "text": text,
-                "parse_mode": "Markdown" # Consistent with telegram_send
-            })
+                "parse_mode": "Markdown" 
+            }
+            res = await client.post(url, json=payload)
             return res.status_code == 200
     except Exception as e:
         log("send_followup_message failed", error=str(e), module="telegram_callback")

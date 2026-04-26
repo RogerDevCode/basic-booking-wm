@@ -1,5 +1,5 @@
 # Codebase Index
-_git:a090de9b — 2026-04-26T21:17Z_
+_git:4e265817 — 2026-04-26T21:20Z_
 
 > Read this file BEFORE exploring the repository.
 
@@ -693,18 +693,18 @@ _git:a090de9b — 2026-04-26T21:17Z_
 - 🔧 `fn` `main` (L46)
 
 ### `f/telegram_callback/_callback_logic.py`
-- 🔧 `fn` `parse_callback_data` (L14)
-- ⚡ `async_fn` `confirm_booking` (L27)
-- ⚡ `async_fn` `update_booking_status` (L58)
+- 🔧 `fn` `parse_callback_data` (L17)
+- ⚡ `async_fn` `confirm_booking` (L30)
+- ⚡ `async_fn` `update_booking_status` (L61)
 - ⚡ `async_fn` `answer_callback_query` (L107)
-- ⚡ `async_fn` `send_followup_message` (L121)
+- ⚡ `async_fn` `send_followup_message` (L122)
 
 ### `f/telegram_callback/_callback_models.py`
-- 📦 `class` `InputSchema` (L4)
-- 📦 `class` `ActionContext` (L14)
-- 📦 `class` `ActionResult` (L22)
-- 📦 `class` `ActionHandler` (L26)
-- ⚡ `async_fn` `handle` (L27)
+- 📦 `class` `InputSchema` (L5)
+- 📦 `class` `ActionContext` (L15)
+- 📦 `class` `ActionResult` (L23)
+- 📦 `class` `ActionHandler` (L27)
+- ⚡ `async_fn` `handle` (L28)
 
 ### `f/telegram_callback/_callback_router.py`
 - 📦 `class` `ConfirmHandler` (L8)
@@ -720,7 +720,7 @@ _git:a090de9b — 2026-04-26T21:17Z_
 - ⚡ `async_fn` `route` (L76)
 
 ### `f/telegram_callback/main.py`
-- 🔧 `fn` `main` (L84)
+- 🔧 `fn` `main` (L85)
 
 ### `f/telegram_gateway/_gateway_logic.py`
 - 📦 `class` `TelegramClient` (L8)
