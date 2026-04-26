@@ -1,4 +1,6 @@
+from __future__ import annotations
 import asyncio
+import os
 # ============================================================================
 # PRE-FLIGHT CHECKLIST
 # Mission         : Auto-register user from Telegram webhook payload
@@ -19,7 +21,7 @@ from ._auto_register_logic import register_telegram_user
 
 MODULE = "telegram_auto_register"
 
-async def _main_async(args: dict[str, Any]) -> Result[RegisterResult]:
+async def _main_async(args: dict[str, object]) -> Result[RegisterResult]:
     # 1. Validate Input
     try:
         input_data = InputSchema.model_validate(args)
@@ -38,23 +40,22 @@ async def _main_async(args: dict[str, Any]) -> Result[RegisterResult]:
         log("Internal error in auto_register", error=str(e), module=MODULE)
         return fail(f"Internal error: {e}")
     finally:
-        await conn.close() # pyright: ignore[reportUnknownMemberType]
+        await conn.close()
 
 
-def main(args: dict) -> None:
+def main(args: dict[str, object]) -> RegisterResult | None:
     import traceback
     try:
-        return asyncio.run(_main_async(args))
+        err, result = asyncio.run(_main_async(args))
+        if err:
+            raise err
+        return result
     except Exception as e:
         tb = traceback.format_exc()
-        # Intentamos usar el adaptador local si está disponible, si no print
         try:
-            from ..internal._wmill_adapter import log
-            log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=os.path.basename(os.path.dirname(__file__)))
-        except:
-            from ..internal._wmill_adapter import log
-            log("BARE_EXCEPT_CAUGHT", file="main.py")
-            print(f"CRITICAL ERROR in {__file__}: {e}\n{tb}")
+            log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=MODULE)
+        except Exception:
+            print(f"CRITICAL ERROR in telegram_auto_register: {e}\n{tb}")
         
         # Elevamos para que Windmill marque como FAILED
         raise RuntimeError(f"Execution failed: {e}")

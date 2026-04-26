@@ -1,5 +1,5 @@
 # Codebase Index
-_git:e57dc4e7 — 2026-04-26T21:15Z_
+_git:44ac8a6a — 2026-04-26T21:16Z_
 
 > Read this file BEFORE exploring the repository.
 
@@ -689,8 +689,8 @@ _git:e57dc4e7 — 2026-04-26T21:15Z_
 - 📦 `class` `InputSchema` (L8)
 
 ### `f/telegram_auto_register/main.py`
-- ⚡ `async_fn` `operation` (L32)
-- 🔧 `fn` `main` (L44)
+- ⚡ `async_fn` `operation` (L34)
+- 🔧 `fn` `main` (L46)
 
 ### `f/telegram_callback/_callback_logic.py`
 - 🔧 `fn` `parse_callback_data` (L14)
