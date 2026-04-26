@@ -9,6 +9,7 @@ class CancelBookingInput(BaseModel):
     actor: Literal['client', 'provider', 'system']
     actor_id: str | None = None
     reason: str | None = Field(default=None, max_length=500)
+    idempotency_key: str | None = None
 
 class CancelResult(TypedDict):
     booking_id: str

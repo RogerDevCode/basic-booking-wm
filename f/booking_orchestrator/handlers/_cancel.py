@@ -33,6 +33,7 @@ async def handle_cancel_booking(
         "actor": "client",
         "actor_id": input_data.client_id,
         "reason": get_entity(input_data.entities, "reason") or input_data.notes,
+        "idempotency_key": f"orch-cancel-{booking_id}",
     }
 
     err, data = await cancel_booking(args)

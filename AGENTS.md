@@ -417,6 +417,67 @@ When implementing a feature:
 
 Do not proceed to step N+1 if step N is not complete.
 
+---
+
+## TYPE FIX CASCADE (mypy --strict → 0 errors)
+
+### Allowed `# type: ignore` — ONLY these two, nowhere else
+
+```
+import asyncpg  # type: ignore[import-untyped]   ← no official stubs
+return wmill    # type: ignore[return-value]      ← SDK boundary
+```
+
+### Stub setup (wmill not installed → manual stubs)
+
+```
+stubs/wmill/__init__.pyi   ← object | None, dict[str, object] (no Any)
+mypy.ini                   ← [mypy-wmill.*] ignore_missing_imports = True
+                              [mypy-asyncpg.*] ignore_missing_imports = True
+pyrightconfig.json         ← "stubPath": "./stubs"
+```
+
+### Cascade order (leaves → trunk)
+
+```
+L0  stubs/wmill/__init__.pyi          remove Any/Dict/Optional legacy
+L0  _config.py                        Optional/List → str|None / list[...]
+L0  booking_fsm/_fsm_models.py        remove unused Any/Dict imports
+L0  booking_fsm/_fsm_responses.py     remove unused Any/Dict imports
+L0  ai_agent/_prompt_builder.py       dict_values[str,object] fix
+──
+L1  _wmill_adapter.py                 restore get_variable → str|None wrapper
+L1  _result.py                        TypeIs replaces cast(Exception,...)
+──
+L2  _db_client.py                     uses restored get_variable; asyncpg boundary
+L2  ai_agent/_llm_client.py           TypedDict ProviderConfig + LLMAPIResponse
+L2  _date_resolver.py                 bool|Any → explicit TypeIs
+L2  gcal_utils/_oauth_logic.py
+L2  booking_fsm/_fsm_machine.py       _as_named_items() / _as_time_slots() TypeIs
+L2  scheduling_engine/
+──
+L3+ every feature main.py             fix in dependency order
+```
+
+### Rules
+
+```
+NEVER  cast() without TypeIs/isinstance check first
+NEVER  Any in public signatures
+NEVER  List[T] Dict[K,V] Optional[T] — use list[T] dict[K,V] T|None
+NEVER  # mypy: disable-error-code at file level
+USE    TypeIs (PEP 742) for narrowing at every data boundary
+USE    Pydantic TypedDict for all external data shapes (HTTP, DB, wmill)
+```
+
+### Verify after each commit
+
+```bash
+MYPYPATH=./stubs uv run mypy --strict f/internal/
+uv run pyright f/internal/
+# must: 0 errors, 0 non-permitted ignores
+```
+
 
 
 <claude-mem-context>

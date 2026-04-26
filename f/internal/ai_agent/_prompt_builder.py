@@ -1,7 +1,10 @@
-from typing import Optional
-from ._constants import INTENT, CONFIDENCE_BOUNDARIES, SOCIAL_CONFIDENCE_VALUES, RULE_CONFIDENCE_VALUES
+from __future__ import annotations
 
-ALL_INTENTS = ", ".join(list(INTENT.values()))
+from typing import cast
+
+from ._constants import INTENT
+
+ALL_INTENTS = ", ".join(cast(list[str], list(INTENT.values())))
 
 OBJECTIVE_PERSONA = """Eres un clasificador transaccional estricto para un sistema de reservas médicas.
 Tu única función es leer el mensaje del paciente y mapearlo a una intención válida.
@@ -26,7 +29,7 @@ INTENT_DEFINITIONS = f"""<INTENT_DEFINITIONS>
 {INTENT['VER_MIS_CITAS']}: El usuario quiere CONSULTAR o GESTIONAR sus citas existentes.
 {INTENT['PREGUNTA_GENERAL']}: Pregunta general sobre servicios, ubicación, políticas.
 {INTENT['SALUDO']}: Saludo puro sin intención de booking.
-{INTENT['DESPEDIDA']}: Despedida pura.
+{INTENT['DESPEDIDA']}: De despedida pura.
 {INTENT['AGRADECIMIENTO']}: Agradecimiento puro.
 {INTENT['DESCONOCIDO']}: No se puede determinar con confianza o mensaje sin sentido.
 {INTENT['ACTIVAR_RECORDATORIOS']}: Activar notificaciones.
@@ -51,10 +54,12 @@ EXTRAE: date, time, booking_id, client_name, service_type, channel, reminder_win
 
 FEW_SHOT_EXAMPLES = f"""<FEW_SHOT_EXAMPLES>
 User: "Hola"
-→ {{"intent":"{INTENT['SALUDO']}","confidence":0.95,"entities":{{}},"needs_more":true,"follow_up":"¿En qué puedo ayudarte?"}}
+→ {{"intent":"{INTENT['SALUDO']}","confidence":0.95,"entities":{{}},"needs_more":true,
+"follow_up":"¿En qué puedo ayudarte?"}}
 
 User: "Quiero agendar para mañana"
-→ {{"intent":"{INTENT['CREAR_CITA']}","confidence":0.95,"entities":{{"date":"mañana"}},"needs_more":false,"follow_up":null}}
+→ {{"intent":"{INTENT['CREAR_CITA']}","confidence":0.95,"entities":{{"date":"mañana"}},
+"needs_more":false,"follow_up":null}}
 </FEW_SHOT_EXAMPLES>"""
 
 OUTPUT_SCHEMA = f"""<OUTPUT_SCHEMA>
@@ -70,7 +75,8 @@ RESPONDE ÚNICAMENTE con un JSON válido:
 
 RECAP = "RECUERDA: DEBES devolver ÚNICAMENTE un objeto JSON válido. Cero texto adicional."
 
-def build_system_prompt(rag_context: Optional[str] = None) -> str:
+
+def build_system_prompt(rag_context: str | None = None) -> str:
     sections = [
         OBJECTIVE_PERSONA,
         ERROR_TOLERANCE,
@@ -84,6 +90,7 @@ def build_system_prompt(rag_context: Optional[str] = None) -> str:
         sections.append(rag_context)
     sections.append(RECAP)
     return "\n\n".join(sections)
+
 
 def build_user_message(text: str) -> str:
     return f"---BEGIN USER DATA---\n{text}\n---END USER DATA---"

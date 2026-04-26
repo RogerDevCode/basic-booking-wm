@@ -96,8 +96,8 @@ async def main(telegram_chat_id: str, intent: str, entities: dict[str, object] |
         err, result = await _main_async(args)
         if err:
             raise err
-        # Windmill expects a JSON-serializable dict, we cast result to Any for the return
-        return dict(result) if result else {}
+        # Windmill expects a JSON-serializable dict, we wrap it in 'data'
+        return {"data": dict(result) if result else {}}
     except Exception as e:
         import traceback
         tb = traceback.format_exc()

@@ -6,12 +6,12 @@ from typing import (
     Awaitable,
     Callable,
     Protocol,
-    TypeGuard,
+    TypeIs,
     cast,
 )
 
 if TYPE_CHECKING:
-    from typing import Any
+    pass
 
 # PEP 695 Type Alias
 type Result[T] = tuple[Exception | None, T | None]
@@ -28,13 +28,13 @@ def fail(error: Exception | str) -> tuple[Exception, None]:
     return (err, None)
 
 
-def is_ok[T](result: Result[T]) -> TypeGuard[tuple[None, T]]:
-    """Type guard to check if a result is successful."""
+def is_ok_outcome[T](result: Result[T]) -> TypeIs[tuple[None, T]]:
+    """Type narrowing to check if a result is successful."""
     return result[0] is None
 
 
-def is_fail[T](result: Result[T]) -> TypeGuard[tuple[Exception, None]]:
-    """Type guard to check if a result failed."""
+def is_fail_outcome[T](result: Result[T]) -> TypeIs[tuple[Exception, None]]:
+    """Type narrowing to check if a result failed."""
     return result[0] is not None
 
 
@@ -82,13 +82,17 @@ async def with_tenant_context[T](
 
         res = await operation()
 
-        if is_ok(res):
+        if is_ok_outcome(res):
             await client.execute("COMMIT")
             return ok(res[1])
 
         await client.execute("ROLLBACK")
-        # Since is_ok failed, res[0] is Exception
-        return fail(cast(Exception, res[0]))
+        # Since is_ok_outcome failed, and it's a tuple of (Exception | None, T | None)
+        # we can check is_fail_outcome
+        if is_fail_outcome(res):
+            return fail(res[0])
+        
+        return fail("unknown_transaction_failure")
 
     except Exception as error:
         try:
@@ -110,13 +114,15 @@ async def with_admin_context[T](
 
         res = await operation()
 
-        if is_ok(res):
+        if is_ok_outcome(res):
             await client.execute("COMMIT")
             return ok(res[1])
 
         await client.execute("ROLLBACK")
-        # Since is_ok failed, res[0] is Exception
-        return fail(cast(Exception, res[0]))
+        if is_fail_outcome(res):
+            return fail(res[0])
+            
+        return fail("unknown_admin_transaction_failure")
 
     except Exception as error:
         try:

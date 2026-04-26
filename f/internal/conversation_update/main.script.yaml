@@ -1,0 +1,3 @@
+summary: Actualizar estado conversacional en Redis
+description: Actualiza o limpia el estado conversacional para un chat_id dado (soporta hand-off de AI a wizard).
+lock: f/internal/conversation_update/main.script.lock

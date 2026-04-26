@@ -1,11 +1,34 @@
 from __future__ import annotations
+
 import os
-from typing import Any, Optional, List, Dict, cast
-from ._wmill_adapter import get_variable_safe
-from ._result import DBClient
+from typing import Protocol, cast
+
 from returns.result import Success
 
-def _resolve_db_url() -> Optional[str]:
+from ._result import DBClient
+from ._wmill_adapter import get_variable_safe
+
+
+class _AsyncpgConn(Protocol):
+    """Internal protocol to contain Any leakage from asyncpg."""
+
+    async def fetch(self, query: str, *args: object) -> list[dict[str, object]]:
+        ...
+
+    async def fetchrow(self, query: str, *args: object) -> dict[str, object] | None:
+        ...
+
+    async def fetchval(self, query: str, *args: object) -> object | None:
+        ...
+
+    async def execute(self, query: str, *args: object) -> str:
+        ...
+
+    async def close(self) -> None:
+        ...
+
+
+def _resolve_db_url() -> str | None:
     # 1. Local environment
     local_url = os.getenv("DATABASE_URL")
     if local_url:
@@ -15,8 +38,9 @@ def _resolve_db_url() -> Optional[str]:
     res = get_variable_safe("DATABASE_URL")
     if isinstance(res, Success):
         return str(res.unwrap())
-    
+
     return None
+
 
 async def create_db_client() -> DBClient:
     """
@@ -26,36 +50,35 @@ async def create_db_client() -> DBClient:
     if not db_url:
         raise RuntimeError("DATABASE_URL not configured")
 
-    import asyncpg # type: ignore[import-untyped, import-not-found, unused-ignore]
-    
+    import asyncpg  # type: ignore[import-untyped]
+
     class AsyncpgWrapper:
-        def __init__(self, conn: Any) -> None:
+        def __init__(self, conn: _AsyncpgConn) -> None:
             self.conn = conn
 
         async def fetch(self, query: str, *args: object) -> list[dict[str, object]]:
-            # Using cast to Any to avoid 'Expression has type Any' from untyped asyncpg
-            conn = cast(Any, self.conn)
-            rows = await conn.fetch(query, *args)
-            return [dict(r) for r in rows]
+            # asyncpg rows are record-like, we convert to dicts
+            # Use cast to satisfy protocol even if asyncpg is untyped
+            rows = await self.conn.fetch(query, *args)
+            return [dict(r) for r in cast(list[dict[str, object]], rows)]
 
         async def fetchrow(self, query: str, *args: object) -> dict[str, object] | None:
-            conn = cast(Any, self.conn)
-            row = await conn.fetchrow(query, *args)
+            row = await self.conn.fetchrow(query, *args)
             return dict(row) if row else None
-            
+
         async def fetchval(self, query: str, *args: object) -> object | None:
-            conn = cast(Any, self.conn)
-            val: object = await conn.fetchval(query, *args)
-            return val
+            val = await self.conn.fetchval(query, *args)
+            return cast(object, val)
 
         async def execute(self, query: str, *args: object) -> str:
-            conn = cast(Any, self.conn)
-            res: str = await conn.execute(query, *args)
-            return res
+            res = await self.conn.execute(query, *args)
+            return str(res)
 
         async def close(self) -> None:
-            conn = cast(Any, self.conn)
-            await conn.close()
+            await self.conn.close()
 
+    # The actual connection from asyncpg is untyped, so we cast it once at the boundary
     conn = await asyncpg.connect(db_url)
-    return cast(DBClient, AsyncpgWrapper(conn))
+    # Double cast to object then protocol to satisfy mypy's strictness about untyped asyncpg return
+    wrapped_conn = cast(_AsyncpgConn, cast(object, conn))
+    return cast(DBClient, AsyncpgWrapper(wrapped_conn))

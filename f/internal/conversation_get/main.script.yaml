@@ -1,0 +1,3 @@
+summary: Obtener estado conversacional de Redis
+description: Recupera el estado actual de la conversación para un chat_id dado.
+lock: f/internal/conversation_get/main.script.lock

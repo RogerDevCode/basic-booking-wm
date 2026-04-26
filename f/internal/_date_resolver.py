@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 import re
 import unicodedata
 import zoneinfo
 from datetime import datetime, timedelta
-from typing import Optional, TypedDict
+from typing import Final, TypedDict
 
 """
 PRE-FLIGHT
@@ -15,22 +17,23 @@ RLS Tenant ID    : NO
 Zod Schemas      : NO
 """
 
-class ResolveDateOpts(TypedDict, total=False):
-    referenceDate: Optional[str]
-    timezone: Optional[str]
 
-DEFAULT_TIMEZONE = "America/Mexico_City"
+class ResolveDateOpts(TypedDict, total=False):
+    referenceDate: str | None
+    timezone: str | None
+
+
+DEFAULT_TIMEZONE: Final[str] = "America/Mexico_City"
+
 
 def _normalise(s: str) -> str:
     """Normalises common Spanish accented chars for case-insensitive matching."""
     s = s.lower().strip()
-    return "".join(
-        c for c in unicodedata.normalize("NFD", s)
-        if unicodedata.category(c) != "Mn"
-    )
+    return "".join(c for c in unicodedata.normalize("NFD", s) if unicodedata.category(c) != "Mn")
+
 
 # Weekday name → 0-based Sunday index (matches TS getUTCDay())
-WEEKDAY_MAP: dict[str, int] = {
+WEEKDAY_MAP: Final[dict[str, int]] = {
     "domingo": 0,
     "lunes": 1,
     "martes": 2,
@@ -40,16 +43,19 @@ WEEKDAY_MAP: dict[str, int] = {
     "sabado": 6,  # normalised
 }
 
+
 def _today_in_timezone(tz: str) -> str:
     """Returns current local date as YYYY-MM-DD in the given timezone."""
     now = datetime.now(zoneinfo.ZoneInfo(tz))
     return now.strftime("%Y-%m-%d")
+
 
 def _add_days(ymd: str, days: int) -> str:
     """Adds days to a YYYY-MM-DD date string."""
     dt = datetime.strptime(ymd, "%Y-%m-%d")
     res = dt + timedelta(days=days)
     return res.strftime("%Y-%m-%d")
+
 
 def _day_of_week(ymd: str) -> int:
     """Returns the day-of-week index (0=Sunday ... 6=Saturday)."""
@@ -58,11 +64,13 @@ def _day_of_week(ymd: str) -> int:
     # Target: 0=Sun, 1=Mon, ..., 6=Sat
     return (dt.weekday() + 1) % 7
 
+
 def _next_weekday(ref: str, target: int) -> str:
     """Resolves next occurrence of target weekday from a reference."""
     current = _day_of_week(ref)
     diff = (target - current + 7) % 7
     return _add_days(ref, diff)
+
 
 def _is_valid_calendar_date(y: int, m: int, d: int) -> bool:
     """Checks if y/m/d forms a valid calendar date."""
@@ -72,14 +80,15 @@ def _is_valid_calendar_date(y: int, m: int, d: int) -> bool:
     except ValueError:
         return False
 
-def resolve_date(input_str: str, opts: Optional[ResolveDateOpts] = None) -> Optional[str]:
+
+def resolve_date(input_str: str, opts: ResolveDateOpts | None = None) -> str | None:
     """
     Resolves a user-supplied date string to an absolute YYYY-MM-DD date.
     Returns None if unrecognised.
     """
     if opts is None:
         opts = {}
-    
+
     tz = opts.get("timezone") or DEFAULT_TIMEZONE
     ref = opts.get("referenceDate") or _today_in_timezone(tz)
     src = _normalise(input_str)
@@ -119,7 +128,7 @@ def resolve_date(input_str: str, opts: Optional[ResolveDateOpts] = None) -> Opti
         d, m = map(int, dm_match.groups())
         ref_dt = datetime.strptime(ref, "%Y-%m-%d")
         ref_y = ref_dt.year
-        
+
         if _is_valid_calendar_date(ref_y, m, d):
             candidate = f"{ref_y:04d}-{m:02d}-{d:02d}"
             if candidate >= ref:
@@ -130,32 +139,34 @@ def resolve_date(input_str: str, opts: Optional[ResolveDateOpts] = None) -> Opti
 
     return None
 
-def resolve_time(input_str: str) -> Optional[str]:
+
+def resolve_time(input_str: str) -> str | None:
     """Resolves a user-supplied time string to HH:MM (24h)."""
     src = input_str.lower().strip()
-    
+
     # Extract numbers and meridiem
     # Remove "las " prefix
     src = re.sub(r"^las\s+", "", src)
-    
+
     match = re.search(r"^(\d{1,2})(?::(\d{2}))?\s*(am|pm|hrs|horas)?", src)
     if not match:
         return None
-    
+
     h = int(match.group(1))
     m = int(match.group(2)) if match.group(2) else 0
-    meridiem = match.group(3)
+    meridiem: str | None = match.group(3)
 
     if meridiem == "pm" and h < 12:
         h += 12
     if meridiem == "am" and h == 12:
         h = 0
-    
+
     if h < 0 or h > 23 or m < 0 or m > 59:
         return None
-    
+
     return f"{h:02d}:{m:02d}"
 
-def today_ymd(opts: Optional[ResolveDateOpts] = None) -> str:
+
+def today_ymd(opts: ResolveDateOpts | None = None) -> str:
     """Convenience: returns today's date in YYYY-MM-DD format."""
     return resolve_date("hoy", opts) or ""

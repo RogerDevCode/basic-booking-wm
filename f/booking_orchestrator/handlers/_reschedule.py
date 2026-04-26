@@ -54,6 +54,7 @@ async def handle_reschedule(
         "actor": "client",
         "actor_id": input_data.client_id,
         "reason": get_entity(input_data.entities, "reason") or input_data.notes,
+        "idempotency_key": f"orch-resch-{booking_id}-{date}-{time}",
     }
 
     err, data = await reschedule_booking(args)

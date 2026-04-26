@@ -1,111 +1,119 @@
-from typing import Any
-import httpx
-import json
+from __future__ import annotations
+
 import time
-import asyncio
-from typing import List, Dict, Any, Optional, Tuple, Literal, cast, TypedDict
+from typing import Final, Literal, TypedDict, cast
+
+import httpx
 from pydantic import BaseModel, ConfigDict
-from ._constants import INTENT
-from ._ai_agent_models import LLMOutput
+
 from .._wmill_adapter import get_variable, log
 
 # ============================================================================
 # LLM CLIENT — Configurable Provider Chain (v6.0)
 # ============================================================================
 
+type LLMProvider = Literal["groq", "openai", "openrouter"]
+
+
 class ChatMessage(TypedDict):
-    role: Literal['system', 'user', 'assistant']
+    role: Literal["system", "user", "assistant"]
     content: str
 
+
+class ProviderConfig(TypedDict):
+    name: LLMProvider
+    url: str
+    key: str | None
+    model: str
+    structured: bool
+
+
 class LLMResponse(BaseModel):
+    model_config = ConfigDict(strict=True)
     content: str
-    provider: Literal['groq', 'openai', 'openrouter']
+    provider: LLMProvider
     tokens_in: int
     tokens_out: int
     latency_ms: int
     cached: bool = False
 
-async def call_llm(
-    system_prompt: str,
-    user_message: str
-) -> Tuple[Optional[Exception], Optional[LLMResponse]]:
+
+async def call_llm(system_prompt: str, user_message: str) -> tuple[Exception | None, LLMResponse | None]:
     # ─── Configuration ──────────────
     order_str = get_variable("LLM_PROVIDER_ORDER") or "openai,groq,openrouter"
-    provider_order = [s.strip().lower() for s in order_str.split(',')]
+    provider_order = [s.strip().lower() for s in order_str.split(",")]
 
-    providers = {
-        'groq': {
-            'name': 'groq',
-            'url': 'https://api.groq.com/openai/v1/chat/completions',
-            'key': get_variable("GROQ_API_KEY"),
-            'model': get_variable("GROQ_MODEL") or "llama-3.3-70b-versatile",
-            'structured': False
+    providers: Final[dict[str, ProviderConfig]] = {
+        "groq": {
+            "name": "groq",
+            "url": "https://api.groq.com/openai/v1/chat/completions",
+            "key": get_variable("GROQ_API_KEY"),
+            "model": get_variable("GROQ_MODEL") or "llama-3.3-70b-versatile",
+            "structured": False,
         },
-        'openai': {
-            'name': 'openai',
-            'url': 'https://api.openai.com/v1/chat/completions',
-            'key': get_variable("OPENAI_API_KEY"),
-            'model': get_variable("OPENAI_MODEL") or "gpt-4o-mini",
-            'structured': True
+        "openai": {
+            "name": "openai",
+            "url": "https://api.openai.com/v1/chat/completions",
+            "key": get_variable("OPENAI_API_KEY"),
+            "model": get_variable("OPENAI_MODEL") or "gpt-4o-mini",
+            "structured": True,
         },
-        'openrouter': {
-            'name': 'openrouter',
-            'url': 'https://openrouter.ai/api/v1/chat/completions',
-            'key': get_variable("OPENROUTER_API_KEY"),
-            'model': get_variable("OPENROUTER_MODEL") or "openrouter/auto:free",
-            'structured': False
-        }
+        "openrouter": {
+            "name": "openrouter",
+            "url": "https://openrouter.ai/api/v1/chat/completions",
+            "key": get_variable("OPENROUTER_API_KEY"),
+            "model": get_variable("OPENROUTER_MODEL") or "openrouter/auto:free",
+            "structured": False,
+        },
     }
 
-    messages: List[ChatMessage] = [
+    messages: list[ChatMessage] = [
         {"role": "system", "content": system_prompt},
-        {"role": "user", "content": user_message}
+        {"role": "user", "content": user_message},
     ]
 
     for p_key in provider_order:
         p = providers.get(p_key)
-        if not p or not p['key']: continue
+        if not p or not p["key"]:
+            continue
 
         start_time = time.time()
         try:
             async with httpx.AsyncClient(timeout=15.0) as client:
-                headers = {
-                    "Authorization": f"Bearer {p['key']}",
-                    "Content-Type": "application/json"
-                }
-                
+                headers = {"Authorization": f"Bearer {p['key']}", "Content-Type": "application/json"}
+
                 # Attributions for OpenRouter
-                if p['name'] == 'openrouter':
+                if p["name"] == "openrouter":
                     headers["HTTP-Referer"] = "https://localhost"
                     headers["X-Title"] = "Windmill Medical Booking"
 
-                body: Dict[str, Any] = {
-                    "model": p['model'],
-                    "messages": messages,
+                body: dict[str, object] = {
+                    "model": p["model"],
+                    "messages": cast(list[object], messages),
                     "temperature": 0.0,
-                    "max_tokens": 512
+                    "max_tokens": 512,
                 }
 
                 # Structured Output for OpenAI
-                if p['structured']:
-                    body["response_format"] = {"type": "json_object"} # Simplified for common use
+                if p["structured"]:
+                    body["response_format"] = {"type": "json_object"}
 
-                response = await client.post(p['url'], headers=headers, json=body)
-                
+                response = await client.post(p["url"], headers=headers, json=body)
+
                 if response.status_code != 200:
                     log(f"LLM Provider {p_key} failed", status=response.status_code, body=response.text)
                     continue
 
-                data = response.json()
-                content = data["choices"][0]["message"]["content"]
-                usage = data.get("usage", {})
+                data = cast(dict[str, Any], response.json())  # httpx.json returns Any
+                content = str(data["choices"][0]["message"]["content"])
+                usage = cast(dict[str, int], data.get("usage", {}))
 
                 return None, LLMResponse(
                     content=content,
-                    provider=cast(Any, p['name']),
+                    provider=p["name"],
                     tokens_in=usage.get("prompt_tokens", 0),
                     tokens_out=usage.get("completion_tokens", 0),
-                    latency_ms=int((time.time() - start_time) * 1000)
+                    latency_ms=int((time.time() - start_time) * 1000),
                 )
 
         except Exception as e:
@@ -113,3 +121,7 @@ async def call_llm(
             continue
 
     return Exception("All LLM providers failed"), None
+
+
+# To satisfy the data mapping in response.json()
+from typing import Any

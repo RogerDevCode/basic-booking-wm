@@ -1,5 +1,5 @@
 # Codebase Index
-_git:ae4e0cba — 2026-04-26T22:10Z_
+_git:929e7c53 — 2026-04-26T23:17Z_
 
 > Read this file BEFORE exploring the repository.
 
@@ -53,9 +53,9 @@ _git:ae4e0cba — 2026-04-26T22:10Z_
 
 ### `f/booking_cancel/_booking_cancel_models.py`
 - 📦 `class` `CancelBookingInput` (L5)
-- 📦 `class` `CancelResult` (L13)
-- 📦 `class` `BookingLookup` (L20)
-- 📦 `class` `UpdatedBooking` (L28)
+- 📦 `class` `CancelResult` (L14)
+- 📦 `class` `BookingLookup` (L21)
+- 📦 `class` `UpdatedBooking` (L29)
 
 ### `f/booking_cancel/_booking_cancel_repository.py`
 - 📦 `class` `BookingCancelRepository` (L7)
@@ -280,6 +280,19 @@ _git:ae4e0cba — 2026-04-26T22:10Z_
 - ⚡ `async_fn` `operation` (L33)
 - ⚡ `async_fn` `main` (L60)
 
+### `f/flows/telegram_webhook__flow/gates/check_parser_error.py`
+- ⚡ `async_fn` `main` (L4)
+
+### `f/flows/telegram_webhook__flow/gates/gate_execute_action.py`
+- ⚡ `async_fn` `main` (L4)
+
+### `f/flows/telegram_webhook__flow/gates/skip_if_router_handled.py`
+- ⚡ `async_fn` `main` (L4)
+
+### `f/flows/telegram_webhook__flow/telegram_webhook_trigger.py`
+- 📦 `class` `TriggerOutput` (L5)
+- ⚡ `async_fn` `main` (L14)
+
 ### `f/gcal_reconcile/_reconcile_logic.py`
 - ⚡ `async_fn` `retry_with_backoff` (L14)
 - ⚡ `async_fn` `call_gcal_api` (L34)
@@ -346,9 +359,9 @@ _git:ae4e0cba — 2026-04-26T22:10Z_
 - ⚡ `async_fn` `main` (L68)
 
 ### `f/internal/_config.py`
-- 🔧 `fn` `get_env` (L55)
-- 🔧 `fn` `require_env` (L58)
-- 🔧 `fn` `require_database_url` (L64)
+- 🔧 `fn` `get_env` (L59)
+- 🔧 `fn` `require_env` (L63)
+- 🔧 `fn` `require_database_url` (L70)
 
 ### `f/internal/_crypto.py`
 - 🔧 `fn` `hash_password` (L24)
@@ -360,30 +373,38 @@ _git:ae4e0cba — 2026-04-26T22:10Z_
 - 🔧 `fn` `decrypt_data` (L104)
 
 ### `f/internal/_date_resolver.py`
-- 📦 `class` `ResolveDateOpts` (L18)
-- 🔧 `fn` `resolve_date` (L75)
-- 🔧 `fn` `resolve_time` (L133)
-- 🔧 `fn` `today_ymd` (L159)
+- 📦 `class` `ResolveDateOpts` (L21)
+- 🔧 `fn` `resolve_date` (L84)
+- 🔧 `fn` `resolve_time` (L143)
+- 🔧 `fn` `today_ymd` (L170)
 
 ### `f/internal/_db_client.py`
-- ⚡ `async_fn` `create_db_client` (L21)
-- 📦 `class` `AsyncpgWrapper` (L31)
-- ⚡ `async_fn` `fetch` (L35)
-- ⚡ `async_fn` `fetchrow` (L41)
-- ⚡ `async_fn` `fetchval` (L46)
-- ⚡ `async_fn` `execute` (L51)
-- ⚡ `async_fn` `close` (L56)
+- ⚡ `async_fn` `fetch` (L15)
+- ⚡ `async_fn` `fetchrow` (L18)
+- ⚡ `async_fn` `fetchval` (L21)
+- ⚡ `async_fn` `execute` (L24)
+- ⚡ `async_fn` `close` (L27)
+- ⚡ `async_fn` `create_db_client` (L45)
+- 📦 `class` `AsyncpgWrapper` (L55)
+- ⚡ `async_fn` `fetch` (L59)
+- ⚡ `async_fn` `fetchrow` (L65)
+- ⚡ `async_fn` `fetchval` (L69)
+- ⚡ `async_fn` `execute` (L73)
+- ⚡ `async_fn` `close` (L77)
 
 ### `f/internal/_file_lock.py`
 - 📦 `class` `FileLockError` (L17)
 - 🔧 `fn` `exclusive_file_lock` (L23)
 - 🔧 `fn` `shared_file_lock` (L92)
 
+### `f/internal/_redis_client.py`
+- ⚡ `async_fn` `create_redis_client` (L32)
+
 ### `f/internal/_result.py`
 - 🔧 `fn` `ok` (L20)
 - 🔧 `fn` `fail` (L25)
-- 🔧 `fn` `is_ok` (L31)
-- 🔧 `fn` `is_fail` (L36)
+- 🔧 `fn` `is_ok_outcome` (L31)
+- 🔧 `fn` `is_fail_outcome` (L36)
 - ⚡ `async_fn` `wrap` (L41)
 - 📦 `class` `DBClient` (L50)
 - ⚡ `async_fn` `fetch` (L53)
@@ -392,24 +413,25 @@ _git:ae4e0cba — 2026-04-26T22:10Z_
 - ⚡ `async_fn` `execute` (L62)
 - ⚡ `async_fn` `close` (L65)
 - ⚡ `async_fn` `with_tenant_context` (L69)
-- ⚡ `async_fn` `with_admin_context` (L103)
+- ⚡ `async_fn` `with_admin_context` (L107)
 
 ### `f/internal/_state_machine.py`
 - 🔧 `fn` `validate_transition` (L40)
 
 ### `f/internal/_wmill_adapter.py`
-- 🔧 `fn` `is_dict_str_any` (L8)
-- 🔧 `fn` `get_variable_safe` (L11)
-- 🔧 `fn` `get_resource_safe` (L18)
-- 🔧 `fn` `log` (L30)
+- 🔧 `fn` `is_dict_str_obj` (L11)
+- 🔧 `fn` `get_variable_safe` (L15)
+- 🔧 `fn` `get_variable` (L23)
+- 🔧 `fn` `get_resource_safe` (L34)
+- 🔧 `fn` `log` (L47)
 
 ### `f/internal/ai_agent/_ai_agent_logic.py`
-- 🔧 `fn` `adjust_intent_with_context` (L20)
-- 🔧 `fn` `extract_entities` (L69)
-- 🔧 `fn` `detect_context` (L139)
-- 🔧 `fn` `determine_escalation_level` (L167)
-- 🔧 `fn` `generate_ai_response` (L182)
-- 🔧 `fn` `detect_social` (L197)
+- 🔧 `fn` `adjust_intent_with_context` (L28)
+- 🔧 `fn` `extract_entities` (L76)
+- 🔧 `fn` `detect_context` (L149)
+- 🔧 `fn` `determine_escalation_level` (L181)
+- 🔧 `fn` `generate_ai_response` (L203)
+- 🔧 `fn` `detect_social` (L220)
 
 ### `f/internal/ai_agent/_ai_agent_models.py`
 - 📦 `class` `ConversationState` (L11)
@@ -439,13 +461,14 @@ _git:ae4e0cba — 2026-04-26T22:10Z_
 - 🔧 `fn` `verify_urgency` (L78)
 
 ### `f/internal/ai_agent/_llm_client.py`
-- 📦 `class` `ChatMessage` (L16)
-- 📦 `class` `LLMResponse` (L20)
-- ⚡ `async_fn` `call_llm` (L28)
+- 📦 `class` `ChatMessage` (L18)
+- 📦 `class` `ProviderConfig` (L23)
+- 📦 `class` `LLMResponse` (L31)
+- ⚡ `async_fn` `call_llm` (L41)
 
 ### `f/internal/ai_agent/_prompt_builder.py`
-- 🔧 `fn` `build_system_prompt` (L73)
-- 🔧 `fn` `build_user_message` (L88)
+- 🔧 `fn` `build_system_prompt` (L79)
+- 🔧 `fn` `build_user_message` (L95)
 
 ### `f/internal/ai_agent/_rag_context.py`
 - 📦 `class` `RAGResult` (L6)
@@ -464,52 +487,66 @@ _git:ae4e0cba — 2026-04-26T22:10Z_
 - 🔧 `fn` `classify_intent` (L175)
 
 ### `f/internal/ai_agent/main.py`
-- 🔧 `fn` `main` (L124)
+- 🔧 `fn` `main` (L132)
 
 ### `f/internal/apply_fix_migration.py`
 - 🔧 `fn` `main` (L22)
 
 ### `f/internal/booking_fsm/_fsm_machine.py`
-- 🔧 `fn` `parse_action` (L21)
-- 🔧 `fn` `parse_callback_data` (L42)
-- 🔧 `fn` `apply_transition` (L56)
-- 🔧 `fn` `flow_step_from_state` (L277)
+- 🔧 `fn` `parse_action` (L55)
+- 🔧 `fn` `parse_callback_data` (L77)
+- 🔧 `fn` `apply_transition` (L94)
+- 🔧 `fn` `flow_step_from_state` (L339)
 
 ### `f/internal/booking_fsm/_fsm_models.py`
-- 📦 `class` `NamedItem` (L22)
-- 📦 `class` `TimeSlotItem` (L26)
-- 📦 `class` `DraftCore` (L37)
+- 📦 `class` `NamedItem` (L20)
+- 📦 `class` `TimeSlotItem` (L25)
+- 📦 `class` `DraftCore` (L36)
 - 📦 `class` `DraftBooking` (L48)
-- 🔧 `fn` `empty_draft` (L55)
-- 📦 `class` `IdleState` (L62)
-- 📦 `class` `SelectingSpecialtyState` (L65)
-- 📦 `class` `SelectingDoctorState` (L70)
-- 📦 `class` `SelectingTimeState` (L77)
-- 📦 `class` `ConfirmingState` (L86)
-- 📦 `class` `CompletedState` (L94)
-- 📦 `class` `BookingStateRoot` (L111)
-- 📦 `class` `SelectAction` (L118)
-- 📦 `class` `SelectDateAction` (L122)
-- 📦 `class` `BackAction` (L126)
-- 📦 `class` `CancelAction` (L129)
-- 📦 `class` `ConfirmYesAction` (L132)
-- 📦 `class` `ConfirmNoAction` (L135)
-- 📦 `class` `TransitionOutcome` (L154)
+- 🔧 `fn` `empty_draft` (L56)
+- 📦 `class` `IdleState` (L65)
+- 📦 `class` `SelectingSpecialtyState` (L69)
+- 📦 `class` `SelectingDoctorState` (L75)
+- 📦 `class` `SelectingTimeState` (L83)
+- 📦 `class` `ConfirmingState` (L93)
+- 📦 `class` `CompletedState` (L102)
+- 📦 `class` `BookingStateRoot` (L114)
+- 📦 `class` `SelectAction` (L123)
+- 📦 `class` `SelectDateAction` (L128)
+- 📦 `class` `BackAction` (L133)
+- 📦 `class` `CancelAction` (L137)
+- 📦 `class` `ConfirmYesAction` (L141)
+- 📦 `class` `ConfirmNoAction` (L145)
+- 📦 `class` `TransitionOutcome` (L159)
 
 ### `f/internal/booking_fsm/_fsm_responses.py`
-- 📦 `class` `InlineButton` (L10)
-- 🔧 `fn` `build_header` (L14)
-- 🔧 `fn` `build_specialty_prompt` (L17)
-- 🔧 `fn` `build_doctors_prompt` (L21)
-- 🔧 `fn` `build_slots_prompt` (L25)
-- 🔧 `fn` `build_confirmation_prompt` (L29)
-- 🔧 `fn` `build_loading_doctors_prompt` (L33)
-- 🔧 `fn` `build_loading_slots_prompt` (L36)
-- 🔧 `fn` `chunk_buttons` (L43)
-- 🔧 `fn` `build_specialty_keyboard` (L46)
-- 🔧 `fn` `build_doctor_keyboard` (L51)
-- 🔧 `fn` `build_time_slot_keyboard` (L57)
-- 🔧 `fn` `build_confirmation_keyboard` (L63)
+- 📦 `class` `InlineButton` (L13)
+- 🔧 `fn` `build_header` (L18)
+- 🔧 `fn` `build_specialty_prompt` (L22)
+- 🔧 `fn` `build_doctors_prompt` (L27)
+- 🔧 `fn` `build_slots_prompt` (L33)
+- 🔧 `fn` `build_confirmation_prompt` (L39)
+- 🔧 `fn` `build_loading_doctors_prompt` (L44)
+- 🔧 `fn` `build_loading_slots_prompt` (L48)
+- 🔧 `fn` `chunk_buttons` (L57)
+- 🔧 `fn` `build_specialty_keyboard` (L61)
+- 🔧 `fn` `build_doctor_keyboard` (L67)
+- 🔧 `fn` `build_time_slot_keyboard` (L74)
+- 🔧 `fn` `build_confirmation_keyboard` (L81)
+
+### `f/internal/conversation_get/_conversation_models.py`
+- 📦 `class` `ConversationState` (L5)
+- 📦 `class` `ConversationGetResult` (L17)
+
+### `f/internal/conversation_get/main.py`
+- ⚡ `async_fn` `main` (L49)
+
+### `f/internal/conversation_update/_update_models.py`
+- 📦 `class` `ConversationUpdateInput` (L5)
+- 📦 `class` `ConversationUpdateResult` (L17)
+
+### `f/internal/conversation_update/main.py`
+- ⚡ `async_fn` `main` (L57)
 
 ### `f/internal/debug_db.py`
 - 🔧 `fn` `main` (L20)
@@ -534,12 +571,17 @@ _git:ae4e0cba — 2026-04-26T22:10Z_
 - ⚡ `async_fn` `refresh_access_token` (L54)
 - ⚡ `async_fn` `persist_new_token` (L84)
 
+### `f/internal/message_parser/main.py`
+- 📦 `class` `ParserInput` (L8)
+- 📦 `class` `ParserResult` (L14)
+- ⚡ `async_fn` `main` (L20)
+
 ### `f/internal/scheduling_engine/_scheduling_logic.py`
-- 🔧 `fn` `time_to_minutes` (L10)
-- 🔧 `fn` `generate_slots_for_rule` (L17)
-- ⚡ `async_fn` `get_availability` (L77)
-- ⚡ `async_fn` `get_availability_range` (L200)
-- ⚡ `async_fn` `validate_override` (L232)
+- 🔧 `fn` `time_to_minutes` (L20)
+- 🔧 `fn` `generate_slots_for_rule` (L28)
+- ⚡ `async_fn` `get_availability` (L85)
+- ⚡ `async_fn` `get_availability_range` (L219)
+- ⚡ `async_fn` `validate_override` (L246)
 
 ### `f/internal/scheduling_engine/_scheduling_models.py`
 - 📦 `class` `TimeSlot` (L4)
@@ -551,6 +593,13 @@ _git:ae4e0cba — 2026-04-26T22:10Z_
 - 📦 `class` `ServiceRow` (L44)
 - 📦 `class` `AffectedBooking` (L49)
 - 📦 `class` `OverrideValidation` (L54)
+
+### `f/internal/telegram_router/_router_models.py`
+- 📦 `class` `RouterInput` (L5)
+- 📦 `class` `RouterResult` (L12)
+
+### `f/internal/telegram_router/main.py`
+- ⚡ `async_fn` `main` (L71)
 
 ### `f/nlu/_tfidf_classifier.py`
 - 📦 `class` `ModelData` (L170)
@@ -1135,6 +1184,8 @@ _git:ae4e0cba — 2026-04-26T22:10Z_
 - `f/internal/booking_fsm/_fsm_machine.script.yaml`
 - `f/internal/booking_fsm/_fsm_models.script.yaml`
 - `f/internal/booking_fsm/_fsm_responses.script.yaml`
+- `f/internal/conversation_get/main.script.yaml`
+- `f/internal/conversation_update/main.script.yaml`
 - `f/internal/debug_db.script.yaml`
 - `f/internal/debug_db_final.script.yaml`
 - `f/internal/gcal_utils/__init__.script.yaml`

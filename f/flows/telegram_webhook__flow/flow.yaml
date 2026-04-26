@@ -1,67 +1,45 @@
 summary: Telegram Webhook - FULL STACK (Python §PY 2025)
+description: Flujo principal para el bot de Telegram, manejando estados y hand-off de AI a Wizard.
 value:
   modules:
-    - id: gateway
-      summary: Step 1 Gateway
+    - id: webhook_trigger
+      summary: Telegram Webhook Trigger
       value:
         type: script
         input_transforms:
           webhook_payload:
             type: javascript
             expr: flow_input.webhook_payload ?? flow_input
-        path: f/telegram_gateway/main
+        path: f/flows/telegram_webhook__flow/telegram_webhook_trigger
 
-    - id: telegram_menu
-      summary: Step 2 Menu Router
+    - id: get_conversation_state
+      summary: Obtener estado conversacional de Redis
       value:
         type: script
         input_transforms:
-          action:
-            type: javascript
-            expr: "(results.gateway.text === '/start' || results.gateway.text === '/menu') ? 'start' : (results.gateway.callback_data ? 'select_option' : 'show')"
           chat_id:
             type: javascript
-            expr: results.gateway.chat_id
+            expr: results.webhook_trigger.chat_id
+        path: f/internal/conversation_get/main
+
+    - id: telegram_router
+      summary: Router con InlineKeyboard + FSM wizard
+      value:
+        type: script
+        input_transforms:
+          chat_id:
+            type: javascript
+            expr: results.webhook_trigger.chat_id
           user_input:
             type: javascript
-            expr: results.gateway.callback_data || results.gateway.text
-        path: f/telegram_menu/main
+            expr: results.webhook_trigger.callback_data || results.webhook_trigger.text
+          state:
+            type: javascript
+            expr: results.get_conversation_state.data
+        path: f/internal/telegram_router/main
 
-    - id: ai_agent
-      summary: Step 3 NLU Pipeline
-      value:
-        type: script
-        input_transforms:
-          chat_id:
-            type: javascript
-            expr: results.gateway.chat_id
-          text:
-            type: javascript
-            expr: results.gateway.text
-        path: f/internal/ai_agent/main
-      skip_if:
-        expr: results.telegram_menu.handled === true
-
-    - id: orchestrator
-      summary: Step 4 Booking Orchestrator
-      value:
-        type: script
-        input_transforms:
-          entities:
-            type: javascript
-            expr: "results.ai_agent ? results.ai_agent.entities || {} : {}"
-          intent:
-            type: javascript
-            expr: "(results.gateway.callback_data === 'cmd:book') ? 'crear_cita' : ((results.gateway.callback_data === 'cmd:mybookings') ? 'mis_citas' : (results.ai_agent ? (results.ai_agent.intent || 'duda_general') : 'duda_general'))"
-          telegram_chat_id:
-            type: javascript
-            expr: results.gateway.chat_id
-        path: f/booking_orchestrator/main
-      skip_if:
-        expr: "results.telegram_menu.handled ? true : ((results.gateway.callback_data || '').startsWith('cmd:') ? false : (results.ai_agent && results.ai_agent.intent === 'duda_general'))"
-
-    - id: send_response
-      summary: Step 5 Send Telegram
+    - id: answer_callback
+      summary: AnswerCallbackQuery — quita el "cargando" del botón
       value:
         type: script
         input_transforms:
@@ -70,14 +48,113 @@ value:
             expr: variable("u/admin/TELEGRAM_BOT_TOKEN")
           chat_id:
             type: javascript
-            expr: results.gateway.chat_id
+            expr: results.webhook_trigger.chat_id
           mode:
             type: static
-            value: send_message
+            value: answer_callback
+          callback_query_id:
+            type: javascript
+            expr: results.webhook_trigger.callback_query_id || ''
+        path: f/telegram_send/main
+      skip_if:
+        expr: "!results.webhook_trigger.callback_query_id"
+
+    - id: gate_skip_if_router_handled
+      summary: Gate — si el router manejó, saltar AI Agent y orchestrator
+      value:
+        type: script
+        input_transforms: {}
+        path: f/flows/telegram_webhook__flow/gates/skip_if_router_handled
+      skip_if:
+        expr: "results.telegram_router.data?.handled === true"
+
+    - id: parse_message
+      summary: Parsear mensaje
+      value:
+        type: script
+        input_transforms:
           text:
             type: javascript
-            expr: "results.telegram_menu.handled ? results.telegram_menu.response_text : ((results.orchestrator && !results.orchestrator.skip) ? results.orchestrator.message : (results.ai_agent ? results.ai_agent.ai_response : 'Lo siento, error de orquestación.'))"
+            expr: results.webhook_trigger.text
+          chat_id:
+            type: javascript
+            expr: results.webhook_trigger.chat_id
+        path: f/internal/message_parser/main
+
+    - id: ai_agent
+      summary: AI Agent con contexto conversacional
+      value:
+        type: script
+        input_transforms:
+          chat_id:
+            type: javascript
+            expr: results.webhook_trigger.chat_id
+          text:
+            type: javascript
+            expr: results.webhook_trigger.text
+          conversation_state:
+            type: javascript
+            expr: results.get_conversation_state.data
+        path: f/internal/ai_agent/main
+
+    - id: execute_action
+      summary: Ejecutar acción de booking (via orchestrator flow)
+      value:
+        type: flow
+        input_transforms:
+          intent:
+            type: javascript
+            expr: "results.ai_agent.data?.intent || 'duda_general'"
+          telegram_chat_id:
+            type: javascript
+            expr: results.webhook_trigger.chat_id
+          entities:
+            type: javascript
+            expr: "results.ai_agent.data?.entities || {}"
+        path: f/flows/booking_orchestrator__flow
+      skip_if:
+        expr: "results.ai_agent.data?.intent === 'duda_general'"
+
+    - id: send_telegram_response
+      summary: Enviar respuesta (sendMessage o editMessageText)
+      value:
+        type: script
+        input_transforms:
+          bot_token:
+            type: javascript
+            expr: variable("u/admin/TELEGRAM_BOT_TOKEN")
+          chat_id:
+            type: javascript
+            expr: results.webhook_trigger.chat_id
+          mode:
+            type: javascript
+            expr: "results.telegram_router.data?.handled ? 'send_message' : 'send_message'" # Simplified for now
+          text:
+            type: javascript
+            expr: "results.telegram_router.data?.handled ? results.telegram_router.data.response_text : ((results.execute_action?.data && !results.execute_action.skip) ? results.execute_action.data.message : (results.ai_agent ? results.ai_agent.data.ai_response : 'Lo siento, error de orquestación.'))"
           inline_buttons_json:
             type: javascript
-            expr: "JSON.stringify(results.telegram_menu.handled ? (results.telegram_menu.inline_buttons || []) : ((results.orchestrator && results.orchestrator.inline_buttons) ? results.orchestrator.inline_buttons : []))"
+            expr: "JSON.stringify(results.telegram_router.data?.handled ? (results.telegram_router.data.inline_buttons || []) : ((results.execute_action?.data && results.execute_action.data.inline_buttons) ? results.execute_action.data.inline_buttons : []))"
         path: f/telegram_send/main
+
+    - id: update_conversation_state
+      summary: Actualizar estado conversacional en Redis (soporta hand-off de AI a wizard)
+      value:
+        type: script
+        input_transforms:
+          chat_id:
+            type: javascript
+            expr: results.webhook_trigger.chat_id
+          active_flow:
+            type: javascript
+            expr: "(results.execute_action?.data?.nextState || results.telegram_router.data?.nextState) ? 'booking' : (results.get_conversation_state.data?.active_flow || null)"
+          booking_state:
+            type: javascript
+            expr: "results.telegram_router.data?.nextState || results.execute_action?.data?.nextState || null"
+          booking_draft:
+            type: javascript
+            expr: "results.telegram_router.data?.nextDraft || results.execute_action?.data?.nextDraft || null"
+          message_id:
+            type: javascript
+            expr: "results.send_telegram_response.message_id || results.get_conversation_state.data?.message_id || null"
+        path: f/internal/conversation_update/main
