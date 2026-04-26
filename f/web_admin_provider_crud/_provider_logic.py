@@ -1,47 +1,17 @@
-from typing import Any, TypedDict
-from datetime import datetime
-from typing import List, Optional, Dict, cast
+from __future__ import annotations
+from typing import List, Optional, Dict, Any, cast, Final
 from ..internal._result import Result, DBClient, ok, fail
-from ..internal._crypto import hash_password
-from ..auth_provider._auth_logic import generate_readable_password
-from ._provider_models import ProviderRow, CreateProviderResult, InputSchema
+from ._provider_models import ProviderRow, InputSchema
 
-class ProviderDBRow(TypedDict, total=False):
-    id: int
-    honorific_id: int | None
-    name: str
-    email: str
-    specialty_id: int | None
-    timezone_id: int | None
-    phone_app: str | None
-    phone_contact: str | None
-    telegram_chat_id: str | None
-    gcal_calendar_id: str | None
-    address_street: str | None
-    address_number: str | None
-    address_complement: str | None
-    address_sector: str | None
-    region_id: int | None
-    commune_id: int | None
-    is_active: bool
-    has_password: bool
-    last_password_change: datetime | None
-    created_at: datetime
-    updated_at: datetime
-    honorific_label: str | None
-    specialty_name: str | None
-    timezone_name: str | None
-    region_name: str | None
-    commune_name: str | None
-
-def map_row(r: ProviderDBRow) -> ProviderRow:
+def map_row_to_provider(row: object) -> ProviderRow:
+    r = cast(Dict[str, object], row)
     return {
         "id": str(r["id"]),
         "honorific_id": str(r["honorific_id"]) if r.get("honorific_id") else None,
         "name": str(r["name"]),
         "email": str(r["email"]),
         "specialty_id": str(r["specialty_id"]) if r.get("specialty_id") else None,
-        "timezone_id": int(r["timezone_id"]) if r.get("timezone_id") else None,
+        "timezone_id": int(cast(int, r["timezone_id"])) if r.get("timezone_id") is not None else None,
         "phone_app": str(r["phone_app"]) if r.get("phone_app") else None,
         "phone_contact": str(r["phone_contact"]) if r.get("phone_contact") else None,
         "telegram_chat_id": str(r["telegram_chat_id"]) if r.get("telegram_chat_id") else None,
@@ -50,13 +20,13 @@ def map_row(r: ProviderDBRow) -> ProviderRow:
         "address_number": str(r["address_number"]) if r.get("address_number") else None,
         "address_complement": str(r["address_complement"]) if r.get("address_complement") else None,
         "address_sector": str(r["address_sector"]) if r.get("address_sector") else None,
-        "region_id": int(r["region_id"]) if r.get("region_id") else None,
-        "commune_id": int(r["commune_id"]) if r.get("commune_id") else None,
+        "region_id": int(cast(int, r["region_id"])) if r.get("region_id") is not None else None,
+        "commune_id": int(cast(int, r["commune_id"])) if r.get("commune_id") is not None else None,
         "is_active": bool(r["is_active"]),
-        "has_password": bool(r.get("has_password")),
-        "last_password_change": r["last_password_change"].isoformat() if isinstance(r.get("last_password_change"), datetime) else str(r.get("last_password_change")) if r.get("last_password_change") else None,
-        "created_at": r["created_at"].isoformat() if isinstance(r.get("created_at"), datetime) else str(r.get("created_at")),
-        "updated_at": r["updated_at"].isoformat() if isinstance(r.get("updated_at"), datetime) else str(r.get("updated_at")),
+        "has_password": bool(r.get("has_password", False)),
+        "last_password_change": str(r["last_password_change"]) if r.get("last_password_change") else None,
+        "created_at": str(r["created_at"]) if r.get("created_at") else "",
+        "updated_at": str(r["updated_at"]) if r.get("updated_at") else "",
         "honorific_label": str(r["honorific_label"]) if r.get("honorific_label") else None,
         "specialty_name": str(r["specialty_name"]) if r.get("specialty_name") else None,
         "timezone_name": str(r["timezone_name"]) if r.get("timezone_name") else None,
@@ -68,119 +38,125 @@ async def list_providers(db: DBClient) -> Result[List[ProviderRow]]:
     try:
         rows = await db.fetch(
             """
-            SELECT
-              p.*,
-              (p.password_hash IS NOT NULL) AS has_password,
-              h.label AS honorific_label,
-              s.name AS specialty_name,
-              t.name AS timezone_name,
-              r.name AS region_name,
-              c.name AS commune_name
+            SELECT p.*, 
+                   h.label as honorific_label,
+                   s.name as specialty_name,
+                   tz.name as timezone_name,
+                   r.name as region_name,
+                   c.name as commune_name,
+                   (p.password_hash IS NOT NULL) as has_password
             FROM providers p
-            LEFT JOIN honorifics h ON h.honorific_id = p.honorific_id
-            LEFT JOIN specialties s ON s.specialty_id = p.specialty_id
-            LEFT JOIN timezones t ON t.id = p.timezone_id
-            LEFT JOIN regions r ON r.region_id = p.region_id
-            LEFT JOIN communes c ON c.commune_id = p.commune_id
+            LEFT JOIN admin_honorifics h ON p.honorific_id = h.honorific_id
+            LEFT JOIN admin_specialties s ON p.specialty_id = s.specialty_id
+            LEFT JOIN admin_timezones tz ON p.timezone_id = tz.timezone_id
+            LEFT JOIN admin_regions r ON p.region_id = r.region_id
+            LEFT JOIN admin_communes c ON p.commune_id = c.commune_id
             ORDER BY p.name ASC
             """
         )
-        return ok([map_row(r) for r in rows])
+        return ok([map_row_to_provider(r) for r in rows])
     except Exception as e:
-        return fail(f"list_failed: {e}")
+        return fail(f"db_error: {e}")
 
-async def create_provider(db: DBClient, input_data: InputSchema) -> Result[CreateProviderResult]:
+async def create_provider(db: DBClient, input_data: InputSchema) -> Result[ProviderRow]:
     if not input_data.name or not input_data.email:
-        return fail("create_failed: name and email are required")
+        return fail("missing_fields: name and email are required")
     
-    temp_pwd = generate_readable_password(4)
-    pwd_hash = hash_password(temp_pwd)
-
     try:
         rows = await db.fetch(
             """
             INSERT INTO providers (
-              name, email, specialty_id, honorific_id, timezone_id,
-              phone_app, phone_contact, telegram_chat_id, gcal_calendar_id,
-              address_street, address_number, address_complement, address_sector,
-              region_id, commune_id, is_active, password_hash, last_password_change
-            ) VALUES (
-              $1, $2, $3::uuid, $4::uuid, $5,
-              $6, $7, $8, $9,
-              $10, $11, $12, $13,
-              $14, $15, $16, $17, NOW()
-            )
-            RETURNING *
+                name, email, honorific_id, specialty_id, timezone_id,
+                phone_app, phone_contact, telegram_chat_id, gcal_calendar_id,
+                address_street, address_number, address_complement, address_sector,
+                region_id, commune_id
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+            RETURNING *, (password_hash IS NOT NULL) as has_password, 
+                      NULL as honorific_label, NULL as specialty_name, NULL as timezone_name, 
+                      NULL as region_name, NULL as commune_name
             """,
-            input_data.name, input_data.email, input_data.specialty_id, input_data.honorific_id, input_data.timezone_id,
-            input_data.phone_app, input_data.phone_contact, input_data.telegram_chat_id, input_data.gcal_calendar_id,
-            input_data.address_street, input_data.address_number, input_data.address_complement, input_data.address_sector,
-            input_data.region_id, input_data.commune_id, input_data.is_active if input_data.is_active is not None else True,
-            pwd_hash
+            input_data.name, input_data.email, input_data.honorific_id, 
+            input_data.specialty_id, input_data.timezone_id,
+            input_data.phone_app, input_data.phone_contact, input_data.telegram_chat_id,
+            input_data.gcal_calendar_id, input_data.address_street, input_data.address_number,
+            input_data.address_complement, input_data.address_sector,
+            input_data.region_id, input_data.commune_id
         )
-        if not rows: return fail("create_failed: no row returned")
-        
-        # Merge created row with metadata
-        row_data = dict(rows[0])
-        row_data["has_password"] = True
-        res = map_row(row_data)
-        
-        full_res = cast(CreateProviderResult, res)
-        full_res["temp_password"] = temp_pwd
-        return ok(full_res)
+        if not rows:
+            return fail("insert_failed")
+        return ok(map_row_to_provider(rows[0]))
     except Exception as e:
-        return fail(f"create_failed: {e}")
+        return fail(f"db_error: {e}")
 
-async def update_provider(db: DBClient, id: str, input_data: InputSchema) -> Result[ProviderRow]:
+async def update_provider(db: DBClient, input_data: InputSchema) -> Result[ProviderRow]:
+    if not input_data.provider_id:
+        return fail("missing_provider_id")
+    
     try:
-        fields = []
-        params = []
-        idx = 1
-        
-        for field in ["name", "email", "timezone_id", "phone_app", "phone_contact", 
-                      "telegram_chat_id", "gcal_calendar_id", "address_street", "address_number",
-                      "address_complement", "address_sector", "region_id", "commune_id", "is_active"]:
-            val = getattr(input_data, field)
-            if val is not None:
-                fields.append(f"{field} = ${idx}")
-                params.append(val)
-                idx += 1
-        
-        if input_data.specialty_id is not None:
-            fields.append(f"specialty_id = ${idx}::uuid")
-            params.append(input_data.specialty_id)
-            idx += 1
-        
-        if input_data.honorific_id is not None:
-            fields.append(f"honorific_id = ${idx}::uuid")
-            params.append(input_data.honorific_id)
-            idx += 1
-            
-        if not fields: return fail("update_failed: no fields provided")
-        
-        fields.append("updated_at = NOW()")
-        params.append(id)
-        
-        query = f"UPDATE providers SET {', '.join(fields)} WHERE id = ${idx}::uuid RETURNING *"
-        rows = await db.fetch(query, *params)
-        
-        if not rows: return fail(f"update_failed: provider {id} not found")
-        return ok(map_row(rows[0]))
-    except Exception as e:
-        return fail(f"update_failed: {e}")
-
-async def reset_provider_password(db: DBClient, id: str) -> Result[Dict[str, Any]]:
-    temp_pwd = generate_readable_password(4)
-    pwd_hash = hash_password(temp_pwd)
-    try:
-        await db.execute(
-            "UPDATE providers SET password_hash = $1, last_password_change = NOW(), updated_at = NOW() WHERE id = $2::uuid",
-            pwd_hash, id
+        rows = await db.fetch(
+            """
+            UPDATE providers
+            SET name = COALESCE($1, name),
+                email = COALESCE($2, email),
+                honorific_id = COALESCE($3, honorific_id),
+                specialty_id = COALESCE($4, specialty_id),
+                timezone_id = COALESCE($5, timezone_id),
+                phone_app = COALESCE($6, phone_app),
+                phone_contact = COALESCE($7, phone_contact),
+                telegram_chat_id = COALESCE($8, telegram_chat_id),
+                gcal_calendar_id = COALESCE($9, gcal_calendar_id),
+                address_street = COALESCE($10, address_street),
+                address_number = COALESCE($11, address_number),
+                address_complement = COALESCE($12, address_complement),
+                address_sector = COALESCE($13, address_sector),
+                region_id = COALESCE($14, region_id),
+                commune_id = COALESCE($15, commune_id),
+                is_active = COALESCE($16, is_active),
+                updated_at = NOW()
+            WHERE provider_id = $17::uuid
+            RETURNING *, (password_hash IS NOT NULL) as has_password,
+                      NULL as honorific_label, NULL as specialty_name, NULL as timezone_name, 
+                      NULL as region_name, NULL as commune_name
+            """,
+            input_data.name, input_data.email, input_data.honorific_id,
+            input_data.specialty_id, input_data.timezone_id,
+            input_data.phone_app, input_data.phone_contact, input_data.telegram_chat_id,
+            input_data.gcal_calendar_id, input_data.address_street, input_data.address_number,
+            input_data.address_complement, input_data.address_sector,
+            input_data.region_id, input_data.commune_id, input_data.is_active,
+            input_data.provider_id
         )
-        return ok({
-            "provider_id": id,
-            "temp_password": temp_pwd,
-            "message": f"New temp password: {temp_pwd} (expires in 24h, must change on first login)"
-        })
+        if not rows:
+            return fail("update_failed_or_not_found")
+        return ok(map_row_to_provider(rows[0]))
     except Exception as e:
-        return fail(f"reset_failed: {e}")
+        return fail(f"db_error: {e}")
+
+async def reset_provider_password(db: DBClient, provider_id: str) -> Result[ProviderRow]:
+    from ..internal._crypto import hash_password
+    import random
+    import string
+    
+    try:
+        chars = string.ascii_letters + string.digits
+        temp_pwd = ''.join(random.choice(chars) for _ in range(8))
+        pwd_hash = hash_password(temp_pwd)
+        
+        rows = await db.fetch(
+            """
+            UPDATE providers
+            SET password_hash = $1,
+                last_password_change = NOW(),
+                updated_at = NOW()
+            WHERE provider_id = $2::uuid
+            RETURNING *, (password_hash IS NOT NULL) as has_password,
+                      NULL as honorific_label, NULL as specialty_name, NULL as timezone_name, 
+                      NULL as region_name, NULL as commune_name
+            """,
+            pwd_hash, provider_id
+        )
+        if not rows:
+            return fail("provider_not_found")
+        return ok(map_row_to_provider(rows[0]))
+    except Exception as e:
+        return fail(f"db_error: {e}")

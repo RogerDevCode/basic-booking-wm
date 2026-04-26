@@ -1,5 +1,5 @@
 # Codebase Index
-_git:feaafb96 — 2026-04-26T21:57Z_
+_git:61eb1c50 — 2026-04-26T22:04Z_
 
 > Read this file BEFORE exploring the repository.
 
@@ -792,12 +792,11 @@ _git:feaafb96 — 2026-04-26T21:57Z_
 - ⚡ `async_fn` `main` (L46)
 
 ### `f/web_admin_provider_crud/_provider_logic.py`
-- 📦 `class` `ProviderDBRow` (L9)
-- 🔧 `fn` `map_row` (L37)
-- ⚡ `async_fn` `list_providers` (L67)
-- ⚡ `async_fn` `create_provider` (L92)
-- ⚡ `async_fn` `update_provider` (L134)
-- ⚡ `async_fn` `reset_provider_password` (L172)
+- 🔧 `fn` `map_row_to_provider` (L6)
+- ⚡ `async_fn` `list_providers` (L37)
+- ⚡ `async_fn` `create_provider` (L61)
+- ⚡ `async_fn` `update_provider` (L91)
+- ⚡ `async_fn` `reset_provider_password` (L135)
 
 ### `f/web_admin_provider_crud/_provider_models.py`
 - 📦 `class` `ProviderRow` (L5)
