@@ -1,10 +1,5 @@
 {
   "mcpServers": {
-    "codebase-index": {
-      "command": "uv",
-      "args": ["run", "python", "-m", "mcp_codebase_index.server"],
-      "env": { "PROJECT_ROOT": "${workspaceFolder}" }
-    },
     "codebase-index-compressed": {
       "command": "mcp-compressor",
       "args": [

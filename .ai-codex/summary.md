@@ -1,5 +1,5 @@
 # Codebase Index
-_git:de4366fe — 2026-04-25T21:02Z_
+_git:a70a5c7d — 2026-04-26T16:40Z_
 
 > Read this file BEFORE exploring the repository.
 
@@ -46,8 +46,9 @@ _git:de4366fe — 2026-04-25T21:02Z_
 - 📦 `class` `ProviderRow` (L26)
 
 ### `f/availability_check/main.py`
-- ⚡ `async_fn` `operation` (L31)
-- 🔧 `fn` `main` (L73)
+- ⚡ `async_fn` `main_async` (L24)
+- ⚡ `async_fn` `operation` (L32)
+- 🔧 `fn` `main` (L74)
 
 ### `f/booking_cancel/_booking_cancel_models.py`
 - 📦 `class` `CancelBookingInput` (L5)
@@ -74,8 +75,9 @@ _git:de4366fe — 2026-04-25T21:02Z_
 - ⚡ `async_fn` `execute_cancel_booking` (L18)
 
 ### `f/booking_cancel/main.py`
-- ⚡ `async_fn` `operation` (L60)
-- 🔧 `fn` `main` (L89)
+- ⚡ `async_fn` `main_async` (L25)
+- ⚡ `async_fn` `operation` (L61)
+- 🔧 `fn` `main` (L90)
 
 ### `f/booking_create/_booking_create_models.py`
 - 📦 `class` `InputSchema` (L5)
@@ -111,8 +113,9 @@ _git:de4366fe — 2026-04-25T21:02Z_
 - ⚡ `async_fn` `execute_create_booking` (L85)
 
 ### `f/booking_create/main.py`
-- ⚡ `async_fn` `operation` (L43)
-- 🔧 `fn` `main` (L76)
+- ⚡ `async_fn` `main_async` (L24)
+- ⚡ `async_fn` `operation` (L44)
+- 🔧 `fn` `main` (L77)
 
 ### `f/booking_orchestrator/_context_resolver.py`
 - ⚡ `async_fn` `resolve_context` (L18)
@@ -148,7 +151,7 @@ _git:de4366fe — 2026-04-25T21:02Z_
 - ⚡ `async_fn` `handle_reschedule` (L19)
 
 ### `f/booking_orchestrator/main.py`
-- 🔧 `fn` `main` (L82)
+- 🔧 `fn` `main` (L83)
 
 ### `f/booking_reschedule/_reschedule_logic.py`
 - 🔧 `fn` `authorize` (L7)
@@ -175,8 +178,9 @@ _git:de4366fe — 2026-04-25T21:02Z_
 - ⚡ `async_fn` `execute_reschedule` (L76)
 
 ### `f/booking_reschedule/main.py`
-- ⚡ `async_fn` `operation` (L68)
-- 🔧 `fn` `main` (L102)
+- ⚡ `async_fn` `main_async` (L26)
+- ⚡ `async_fn` `operation` (L69)
+- 🔧 `fn` `main` (L103)
 
 ### `f/booking_search/_search_logic.py`
 - ⚡ `async_fn` `execute_search` (L6)
@@ -358,7 +362,7 @@ _git:de4366fe — 2026-04-25T21:02Z_
 - 🔧 `fn` `today_ymd` (L159)
 
 ### `f/internal/_db_client.py`
-- ⚡ `async_fn` `create_db_client` (L31)
+- ⚡ `async_fn` `create_db_client` (L33)
 
 ### `f/internal/_result.py`
 - 🔧 `fn` `ok` (L13)
@@ -379,9 +383,9 @@ _git:de4366fe — 2026-04-25T21:02Z_
 
 ### `f/internal/_wmill_adapter.py`
 - 🔧 `fn` `get_variable` (L8)
-- 🔧 `fn` `get_env` (L25)
-- 🔧 `fn` `log` (L29)
-- 🔧 `fn` `run_script` (L48)
+- 🔧 `fn` `get_env` (L24)
+- 🔧 `fn` `log` (L28)
+- 🔧 `fn` `run_script` (L47)
 
 ### `f/internal/ai_agent/_ai_agent_logic.py`
 - 🔧 `fn` `adjust_intent_with_context` (L19)
@@ -446,6 +450,9 @@ _git:de4366fe — 2026-04-25T21:02Z_
 ### `f/internal/ai_agent/main.py`
 - 🔧 `fn` `main` (L124)
 
+### `f/internal/apply_fix_migration.py`
+- 🔧 `fn` `main` (L22)
+
 ### `f/internal/booking_fsm/_fsm_machine.py`
 - 🔧 `fn` `parse_action` (L18)
 - 🔧 `fn` `parse_callback_data` (L39)
@@ -488,6 +495,12 @@ _git:de4366fe — 2026-04-25T21:02Z_
 - 🔧 `fn` `build_time_slot_keyboard` (L54)
 - 🔧 `fn` `build_confirmation_keyboard` (L60)
 
+### `f/internal/debug_db.py`
+- 🔧 `fn` `main` (L20)
+
+### `f/internal/debug_db_final.py`
+- 🔧 `fn` `main` (L15)
+
 ### `f/internal/gcal_utils/_gcal_logic.py`
 - 🔧 `fn` `build_gcal_event` (L5)
 
@@ -522,6 +535,9 @@ _git:de4366fe — 2026-04-25T21:02Z_
 - 📦 `class` `ServiceRow` (L44)
 - 📦 `class` `AffectedBooking` (L49)
 - 📦 `class` `OverrideValidation` (L54)
+
+### `f/internal/test_var.py`
+- 🔧 `fn` `main` (L2)
 
 ### `f/nlu/_tfidf_classifier.py`
 - 📦 `class` `TfIdfResult` (L190)
@@ -1097,10 +1113,13 @@ _git:de4366fe — 2026-04-25T21:02Z_
 - `f/internal/ai_agent/_rag_context.script.yaml`
 - `f/internal/ai_agent/_tfidf_classifier.script.yaml`
 - `f/internal/ai_agent/main.script.yaml`
+- `f/internal/apply_fix_migration.script.yaml`
 - `f/internal/booking_fsm/__init__.script.yaml`
 - `f/internal/booking_fsm/_fsm_machine.script.yaml`
 - `f/internal/booking_fsm/_fsm_models.script.yaml`
 - `f/internal/booking_fsm/_fsm_responses.script.yaml`
+- `f/internal/debug_db.script.yaml`
+- `f/internal/debug_db_final.script.yaml`
 - `f/internal/gcal_utils/__init__.script.yaml`
 - `f/internal/gcal_utils/_gcal_logic.script.yaml`
 - `f/internal/gcal_utils/_gcal_models.script.yaml`
@@ -1108,6 +1127,7 @@ _git:de4366fe — 2026-04-25T21:02Z_
 - `f/internal/scheduling_engine/__init__.script.yaml`
 - `f/internal/scheduling_engine/_scheduling_logic.script.yaml`
 - `f/internal/scheduling_engine/_scheduling_models.script.yaml`
+- `f/internal/test_var.script.yaml`
 - `f/nlu/__init__.script.yaml`
 - `f/nlu/_constants.script.yaml`
 - `f/nlu/_tfidf_classifier.script.yaml`

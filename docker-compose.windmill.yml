@@ -40,6 +40,8 @@ services:
       - POSTGRES_DB=windmill
     volumes:
       - db_data:/var/lib/postgresql/data
+    ports:
+      - 5432:5432
     expose:
       - 5432
     healthcheck:
@@ -81,6 +83,7 @@ services:
       - DATABASE_URL=postgresql://windmill:windmill@db:5432/windmill?sslmode=disable&application_name=windmill&statement_cache_size=0
       - MODE=server
       - SERVER_TIMEOUT_SECS=600
+      - WINDMILL_BASE_URL=https://titanium.stax.ink
       - DENO_AUTH_TOKENS=${DENO_AUTH_TOKENS:-}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/version"]
@@ -227,7 +230,7 @@ services:
       - REQUIRE_SIGNED_DEBUG_REQUESTS=false
       - WINDMILL_BASE_URL=http://windmill_server:8000
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3001/healthz || exit 1"]
+      test: ["CMD-SHELL", "curl -sf http://localhost:3001/ | grep -q ok"]
       interval: 30s
       timeout: 10s
       retries: 3
