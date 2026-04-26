@@ -165,11 +165,11 @@
 - [x] `f/provider_manage/_manage_models.py`: 0 errors
 </details>
 
-<details>
-<summary><b>Module: <code>rag_query</code> (10 errors)</b></summary>
+<details open>
+<summary><b>Module: <code>rag_query</code> (0 errors) ✅</b></summary>
 
-- [ ] `f/rag_query/main.py`: 6 errors
-- [ ] `f/rag_query/_rag_logic.py`: 4 errors
+- [x] `f/rag_query/main.py`: 0 errors
+- [x] `f/rag_query/_rag_logic.py`: 0 errors
 </details>
 
 <details>
