@@ -1,5 +1,5 @@
 # Codebase Index
-_git:b5f45d02 — 2026-04-26T21:52Z_
+_git:feaafb96 — 2026-04-26T21:57Z_
 
 > Read this file BEFORE exploring the repository.
 
@@ -392,10 +392,10 @@ _git:b5f45d02 — 2026-04-26T21:52Z_
 - 🔧 `fn` `validate_transition` (L40)
 
 ### `f/internal/_wmill_adapter.py`
-- 🔧 `fn` `get_variable` (L12)
-- 🔧 `fn` `get_env` (L27)
-- 🔧 `fn` `log` (L32)
-- 🔧 `fn` `run_script` (L51)
+- 🔧 `fn` `is_dict_str_any` (L8)
+- 🔧 `fn` `get_variable_safe` (L11)
+- 🔧 `fn` `get_resource_safe` (L18)
+- 🔧 `fn` `log` (L30)
 
 ### `f/internal/ai_agent/_ai_agent_logic.py`
 - 🔧 `fn` `adjust_intent_with_context` (L20)

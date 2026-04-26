@@ -31,8 +31,14 @@ managed = true
 [tool.mypy]
 python_version = "3.13"
 strict = true
+mypy_path = "stubs"
 warn_return_any = true
 warn_unused_ignores = true
+
+[[tool.mypy.overrides]]
+module = "wmill.*"
+ignore_missing_imports = true
+
 
 [tool.ruff]
 line-length = 120

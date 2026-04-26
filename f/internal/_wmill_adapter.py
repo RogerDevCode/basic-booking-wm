@@ -1,62 +1,35 @@
-# mypy: disable-error-code="import-not-found, import-untyped, misc, no-any-return"
-"""Windmill SDK adapter - encapsulates untyped external library."""
 from __future__ import annotations
+from typing import Any, Dict, Optional, TypeVar, TypeIs, cast
+import wmill
+from returns.result import Result, Success, Failure
 
-import os
-import traceback
-from typing import Any, cast
+T = TypeVar("T")
 
-# Encapsulates Windmill SDK to prevent direct dependencies in business logic
+def is_dict_str_any(val: object) -> TypeIs[Dict[str, object]]:
+    return isinstance(val, dict) and all(isinstance(k, str) for k in val.keys())
 
-
-def get_variable(path: str) -> str | None:
-    """Gets a Windmill variable or fallback to env for local dev."""
+def get_variable_safe(path: str) -> Result[str, Exception]:
     try:
-        import wmill
-
-        val: object = wmill.get_variable(path)
-        if val is not None and str(val).strip():
-            return str(val)
+        val = wmill.get_variable(path)
+        return Success(str(val))
     except Exception as e:
-        log("get_variable failed", path=path, error=str(e))
+        return Failure(e)
 
-    env_name = path.split("/")[-1] if "/" in path else path
-    return os.getenv(env_name)
-
-
-def get_env(key: str) -> str | None:
-    """Gets an environment variable safely."""
-    return os.getenv(key)
-
+def get_resource_safe(path: str, schema: type[T]) -> Result[T, Exception]:
+    try:
+        raw: object = wmill.get_resource(path)
+        if not is_dict_str_any(raw):
+            return Failure(TypeError(f"Resource at {path} is not a valid dictionary"))
+        
+        # Boundary validation via cast + TypeGuard (simplified for brevity, 
+        # normally you'd use Pydantic here)
+        return Success(cast(T, raw))
+    except Exception as e:
+        return Failure(e)
 
 def log(message: str, **kwargs: object) -> None:
-    """Structured logging compatible with Windmill."""
-    if "error" in kwargs and "traceback" not in kwargs:
-        kwargs["traceback"] = traceback.format_exc()
-
     try:
-        import wmill
-
-        if hasattr(wmill, "log"):
-            log_fn: Any = getattr(wmill, "log")
-            if callable(log_fn):
-                log_fn(message, **kwargs)
-            return
-    except (ImportError, Exception):
+        # Internal non-leaking log
+        print(f"WMILL_LOG: {message} | {kwargs}")
+    except Exception:
         pass
-
-    print(f"[LOG] {message} {kwargs if kwargs else ''}")
-
-
-def run_script(path: str, args: dict[str, object]) -> tuple[str | None, object | None]:
-    """Runs a Windmill script and returns its Result tuple."""
-    try:
-        import wmill
-
-        result: object = wmill.run_script(path=path, args=args)
-        if isinstance(result, (list, tuple)) and len(result) == 2:
-            return cast("str | None", result[0]), result[1]
-        return None, result
-    except Exception as e:
-        log("run_script failed", path=path, error=str(e))
-        return f"Windmill script execution failed: {str(e)}", None
