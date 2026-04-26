@@ -1,18 +1,24 @@
-import json
+from __future__ import annotations
 from datetime import datetime, timezone, timedelta
-from typing import Optional, List, Dict, Any, cast
+from typing import Dict, Any, cast, Final
 from ..internal._result import Result, DBClient, ok, fail
-from ._lock_models import LockInfo, LockResult, LockRow, InputSchema
+from ._lock_models import LockInfo, LockResult, InputSchema
 
-def map_row_to_lock_info(r: Dict[str, Any]) -> LockInfo:
+def map_row_to_lock_info(row: object) -> LockInfo:
+    r = cast(Dict[str, object], row)
+    def to_iso(val: object) -> str:
+        if isinstance(val, datetime):
+            return val.isoformat()
+        return str(val)
+
     return {
         "lock_id": str(r["lock_id"]),
         "lock_key": str(r["lock_key"]),
         "owner_token": str(r["owner_token"]),
         "provider_id": str(r["provider_id"]),
-        "start_time": r["start_time"].isoformat() if isinstance(r.get("start_time"), datetime) else str(r.get("start_time")),
-        "acquired_at": r["acquired_at"].isoformat() if isinstance(r.get("acquired_at"), datetime) else str(r.get("acquired_at")),
-        "expires_at": r["expires_at"].isoformat() if isinstance(r.get("expires_at"), datetime) else str(r.get("expires_at")),
+        "start_time": to_iso(r.get("start_time")),
+        "acquired_at": to_iso(r.get("acquired_at")),
+        "expires_at": to_iso(r.get("expires_at")),
     }
 
 async def acquire_lock(db: DBClient, input_data: InputSchema) -> Result[LockResult]:
@@ -54,7 +60,8 @@ async def acquire_lock(db: DBClient, input_data: InputSchema) -> Result[LockResu
     if rows:
         return ok({"acquired": True, "lock": map_row_to_lock_info(rows[0])})
 
-    return ok({"acquired": False, "reason": "lock_already_held"})
+    res: LockResult = {"acquired": False, "reason": "lock_already_held"}
+    return ok(res)
 
 async def release_lock(db: DBClient, input_data: InputSchema) -> Result[LockResult]:
     if not input_data.owner_token:
@@ -66,9 +73,11 @@ async def release_lock(db: DBClient, input_data: InputSchema) -> Result[LockResu
     )
     
     if not rows:
-        return ok({"released": False, "reason": "lock_not_found_or_unauthorized"})
+        res_fail: LockResult = {"released": False, "reason": "lock_not_found_or_unauthorized"}
+        return ok(res_fail)
     
-    return ok({"released": True})
+    res_ok: LockResult = {"released": True}
+    return ok(res_ok)
 
 async def check_lock(db: DBClient, lock_key: str) -> Result[LockResult]:
     rows = await db.fetch(
@@ -80,12 +89,15 @@ async def check_lock(db: DBClient, lock_key: str) -> Result[LockResult]:
         lock_key
     )
     if not rows:
-        return ok({"locked": False})
+        res_no: LockResult = {"locked": False}
+        return ok(res_no)
     
     r = rows[0]
     exp = r["expires_at"].isoformat() if isinstance(r.get("expires_at"), datetime) else str(r.get("expires_at"))
-    return ok({"locked": True, "owner": str(r["owner_token"]), "expires_at": exp})
+    res_yes: LockResult = {"locked": True, "owner": str(r["owner_token"]), "expires_at": exp}
+    return ok(res_yes)
 
 async def cleanup_locks(db: DBClient) -> Result[LockResult]:
     rows = await db.fetch("DELETE FROM booking_locks WHERE expires_at < NOW() RETURNING lock_key")
-    return ok({"cleaned": len(rows)})
+    res: LockResult = {"cleaned": len(rows)}
+    return ok(res)

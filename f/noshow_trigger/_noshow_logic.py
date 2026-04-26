@@ -3,7 +3,7 @@ from ..internal._result import Result, DBClient, ok, fail
 from ..internal._state_machine import validate_transition
 
 class BookingRepository:
-    def __init__(self, db: DBClient):
+    def __init__(self, db: DBClient) -> None:
         self.db = db
 
     async def find_expired_confirmed(self, lookback_minutes: int) -> Result[List[str]]:

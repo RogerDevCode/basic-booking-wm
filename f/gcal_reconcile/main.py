@@ -1,4 +1,6 @@
+from __future__ import annotations
 import asyncio
+import os
 # ============================================================================
 # PRE-FLIGHT CHECKLIST
 # Mission         : Cron job to retry pending GCal syncs (every 5 minutes)
@@ -19,7 +21,7 @@ from ._reconcile_logic import sync_booking_to_gcal
 
 MODULE = "gcal_reconcile"
 
-async def _main_async(args: dict[str, Any]) -> Result[ReconcileResult]:
+async def _main_async(args: dict[str, object]) -> Result[ReconcileResult]:
     try:
         input_data = InputSchema.model_validate(args)
     except Exception as e:
@@ -64,13 +66,28 @@ async def _main_async(args: dict[str, Any]) -> Result[ReconcileResult]:
                     "processed": 0, "synced": 0, "partial": 0, "failed": 0, "skipped": 0, "errors": []
                 }
                 
-                for row in booking_rows:
+                for row_raw in booking_rows:
                     res["processed"] += 1
                     if input_data.dry_run:
                         res["skipped"] += 1
                         continue
                     
-                    booking = cast(BookingRow, row)
+                    row = cast(Dict[str, object], row_raw)
+                    booking = cast(BookingRow, {
+                        "booking_id": str(row["booking_id"]),
+                        "status": str(row["status"]),
+                        "start_time": str(row["start_time"]),
+                        "end_time": str(row["end_time"]),
+                        "gcal_provider_event_id": str(row["gcal_provider_event_id"]) if row.get("gcal_provider_event_id") else None,
+                        "gcal_client_event_id": str(row["gcal_client_event_id"]) if row.get("gcal_client_event_id") else None,
+                        "gcal_retry_count": int(cast(Any, row["gcal_retry_count"])),
+                        "provider_name": str(row["provider_name"]),
+                        "provider_calendar_id": str(row["provider_calendar_id"]) if row.get("provider_calendar_id") else None,
+                        "client_name": str(row["client_name"]),
+                        "client_calendar_id": str(row["client_calendar_id"]) if row.get("client_calendar_id") else None,
+                        "service_name": str(row["service_name"])
+                    })
+                    
                     sync_res = await sync_booking_to_gcal(booking, input_data.max_retries)
                     
                     status: str
@@ -122,23 +139,22 @@ async def _main_async(args: dict[str, Any]) -> Result[ReconcileResult]:
         log("Unexpected error in gcal_reconcile", error=str(e), module=MODULE)
         return Exception(f"Internal error: {e}"), None
     finally:
-        await conn.close() # pyright: ignore[reportUnknownMemberType]
+        await conn.close()
 
 
-def main(args: dict):
+def main(args: dict[str, object]) -> ReconcileResult | None:
     import traceback
     try:
-        return asyncio.run(_main_async(args))
+        err, result = asyncio.run(_main_async(args))
+        if err:
+            raise err
+        return result
     except Exception as e:
         tb = traceback.format_exc()
-        # Intentamos usar el adaptador local si está disponible, si no print
         try:
-            from ..internal._wmill_adapter import log
-            log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=os.path.basename(os.path.dirname(__file__)))
-        except:
-            from ..internal._wmill_adapter import log
-            log("BARE_EXCEPT_CAUGHT", file="main.py")
-            print(f"CRITICAL ERROR in {__file__}: {e}\n{tb}")
+            log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=MODULE)
+        except Exception:
+            print(f"CRITICAL ERROR in gcal_reconcile: {e}\n{tb}")
         
         # Elevamos para que Windmill marque como FAILED
         raise RuntimeError(f"Execution failed: {e}")

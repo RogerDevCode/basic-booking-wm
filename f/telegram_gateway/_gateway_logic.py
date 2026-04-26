@@ -1,3 +1,4 @@
+from typing import Any
 import httpx
 from typing import Optional, List, Dict, Any, Tuple
 from ..internal._result import Result, DBClient, ok, fail
@@ -5,7 +6,7 @@ from ..internal._db_client import create_db_client
 from ._gateway_models import SendMessageOptions
 
 class TelegramClient:
-    def __init__(self, token: str):
+    def __init__(self, token: str) -> None:
         self.token = token
         self.base_url = f"https://api.telegram.org/bot{token}"
 
@@ -31,7 +32,7 @@ class TelegramClient:
             return fail(f"send_message_failed: {e}")
 
 class ClientRepository:
-    def __init__(self, db_url: str):
+    def __init__(self, db_url: str) -> None:
         self.db_url = db_url
 
     async def ensure_registered(self, full_name: str) -> Result[None]:

@@ -1,4 +1,5 @@
-from typing import Optional, List, Literal, Dict, Any, TypedDict
+from __future__ import annotations
+from typing import Optional, List, Literal, Dict, TypedDict
 from pydantic import BaseModel, ConfigDict, Field
 
 class DLQEntry(TypedDict):
@@ -9,7 +10,7 @@ class DLQEntry(TypedDict):
     failure_reason: str
     last_error_message: str
     last_error_stack: Optional[str]
-    original_payload: Dict[str, Any]
+    original_payload: Dict[str, object]
     idempotency_key: str
     status: Literal['pending', 'resolved', 'discarded']
     created_at: str

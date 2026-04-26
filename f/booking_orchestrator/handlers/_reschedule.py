@@ -1,9 +1,9 @@
-from typing import Any
+from typing import cast
 from f.booking_orchestrator._orchestrator_models import OrchestratorInput, OrchestratorResult
 from f.booking_orchestrator._get_entity import get_entity
 from ._get_my_bookings import handle_get_my_bookings
 from f.booking_reschedule.main import main_async as reschedule_booking
-from f.internal._result import Result
+from f.internal._result import Result, DBClient, ok, fail
 
 """
 PRE-FLIGHT
@@ -17,8 +17,7 @@ Zod Schemas      : NO
 """
 
 async def handle_reschedule(
-    conn: Any,
-
+    conn: DBClient,
     input_data: OrchestratorInput
 ) -> Result[OrchestratorResult]:
     booking_id = input_data.booking_id or get_entity(input_data.entities, "booking_id")
@@ -27,10 +26,10 @@ async def handle_reschedule(
 
     if not booking_id:
         cloned_input = input_data.model_copy(update={"notes": "Dime el ID de la cita que quieres mover y la nueva fecha/hora."})
-        return await handle_get_my_bookings(cloned_input)
+        return await handle_get_my_bookings(conn, cloned_input)
 
     if not date or not time:
-        return None, {
+        res: OrchestratorResult = {
             "action": "reagendar_cita",
             "success": False,
             "data": None,
@@ -46,9 +45,10 @@ async def handle_reschedule(
                 "client_id": input_data.client_id,
             }
         }
+        return ok(res)
 
     # Call booking_reschedule
-    args = {
+    args: dict[str, object] = {
         "booking_id": booking_id,
         "new_start_time": f"{date}T{time}:00",
         "actor": "client",
@@ -58,9 +58,10 @@ async def handle_reschedule(
 
     err, data = await reschedule_booking(args)
 
-    return None, {
+    res_final: OrchestratorResult = {
         "action": "reagendar_cita",
         "success": err is None,
         "data": data,
         "message": f"❌ No se pudo reagendar: {err}" if err else f"✅ Reagendada para el {date} a las {time}.",
     }
+    return ok(res_final)

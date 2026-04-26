@@ -1,5 +1,14 @@
+from __future__ import annotations
 import asyncio
-import wmill
+from typing import Any, cast
+from pydantic import ValidationError
+from ..internal._wmill_adapter import log
+from ..internal._db_client import create_db_client
+from ..internal._result import with_tenant_context, Result
+from ._booking_cancel_models import CancelBookingInput, CancelResult, UpdatedBooking
+from ._booking_cancel_repository import PostgresBookingCancelRepository
+from ._cancel_booking_logic import execute_cancel_booking, authorize_actor
+
 # ============================================================================
 # PRE-FLIGHT CHECKLIST
 # Mission         : Cancel an existing medical appointment
@@ -11,20 +20,11 @@ import wmill
 # Zod Schemas     : YES — InputSchema validates all inputs
 # ============================================================================
 
-from typing import Any
-from pydantic import ValidationError
-from ..internal._wmill_adapter import log
-from ..internal._db_client import create_db_client
-from ..internal._result import with_tenant_context, Result
-from ._booking_cancel_models import CancelBookingInput, CancelResult, UpdatedBooking
-from ._booking_cancel_repository import PostgresBookingCancelRepository
-from ._cancel_booking_logic import execute_cancel_booking, authorize_actor
-
 MODULE = "booking_cancel"
 
-async def main_async(args: object) -> tuple[Exception | None, CancelResult | None]:
-    raw_input: Any
-    if isinstance(args, dict) and "rawInput" in args:
+async def main_async(args: dict[str, object]) -> Result[CancelResult]:
+    raw_input: object
+    if "rawInput" in args:
         raw_input = args["rawInput"]
     else:
         raw_input = args
@@ -35,68 +35,76 @@ async def main_async(args: object) -> tuple[Exception | None, CancelResult | Non
         input_data = CancelBookingInput.model_validate(raw_input)
     except ValidationError as e:
         log("validation_failed", error=str(e), module=MODULE)
-        return (Exception(f"validation_error: {e}"), None)
+        return Exception(f"validation_error: {e}"), None
     except Exception as e:
         log("validation_failed", error=str(e), module=MODULE)
-        return (Exception(f"validation_error: {e}"), None)
+        return Exception(f"validation_error: {e}"), None
 
     try:
         conn = await create_db_client()
     except Exception as e:
-        return (Exception(f"configuration_error: {e}"), None)
+        return Exception(f"configuration_error: {e}"), None
 
     try:
         repo = PostgresBookingCancelRepository(conn)
         
-        # Initial Lookup (Outside of Tenant Context Transaction? 
-        # TS code fetches outside the tenant context to find the provider_id)
+        # Initial Lookup
         booking = await repo.fetch_booking(input_data.booking_id)
         if not booking:
-            return (Exception(f"booking_not_found: {input_data.booking_id}"), None)
+            return Exception(f"booking_not_found: {input_data.booking_id}"), None
 
         err_auth, _ = authorize_actor(input_data, booking)
         if err_auth is not None:
-            return (err_auth, None)
+            return err_auth, None
 
         async def operation() -> Result[UpdatedBooking]:
             return await execute_cancel_booking(repo, input_data, booking)
         
-        err, updated = await with_tenant_context(conn, booking["provider_id"], operation)
+        # Cast booking to dict[str, object] to avoid Any contamination
+        b_dict = cast(dict[str, object], booking)
+        tenant_id = str(b_dict["provider_id"])
+        
+        err, updated = await with_tenant_context(conn, tenant_id, operation)
         
         if err is not None:
             log("transaction_failed", error=str(err), module=MODULE)
-            return (err, None)
+            return err, None
 
         if not updated:
-            return (Exception("cancel_failed: no result returned"), None)
+            return Exception("cancel_failed: no result returned"), None
+        
+        # Cast updated to dict[str, object] as well
+        u_dict = cast(dict[str, object], updated)
             
         result: CancelResult = {
-            "booking_id": updated["booking_id"],
-            "previous_status": booking["status"],
-            "new_status": updated["status"],
-            "cancelled_by": updated["cancelled_by"],
-            "cancellation_reason": updated["cancellation_reason"]
+            "booking_id": str(u_dict["booking_id"]),
+            "previous_status": str(b_dict["status"]),
+            "new_status": str(u_dict["status"]),
+            "cancelled_by": str(u_dict["cancelled_by"]),
+            "cancellation_reason": str(u_dict["cancellation_reason"]) if u_dict.get("cancellation_reason") else None
         }
         
-        return (None, result)
+        return None, result
 
     except Exception as e:
         log("unexpected_exception", error=str(e), module=MODULE)
-        return (Exception(str(e)), None)
+        return Exception(str(e)), None
     finally:
-        await conn.close() # pyright: ignore[reportUnknownMemberType]
+        await conn.close()
 
 
-def main(args: dict):
+def main(args: dict[str, object]) -> CancelResult | None:
     import traceback
     try:
-        return asyncio.run(main_async(args))
+        err, result = asyncio.run(main_async(args))
+        if err:
+            raise err
+        return result
     except Exception as e:
         tb = traceback.format_exc()
         try:
-            from ..internal._wmill_adapter import log
-            log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module="booking_cancel")
-        except:
+            log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=MODULE)
+        except Exception:
             print(f"CRITICAL ERROR in booking_cancel: {e}\n{tb}")
         
         # Elevamos para que Windmill marque como FAILED

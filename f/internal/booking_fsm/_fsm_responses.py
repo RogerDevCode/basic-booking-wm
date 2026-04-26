@@ -1,3 +1,4 @@
+from typing import Any
 from typing import List, Optional, Dict, Any, TypedDict
 
 # ============================================================================
@@ -41,26 +42,26 @@ def chunk_buttons(btns: List[InlineButton], size: int = 2) -> List[List[InlineBu
     return [btns[i:i + size] for i in range(0, len(btns), size)]
 
 def build_specialty_keyboard(items: List[Dict[str, str]]) -> List[List[InlineButton]]:
-    list_btns = [{"text": it["name"], "callback_data": f"spec:{it['id']}"} for it in items]
-    list_btns.append({"text": "❌ Cancelar", "callback_data": "cancel"})
+    list_btns: List[InlineButton] = [InlineButton(text=it["name"], callback_data=f"spec:{it['id']}") for it in items]
+    list_btns.append(InlineButton(text="❌ Cancelar", callback_data="cancel"))
     return chunk_buttons(list_btns)
 
 def build_doctor_keyboard(items: List[Dict[str, str]]) -> List[List[InlineButton]]:
-    list_btns = [{"text": it["name"], "callback_data": f"doc:{it['id']}"} for it in items]
-    list_btns.append({"text": "⬅️ Volver", "callback_data": "back"})
-    list_btns.append({"text": "❌ Cancelar", "callback_data": "cancel"})
+    list_btns: List[InlineButton] = [InlineButton(text=it["name"], callback_data=f"doc:{it['id']}") for it in items]
+    list_btns.append(InlineButton(text="⬅️ Volver", callback_data="back"))
+    list_btns.append(InlineButton(text="❌ Cancelar", callback_data="cancel"))
     return chunk_buttons(list_btns)
 
 def build_time_slot_keyboard(items: List[Dict[str, str]]) -> List[List[InlineButton]]:
-    list_btns = [{"text": it["label"], "callback_data": f"time:{it['id']}"} for it in items]
-    list_btns.append({"text": "⬅️ Volver", "callback_data": "back"})
-    list_btns.append({"text": "❌ Cancelar", "callback_data": "cancel"})
+    list_btns: List[InlineButton] = [InlineButton(text=it["label"], callback_data=f"time:{it['id']}") for it in items]
+    list_btns.append(InlineButton(text="⬅️ Volver", callback_data="back"))
+    list_btns.append(InlineButton(text="❌ Cancelar", callback_data="cancel"))
     return chunk_buttons(list_btns)
 
 def build_confirmation_keyboard() -> List[List[InlineButton]]:
     return [
         [
-            {"text": "✅ Sí, confirmar", "callback_data": "cfm:yes"},
-            {"text": "❌ No, volver", "callback_data": "cfm:no"}
+            InlineButton(text="✅ Sí, confirmar", callback_data="cfm:yes"),
+            InlineButton(text="❌ No, volver", callback_data="cfm:no")
         ]
     ]

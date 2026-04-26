@@ -1,6 +1,7 @@
+from __future__ import annotations
 import json
 from datetime import datetime, date
-from typing import Protocol
+from typing import Protocol, Any, cast
 from ._booking_create_models import (
     ClientContext,
     ProviderContext,
@@ -72,11 +73,11 @@ class PostgresBookingCreateRepository:
         )
         if not row:
             return None
-        return {
+        return cast(ServiceContext, {
             "id": str(row["service_id"]),
             "name": str(row["name"]),
-            "duration": int(str(row["duration_minutes"]))
-        }
+            "duration": int(cast(Any, row["duration_minutes"]))
+        })
 
     async def is_provider_blocked(self, provider_id: str, target_date: date) -> bool:
         row = await self._client.fetchrow(

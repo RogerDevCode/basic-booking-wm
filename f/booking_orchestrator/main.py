@@ -1,17 +1,5 @@
+from __future__ import annotations
 import asyncio
-import wmill
-# ============================================================================
-# PRE-FLIGHT CHECKLIST
-# Mission         : Routes AI intents to booking actions (create, cancel, reschedule, list)
-# DB Tables Used  : bookings, providers, clients, services, provider_schedules
-# Concurrency Risk: YES — delegates to booking_create/cancel/reschedule which use transactions
-# GCal Calls      : NO — delegates to gcal_sync
-# Idempotency Key : YES — delegates to child scripts
-# RLS Tenant ID   : YES — with_tenant_context wraps all DB ops
-# Pydantic Schemas: YES — OrchestratorInput validates all inputs
-# mypy + pyright  : PASS (strict mode)
-# ============================================================================
-
 from typing import Any
 from ..internal._wmill_adapter import log
 from ..internal._db_client import create_db_client
@@ -25,6 +13,18 @@ from .handlers._reschedule import handle_reschedule
 from .handlers._list_available import handle_list_available
 from .handlers._get_my_bookings import handle_get_my_bookings
 
+# ============================================================================
+# PRE-FLIGHT CHECKLIST
+# Mission         : Routes AI intents to booking actions (create, cancel, reschedule, list)
+# DB Tables Used  : bookings, providers, clients, services, provider_schedules
+# Concurrency Risk: YES — delegates to booking_create/cancel/reschedule which use transactions
+# GCal Calls      : NO — delegates to gcal_sync
+# Idempotency Key : YES — delegates to child scripts
+# RLS Tenant ID   : YES — with_tenant_context wraps all DB ops
+# Pydantic Schemas: YES — OrchestratorInput validates all inputs
+# mypy + pyright  : PASS (strict mode)
+# ============================================================================
+
 MODULE = "booking_orchestrator"
 
 HANDLER_MAP: dict[str, OrchestratorHandler] = {
@@ -35,7 +35,7 @@ HANDLER_MAP: dict[str, OrchestratorHandler] = {
     "mis_citas": handle_get_my_bookings,
 }
 
-async def _main_async(args: dict[str, Any]) -> Result[OrchestratorResult]:
+async def _main_async(args: dict[str, object]) -> Result[OrchestratorResult]:
     try:
         input_data = OrchestratorInput.model_validate(args)
     except Exception as e:
@@ -69,6 +69,9 @@ async def _main_async(args: dict[str, Any]) -> Result[OrchestratorResult]:
             log("Orchestration execution failed", error=str(exec_err), module=MODULE)
             return exec_err, None
 
+        if not result:
+            return Exception("No result returned from handler"), None
+
         return None, result
 
     except Exception as e:
@@ -77,15 +80,24 @@ async def _main_async(args: dict[str, Any]) -> Result[OrchestratorResult]:
         log("Unexpected orchestrator error", error=str(e), traceback=tb, module=MODULE)
         return Exception(f"Internal orchestrator error: {e}"), None
     finally:
-        await conn.close() # pyright: ignore[reportUnknownMemberType]
+        await conn.close()
 
 
-def main(telegram_chat_id: str, intent: str, entities: dict[str, Any] | None = None) -> dict[str, Any]:
+def main(telegram_chat_id: str, intent: str, entities: dict[str, object] | None = None) -> dict[str, Any]:
     """
     Entrypoint sincrónico para la ejecución en Windmill.
     """
     try:
-        return asyncio.run(_main_async({"telegram_chat_id": telegram_chat_id, "intent": intent, "entities": entities or {}}))
+        args: dict[str, object] = {
+            "telegram_chat_id": telegram_chat_id, 
+            "intent": intent, 
+            "entities": entities or {}
+        }
+        err, result = asyncio.run(_main_async(args))
+        if err:
+            raise err
+        # Windmill expects a JSON-serializable dict, we cast result to Any for the return
+        return dict(result) if result else {}
     except Exception as e:
         import traceback
         tb = traceback.format_exc()

@@ -92,7 +92,7 @@ async def _main_async(args: dict[str, Any]) -> Result[ReminderConfigResult]:
         await conn.close() # pyright: ignore[reportUnknownMemberType]
 
 
-def main(args: dict):
+def main(args: dict) -> None:
     import traceback
     try:
         return asyncio.run(_main_async(args))

@@ -1,4 +1,6 @@
+from __future__ import annotations
 import asyncio
+import os
 # ============================================================================
 # PRE-FLIGHT CHECKLIST
 # Mission         : System health monitoring (DB, GCal, Telegram, Gmail)
@@ -10,9 +12,8 @@ import asyncio
 # Pydantic Schemas: YES — InputSchema validates optional filter
 # ============================================================================
 
-import os
 from datetime import datetime, timezone
-from typing import Any, Dict, List
+from typing import Any, List, Literal
 from ..internal._wmill_adapter import log, get_variable
 from ..internal._result import Result, ok, fail
 from ._health_models import InputSchema, HealthResult, ComponentStatus
@@ -20,15 +21,15 @@ from ._health_logic import check_database, check_gcal, check_telegram, check_gma
 
 MODULE = "health_check"
 
-async def _main_async(args: dict[str, Any]) -> Result[HealthResult]:
+async def _main_async(args: dict[str, object]) -> Result[HealthResult]:
     # 1. Validate Input
     try:
         input_data = InputSchema.model_validate(args)
     except Exception as e:
         return fail(f"Validation error: {e}")
 
-    gcal_token = get_variable("GCAL_ACCESS_TOKEN")
-    tg_token = get_variable("TELEGRAM_BOT_TOKEN")
+    gcal_token = str(get_variable("GCAL_ACCESS_TOKEN")) if get_variable("GCAL_ACCESS_TOKEN") else None
+    tg_token = str(get_variable("TELEGRAM_BOT_TOKEN")) if get_variable("TELEGRAM_BOT_TOKEN") else None
     gm_pass = os.getenv("GMAIL_PASSWORD")
 
     components: List[ComponentStatus] = []
@@ -52,31 +53,31 @@ async def _main_async(args: dict[str, Any]) -> Result[HealthResult]:
     for c in components:
         max_sev = max(max_sev, status_priority.get(c["status"], 0))
     
-    overall: Any = 'healthy'
+    overall: Literal['healthy', 'unhealthy', 'degraded'] = 'healthy'
     if max_sev == 2: overall = 'unhealthy'
     elif max_sev == 1: overall = 'degraded'
 
-    return ok({
+    res: HealthResult = {
         "overall": overall,
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "components": components
-    })
+    }
+    return ok(res)
 
 
-def main(args: dict):
+def main(args: dict[str, object]) -> HealthResult | None:
     import traceback
     try:
-        return asyncio.run(_main_async(args))
+        err, result = asyncio.run(_main_async(args))
+        if err:
+            raise err
+        return result
     except Exception as e:
         tb = traceback.format_exc()
-        # Intentamos usar el adaptador local si está disponible, si no print
         try:
-            from ..internal._wmill_adapter import log
-            log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=os.path.basename(os.path.dirname(__file__)))
-        except:
-            from ..internal._wmill_adapter import log
-            log("BARE_EXCEPT_CAUGHT", file="main.py")
-            print(f"CRITICAL ERROR in {__file__}: {e}\n{tb}")
+            log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=MODULE)
+        except Exception:
+            print(f"CRITICAL ERROR in health_check: {e}\n{tb}")
         
         # Elevamos para que Windmill marque como FAILED
         raise RuntimeError(f"Execution failed: {e}")

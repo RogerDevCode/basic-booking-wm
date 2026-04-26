@@ -1,6 +1,7 @@
+from __future__ import annotations
 import json
 from datetime import datetime
-from typing import Protocol, cast
+from typing import Protocol, cast, Any
 from ..internal._result import DBClient
 from ..internal._state_machine import BookingStatus
 from ._reschedule_models import BookingRow, ServiceRow, RescheduleInput, RescheduleWriteResult
@@ -50,10 +51,10 @@ class PostgresRescheduleRepository:
         )
         if not row:
             return None
-        return {
+        return cast(ServiceRow, {
             "service_id": str(row["service_id"]),
-            "duration_minutes": int(str(row["duration_minutes"]))
-        }
+            "duration_minutes": int(cast(Any, row["duration_minutes"]))
+        })
 
     async def check_overlap(self, provider_id: str, exclude_booking_id: str, new_start: datetime, new_end: datetime) -> bool:
         row = await self._client.fetchrow(

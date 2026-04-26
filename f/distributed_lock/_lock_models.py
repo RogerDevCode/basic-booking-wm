@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import Optional, Literal, TypedDict, List, Any
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -25,9 +26,9 @@ class LockRow(TypedDict):
     lock_key: str
     owner_token: str
     provider_id: str
-    start_time: Any
-    acquired_at: Any
-    expires_at: Any
+    start_time: object
+    acquired_at: object
+    expires_at: object
 
 class InputSchema(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
@@ -38,5 +39,3 @@ class InputSchema(BaseModel):
     provider_id: str
     start_time: Optional[str] = None
     ttl_seconds: int = Field(default=30, ge=1, le=3600)
-
-from typing import Any

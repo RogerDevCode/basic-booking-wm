@@ -3,7 +3,7 @@ from ..internal._result import Result, DBClient, ok, fail
 from ._rag_models import KBRow, KBEntry
 
 class KBRepository:
-    def __init__(self, db: DBClient):
+    def __init__(self, db: DBClient) -> None:
         self.db = db
 
     async def fetch_active_entries(self, category: Optional[str] = None) -> Result[List[KBRow]]:

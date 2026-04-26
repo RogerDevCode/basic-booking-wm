@@ -1,42 +1,34 @@
+from __future__ import annotations
+
 import os
 import ssl
+from typing import TYPE_CHECKING, cast
 
-import asyncpg  # type: ignore[import-untyped, import-not-found]
+import asyncpg  # type: ignore[import-untyped]
+
+if TYPE_CHECKING:
+    from ._result import DBClient
 
 # ============================================================================
 # DB CLIENT — PostgreSQL Connection Abstraction
-# ============================================================================
-# Implements SOLID-D: Dependency Inversion Principle.
-# Scripts depend on this abstraction, not on raw asyncpg calls.
-#
-# DB URL resolution priority:
-#   1. Explicit `url` argument
-#   2. wmill.get_variable("u/admin/DATABASE_URL")  — Windmill production
-#   3. os.getenv("DATABASE_URL")                   — local dev fallback
 # ============================================================================
 
 
 def _resolve_db_url() -> str | None:
     """Resolves DATABASE_URL from Windmill variables with env fallback."""
-    from ._wmill_adapter import get_variable  # local import avoids circular deps
+    from ._wmill_adapter import get_variable
 
-    # Try Windmill variable first (production paths)
     for path in ["g/all/DATABASE_URL", "u/admin/DATABASE_URL", "DATABASE_URL"]:
         wm_url = get_variable(path)
         if wm_url:
             return wm_url
 
-    # Fallback for local development
     return os.getenv("DATABASE_URL")
 
 
-async def create_db_client(url: str | None = None, **kwargs: object) -> asyncpg.Connection:
+async def create_db_client(url: str | None = None, **kwargs: object) -> DBClient:
     """
     Creates a configured PostgreSQL client.
-    Usage:
-        conn = await create_db_client()
-        ...
-        await conn.close()
     """
     db_url = url or _resolve_db_url()
     if not db_url:
@@ -48,16 +40,17 @@ async def create_db_client(url: str | None = None, **kwargs: object) -> asyncpg.
 
     is_localhost = "localhost" in db_url or "127.0.0.1" in db_url
 
-    # Configure default SSL based on localhost or sslmode=disable
-    ssl_ctx: object
-    if "ssl" not in kwargs:
+    new_kwargs: dict[str, object] = dict(kwargs)
+    if "ssl" not in new_kwargs:
         if is_localhost or "sslmode=disable" in db_url:
-            ssl_ctx = False
+            new_kwargs["ssl"] = False
         else:
             ssl_ctx = ssl.create_default_context()
-            ssl_ctx.check_hostname = False  # type: ignore[union-attr]
-            ssl_ctx.verify_mode = ssl.CERT_NONE  # type: ignore[union-attr]
-        kwargs["ssl"] = ssl_ctx
+            ssl_ctx.check_hostname = False
+            ssl_ctx.verify_mode = ssl.CERT_NONE
+            new_kwargs["ssl"] = ssl_ctx
 
-    conn = await asyncpg.connect(db_url, **kwargs)  # type: ignore[no-untyped-call]
-    return conn  # type: ignore[no-any-return]
+    # asyncpg.connect returns Any because it's untyped.
+    # We cast immediately to DBClient to stop Any contamination.
+    conn: DBClient = cast("DBClient", await asyncpg.connect(db_url, **new_kwargs))
+    return conn

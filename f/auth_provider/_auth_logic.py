@@ -1,14 +1,18 @@
+from __future__ import annotations
 import random
 import string
 from datetime import datetime, timedelta, timezone
-from typing import List, Optional, Dict, Any, cast
+from typing import Any, cast, Final
 from ..internal._result import Result, DBClient, ok, fail
 from ..internal._crypto import hash_password, verify_password, validate_password_policy
 from ._auth_models import (
     InputSchema, TempPasswordResult, PasswordChangeResult, VerifyResult
 )
 
-def generate_readable_password(length: int = 4) -> str:
+# Constants
+DEFAULT_PWD_LEN: Final[int] = 4
+
+def generate_readable_password(length: int = DEFAULT_PWD_LEN) -> str:
     """Generates a simple readable alphanumeric password."""
     chars = string.ascii_uppercase + string.digits
     return ''.join(random.choice(chars) for _ in range(length))
@@ -22,7 +26,7 @@ async def admin_generate_temp_password(db: DBClient, input_data: InputSchema) ->
         return fail(f"Provider {input_data.provider_id} not found")
 
     provider = rows[0]
-    temp_pwd = generate_readable_password(4)
+    temp_pwd = generate_readable_password(DEFAULT_PWD_LEN)
     pwd_hash = hash_password(temp_pwd)
     expires_at = (datetime.now(timezone.utc) + timedelta(days=1)).isoformat()
 
@@ -62,7 +66,8 @@ async def provider_change_password(db: DBClient, input_data: InputSchema) -> Res
     if not rows or not rows[0].get("password_hash"):
         return fail("Provider not found or no password set")
 
-    if not verify_password(input_data.current_password, rows[0]["password_hash"]):
+    stored_hash = cast(str, rows[0]["password_hash"])
+    if not verify_password(input_data.current_password, stored_hash):
         return fail("Current password is incorrect")
 
     new_hash = hash_password(input_data.new_password)
@@ -97,5 +102,6 @@ async def provider_verify(db: DBClient, input_data: InputSchema) -> Result[Verif
     if not p.get("password_hash"):
         return ok({"provider_id": input_data.provider_id, "valid": False, "provider_name": str(p["name"])})
 
-    is_valid = verify_password(input_data.current_password, p["password_hash"])
+    stored_hash = cast(str, p["password_hash"])
+    is_valid = verify_password(input_data.current_password, stored_hash)
     return ok({"provider_id": input_data.provider_id, "valid": is_valid, "provider_name": str(p["name"])})

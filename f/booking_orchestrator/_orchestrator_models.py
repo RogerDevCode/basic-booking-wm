@@ -52,12 +52,12 @@ class OrchestratorInput(BaseModel):
 class OrchestratorResult(TypedDict, total=False):
     action: str
     success: bool
-    data: Any
+    data: object
     message: str
     follow_up: Optional[str]
-    inline_buttons: Optional[list[list[dict[str, Any]]]]
-    nextState: Optional[Any]  # Placeholder for BookingState
-    nextDraft: Optional[Any]  # Placeholder for DraftBooking
+    inline_buttons: Optional[list[list[dict[str, str]]]]
+    nextState: Optional[object]
+    nextDraft: Optional[object]
 
 class ResolvedContext(TypedDict):
     tenantId: str

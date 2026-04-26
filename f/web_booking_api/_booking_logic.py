@@ -1,3 +1,4 @@
+from typing import Any
 import hashlib
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any, cast
@@ -19,7 +20,7 @@ def calculate_end_time(start_time_str: str, duration_minutes: int) -> Result[str
         return fail("formato_fecha_invalido")
 
 class BookingRepository:
-    def __init__(self, db: DBClient):
+    def __init__(self, db: DBClient) -> None:
         self.db = db
 
     async def resolve_tenant_for_booking(self, booking_id: str) -> Result[str]:

@@ -1,3 +1,4 @@
+from typing import Any
 from datetime import datetime
 from typing import List, Optional, Dict, Any, cast, Tuple
 from ..internal._result import Result, DBClient, ok, fail
@@ -5,7 +6,7 @@ from ..internal._crypto import hash_password, verify_password, validate_password
 from ._profile_models import ProfileRow, InputSchema
 
 class ProfileRepository:
-    def __init__(self, db: DBClient):
+    def __init__(self, db: DBClient) -> None:
         self.db = db
 
     async def find_by_id(self, provider_id: str) -> Result[ProfileRow]:

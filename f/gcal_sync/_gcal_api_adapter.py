@@ -1,6 +1,7 @@
+from __future__ import annotations
 import httpx
 from datetime import datetime
-from typing import Optional, Any, Dict, List, cast
+from typing import Optional, Dict, cast, Any
 from ..internal._result import Result, DBClient, ok, fail, with_tenant_context
 from ._gcal_sync_models import BookingDetails
 
@@ -59,7 +60,7 @@ async def call_gcal_api(
     path: str,
     calendar_id: str,
     access_token: str,
-    body: Optional[Dict[str, Any]] = None
+    body: Optional[Dict[str, object]] = None
 ) -> Result[Dict[str, Any]]:
     import urllib.parse
     url = f"{GCAL_BASE}/calendars/{urllib.parse.quote(calendar_id)}/{path}"
@@ -76,12 +77,13 @@ async def call_gcal_api(
                 return fail(f"GCal API {response.status_code}: {response.text}")
 
             if method == "DELETE":
-                return ok({})
+                res_del: Dict[str, Any] = {}
+                return ok(res_del)
 
             data = response.json()
             if not isinstance(data, dict):
                 return fail("GCal API returned non-object response")
             
-            return ok(data)
+            return ok(cast(Dict[str, Any], data))
     except Exception as e:
         return fail(f"Network error: {e}")

@@ -1,5 +1,13 @@
+from __future__ import annotations
 import asyncio
-import wmill
+from typing import Any
+from ..internal._wmill_adapter import log
+from ..internal._db_client import create_db_client
+from ..internal._result import with_tenant_context, Result
+from ..internal.scheduling_engine import get_availability
+from ._availability_models import InputSchema, AvailabilityResult
+from ._availability_logic import get_provider, get_provider_service_id
+
 # ============================================================================
 # PRE-FLIGHT CHECKLIST
 # Mission         : Get available time slots for a provider on a given date
@@ -11,17 +19,9 @@ import wmill
 # Pydantic Schemas: YES — InputSchema validates all inputs
 # ============================================================================
 
-from typing import Any
-from ..internal._wmill_adapter import log
-from ..internal._db_client import create_db_client
-from ..internal._result import with_tenant_context, Result
-from ..internal.scheduling_engine import get_availability
-from ._availability_models import InputSchema, AvailabilityResult
-from ._availability_logic import get_provider, get_provider_service_id
-
 MODULE = "availability_check"
 
-async def main_async(args: dict[str, Any]) -> Result[AvailabilityResult]:
+async def main_async(args: dict[str, object]) -> Result[AvailabilityResult]:
     try:
         input_data = InputSchema.model_validate(args)
     except Exception as e:
@@ -50,17 +50,18 @@ async def main_async(args: dict[str, Any]) -> Result[AvailabilityResult]:
             if not sched_result:
                 return Exception("No availability data returned"), None
 
-            return None, {
+            res: AvailabilityResult = {
                 "provider_id": input_data.provider_id,
-                "provider_name": provider["name"],
-                "date": sched_result["date"],
-                "timezone": provider["timezone"],
-                "slots": sched_result["slots"],
-                "total_available": sched_result["total_available"],
-                "total_booked": sched_result["total_booked"],
-                "is_blocked": sched_result["is_blocked"],
-                "block_reason": sched_result["block_reason"],
+                "provider_name": str(provider["name"]),
+                "date": str(sched_result["date"]),
+                "timezone": str(provider["timezone"]),
+                "slots": list(sched_result["slots"]),
+                "total_available": int(sched_result["total_available"]),
+                "total_booked": int(sched_result["total_booked"]),
+                "is_blocked": bool(sched_result["is_blocked"]),
+                "block_reason": str(sched_result["block_reason"]) if sched_result["block_reason"] else None,
             }
+            return None, res
 
         return await with_tenant_context(conn, input_data.tenant_id, operation)
 
@@ -68,20 +69,21 @@ async def main_async(args: dict[str, Any]) -> Result[AvailabilityResult]:
         log("Unexpected error in availability_check", error=str(e), module=MODULE)
         return Exception(f"Internal error: {e}"), None
     finally:
-        await conn.close() # pyright: ignore[reportUnknownMemberType]
+        await conn.close()
 
 
-def main(args: dict):
+def main(args: dict[str, object]) -> AvailabilityResult | None:
     import traceback
     try:
-        return asyncio.run(main_async(args))
+        err, result = asyncio.run(main_async(args))
+        if err:
+            raise err
+        return result
     except Exception as e:
         tb = traceback.format_exc()
-        # Intentamos usar el adaptador local si está disponible, si no print
         try:
-            from ..internal._wmill_adapter import log
-            log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module="availability_check")
-        except:
+            log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=MODULE)
+        except Exception:
             print(f"CRITICAL ERROR in availability_check: {e}\n{tb}")
         
         # Elevamos para que Windmill marque como FAILED

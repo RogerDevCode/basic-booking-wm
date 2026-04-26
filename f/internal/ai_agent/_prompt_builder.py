@@ -1,7 +1,7 @@
 from typing import Optional
 from ._constants import INTENT, CONFIDENCE_BOUNDARIES, SOCIAL_CONFIDENCE_VALUES, RULE_CONFIDENCE_VALUES
 
-ALL_INTENTS = ", ".join(INTENT.values())
+ALL_INTENTS = ", ".join(list(INTENT.values()))
 
 OBJECTIVE_PERSONA = """Eres un clasificador transaccional estricto para un sistema de reservas médicas.
 Tu única función es leer el mensaje del paciente y mapearlo a una intención válida.

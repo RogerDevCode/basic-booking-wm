@@ -1,9 +1,9 @@
-from typing import Any
+from typing import cast
 from f.booking_orchestrator._orchestrator_models import OrchestratorInput, OrchestratorResult
 from f.booking_orchestrator._get_entity import get_entity
 from ._get_my_bookings import handle_get_my_bookings
 from f.booking_cancel.main import main_async as cancel_booking
-from f.internal._result import Result
+from f.internal._result import Result, DBClient, ok, fail
 
 """
 PRE-FLIGHT
@@ -17,8 +17,7 @@ Zod Schemas      : NO
 """
 
 async def handle_cancel_booking(
-    conn: Any,
-
+    conn: DBClient,
     input_data: OrchestratorInput
 ) -> Result[OrchestratorResult]:
     booking_id = input_data.booking_id or get_entity(input_data.entities, "booking_id")
@@ -26,10 +25,10 @@ async def handle_cancel_booking(
     if not booking_id:
         # If no ID, show current bookings so user can pick
         cloned_input = input_data.model_copy(update={"notes": "Por favor, dime el ID de la cita que deseas cancelar."})
-        return await handle_get_my_bookings(cloned_input)
+        return await handle_get_my_bookings(conn, cloned_input)
 
     # Call booking_cancel
-    args = {
+    args: dict[str, object] = {
         "booking_id": booking_id,
         "actor": "client",
         "actor_id": input_data.client_id,
@@ -38,9 +37,10 @@ async def handle_cancel_booking(
 
     err, data = await cancel_booking(args)
 
-    return None, {
+    res: OrchestratorResult = {
         "action": "cancelar_cita",
         "success": err is None,
         "data": data,
         "message": f"❌ No se pudo cancelar: {err}" if err else "✅ Tu cita ha sido cancelada exitosamente.",
     }
+    return ok(res)

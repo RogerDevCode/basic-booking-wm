@@ -1,9 +1,9 @@
-from typing import Any
+from typing import cast
 import zoneinfo
 from datetime import datetime
 from f.booking_orchestrator._orchestrator_models import OrchestratorInput, OrchestratorResult
 from f.internal._db_client import create_db_client
-from f.internal._result import with_tenant_context, Result
+from f.internal._result import with_tenant_context, Result, DBClient, ok, fail
 
 """
 PRE-FLIGHT
@@ -17,24 +17,18 @@ Zod Schemas      : NO
 """
 
 async def handle_get_my_bookings(
-    conn: Any,
-
+    conn: DBClient,
     input_data: OrchestratorInput
 ) -> Result[OrchestratorResult]:
     client_id = input_data.client_id
     tenant_id = input_data.tenant_id
     
     if not client_id or not tenant_id:
-        return None, {
-            "action": "mis_citas",
-            "success": False,
-            "data": None,
-            "message": "Falta identificación de paciente o establecimiento."
-        }
+        return fail("Falta identificación de paciente o establecimiento.")
 
     conn = await create_db_client()
     try:
-        async def operation() -> Result[list[dict]]:
+        async def operation() -> Result[list[dict[str, object]]]:
             rows = await conn.fetch(
                 """
                 SELECT b.booking_id, b.status, b.start_time, p.name as provider_name, p.specialty, s.name as service_name
@@ -48,8 +42,7 @@ async def handle_get_my_bookings(
                 """,
                 client_id
             )
-            # Ensure rows is a list of dicts (asyncpg Record is like a dict)
-            return None, list(rows)
+            return ok(cast(list[dict[str, object]], rows))
 
         err, rows = await with_tenant_context(conn, tenant_id, operation)
         if err or rows is None:
@@ -57,7 +50,7 @@ async def handle_get_my_bookings(
 
         # Formatting
         tz = zoneinfo.ZoneInfo("America/Mexico_City")
-        lines = []
+        lines: list[str] = []
         for r in rows:
             st = r["start_time"]
             # Handle both datetime objects and ISO strings
@@ -70,16 +63,19 @@ async def handle_get_my_bookings(
             else:
                 continue
             
+            provider_name = cast(str, r.get("provider_name", "Desconocido"))
+            service_name = cast(str, r.get("service_name", "Servicio"))
             fmt_str = dt.strftime("%d/%m %H:%M")
-            lines.append(f"• {fmt_str}hs - {r['provider_name']}: {r['service_name']}")
+            lines.append(f"• {fmt_str}hs - {provider_name}: {service_name}")
 
         msg_body = "\n".join(lines)
-        return None, {
+        res_data: OrchestratorResult = {
             "action": "mis_citas",
             "success": True,
             "data": rows,
             "message": f"📋 Tus próximas citas:\n{msg_body}" if lines else "📋 No tienes próximas citas.",
             "follow_up": input_data.notes
         }
+        return ok(res_data)
     finally:
         await conn.close()

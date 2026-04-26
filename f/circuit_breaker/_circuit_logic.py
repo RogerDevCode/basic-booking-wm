@@ -1,4 +1,5 @@
-from typing import Optional, cast
+from __future__ import annotations
+from typing import Optional, Literal, TypedDict, Final, cast, Any
 from datetime import datetime
 from ..internal._result import DBClient
 from ._circuit_models import CircuitState
@@ -20,20 +21,30 @@ async def get_state(db: DBClient, service_id: str) -> Optional[CircuitState]:
         return None
     
     r = rows[0]
-    return {
+    
+    # Helper to convert potential datetime/str to isoformat str
+    def to_iso(val: object) -> str | None:
+        if isinstance(val, datetime):
+            return val.isoformat()
+        if isinstance(val, str):
+            return val
+        return None
+
+    res: CircuitState = {
         "service_id": str(r["service_id"]),
-        "state": cast(Any, r["state"]),
-        "failure_count": int(r["failure_count"]),
-        "success_count": int(r["success_count"]),
-        "failure_threshold": int(r["failure_threshold"]),
-        "success_threshold": int(r["success_threshold"]),
-        "timeout_seconds": int(r["timeout_seconds"]),
-        "opened_at": r["opened_at"].isoformat() if isinstance(r.get("opened_at"), datetime) else str(r.get("opened_at")) if r.get("opened_at") else None,
-        "half_open_at": r["half_open_at"].isoformat() if isinstance(r.get("half_open_at"), datetime) else str(r.get("half_open_at")) if r.get("half_open_at") else None,
-        "last_failure_at": r["last_failure_at"].isoformat() if isinstance(r.get("last_failure_at"), datetime) else str(r.get("last_failure_at")) if r.get("last_failure_at") else None,
-        "last_success_at": r["last_success_at"].isoformat() if isinstance(r.get("last_success_at"), datetime) else str(r.get("last_success_at")) if r.get("last_success_at") else None,
+        "state": cast(Literal['closed', 'open', 'half-open'], str(r["state"])),
+        "failure_count": int(cast(Any, r["failure_count"])),
+        "success_count": int(cast(Any, r["success_count"])),
+        "failure_threshold": int(cast(Any, r["failure_threshold"])),
+        "success_threshold": int(cast(Any, r["success_threshold"])),
+        "timeout_seconds": int(cast(Any, r["timeout_seconds"])),
+        "opened_at": to_iso(r.get("opened_at")),
+        "half_open_at": to_iso(r.get("half_open_at")),
+        "last_failure_at": to_iso(r.get("last_failure_at")),
+        "last_success_at": to_iso(r.get("last_success_at")),
         "last_error_message": str(r["last_error_message"]) if r.get("last_error_message") else None,
     }
+    return res
 
 async def init_service(db: DBClient, service_id: str) -> None:
     await db.execute(
@@ -44,5 +55,3 @@ async def init_service(db: DBClient, service_id: str) -> None:
         """,
         service_id
     )
-
-from typing import Any

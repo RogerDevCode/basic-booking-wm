@@ -1,6 +1,6 @@
-from typing import Optional, Callable, Awaitable
+from typing import Optional, Callable, Awaitable, cast
 from ._orchestrator_models import CanonicalIntent, OrchestratorInput, OrchestratorResult
-from ..internal._result import Result, DBClient
+from f.internal._result import Result, DBClient
 
 """
 PRE-FLIGHT
@@ -34,7 +34,7 @@ def normalize_intent(intent: str) -> Optional[CanonicalIntent]:
     if mapped:
         return mapped
     if intent in AUTHORIZED_INTENTS:
-        return intent  # type: ignore
+        return cast(CanonicalIntent, intent)
     return None
 
 # Type alias for handlers

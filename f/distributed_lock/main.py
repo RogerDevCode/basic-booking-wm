@@ -1,4 +1,6 @@
+from __future__ import annotations
 import asyncio
+import os
 # ============================================================================
 # PRE-FLIGHT CHECKLIST
 # Mission         : Advisory lock for race condition prevention
@@ -10,7 +12,7 @@ import asyncio
 # Pydantic Schemas: YES — InputSchema validates action and key
 # ============================================================================
 
-from typing import Any, Dict, cast
+from typing import Any, cast
 from ..internal._wmill_adapter import log
 from ..internal._db_client import create_db_client
 from ..internal._result import with_tenant_context, Result, ok, fail
@@ -19,10 +21,9 @@ from ._lock_logic import acquire_lock, release_lock, check_lock, cleanup_locks
 
 MODULE = "distributed_lock"
 
-async def _main_async(args: dict[str, Any]) -> Result[LockResult]:
+async def _main_async(args: dict[str, object]) -> Result[LockResult]:
     # 1. Validate Input
     try:
-        # Note: rawInput key compatibility from TS version if needed
         data = args.get("rawInput", args)
         input_data = InputSchema.model_validate(data)
     except Exception as e:
@@ -49,23 +50,22 @@ async def _main_async(args: dict[str, Any]) -> Result[LockResult]:
         log("Distributed Lock Internal Error", error=str(e), module=MODULE)
         return fail(f"internal_error: {e}")
     finally:
-        await conn.close() # pyright: ignore[reportUnknownMemberType]
+        await conn.close()
 
 
-def main(args: dict):
+def main(args: dict[str, object]) -> LockResult | None:
     import traceback
     try:
-        return asyncio.run(_main_async(args))
+        err, result = asyncio.run(_main_async(args))
+        if err:
+            raise err
+        return result
     except Exception as e:
         tb = traceback.format_exc()
-        # Intentamos usar el adaptador local si está disponible, si no print
         try:
-            from ..internal._wmill_adapter import log
-            log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=os.path.basename(os.path.dirname(__file__)))
-        except:
-            from ..internal._wmill_adapter import log
-            log("BARE_EXCEPT_CAUGHT", file="main.py")
-            print(f"CRITICAL ERROR in {__file__}: {e}\n{tb}")
+            log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=MODULE)
+        except Exception:
+            print(f"CRITICAL ERROR in distributed_lock: {e}\n{tb}")
         
         # Elevamos para que Windmill marque como FAILED
         raise RuntimeError(f"Execution failed: {e}")

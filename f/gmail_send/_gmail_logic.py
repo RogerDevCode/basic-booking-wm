@@ -1,19 +1,20 @@
+from __future__ import annotations
 import smtplib
 import asyncio
 import time
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from typing import List, Optional, Dict, Any, Tuple
+from typing import List, Optional, Dict, Any, Tuple, cast
 from ._gmail_models import ActionLink
 
-def safe_string(value: Any, fallback: str = '') -> str:
+def safe_string(value: object, fallback: str = '') -> str:
     if value is None: return fallback
     if isinstance(value, (str, int, float, bool)): return str(value)
     return fallback
 
 def build_email_content(
     message_type: str,
-    details: Dict[str, Any],
+    details: Dict[str, object],
     action_links: List[ActionLink]
 ) -> Tuple[str, str]:
     date = safe_string(details.get('date'), 'Por confirmar')
@@ -110,7 +111,7 @@ def build_email_content(
     return subject, html
 
 async def send_with_retry(
-    smtp_config: Dict[str, Any],
+    smtp_config: Dict[str, object],
     from_addr: str,
     to_addr: str,
     subject: str,
@@ -118,23 +119,22 @@ async def send_with_retry(
     max_retries: int = 3
 ) -> Tuple[Optional[Exception], Optional[str]]:
     
-    last_err = None
+    last_err: Optional[Exception] = None
     for attempt in range(max_retries):
         try:
             # Sync wrapper for SMTP
-            def do_send():
+            def do_send() -> None:
                 msg = MIMEMultipart('alternative')
                 msg['Subject'] = subject
                 msg['From'] = from_addr
                 msg['To'] = to_addr
                 msg.attach(MIMEText(html, 'html'))
 
-                with smtplib.SMTP(smtp_config['host'], smtp_config['port']) as server:
-                    if smtp_config['port'] == 587:
+                with smtplib.SMTP(str(smtp_config['host']), int(cast(Any, smtp_config['port']))) as server:
+                    if int(cast(Any, smtp_config['port'])) == 587:
                         server.starttls()
-                    server.login(smtp_config['user'], smtp_config['password'])
+                    server.login(str(smtp_config['user']), str(smtp_config['password']))
                     server.send_message(msg)
-                return "sent"
 
             # Execute in thread pool to not block event loop
             loop = asyncio.get_event_loop()
@@ -144,6 +144,6 @@ async def send_with_retry(
         except Exception as e:
             last_err = e
             if attempt < max_retries - 1:
-                await asyncio.sleep(2 ** attempt)
+                await asyncio.sleep(2.0 ** attempt)
                 
     return last_err, None

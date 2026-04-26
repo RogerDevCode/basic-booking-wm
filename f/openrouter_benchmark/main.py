@@ -62,7 +62,7 @@ async def _main_async(args: dict[str, Any] = {}) -> Result[BenchmarkReport]:
     return ok(report)
 
 
-def main(args: dict):
+def main(args: dict) -> None:
     import traceback
     try:
         return asyncio.run(_main_async(args))

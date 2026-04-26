@@ -1,5 +1,6 @@
+from __future__ import annotations
 import json
-from typing import Optional, List, Dict, Any, cast
+from typing import cast, Any
 from ..internal._result import Result, DBClient, ok, fail
 from ._logger_models import LogResult, InputSchema
 
@@ -21,6 +22,7 @@ async def persist_log(db: DBClient, input_data: InputSchema) -> Result[LogResult
         if not rows:
             return fail("db_insert_failed: No message_id returned")
 
-        return ok({"message_id": str(rows[0]["message_id"])})
+        res: LogResult = {"message_id": str(rows[0]["message_id"])}
+        return ok(res)
     except Exception as e:
         return fail(f"persistence_error: {e}")

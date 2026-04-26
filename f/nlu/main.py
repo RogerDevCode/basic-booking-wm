@@ -57,7 +57,7 @@ async def _main_async(args: Any) -> ExtractedIntent:
     }
 
 
-def main(args: dict):
+def main(args: dict) -> None:
     import traceback
     try:
         return asyncio.run(_main_async(args))

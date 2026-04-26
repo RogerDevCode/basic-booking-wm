@@ -1,11 +1,14 @@
+from __future__ import annotations
 import re
 import json
-from datetime import datetime, timedelta, date, timezone
-from typing import List, Optional, Dict, Any, cast, Tuple, Union
-from ..internal._result import Result, DBClient, ok, fail, with_tenant_context
-from ._wizard_models import WizardState, StepView, InputSchema
+from datetime import datetime, timedelta, date
+from typing import List, Optional, Dict, Any, cast, Final
+from ..internal._result import Result, DBClient, ok, fail
+from ._wizard_models import WizardState, StepView
 
-number = Union[int, float]
+# Constants
+START_HOUR: Final[int] = 8
+END_HOUR: Final[int] = 18
 
 class DateUtils:
     @staticmethod
@@ -41,15 +44,16 @@ class DateUtils:
 
 class WizardUI:
     @staticmethod
-    def build_date_selection(state: WizardState, week_offset: number = 0) -> StepView:
+    def build_date_selection(state: WizardState, week_offset: int = 0) -> StepView:
         dates = DateUtils.get_week_dates(week_offset)
-        keyboard = []
+        keyboard: list[list[str]] = []
         for i in range(0, len(dates), 2):
             row = [f"{d['dayName']} {d['label']}" for d in dates[i:i+2]]
             keyboard.append(row)
         
         nav = ["Semana siguiente »"]
-        if week_offset > 0: nav.insert(0, "« Semana anterior")
+        if week_offset > 0:
+            nav.insert(0, "« Semana anterior")
         keyboard.append(nav)
         keyboard.append(["❌ Cancelar"])
 
@@ -62,7 +66,7 @@ class WizardUI:
 
     @staticmethod
     def build_time_selection(state: WizardState, slots: List[str]) -> StepView:
-        keyboard = []
+        keyboard: list[list[str]] = []
         for i in range(0, len(slots), 3):
             keyboard.append(slots[i:i+3])
         keyboard.append(["« Volver a fechas", "❌ Cancelar"])
@@ -86,13 +90,13 @@ class WizardUI:
         }
 
 class WizardRepository:
-    def __init__(self, db: DBClient):
+    def __init__(self, db: DBClient) -> None:
         self.db = db
 
     async def get_service_duration(self, service_id: str) -> Result[int]:
         rows = await self.db.fetch("SELECT duration_minutes FROM services WHERE service_id = $1::uuid AND is_active = true LIMIT 1", service_id)
         if not rows: return fail(f"service_not_found: {service_id}")
-        return ok(int(rows[0]["duration_minutes"]))
+        return ok(int(cast(Any, rows[0]["duration_minutes"])))
 
     async def get_available_slots(self, provider_id: str, date_str: str, duration_min: int) -> Result[List[str]]:
         rows = await self.db.fetch(
@@ -107,10 +111,13 @@ class WizardRepository:
         booked_times = set()
         for r in rows:
             st = r["start_time"]
-            if isinstance(st, str): st = datetime.fromisoformat(st.replace("Z", "+00:00"))
-            booked_times.add(f"{st.hour:02d}:{st.minute:02d}")
+            if isinstance(st, str):
+                st_dt = datetime.fromisoformat(st.replace("Z", "+00:00"))
+            else:
+                st_dt = cast(datetime, st)
+            booked_times.add(f"{st_dt.hour:02d}:{st_dt.minute:02d}")
 
-        all_slots = DateUtils.generate_time_slots(8, 18, duration_min)
+        all_slots = DateUtils.generate_time_slots(START_HOUR, END_HOUR, duration_min)
         available = [s for s in all_slots if s not in booked_times]
         return ok(available)
 

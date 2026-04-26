@@ -1,6 +1,7 @@
+from __future__ import annotations
 from typing import Optional, List, Literal, TypedDict, Dict, Any
 from pydantic import BaseModel, ConfigDict, Field
-from f.internal._config import DEFAULT_TIMEZONE
+from ..internal._config import DEFAULT_TIMEZONE
 
 class WizardState(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
@@ -22,7 +23,7 @@ class InputSchema(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
     
     action: Literal['start', 'select_date', 'select_time', 'confirm', 'cancel', 'back']
-    wizard_state: Optional[Dict[str, Any]] = None
+    wizard_state: Optional[Dict[str, object]] = None
     user_input: Optional[str] = None
     provider_id: Optional[str] = None
     service_id: Optional[str] = None
@@ -33,5 +34,5 @@ class WizardResult(TypedDict):
     reply_keyboard: List[List[str]]
     force_reply: bool
     reply_placeholder: str
-    wizard_state: WizardState
+    wizard_state: dict[str, object]
     is_complete: bool

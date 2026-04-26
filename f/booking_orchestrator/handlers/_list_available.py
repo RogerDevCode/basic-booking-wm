@@ -1,7 +1,7 @@
 from datetime import datetime
-from typing import cast, Any
+from typing import cast
 from f.booking_orchestrator._orchestrator_models import OrchestratorInput, OrchestratorResult, AvailabilityData
-from f.internal._result import Result
+from f.internal._result import Result, DBClient, ok, fail
 from f.availability_check.main import main_async as check_availability
 
 """
@@ -16,7 +16,7 @@ Zod Schemas      : NO
 """
 
 async def handle_list_available(
-    conn: Any,
+    conn: DBClient,
     input_data: OrchestratorInput
 ) -> Result[OrchestratorResult]:
     provider_id = input_data.provider_id
@@ -24,12 +24,12 @@ async def handle_list_available(
     service_id = input_data.service_id
 
     if not provider_id or not date:
-        return None, {
+        return ok(cast(OrchestratorResult, {
             "action": "ver_disponibilidad",
             "success": False,
             "data": None,
             "message": "Necesito el doctor y la fecha para consultar disponibilidad.",
-        }
+        }))
 
     # 1. CALL AVAILABILITY MODULE
     try:
@@ -39,30 +39,30 @@ async def handle_list_available(
             "service_id": service_id,
         })
     except Exception as e:
-        return Exception(f"Failed to call availability_check: {e}"), None
+        return fail(f"Failed to call availability_check: {e}")
 
-    if err_msg or not data:
-        return None, {
+    if err_msg or data is None:
+        return ok(cast(OrchestratorResult, {
             "action": "ver_disponibilidad", "success": False, "data": None,
             "message": f"❌ Error: {err_msg or 'Desconocido'}",
-        }
+        }))
 
     avail = cast(AvailabilityData, data)
     if avail.get("is_blocked"):
-        return None, {
+        return ok(cast(OrchestratorResult, {
             "action": "ver_disponibilidad", "success": True, "data": data,
             "message": f"😅 No hay disponibilidad el {date}: {avail.get('block_reason', 'Motivo desconocido')}",
-        }
+        }))
 
     all_slots = avail.get("slots", [])
     slots = [s for s in all_slots if s.get("available")]
     slots = slots[:10]
     
     if not slots:
-        return None, {
+        return ok(cast(OrchestratorResult, {
             "action": "ver_disponibilidad", "success": True, "data": data,
             "message": f"😅 No hay horarios disponibles el {date}.",
-        }
+        }))
 
     # 2. FORMAT RESPONSE
     morning: list[str] = []
@@ -83,8 +83,9 @@ async def handle_list_available(
     if afternoon:
         message += f"🌇 *Tarde:*\n{', '.join(afternoon)}\n\n"
 
-    return None, {
+    res: OrchestratorResult = {
         "action": "ver_disponibilidad", "success": True, "data": data,
         "message": message,
         "follow_up": "¿Te gustaría agendar alguno de estos horarios?"
     }
+    return ok(res)

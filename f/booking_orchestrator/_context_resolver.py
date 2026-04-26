@@ -1,5 +1,5 @@
-from typing import Optional
-from f.internal._result import Result, DBClient
+from typing import Optional, cast
+from f.internal._result import Result, DBClient, ok, fail
 from f.internal._date_resolver import resolve_date, resolve_time
 from ._get_entity import get_entity
 from ._orchestrator_models import OrchestratorInput, ResolvedContext
@@ -8,9 +8,7 @@ from ._orchestrator_models import OrchestratorInput, ResolvedContext
 PRE-FLIGHT
 Mission          : Resolve full context (ids, date, time) from partial AI input.
 DB Tables Used   : providers, services, clients, specialties
-Concurrency Risk : NO — read-only (except client creation)
-GCal Calls       : NO
-Idempotency Key  : NO
+...
 RLS Tenant ID    : NO — discovery mode
 Zod Schemas      : NO
 """
@@ -23,14 +21,14 @@ async def resolve_context(
     Intelligently resolves missing IDs and normalises date/time.
     """
     try:
-        tenant_id = input_data.tenant_id
-        client_id = input_data.client_id
+        tenant_id: Optional[str] = input_data.tenant_id
+        client_id: Optional[str] = input_data.client_id
         
         # Try to get from entities if not explicitly provided
-        provider_id = input_data.provider_id or get_entity(input_data.entities, "provider_id")
-        service_id = input_data.service_id or get_entity(input_data.entities, "service_id")
-        res_date = input_data.date or get_entity(input_data.entities, "date")
-        res_time = input_data.time or get_entity(input_data.entities, "time")
+        provider_id: Optional[str] = input_data.provider_id or get_entity(input_data.entities, "provider_id")
+        service_id: Optional[str] = input_data.service_id or get_entity(input_data.entities, "service_id")
+        res_date: Optional[str] = input_data.date or get_entity(input_data.entities, "date")
+        res_time: Optional[str] = input_data.time or get_entity(input_data.entities, "time")
 
         provider_name = get_entity(input_data.entities, "provider_name")
         specialty_name = get_entity(input_data.entities, "specialty_name")
@@ -83,7 +81,7 @@ async def resolve_context(
                     provider_id = tenant_id
 
         if not tenant_id:
-            return Exception("Could not resolve tenant_id"), None
+            return fail("Could not resolve tenant_id")
 
         # 5. Client Resolution by Telegram Chat ID
         if not client_id and input_data.telegram_chat_id:
@@ -112,7 +110,7 @@ async def resolve_context(
             if rows:
                 service_id = str(rows[0]["service_id"])
 
-        return None, {
+        res: ResolvedContext = {
             "tenantId": tenant_id,
             "clientId": client_id,
             "providerId": provider_id,
@@ -120,5 +118,6 @@ async def resolve_context(
             "date": res_date,
             "time": res_time,
         }
+        return ok(res)
     except Exception as e:
-        return Exception(f"Context resolution error: {e}"), None
+        return fail(f"Context resolution error: {e}")

@@ -1,4 +1,5 @@
-from typing import List, Optional, Literal, TypedDict
+from __future__ import annotations
+from typing import List, Optional, TypedDict
 from pydantic import BaseModel, ConfigDict, Field
 
 class InputSchema(BaseModel):

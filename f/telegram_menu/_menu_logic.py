@@ -1,13 +1,14 @@
+from typing import Any
 from typing import List, Dict, Any, Optional
 
 class MenuInput:
-    def __init__(self, action: str, chat_id: str, user_input: Optional[str] = None):
+    def __init__(self, action: str, chat_id: str, user_input: Optional[str] = None) -> None:
         self.action = action
         self.chat_id = chat_id
         self.user_input = user_input
 
 class MenuResponse:
-    def __init__(self, handled: bool, response_text: str, inline_buttons: List[List[Dict[str, Any]]]):
+    def __init__(self, handled: bool, response_text: str, inline_buttons: List[List[Dict[str, Any]]]) -> None:
         self.handled = handled
         self.response_text = response_text
         self.inline_buttons = inline_buttons

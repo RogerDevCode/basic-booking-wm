@@ -1,4 +1,5 @@
-from typing import List, Optional, Literal, Dict, Any, TypedDict
+from __future__ import annotations
+from typing import List, Optional, Literal, Dict, TypedDict
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 class ActionLink(BaseModel):
@@ -30,5 +31,5 @@ class InputSchema(BaseModel):
         'provider_schedule_change',
         'custom'
     ]
-    booking_details: Dict[str, Any] = Field(default_factory=dict)
+    booking_details: Dict[str, object] = Field(default_factory=dict)
     action_links: List[ActionLink] = Field(default_factory=list)

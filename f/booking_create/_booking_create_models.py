@@ -1,3 +1,4 @@
+from __future__ import annotations
 from datetime import datetime
 from typing import Literal, TypedDict, Any
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -16,9 +17,12 @@ class InputSchema(BaseModel):
 
     @field_validator('start_time', mode='before')
     @classmethod
-    def parse_datetime(cls, v: Any) -> datetime:
+    def parse_datetime(cls, v: object) -> datetime | object:
         if isinstance(v, str):
-            return datetime.fromisoformat(v.replace('Z', '+00:00'))
+            try:
+                return datetime.fromisoformat(v.replace('Z', '+00:00'))
+            except ValueError:
+                return v
         return v
 
 class BookingCreated(TypedDict):

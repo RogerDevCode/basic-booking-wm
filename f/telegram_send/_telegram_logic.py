@@ -1,3 +1,4 @@
+from typing import Any
 import httpx
 import asyncio
 import json
@@ -7,7 +8,7 @@ from ..internal._config import MAX_RETRIES, TIMEOUT_TELEGRAM_API_MS
 from ._telegram_models import TelegramInput, TelegramSendData, TelegramResponse, InlineButton
 
 class TelegramService:
-    def __init__(self, bot_token: str):
+    def __init__(self, bot_token: str) -> None:
         self.bot_token = bot_token
         self.base_url = f"https://api.telegram.org/bot{bot_token}"
 

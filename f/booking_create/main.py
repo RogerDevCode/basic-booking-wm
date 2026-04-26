@@ -1,5 +1,5 @@
+from __future__ import annotations
 import asyncio
-import wmill
 # ============================================================================
 # PRE-FLIGHT CHECKLIST
 # Mission         : Create a new medical appointment (SOLID Refactor)
@@ -21,22 +21,20 @@ from ._create_booking_logic import execute_create_booking
 
 MODULE = "booking_create"
 
-async def main_async(args: object) -> tuple[Exception | None, BookingCreated | None]:
+async def main_async(args: dict[str, object]) -> Result[BookingCreated]:
     try:
-        if not isinstance(args, dict):
-            raise ValueError("Input must be a JSON object")
         input_data = InputSchema.model_validate(args)
     except ValidationError as e:
         log("Validation failed", error=str(e), module=MODULE)
-        return (Exception(f"Validation error: {e}"), None)
+        return Exception(f"Validation error: {e}"), None
     except Exception as e:
         log("Validation failed", error=str(e), module=MODULE)
-        return (Exception(f"Validation error: {e}"), None)
+        return Exception(f"Validation error: {e}"), None
 
     try:
         conn = await create_db_client()
     except Exception as e:
-        return (Exception(f"CONFIGURATION_ERROR: {e}"), None)
+        return Exception(f"CONFIGURATION_ERROR: {e}"), None
 
     try:
         repo = PostgresBookingCreateRepository(conn)
@@ -50,41 +48,42 @@ async def main_async(args: object) -> tuple[Exception | None, BookingCreated | N
             msg = str(err)
             log("Transaction failed", error=msg, idempotency_key=input_data.idempotency_key, module=MODULE)
             if "duplicate key" in msg or "unique constraint" in msg:
-                return (Exception("A booking with this idempotency key already exists"), None)
+                return Exception("A booking with this idempotency key already exists"), None
             if "booking_no_overlap" in msg or "exclusion constraint" in msg:
-                return (Exception("This time slot was just booked. Please choose a different time."), None)
-            return (err, None)
+                return Exception("This time slot was just booked. Please choose a different time."), None
+            return err, None
 
         if not result:
             log("Transaction succeeded but no result returned", module=MODULE)
-            return (Exception("Booking creation failed: no result"), None)
+            return Exception("Booking creation failed: no result"), None
             
         log("Booking creation complete", booking_id=str(result["booking_id"]), module=MODULE)
-        return (None, result)
+        return None, result
 
     except Exception as e:
         log("Unexpected infrastructure error", error=str(e), module=MODULE)
         msg = str(e)
         if "duplicate key" in msg or "unique constraint" in msg:
-            return (Exception("A booking with this idempotency key already exists"), None)
+            return Exception("A booking with this idempotency key already exists"), None
         if "booking_no_overlap" in msg or "exclusion constraint" in msg:
-            return (Exception("This time slot was just booked. Please choose a different time."), None)
-        return (Exception(f"Internal error: {msg}"), None)
+            return Exception("This time slot was just booked. Please choose a different time."), None
+        return Exception(f"Internal error: {msg}"), None
     finally:
-        await conn.close() # pyright: ignore[reportUnknownMemberType]
+        await conn.close()
 
 
-def main(args: dict):
+def main(args: dict[str, object]) -> BookingCreated | None:
     import traceback
     try:
-        return asyncio.run(main_async(args))
+        err, result = asyncio.run(main_async(args))
+        if err:
+            raise err
+        return result
     except Exception as e:
         tb = traceback.format_exc()
-        # Intentamos usar el adaptador local si está disponible, si no print
         try:
-            from ..internal._wmill_adapter import log
-            log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module="booking_create")
-        except:
+            log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=MODULE)
+        except Exception:
             print(f"CRITICAL ERROR in booking_create: {e}\n{tb}")
         
         # Elevamos para que Windmill marque como FAILED

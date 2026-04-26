@@ -1,4 +1,6 @@
+from __future__ import annotations
 import asyncio
+import os
 # ============================================================================
 # PRE-FLIGHT CHECKLIST
 # Mission         : Send email notifications with HTML action links
@@ -10,7 +12,6 @@ import asyncio
 # Pydantic Schemas: YES — InputSchema validates recipient and message type
 # ============================================================================
 
-import os
 from typing import Any, Dict
 from ..internal._wmill_adapter import log
 from ..internal._result import Result, ok, fail
@@ -19,7 +20,7 @@ from ._gmail_logic import build_email_content, send_with_retry
 
 MODULE = "gmail_send"
 
-async def _main_async(args: dict[str, Any]) -> Result[GmailSendData]:
+async def _main_async(args: dict[str, object]) -> Result[GmailSendData]:
     # 1. Validate Input
     try:
         input_data = InputSchema.model_validate(args)
@@ -30,7 +31,7 @@ async def _main_async(args: dict[str, Any]) -> Result[GmailSendData]:
     smtp_host = os.getenv('SMTP_HOST', 'smtp.gmail.com')
     try:
         smtp_port = int(os.getenv('SMTP_PORT', '587'))
-    except ValueError:
+    except (ValueError, TypeError):
         smtp_port = 587
         
     smtp_user = os.getenv('GMAIL_USER') or os.getenv('DEV_LOCAL_GMAIL_USER')
@@ -41,7 +42,7 @@ async def _main_async(args: dict[str, Any]) -> Result[GmailSendData]:
     if not smtp_user or not smtp_pass:
         return fail("SMTP credentials not configured (GMAIL_USER/GMAIL_PASSWORD)")
 
-    smtp_config = {
+    smtp_config: Dict[str, object] = {
         "host": smtp_host,
         "port": smtp_port,
         "user": smtp_user,
@@ -69,29 +70,29 @@ async def _main_async(args: dict[str, Any]) -> Result[GmailSendData]:
         log("Gmail send failed", error=str(err_send), module=MODULE)
         return fail(err_send)
 
-    return ok({
+    res: GmailSendData = {
         "sent": True,
         "message_id": msg_id,
-        "recipient_email": input_data.recipient_email,
+        "recipient_email": str(input_data.recipient_email),
         "message_type": input_data.message_type,
         "subject": subject
-    })
+    }
+    return ok(res)
 
 
-def main(args: dict):
+def main(args: dict[str, object]) -> GmailSendData | None:
     import traceback
     try:
-        return asyncio.run(_main_async(args))
+        err, result = asyncio.run(_main_async(args))
+        if err:
+            raise err
+        return result
     except Exception as e:
         tb = traceback.format_exc()
-        # Intentamos usar el adaptador local si está disponible, si no print
         try:
-            from ..internal._wmill_adapter import log
-            log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=os.path.basename(os.path.dirname(__file__)))
-        except:
-            from ..internal._wmill_adapter import log
-            log("BARE_EXCEPT_CAUGHT", file="main.py")
-            print(f"CRITICAL ERROR in {__file__}: {e}\n{tb}")
+            log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=MODULE)
+        except Exception:
+            print(f"CRITICAL ERROR in gmail_send: {e}\n{tb}")
         
         # Elevamos para que Windmill marque como FAILED
         raise RuntimeError(f"Execution failed: {e}")

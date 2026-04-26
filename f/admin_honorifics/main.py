@@ -1,25 +1,35 @@
-import asyncio
-# ============================================================================
-# PRE-FLIGHT CHECKLIST
-# Mission         : CRUD for honorifics management
-# DB Tables Used  : honorifics
-# Concurrency Risk: NO
-# GCal Calls      : NO
-# Idempotency Key : N/A
-# RLS Tenant ID   : YES — with_tenant_context for mutations
-# Pydantic Schemas: YES — InputSchema validates action and fields
-# ============================================================================
+from __future__ import annotations
 
-from typing import Any, Dict
-from ..internal._wmill_adapter import log
+import asyncio
+import os
+from typing import TYPE_CHECKING, Any
+
 from ..internal._db_client import create_db_client
-from ..internal._result import Result, ok, fail, with_tenant_context, with_admin_context
-from ._honorifics_models import InputSchema, HonorificRow
-from ._honorifics_logic import list_honorifics, create_honorific, update_honorific, delete_honorific
+from ..internal._result import (
+    fail,
+    ok,
+    with_admin_context,
+    with_tenant_context,
+)
+from ..internal._wmill_adapter import log
+from ._honorifics_logic import (
+    create_honorific,
+    delete_honorific,
+    list_honorifics,
+    update_honorific,
+)
+from ._honorifics_models import InputSchema
+
+if TYPE_CHECKING:
+    from ..internal._result import Result
+    from ._honorifics_models import HonorificRow
 
 MODULE = "admin_honorifics"
 
-async def _main_async(args: dict[str, Any]) -> Result[Any]:
+type HonorificResult = list[HonorificRow] | HonorificRow | dict[str, bool]
+
+async def _main_async(args: dict[str, object]) -> Result[HonorificResult]:
+    """Main async entrypoint for honorifics management."""
     # 1. Validate Input
     try:
         input_data = InputSchema.model_validate(args)
@@ -28,56 +38,74 @@ async def _main_async(args: dict[str, Any]) -> Result[Any]:
 
     conn = await create_db_client()
     try:
-        if input_data.action == 'list':
+        if input_data.action == "list":
             # List is global (admin mode)
-            return await with_admin_context(conn, lambda: list_honorifics(conn))
+            async def list_op() -> Result[list[HonorificRow]]:
+                return await list_honorifics(conn)
+            return await with_admin_context(conn, list_op)
 
         # Mutations require tenant isolation
-        async def operation() -> Result[Any]:
-            if input_data.action == 'create':
+        async def operation() -> Result[HonorificRow | dict[str, bool]]:
+            if input_data.action == "create":
                 if not input_data.code or not input_data.label:
                     return fail("create_failed: code and label are required")
                 return await create_honorific(
-                    conn, input_data.code, input_data.label, input_data.gender,
-                    input_data.sort_order or 99, input_data.is_active if input_data.is_active is not None else True
+                    conn,
+                    input_data.code,
+                    input_data.label,
+                    input_data.gender,
+                    input_data.sort_order or 99,
+                    input_data.is_active if input_data.is_active is not None else True,
                 )
-            elif input_data.action == 'update':
+            elif input_data.action == "update":
                 if not input_data.honorific_id:
                     return fail("update_failed: honorific_id is required")
                 return await update_honorific(
-                    conn, input_data.honorific_id, input_data.code, input_data.label,
-                    input_data.gender, input_data.sort_order, input_data.is_active
+                    conn,
+                    input_data.honorific_id,
+                    input_data.code,
+                    input_data.label,
+                    input_data.gender,
+                    input_data.sort_order,
+                    input_data.is_active,
                 )
-            elif input_data.action == 'delete':
+            elif input_data.action == "delete":
                 if not input_data.honorific_id:
                     return fail("delete_failed: honorific_id is required")
                 return await delete_honorific(conn, input_data.honorific_id)
-            
+
             return fail(f"unsupported_action: {input_data.action}")
 
-        return await with_tenant_context(conn, input_data.tenant_id, operation)
+        # The union return type needs to be compatible with HonorificResult
+        res: Result[HonorificResult] = await with_tenant_context(conn, input_data.tenant_id, operation)
+        return res
 
     except Exception as e:
         log("Admin Honorifics Internal Error", error=str(e), module=MODULE)
         return fail(f"internal_error: {e}")
     finally:
-        await conn.close() # pyright: ignore[reportUnknownMemberType]
+        await conn.close()
 
 
-def main(args: dict):
+def main(args: dict[str, object]) -> HonorificResult | None:
+    """Windmill entrypoint."""
     import traceback
+
     try:
-        return asyncio.run(_main_async(args))
+        err, result = asyncio.run(_main_async(args))
+        if err:
+            raise err
+        return result
     except Exception as e:
         tb = traceback.format_exc()
-        # Intentamos usar el adaptador local si está disponible, si no print
         try:
-            from ..internal._wmill_adapter import log
-            log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=os.path.basename(os.path.dirname(__file__)))
-        except:
-            from ..internal._wmill_adapter import log
-            log("BARE_EXCEPT_CAUGHT", file="main.py")
+            log(
+                "CRITICAL_ENTRYPOINT_ERROR",
+                error=str(e),
+                traceback=tb,
+                module=MODULE,
+            )
+        except Exception:
             print(f"CRITICAL ERROR in {__file__}: {e}\n{tb}")
-        
-        # Elevamos para que Windmill marque como FAILED
-        raise RuntimeError(f"Execution failed: {e}")
+
+        raise RuntimeError(f"Execution failed: {e}") from e

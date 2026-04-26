@@ -1,4 +1,6 @@
+from __future__ import annotations
 import asyncio
+import os
 # ============================================================================
 # PRE-FLIGHT CHECKLIST
 # Mission         : Password management for providers
@@ -10,18 +12,22 @@ import asyncio
 # Pydantic Schemas: YES — InputSchema validates action and fields
 # ============================================================================
 
-from typing import Any, Dict
+from typing import Any
 from ..internal._wmill_adapter import log
 from ..internal._db_client import create_db_client
-from ..internal._result import Result, ok, fail, with_tenant_context
-from ._auth_models import InputSchema
+from ..internal._result import Result, fail, with_tenant_context
+from ._auth_models import (
+    InputSchema, TempPasswordResult, PasswordChangeResult, VerifyResult
+)
 from ._auth_logic import (
     admin_generate_temp_password, provider_change_password, provider_verify
 )
 
 MODULE = "auth_provider"
 
-async def _main_async(args: dict[str, Any]) -> Result[Any]:
+type AuthResult = TempPasswordResult | PasswordChangeResult | VerifyResult
+
+async def _main_async(args: dict[str, object]) -> Result[AuthResult]:
     # 1. Validate Input
     try:
         input_data = InputSchema.model_validate(args)
@@ -31,7 +37,7 @@ async def _main_async(args: dict[str, Any]) -> Result[Any]:
     conn = await create_db_client()
     try:
         # 2. Execute within Tenant Context
-        async def operation() -> Result[Any]:
+        async def operation() -> Result[AuthResult]:
             if input_data.action == 'admin_generate_temp':
                 return await admin_generate_temp_password(conn, input_data)
             elif input_data.action == 'provider_change':
@@ -50,19 +56,19 @@ async def _main_async(args: dict[str, Any]) -> Result[Any]:
         await conn.close() # pyright: ignore[reportUnknownMemberType]
 
 
-def main(args: dict):
+def main(args: dict[str, object]) -> AuthResult | None:
     import traceback
     try:
-        return asyncio.run(_main_async(args))
+        err, result = asyncio.run(_main_async(args))
+        if err:
+            raise err
+        return result
     except Exception as e:
         tb = traceback.format_exc()
         # Intentamos usar el adaptador local si está disponible, si no print
         try:
-            from ..internal._wmill_adapter import log
-            log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=os.path.basename(os.path.dirname(__file__)))
-        except:
-            from ..internal._wmill_adapter import log
-            log("BARE_EXCEPT_CAUGHT", file="main.py")
+            log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=MODULE)
+        except Exception:
             print(f"CRITICAL ERROR in {__file__}: {e}\n{tb}")
         
         # Elevamos para que Windmill marque como FAILED

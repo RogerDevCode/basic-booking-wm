@@ -1,3 +1,4 @@
+from typing import Any
 from typing import Dict, Optional, Tuple, Any
 from ._callback_models import ActionContext, ActionResult, ActionHandler
 from ._callback_logic import confirm_booking, update_booking_status
@@ -66,10 +67,10 @@ class AcknowledgeHandler:
         })
 
 class TelegramRouter:
-    def __init__(self):
+    def __init__(self) -> None:
         self.handlers: Dict[str, ActionHandler] = {}
 
-    def register(self, action: str, handler: ActionHandler):
+    def register(self, action: str, handler: ActionHandler) -> None:
         self.handlers[action] = handler
 
     async def route(self, action: str, context: ActionContext) -> Result[ActionResult]:

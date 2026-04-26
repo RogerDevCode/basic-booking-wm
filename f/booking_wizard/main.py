@@ -1,4 +1,7 @@
+from __future__ import annotations
 import asyncio
+import os
+import re
 # ============================================================================
 # PRE-FLIGHT CHECKLIST
 # Mission         : Multi-step appointment booking flow (availability → confirmation → creation)
@@ -10,16 +13,16 @@ import asyncio
 # Pydantic Schemas: YES — InputSchema validates parameters
 # ============================================================================
 
-from typing import Any, Dict, cast, Optional, Tuple
+from typing import Any, cast, Optional
 from ..internal._wmill_adapter import log
 from ..internal._db_client import create_db_client
-from ..internal._result import Result, ok, fail, with_tenant_context
-from ._wizard_models import InputSchema, WizardState, WizardResult, StepView
+from ..internal._result import Result, fail, with_tenant_context
+from ._wizard_models import InputSchema, WizardState, StepView
 from ._wizard_logic import WizardRepository, WizardUI
 
 MODULE = "booking_wizard"
 
-async def _main_async(args: dict[str, Any]) -> Result[Dict[str, Any]]:
+async def _main_async(args: dict[str, object]) -> Result[dict[str, object]]:
     # 1. Validate Input
     try:
         input_data = InputSchema.model_validate(args)
@@ -31,13 +34,13 @@ async def _main_async(args: dict[str, Any]) -> Result[Dict[str, Any]]:
         # Determine Tenant
         tenant_id: Optional[str] = input_data.provider_id
         if not tenant_id and input_data.wizard_state:
-            tenant_id = input_data.wizard_state.get("client_id")
+            tenant_id = str(input_data.wizard_state.get("client_id", ""))
         
         if not tenant_id:
             return fail("authentication_error: tenant_id_required")
 
         # 2. Execute within Tenant Context
-        async def operation() -> Result[Dict[str, Any]]:
+        async def operation() -> Result[dict[str, object]]:
             repo = WizardRepository(conn)
             
             # Initial state
@@ -54,7 +57,8 @@ async def _main_async(args: dict[str, Any]) -> Result[Dict[str, Any]]:
             duration = 30
             if input_data.service_id:
                 err_dur, d = await repo.get_service_duration(input_data.service_id)
-                if not err_dur and d: duration = d
+                if not err_dur and d:
+                    duration = d
 
             view: Optional[StepView] = None
             action = input_data.action
@@ -63,18 +67,17 @@ async def _main_async(args: dict[str, Any]) -> Result[Dict[str, Any]]:
                 view = WizardUI.build_date_selection(state, 0)
             
             elif action == 'select_date':
-                # Assume user_input has the date or it's a nav command
                 if input_data.user_input and "Semana" in input_data.user_input:
                     offset = 7 if "siguiente" in input_data.user_input else 0
                     view = WizardUI.build_date_selection(state, offset)
                 else:
-                    # simplistic date parsing for demo, in real it would be more robust
                     match = re.search(r"(\d{4}-\d{2}-\d{2})", input_data.user_input or "")
                     d_str = match.group(1) if match else state.selected_date
                     if d_str:
                         state.selected_date = d_str
                         err_slots, slots = await repo.get_available_slots(input_data.provider_id or "", d_str, duration)
-                        if err_slots: return fail(err_slots)
+                        if err_slots:
+                            return fail(err_slots)
                         view = WizardUI.build_time_selection(state, slots or [])
                     else:
                         view = WizardUI.build_date_selection(state, 0)
@@ -82,7 +85,8 @@ async def _main_async(args: dict[str, Any]) -> Result[Dict[str, Any]]:
             elif action == 'select_time':
                 state.selected_time = input_data.user_input
                 err_names, names = await repo.get_names(input_data.provider_id or "", input_data.service_id or "")
-                if err_names: return fail(err_names)
+                if err_names:
+                    return fail(err_names)
                 view = WizardUI.build_confirmation(state, names["provider"], names["service"])
 
             elif action == 'confirm':
@@ -94,7 +98,8 @@ async def _main_async(args: dict[str, Any]) -> Result[Dict[str, Any]]:
                     state.selected_date or "", state.selected_time or "",
                     input_data.timezone, duration
                 )
-                if err_create: return fail(err_create)
+                if err_create:
+                    return fail(err_create)
                 
                 state.step = 99
                 view = {
@@ -114,21 +119,22 @@ async def _main_async(args: dict[str, Any]) -> Result[Dict[str, Any]]:
                 }
 
             elif action == 'back':
-                # Simplified back logic
                 prev_step = max(0, state.step - 1)
                 state.step = prev_step
-                view = WizardUI.build_date_selection(state, 0) # Fallback view
+                view = WizardUI.build_date_selection(state, 0) 
 
-            if not view: return fail("no_view_generated")
+            if not view:
+                return fail("no_view_generated")
 
-            return ok({
+            res: dict[str, object] = {
                 "message": view["message"],
                 "reply_keyboard": view["reply_keyboard"],
                 "force_reply": view["force_reply"],
                 "reply_placeholder": view["reply_placeholder"],
                 "wizard_state": view["new_state"].model_dump(),
                 "is_complete": view["new_state"].step == 99
-            })
+            }
+            return None, res
 
         return await with_tenant_context(conn, tenant_id, operation)
 
@@ -136,25 +142,22 @@ async def _main_async(args: dict[str, Any]) -> Result[Dict[str, Any]]:
         log("Wizard Orchestrator Error", error=str(e), module=MODULE)
         return fail(f"internal_error: {e}")
     finally:
-        await conn.close() # pyright: ignore[reportUnknownMemberType]
-
-import re
+        await conn.close()
 
 
-def main(args: dict):
+def main(args: dict[str, object]) -> dict[str, object] | None:
     import traceback
     try:
-        return asyncio.run(_main_async(args))
+        err, result = asyncio.run(_main_async(args))
+        if err:
+            raise err
+        return result
     except Exception as e:
         tb = traceback.format_exc()
-        # Intentamos usar el adaptador local si está disponible, si no print
         try:
-            from ..internal._wmill_adapter import log
-            log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=os.path.basename(os.path.dirname(__file__)))
-        except:
-            from ..internal._wmill_adapter import log
-            log("BARE_EXCEPT_CAUGHT", file="main.py")
-            print(f"CRITICAL ERROR in {__file__}: {e}\n{tb}")
+            log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=MODULE)
+        except Exception:
+            print(f"CRITICAL ERROR in booking_wizard: {e}\n{tb}")
         
         # Elevamos para que Windmill marque como FAILED
         raise RuntimeError(f"Execution failed: {e}")

@@ -147,7 +147,7 @@ def cosine_similarity(a: Dict[str, float], b: Dict[str, float], idf: Dict[str, f
     return dot / (math.sqrt(mag_a) * math.sqrt(mag_b))
 
 class TfIdfModel:
-    def __init__(self):
+    def __init__(self) -> None:
         self.intents = list(CORPUS.keys())
         intent_docs = []
         for intent in self.intents:

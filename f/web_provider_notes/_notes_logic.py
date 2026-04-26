@@ -1,3 +1,4 @@
+from typing import Any
 from datetime import datetime
 from typing import List, Optional, Dict, Any, cast, Tuple
 from ..internal._result import Result, DBClient, ok, fail
@@ -29,7 +30,7 @@ def map_row_to_note(r: Dict[str, Any], tags: List[Tag] = []) -> NoteRow:
     }
 
 class NoteRepository:
-    def __init__(self, db: DBClient):
+    def __init__(self, db: DBClient) -> None:
         self.db = db
 
     async def get_tags(self, note_id: str) -> List[Tag]:
