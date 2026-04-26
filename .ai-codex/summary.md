@@ -1,5 +1,5 @@
 # Codebase Index
-_git:9f3480ed — 2026-04-26T20:53Z_
+_git:18962a58 — 2026-04-26T21:02Z_
 
 > Read this file BEFORE exploring the repository.
 
@@ -547,8 +547,8 @@ _git:9f3480ed — 2026-04-26T20:53Z_
 - 📦 `class` `OverrideValidation` (L54)
 
 ### `f/nlu/_tfidf_classifier.py`
-- 📦 `class` `TfIdfResult` (L190)
-- 🔧 `fn` `classify_intent` (L195)
+- 📦 `class` `TfIdfResult` (L191)
+- 🔧 `fn` `classify_intent` (L196)
 
 ### `f/nlu/main.py`
 - 📦 `class` `ExtractedIntent` (L17)
@@ -602,10 +602,12 @@ _git:9f3480ed — 2026-04-26T20:53Z_
 - ⚡ `async_fn` `get_provider_agenda` (L7)
 
 ### `f/provider_agenda/_agenda_models.py`
-- 📦 `class` `AgendaBooking` (L5)
-- 📦 `class` `AgendaDay` (L13)
-- 📦 `class` `AgendaResult` (L20)
-- 📦 `class` `InputSchema` (L27)
+- 📦 `class` `AgendaRow` (L6)
+- 📦 `class` `AgendaInput` (L15)
+- 📦 `class` `AgendaBooking` (L20)
+- 📦 `class` `AgendaDay` (L28)
+- 📦 `class` `AgendaResult` (L35)
+- 📦 `class` `InputSchema` (L42)
 
 ### `f/provider_agenda/main.py`
 - ⚡ `async_fn` `operation` (L32)
@@ -756,11 +758,11 @@ _git:9f3480ed — 2026-04-26T20:53Z_
 - 🔧 `fn` `main` (L38)
 
 ### `f/telegram_send/_telegram_logic.py`
-- 📦 `class` `TelegramService` (L10)
-- ⚡ `async_fn` `execute` (L15)
-- 🔧 `fn` `prepare_request` (L38)
-- ⚡ `async_fn` `api_call` (L79)
-- 🔧 `fn` `normalize_keyboard` (L95)
+- 📦 `class` `TelegramService` (L12)
+- ⚡ `async_fn` `execute` (L17)
+- 🔧 `fn` `prepare_request` (L40)
+- ⚡ `async_fn` `api_call` (L81)
+- 🔧 `fn` `normalize_keyboard` (L97)
 
 ### `f/telegram_send/_telegram_models.py`
 - 📦 `class` `InlineButton` (L9)
@@ -835,20 +837,20 @@ _git:9f3480ed — 2026-04-26T20:53Z_
 - 🔧 `fn` `main` (L58)
 
 ### `f/web_admin_tags/_tags_logic.py`
-- 🔧 `fn` `map_category` (L7)
-- 🔧 `fn` `map_tag` (L18)
-- ⚡ `async_fn` `verify_admin_access` (L31)
-- 📦 `class` `TagRepository` (L37)
-- ⚡ `async_fn` `list_categories` (L41)
-- ⚡ `async_fn` `create_category` (L57)
-- ⚡ `async_fn` `update_category` (L68)
-- ⚡ `async_fn` `set_category_status` (L88)
-- ⚡ `async_fn` `delete_category` (L99)
-- ⚡ `async_fn` `list_tags` (L106)
-- ⚡ `async_fn` `create_tag` (L130)
-- ⚡ `async_fn` `update_tag` (L145)
-- ⚡ `async_fn` `set_tag_status` (L170)
-- ⚡ `async_fn` `delete_tag` (L181)
+- 🔧 `fn` `map_category` (L8)
+- 🔧 `fn` `map_tag` (L19)
+- ⚡ `async_fn` `verify_admin_access` (L32)
+- 📦 `class` `TagRepository` (L38)
+- ⚡ `async_fn` `list_categories` (L42)
+- ⚡ `async_fn` `create_category` (L58)
+- ⚡ `async_fn` `update_category` (L69)
+- ⚡ `async_fn` `set_category_status` (L89)
+- ⚡ `async_fn` `delete_category` (L100)
+- ⚡ `async_fn` `list_tags` (L107)
+- ⚡ `async_fn` `create_tag` (L131)
+- ⚡ `async_fn` `update_tag` (L146)
+- ⚡ `async_fn` `set_tag_status` (L171)
+- ⚡ `async_fn` `delete_tag` (L182)
 
 ### `f/web_admin_tags/_tags_models.py`
 - 📦 `class` `CategoryRow` (L5)
@@ -960,10 +962,10 @@ _git:9f3480ed — 2026-04-26T20:53Z_
 - 🔧 `fn` `main` (L47)
 
 ### `f/web_patient_profile/_profile_logic.py`
-- 🔧 `fn` `map_to_profile` (L7)
-- ⚡ `async_fn` `find_user` (L18)
-- ⚡ `async_fn` `find_or_create_client` (L26)
-- ⚡ `async_fn` `update_profile` (L47)
+- 🔧 `fn` `map_to_profile` (L8)
+- ⚡ `async_fn` `find_user` (L19)
+- ⚡ `async_fn` `find_or_create_client` (L27)
+- ⚡ `async_fn` `update_profile` (L48)
 
 ### `f/web_patient_profile/_profile_models.py`
 - 📦 `class` `ProfileResult` (L5)

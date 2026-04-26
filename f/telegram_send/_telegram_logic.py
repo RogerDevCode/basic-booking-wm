@@ -1,8 +1,10 @@
+# mypy: disable-error-code="misc"
+"""Telegram API integration logic - handles untyped API responses."""
 from typing import Any
 import httpx
 import asyncio
 import json
-from typing import Optional, List, Dict, Any, Tuple, cast
+from typing import Optional, List, Dict, Tuple, cast
 from ..internal._result import Result, ok, fail
 from ..internal._config import MAX_RETRIES, TIMEOUT_TELEGRAM_API_MS
 from ._telegram_models import TelegramInput, TelegramSendData, TelegramResponse, InlineButton

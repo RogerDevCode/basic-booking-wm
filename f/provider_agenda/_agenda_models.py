@@ -1,6 +1,21 @@
-from typing import Any
+from __future__ import annotations
 from typing import Optional, List, TypedDict, Dict, Any
 from pydantic import BaseModel, ConfigDict, Field
+from datetime import date
+
+class AgendaRow(TypedDict):
+    booking_id: str
+    status: str
+    start_time: str
+    end_time: str
+    client_name: str
+    client_phone: Optional[str]
+    service_name: str
+
+class AgendaInput(BaseModel):
+    model_config = ConfigDict(strict=True)
+    provider_id: str
+    target_date: date
 
 class AgendaBooking(TypedDict):
     booking_id: str
