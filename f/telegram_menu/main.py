@@ -36,10 +36,10 @@ async def _main_async(args: dict[str, object]) -> Dict[str, object]:
             "error_message": str(e)
         }
 
-def main(action: str, chat_id: str, user_input: Optional[str] = None) -> Dict[str, object]:
+async def main(action: str, chat_id: str, user_input: Optional[str] = None) -> Dict[str, object]:
     args: dict[str, object] = {"action": action, "chat_id": chat_id, "user_input": user_input}
     try:
-        return asyncio.run(_main_async(args))
+        return await _main_async(args)
     except Exception as e:
         tb = traceback.format_exc()
         try:

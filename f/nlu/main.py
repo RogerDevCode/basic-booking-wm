@@ -50,10 +50,10 @@ async def _main_async(args: dict[str, object]) -> ExtractedIntent:
     }
 
 
-def main(args: dict[str, object]) -> ExtractedIntent | None:
+async def main(args: dict[str, object]) -> ExtractedIntent | None:
     import traceback
     try:
-        return asyncio.run(_main_async(args))
+        return await _main_async(args)
     except Exception as e:
         tb = traceback.format_exc()
         try:

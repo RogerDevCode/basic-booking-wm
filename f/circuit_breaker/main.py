@@ -102,19 +102,6 @@ async def _main_async(args: dict[str, object]) -> Result[CircuitBreakerResult | 
         await conn.close()
 
 
-def main(args: dict[str, object]) -> dict[str, Any] | None:
-    import traceback
-    try:
-        err, result = asyncio.run(_main_async(args))
-        if err:
-            raise err
-        return cast(dict[str, Any], result) if result else None
-    except Exception as e:
-        tb = traceback.format_exc()
-        try:
-            log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=MODULE)
-        except Exception:
-            print(f"CRITICAL ERROR in circuit_breaker: {e}\n{tb}")
-        
-        # Elevamos para que Windmill marque como FAILED
-        raise RuntimeError(f"Execution failed: {e}")
+async def main(args: dict[str, object]) -> Result[CircuitBreakerResult | CircuitState]:
+    """Windmill entrypoint."""
+    return await _main_async(args)

@@ -32,8 +32,16 @@ async def _main_async(args: dict[str, object]) -> Result[object]:
     try:
         # 2. Execute within Tenant Context
         async def operation() -> Result[object]:
-            # cast to Any for compatible passing between models
-            return await get_provider_agenda(conn, cast(Any, input_data))
+            # Construct AgendaInput from InputSchema
+            from ._agenda_models import AgendaInput
+            from datetime import date
+            
+            # Use date_from as the target_date for the single-day logic
+            agenda_input = AgendaInput(
+                provider_id=input_data.provider_id,
+                target_date=date.fromisoformat(input_data.date_from)
+            )
+            return await get_provider_agenda(conn, agenda_input)
 
         return await with_tenant_context(conn, input_data.provider_id, operation)
 
@@ -44,10 +52,11 @@ async def _main_async(args: dict[str, object]) -> Result[object]:
         await conn.close()
 
 
-def main(args: dict[str, object]) -> object | None:
+async def main(args: dict[str, object]) -> object | None:
+    """Windmill entrypoint."""
     import traceback
     try:
-        err, result = asyncio.run(_main_async(args))
+        err, result = await _main_async(args)
         if err:
             raise err
         return result

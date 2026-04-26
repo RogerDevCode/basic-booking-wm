@@ -51,13 +51,22 @@ def parse_callback_data(data: str) -> Optional[BookingAction]:
 
     return None
 
+from pydantic import TypeAdapter
+
 def apply_transition(
     current_state: BookingState,
-    action: BookingAction,
+    action: BookingAction | dict[str, Any],
     draft: DraftBooking,
     items: Optional[List[object]] = None
 ) -> Result[TransitionOutcome]:
-    
+    # 0. Ensure action is a Pydantic model
+    if isinstance(action, dict):
+        try:
+            # We use BookingAction here as it's already imported
+            action = TypeAdapter(BookingAction).validate_python(action)
+        except Exception as e:
+            return fail(f"invalid_action_structure: {e}")
+
     # 1. Global Actions
     if action.type == 'cancel':
         return ok(TransitionOutcome(

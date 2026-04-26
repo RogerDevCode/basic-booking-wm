@@ -1,5 +1,5 @@
 # Codebase Index
-_git:d9feeac4 — 2026-04-26T21:36Z_
+_git:b5f45d02 — 2026-04-26T21:52Z_
 
 > Read this file BEFORE exploring the repository.
 
@@ -19,7 +19,7 @@ _git:d9feeac4 — 2026-04-26T21:36Z_
 ### `f/admin_honorifics/main.py`
 - ⚡ `async_fn` `list_op` (L43)
 - ⚡ `async_fn` `operation` (L48)
-- 🔧 `fn` `main` (L90)
+- ⚡ `async_fn` `main` (L90)
 
 ### `f/auth_provider/_auth_logic.py`
 - 🔧 `fn` `generate_readable_password` (L15)
@@ -35,7 +35,7 @@ _git:d9feeac4 — 2026-04-26T21:36Z_
 
 ### `f/auth_provider/main.py`
 - ⚡ `async_fn` `operation` (L40)
-- 🔧 `fn` `main` (L59)
+- ⚡ `async_fn` `main` (L59)
 
 ### `f/availability_check/_availability_logic.py`
 - ⚡ `async_fn` `get_provider_service_id` (L5)
@@ -49,7 +49,7 @@ _git:d9feeac4 — 2026-04-26T21:36Z_
 ### `f/availability_check/main.py`
 - ⚡ `async_fn` `main_async` (L24)
 - ⚡ `async_fn` `operation` (L32)
-- 🔧 `fn` `main` (L75)
+- ⚡ `async_fn` `main` (L75)
 
 ### `f/booking_cancel/_booking_cancel_models.py`
 - 📦 `class` `CancelBookingInput` (L5)
@@ -78,7 +78,7 @@ _git:d9feeac4 — 2026-04-26T21:36Z_
 ### `f/booking_cancel/main.py`
 - ⚡ `async_fn` `main_async` (L25)
 - ⚡ `async_fn` `operation` (L60)
-- 🔧 `fn` `main` (L96)
+- ⚡ `async_fn` `main` (L96)
 
 ### `f/booking_create/_booking_create_models.py`
 - 📦 `class` `InputSchema` (L6)
@@ -116,7 +116,7 @@ _git:d9feeac4 — 2026-04-26T21:36Z_
 ### `f/booking_create/main.py`
 - ⚡ `async_fn` `main_async` (L24)
 - ⚡ `async_fn` `operation` (L42)
-- 🔧 `fn` `main` (L75)
+- ⚡ `async_fn` `main` (L75)
 
 ### `f/booking_orchestrator/_context_resolver.py`
 - ⚡ `async_fn` `resolve_context` (L16)
@@ -152,7 +152,7 @@ _git:d9feeac4 — 2026-04-26T21:36Z_
 - ⚡ `async_fn` `handle_reschedule` (L19)
 
 ### `f/booking_orchestrator/main.py`
-- 🔧 `fn` `main` (L86)
+- ⚡ `async_fn` `main` (L86)
 
 ### `f/booking_reschedule/_reschedule_logic.py`
 - 🔧 `fn` `authorize` (L7)
@@ -181,7 +181,7 @@ _git:d9feeac4 — 2026-04-26T21:36Z_
 ### `f/booking_reschedule/main.py`
 - ⚡ `async_fn` `main_async` (L26)
 - ⚡ `async_fn` `operation` (L69)
-- 🔧 `fn` `main` (L103)
+- ⚡ `async_fn` `main` (L103)
 
 ### `f/booking_search/_search_logic.py`
 - ⚡ `async_fn` `execute_search` (L7)
@@ -192,7 +192,7 @@ _git:d9feeac4 — 2026-04-26T21:36Z_
 - 📦 `class` `BookingSearchResult` (L27)
 
 ### `f/booking_search/main.py`
-- 🔧 `fn` `main` (L65)
+- ⚡ `async_fn` `main` (L65)
 
 ### `f/booking_wizard/_wizard_logic.py`
 - 📦 `class` `DateUtils` (L13)
@@ -217,7 +217,7 @@ _git:d9feeac4 — 2026-04-26T21:36Z_
 
 ### `f/booking_wizard/main.py`
 - ⚡ `async_fn` `operation` (L43)
-- 🔧 `fn` `main` (L148)
+- ⚡ `async_fn` `main` (L148)
 
 ### `f/circuit_breaker/_circuit_logic.py`
 - ⚡ `async_fn` `get_state` (L7)
@@ -231,7 +231,7 @@ _git:d9feeac4 — 2026-04-26T21:36Z_
 
 ### `f/circuit_breaker/main.py`
 - ⚡ `async_fn` `operation` (L33)
-- 🔧 `fn` `main` (L105)
+- ⚡ `async_fn` `main` (L105)
 
 ### `f/conversation_logger/_logger_logic.py`
 - ⚡ `async_fn` `persist_log` (L7)
@@ -242,7 +242,7 @@ _git:d9feeac4 — 2026-04-26T21:36Z_
 
 ### `f/conversation_logger/main.py`
 - ⚡ `async_fn` `operation` (L34)
-- 🔧 `fn` `main` (L46)
+- ⚡ `async_fn` `main` (L46)
 
 ### `f/distributed_lock/_lock_logic.py`
 - 🔧 `fn` `map_row_to_lock_info` (L7)
@@ -260,7 +260,7 @@ _git:d9feeac4 — 2026-04-26T21:36Z_
 
 ### `f/distributed_lock/main.py`
 - ⚡ `async_fn` `operation` (L35)
-- 🔧 `fn` `main` (L56)
+- ⚡ `async_fn` `main` (L56)
 
 ### `f/dlq_processor/_dlq_logic.py`
 - 🔧 `fn` `map_row_to_dlq_entry` (L8)
@@ -278,7 +278,7 @@ _git:d9feeac4 — 2026-04-26T21:36Z_
 
 ### `f/dlq_processor/main.py`
 - ⚡ `async_fn` `operation` (L33)
-- 🔧 `fn` `main` (L60)
+- ⚡ `async_fn` `main` (L60)
 
 ### `f/gcal_reconcile/_reconcile_logic.py`
 - ⚡ `async_fn` `retry_with_backoff` (L14)
@@ -295,7 +295,7 @@ _git:d9feeac4 — 2026-04-26T21:36Z_
 
 ### `f/gcal_reconcile/main.py`
 - ⚡ `async_fn` `provider_batch` (L42)
-- 🔧 `fn` `main` (L145)
+- ⚡ `async_fn` `main` (L145)
 
 ### `f/gcal_sync/_gcal_api_adapter.py`
 - ⚡ `async_fn` `fetch_booking_details` (L10)
@@ -315,7 +315,7 @@ _git:d9feeac4 — 2026-04-26T21:36Z_
 - ⚡ `async_fn` `operation` (L15)
 
 ### `f/gcal_sync/main.py`
-- 🔧 `fn` `main` (L88)
+- ⚡ `async_fn` `main` (L88)
 
 ### `f/gmail_send/_gmail_logic.py`
 - 🔧 `fn` `safe_string` (L10)
@@ -329,7 +329,7 @@ _git:d9feeac4 — 2026-04-26T21:36Z_
 - 📦 `class` `InputSchema` (L18)
 
 ### `f/gmail_send/main.py`
-- 🔧 `fn` `main` (L83)
+- ⚡ `async_fn` `main` (L83)
 
 ### `f/health_check/_health_logic.py`
 - ⚡ `async_fn` `check_database` (L10)
@@ -343,7 +343,7 @@ _git:d9feeac4 — 2026-04-26T21:36Z_
 - 📦 `class` `InputSchema` (L16)
 
 ### `f/health_check/main.py`
-- 🔧 `fn` `main` (L68)
+- ⚡ `async_fn` `main` (L68)
 
 ### `f/internal/_config.py`
 - 🔧 `fn` `get_env` (L55)
@@ -466,8 +466,8 @@ _git:d9feeac4 — 2026-04-26T21:36Z_
 ### `f/internal/booking_fsm/_fsm_machine.py`
 - 🔧 `fn` `parse_action` (L21)
 - 🔧 `fn` `parse_callback_data` (L42)
-- 🔧 `fn` `apply_transition` (L54)
-- 🔧 `fn` `flow_step_from_state` (L268)
+- 🔧 `fn` `apply_transition` (L56)
+- 🔧 `fn` `flow_step_from_state` (L277)
 
 ### `f/internal/booking_fsm/_fsm_models.py`
 - 📦 `class` `NamedItem` (L22)
@@ -554,7 +554,7 @@ _git:d9feeac4 — 2026-04-26T21:36Z_
 
 ### `f/nlu/main.py`
 - 📦 `class` `ExtractedIntent` (L19)
-- 🔧 `fn` `main` (L53)
+- ⚡ `async_fn` `main` (L53)
 
 ### `f/noshow_trigger/_noshow_logic.py`
 - 📦 `class` `BookingRepository` (L5)
@@ -568,7 +568,7 @@ _git:d9feeac4 — 2026-04-26T21:36Z_
 
 ### `f/noshow_trigger/main.py`
 - ⚡ `async_fn` `provider_batch` (L41)
-- 🔧 `fn` `main` (L91)
+- ⚡ `async_fn` `main` (L91)
 
 ### `f/openrouter_benchmark/_benchmark_logic.py`
 - 🔧 `fn` `extract_json` (L43)
@@ -598,7 +598,7 @@ _git:d9feeac4 — 2026-04-26T21:36Z_
 
 ### `f/patient_register/main.py`
 - ⚡ `async_fn` `operation` (L42)
-- 🔧 `fn` `main` (L54)
+- ⚡ `async_fn` `main` (L54)
 
 ### `f/provider_agenda/_agenda_logic.py`
 - ⚡ `async_fn` `get_provider_agenda` (L7)
@@ -613,7 +613,7 @@ _git:d9feeac4 — 2026-04-26T21:36Z_
 
 ### `f/provider_agenda/main.py`
 - ⚡ `async_fn` `operation` (L34)
-- 🔧 `fn` `main` (L47)
+- ⚡ `async_fn` `main` (L55)
 
 ### `f/provider_manage/_manage_logic.py`
 - ⚡ `async_fn` `handle_provider_actions` (L6)
@@ -626,7 +626,7 @@ _git:d9feeac4 — 2026-04-26T21:36Z_
 
 ### `f/provider_manage/main.py`
 - ⚡ `async_fn` `operation` (L41)
-- 🔧 `fn` `main` (L65)
+- ⚡ `async_fn` `main` (L65)
 
 ### `f/rag_query/_rag_logic.py`
 - 📦 `class` `KBRepository` (L6)
@@ -642,7 +642,7 @@ _git:d9feeac4 — 2026-04-26T21:36Z_
 
 ### `f/rag_query/main.py`
 - ⚡ `async_fn` `operation` (L34)
-- 🔧 `fn` `main` (L63)
+- ⚡ `async_fn` `main` (L63)
 
 ### `f/reminder_config/_config_logic.py`
 - ⚡ `async_fn` `load_preferences` (L14)
@@ -658,7 +658,7 @@ _git:d9feeac4 — 2026-04-26T21:36Z_
 
 ### `f/reminder_config/main.py`
 - ⚡ `async_fn` `operation` (L37)
-- 🔧 `fn` `main` (L100)
+- ⚡ `async_fn` `main` (L100)
 
 ### `f/reminder_cron/_reminder_logic.py`
 - 🔧 `fn` `format_date_es` (L6)
@@ -679,7 +679,7 @@ _git:d9feeac4 — 2026-04-26T21:36Z_
 
 ### `f/reminder_cron/main.py`
 - ⚡ `async_fn` `provider_batch` (L54)
-- 🔧 `fn` `main` (L108)
+- ⚡ `async_fn` `main` (L108)
 
 ### `f/telegram_auto_register/_auto_register_logic.py`
 - ⚡ `async_fn` `register_telegram_user` (L7)
@@ -690,7 +690,7 @@ _git:d9feeac4 — 2026-04-26T21:36Z_
 
 ### `f/telegram_auto_register/main.py`
 - ⚡ `async_fn` `operation` (L34)
-- 🔧 `fn` `main` (L46)
+- ⚡ `async_fn` `main` (L46)
 
 ### `f/telegram_callback/_callback_logic.py`
 - 🔧 `fn` `parse_callback_data` (L17)
@@ -720,7 +720,7 @@ _git:d9feeac4 — 2026-04-26T21:36Z_
 - ⚡ `async_fn` `route` (L76)
 
 ### `f/telegram_callback/main.py`
-- 🔧 `fn` `main` (L85)
+- ⚡ `async_fn` `main` (L85)
 
 ### `f/telegram_gateway/_gateway_logic.py`
 - 📦 `class` `TelegramClient` (L8)
@@ -741,7 +741,7 @@ _git:d9feeac4 — 2026-04-26T21:36Z_
 - ⚡ `async_fn` `route_update` (L20)
 - ⚡ `async_fn` `handle_callback` (L27)
 - ⚡ `async_fn` `handle_message` (L39)
-- 🔧 `fn` `main` (L92)
+- ⚡ `async_fn` `main` (L92)
 
 ### `f/telegram_menu/_menu_logic.py`
 - 🔧 `fn` `parse_user_option` (L10)
@@ -756,7 +756,7 @@ _git:d9feeac4 — 2026-04-26T21:36Z_
 - 📦 `class` `MenuResult` (L23)
 
 ### `f/telegram_menu/main.py`
-- 🔧 `fn` `main` (L39)
+- ⚡ `async_fn` `main` (L39)
 
 ### `f/telegram_send/_telegram_logic.py`
 - 📦 `class` `TelegramService` (L13)
@@ -778,7 +778,7 @@ _git:d9feeac4 — 2026-04-26T21:36Z_
 - 📦 `class` `TelegramSendData` (L76)
 
 ### `f/telegram_send/main.py`
-- 🔧 `fn` `main` (L40)
+- ⚡ `async_fn` `main` (L40)
 
 ### `f/web_admin_dashboard/_dashboard_logic.py`
 - ⚡ `async_fn` `fetch_dashboard_stats` (L6)
@@ -789,7 +789,7 @@ _git:d9feeac4 — 2026-04-26T21:36Z_
 
 ### `f/web_admin_dashboard/main.py`
 - ⚡ `async_fn` `operation` (L34)
-- 🔧 `fn` `main` (L46)
+- ⚡ `async_fn` `main` (L46)
 
 ### `f/web_admin_provider_crud/_provider_logic.py`
 - 📦 `class` `ProviderDBRow` (L9)

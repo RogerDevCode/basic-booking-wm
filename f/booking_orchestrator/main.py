@@ -83,9 +83,9 @@ async def _main_async(args: dict[str, object]) -> Result[OrchestratorResult]:
         await conn.close()
 
 
-def main(telegram_chat_id: str, intent: str, entities: dict[str, object] | None = None) -> dict[str, Any]:
+async def main(telegram_chat_id: str, intent: str, entities: dict[str, object] | None = None) -> dict[str, Any]:
     """
-    Entrypoint sincrónico para la ejecución en Windmill.
+    Entrypoint asincrónico para la ejecución en Windmill.
     """
     try:
         args: dict[str, object] = {
@@ -93,7 +93,7 @@ def main(telegram_chat_id: str, intent: str, entities: dict[str, object] | None 
             "intent": intent, 
             "entities": entities or {}
         }
-        err, result = asyncio.run(_main_async(args))
+        err, result = await _main_async(args)
         if err:
             raise err
         # Windmill expects a JSON-serializable dict, we cast result to Any for the return

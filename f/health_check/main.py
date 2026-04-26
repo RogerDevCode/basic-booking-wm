@@ -65,19 +65,6 @@ async def _main_async(args: dict[str, object]) -> Result[HealthResult]:
     return ok(res)
 
 
-def main(args: dict[str, object]) -> HealthResult | None:
-    import traceback
-    try:
-        err, result = asyncio.run(_main_async(args))
-        if err:
-            raise err
-        return result
-    except Exception as e:
-        tb = traceback.format_exc()
-        try:
-            log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=MODULE)
-        except Exception:
-            print(f"CRITICAL ERROR in health_check: {e}\n{tb}")
-        
-        # Elevamos para que Windmill marque como FAILED
-        raise RuntimeError(f"Execution failed: {e}")
+async def main(args: dict[str, object]) -> Result[HealthResult]:
+    """Windmill entrypoint."""
+    return await _main_async(args)

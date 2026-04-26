@@ -37,7 +37,7 @@ async def _main_async(args: dict[str, object]) -> Result[TelegramSendData]:
     service = TelegramService(str(resolved_token))
     return await service.execute(input_data)
 
-def main(mode: str, chat_id: str, text: str, bot_token: Optional[str] = None, 
+async def main(mode: str, chat_id: str, text: str, bot_token: Optional[str] = None, 
          parse_mode: Optional[str] = None, inline_buttons_json: Optional[str] = None, 
          message_id: Optional[int] = None) -> TelegramSendData | None:
     
@@ -63,7 +63,7 @@ def main(mode: str, chat_id: str, text: str, bot_token: Optional[str] = None,
     }
     
     try:
-        err, result = asyncio.run(_main_async(args))
+        err, result = await _main_async(args)
         if err:
             raise err
         # Ensure it returns the data model

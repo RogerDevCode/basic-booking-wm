@@ -93,19 +93,6 @@ async def main_async(args: dict[str, object]) -> Result[CancelResult]:
         await conn.close()
 
 
-def main(args: dict[str, object]) -> CancelResult | None:
-    import traceback
-    try:
-        err, result = asyncio.run(main_async(args))
-        if err:
-            raise err
-        return result
-    except Exception as e:
-        tb = traceback.format_exc()
-        try:
-            log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=MODULE)
-        except Exception:
-            print(f"CRITICAL ERROR in booking_cancel: {e}\n{tb}")
-        
-        # Elevamos para que Windmill marque como FAILED
-        raise RuntimeError(f"Execution failed: {e}")
+async def main(args: dict[str, object]) -> Result[CancelResult]:
+    """Windmill entrypoint."""
+    return await main_async(args)

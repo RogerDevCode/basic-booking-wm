@@ -89,5 +89,5 @@ async def _main_async(args: dict[str, object]) -> dict[str, object]:
     }
 
 
-def main(webhook_payload: dict[str, object]) -> dict[str, object]:
-    return asyncio.run(_main_async(webhook_payload))
+async def main(webhook_payload: dict[str, object]) -> dict[str, object]:
+    return await _main_async(webhook_payload)
