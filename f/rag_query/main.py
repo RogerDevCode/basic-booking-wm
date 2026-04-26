@@ -1,4 +1,6 @@
+from __future__ import annotations
 import asyncio
+import os
 # ============================================================================
 # PRE-FLIGHT CHECKLIST
 # Mission         : Semantic search against knowledge base (keyword-based fallback)
@@ -19,7 +21,7 @@ from ._rag_logic import KBRepository, perform_keyword_search
 
 MODULE = "rag_query"
 
-async def _main_async(args: dict[str, Any]) -> Result[RAGResult]:
+async def _main_async(args: dict[str, object]) -> Result[RAGResult]:
     # 1. Validate Input
     try:
         input_data = InputSchema.model_validate(args)
@@ -37,15 +39,17 @@ async def _main_async(args: dict[str, Any]) -> Result[RAGResult]:
                 return fail(err_fetch)
 
             if not rows:
-                return ok({"entries": [], "count": 0, "method": "keyword"})
+                res_empty: RAGResult = {"entries": [], "count": 0, "method": "keyword"}
+                return ok(res_empty)
 
             entries = perform_keyword_search(input_data.query, rows, input_data.top_k)
             
-            return ok({
+            res_full: RAGResult = {
                 "entries": entries,
                 "count": len(entries),
                 "method": "keyword"
-            })
+            }
+            return ok(res_full)
 
         return await with_tenant_context(conn, input_data.provider_id, operation)
 
@@ -53,23 +57,22 @@ async def _main_async(args: dict[str, Any]) -> Result[RAGResult]:
         log("Internal error in rag_query", error=str(e), module=MODULE)
         return fail(f"internal_error: {e}")
     finally:
-        await conn.close() # pyright: ignore[reportUnknownMemberType]
+        await conn.close()
 
 
-def main(args: dict) -> None:
+def main(args: dict[str, object]) -> RAGResult | None:
     import traceback
     try:
-        return asyncio.run(_main_async(args))
+        err, result = asyncio.run(_main_async(args))
+        if err:
+            raise err
+        return result
     except Exception as e:
         tb = traceback.format_exc()
-        # Intentamos usar el adaptador local si está disponible, si no print
         try:
-            from ..internal._wmill_adapter import log
-            log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=os.path.basename(os.path.dirname(__file__)))
-        except:
-            from ..internal._wmill_adapter import log
-            log("BARE_EXCEPT_CAUGHT", file="main.py")
-            print(f"CRITICAL ERROR in {__file__}: {e}\n{tb}")
+            log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=MODULE)
+        except Exception:
+            print(f"CRITICAL ERROR in rag_query: {e}\n{tb}")
         
         # Elevamos para que Windmill marque como FAILED
         raise RuntimeError(f"Execution failed: {e}")

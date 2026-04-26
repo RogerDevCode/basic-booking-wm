@@ -1,5 +1,5 @@
 # Codebase Index
-_git:dfcaefa6 — 2026-04-26T21:09Z_
+_git:8e8ce1f1 — 2026-04-26T21:09Z_
 
 > Read this file BEFORE exploring the repository.
 
@@ -641,8 +641,8 @@ _git:dfcaefa6 — 2026-04-26T21:09Z_
 - 📦 `class` `InputSchema` (L22)
 
 ### `f/rag_query/main.py`
-- ⚡ `async_fn` `operation` (L32)
-- 🔧 `fn` `main` (L59)
+- ⚡ `async_fn` `operation` (L34)
+- 🔧 `fn` `main` (L63)
 
 ### `f/reminder_config/_config_logic.py`
 - ⚡ `async_fn` `load_preferences` (L14)
