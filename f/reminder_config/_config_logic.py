@@ -1,6 +1,6 @@
-from typing import Any
+from __future__ import annotations
 import json
-from typing import Dict, Any, List, Optional, Tuple, cast
+from typing import Dict, List, Optional, Tuple, cast, Any
 from ..internal._result import Result, DBClient, ok, fail
 from ._config_models import ReminderPrefs
 
@@ -17,10 +17,15 @@ async def load_preferences(db: DBClient, client_id: str) -> ReminderPrefs:
         if not rows or not rows[0].get("metadata"):
             return DEFAULTS.copy()
 
-        meta = rows[0]["metadata"]
-        if isinstance(meta, str): meta = json.loads(meta)
+        meta_raw = rows[0]["metadata"]
+        if isinstance(meta_raw, str):
+            meta = cast(Dict[str, object], json.loads(meta_raw))
+        else:
+            meta = cast(Dict[str, object], meta_raw)
         
-        raw_prefs = meta.get("reminder_preferences", {})
+        raw_prefs_raw = meta.get("reminder_preferences", {})
+        raw_prefs = cast(Dict[str, object], raw_prefs_raw)
+        
         if not isinstance(raw_prefs, dict):
             return DEFAULTS.copy()
 

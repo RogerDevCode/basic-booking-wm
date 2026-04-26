@@ -1,5 +1,5 @@
-from typing import Any
-from typing import Optional, List, Literal, TypedDict, Dict, Any
+from __future__ import annotations
+from typing import Optional, List, Literal, TypedDict, Dict
 from pydantic import BaseModel, ConfigDict, Field
 
 class ReminderPrefs(TypedDict):

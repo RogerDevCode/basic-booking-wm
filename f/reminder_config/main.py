@@ -1,4 +1,6 @@
+from __future__ import annotations
 import asyncio
+import os
 # ============================================================================
 # PRE-FLIGHT CHECKLIST
 # Mission         : Configure reminder preferences (UI-driven)
@@ -10,7 +12,7 @@ import asyncio
 # Pydantic Schemas: YES — InputSchema validates action and client_id
 # ============================================================================
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, cast
 from ..internal._wmill_adapter import log
 from ..internal._db_client import create_db_client
 from ..internal._result import Result, ok, fail, with_tenant_context
@@ -22,7 +24,7 @@ from ._config_logic import (
 
 MODULE = "reminder_config"
 
-async def _main_async(args: dict[str, Any]) -> Result[ReminderConfigResult]:
+async def _main_async(args: dict[str, object]) -> Result[ReminderConfigResult]:
     # 1. Validate Input
     try:
         input_data = InputSchema.model_validate(args)
@@ -42,16 +44,18 @@ async def _main_async(args: dict[str, Any]) -> Result[ReminderConfigResult]:
             if input_data.action == 'toggle_channel':
                 if input_data.channel == 'telegram':
                     all_on = prefs["telegram_24h"] and prefs["telegram_2h"] and prefs["telegram_30min"]
-                    prefs = {**prefs, "telegram_24h": not all_on, "telegram_2h": not all_on, "telegram_30min": not all_on}
+                    prefs = cast(ReminderPrefs, {**prefs, "telegram_24h": not all_on, "telegram_2h": not all_on, "telegram_30min": not all_on})
                 elif input_data.channel == 'gmail':
-                    prefs = {**prefs, "gmail_24h": not prefs["gmail_24h"]}
+                    prefs = cast(ReminderPrefs, {**prefs, "gmail_24h": not prefs["gmail_24h"]})
                 await save_preferences(conn, input_data.client_id, prefs)
 
             elif input_data.action == 'toggle_window':
                 if input_data.window:
                     key = f"telegram_{input_data.window}"
                     if key in prefs:
-                        prefs[key] = not prefs[key] # type: ignore[literal-required]
+                        # Using cast to Any temporarily to bypass literal-required issue
+                        new_val = not cast(Any, prefs)[key]
+                        cast(Any, prefs)[key] = new_val
                         await save_preferences(conn, input_data.client_id, prefs)
 
             elif input_data.action == 'deactivate_all':
@@ -77,11 +81,12 @@ async def _main_async(args: dict[str, Any]) -> Result[ReminderConfigResult]:
                 message = "📋 Menú principal. ¿En qué puedo ayudarte?"
                 reply_keyboard = [['📅 Agendar cita', '📋 Mis citas'], ['🔔 Recordatorios', '❓ Información']]
 
-            return ok({
+            res: ReminderConfigResult = {
                 "message": message,
                 "reply_keyboard": reply_keyboard,
                 "preferences": prefs
-            })
+            }
+            return ok(res)
 
         return await with_tenant_context(conn, input_data.client_id, operation)
 
@@ -89,23 +94,22 @@ async def _main_async(args: dict[str, Any]) -> Result[ReminderConfigResult]:
         log("Reminder Config Internal Error", error=str(e), module=MODULE)
         return fail(f"internal_error: {e}")
     finally:
-        await conn.close() # pyright: ignore[reportUnknownMemberType]
+        await conn.close()
 
 
-def main(args: dict) -> None:
+def main(args: dict[str, object]) -> ReminderConfigResult | None:
     import traceback
     try:
-        return asyncio.run(_main_async(args))
+        err, result = asyncio.run(_main_async(args))
+        if err:
+            raise err
+        return result
     except Exception as e:
         tb = traceback.format_exc()
-        # Intentamos usar el adaptador local si está disponible, si no print
         try:
-            from ..internal._wmill_adapter import log
-            log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=os.path.basename(os.path.dirname(__file__)))
-        except:
-            from ..internal._wmill_adapter import log
-            log("BARE_EXCEPT_CAUGHT", file="main.py")
-            print(f"CRITICAL ERROR in {__file__}: {e}\n{tb}")
+            log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=MODULE)
+        except Exception:
+            print(f"CRITICAL ERROR in reminder_config: {e}\n{tb}")
         
         # Elevamos para que Windmill marque como FAILED
         raise RuntimeError(f"Execution failed: {e}")

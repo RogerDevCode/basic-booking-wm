@@ -1,5 +1,5 @@
 # Codebase Index
-_git:e5821b16 — 2026-04-26T21:09Z_
+_git:6a169627 — 2026-04-26T21:12Z_
 
 > Read this file BEFORE exploring the repository.
 
@@ -646,10 +646,10 @@ _git:e5821b16 — 2026-04-26T21:09Z_
 
 ### `f/reminder_config/_config_logic.py`
 - ⚡ `async_fn` `load_preferences` (L14)
-- ⚡ `async_fn` `save_preferences` (L38)
-- 🔧 `fn` `build_config_message` (L59)
-- 🔧 `fn` `build_window_config` (L76)
-- 🔧 `fn` `set_all` (L95)
+- ⚡ `async_fn` `save_preferences` (L43)
+- 🔧 `fn` `build_config_message` (L64)
+- 🔧 `fn` `build_window_config` (L81)
+- 🔧 `fn` `set_all` (L100)
 
 ### `f/reminder_config/_config_models.py`
 - 📦 `class` `ReminderPrefs` (L5)
@@ -657,8 +657,8 @@ _git:e5821b16 — 2026-04-26T21:09Z_
 - 📦 `class` `InputSchema` (L16)
 
 ### `f/reminder_config/main.py`
-- ⚡ `async_fn` `operation` (L35)
-- 🔧 `fn` `main` (L95)
+- ⚡ `async_fn` `operation` (L37)
+- 🔧 `fn` `main` (L100)
 
 ### `f/reminder_cron/_reminder_logic.py`
 - 🔧 `fn` `format_date_es` (L6)
