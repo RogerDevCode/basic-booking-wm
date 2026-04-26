@@ -172,11 +172,11 @@
 - [x] `f/rag_query/_rag_logic.py`: 0 errors
 </details>
 
-<details>
-<summary><b>Module: <code>reminder_config</code> (10 errors)</b></summary>
+<details open>
+<summary><b>Module: <code>reminder_config</code> (0 errors) ✅</b></summary>
 
-- [ ] `f/reminder_config/main.py`: 7 errors
-- [ ] `f/reminder_config/_config_logic.py`: 3 errors
+- [x] `f/reminder_config/main.py`: 0 errors
+- [x] `f/reminder_config/_config_logic.py`: 0 errors
 </details>
 
 <details>
