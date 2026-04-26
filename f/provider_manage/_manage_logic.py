@@ -1,9 +1,9 @@
-from typing import Any
+from __future__ import annotations
 from typing import List, Optional, Dict, Any, cast
 from ..internal._result import Result, DBClient, ok, fail
 from ._manage_models import InputSchema
 
-async def handle_provider_actions(db: DBClient, input_data: InputSchema) -> Result[Dict[str, Any]]:
+async def handle_provider_actions(db: DBClient, input_data: InputSchema) -> Result[Dict[str, object]]:
     action = input_data.action
     if action == 'create_provider':
         if not input_data.name or not input_data.email:
@@ -18,7 +18,8 @@ async def handle_provider_actions(db: DBClient, input_data: InputSchema) -> Resu
             input_data.specialty or 'Medicina General', input_data.timezone
         )
         if not rows: return fail("DATABASE_ERROR: Failed to create provider")
-        return ok({"created": True, "provider_id": str(rows[0]["provider_id"]), "name": str(rows[0]["name"])})
+        res_create: Dict[str, object] = {"created": True, "provider_id": str(rows[0]["provider_id"]), "name": str(rows[0]["name"])}
+        return ok(res_create)
 
     elif action == 'update_provider':
         if not input_data.provider_id: return fail("MISSING_FIELDS: provider_id is required")
@@ -36,15 +37,17 @@ async def handle_provider_actions(db: DBClient, input_data: InputSchema) -> Resu
             input_data.name, input_data.phone, input_data.specialty, 
             input_data.timezone, input_data.is_active, input_data.provider_id
         )
-        return ok({"updated": True})
+        res_upd: Dict[str, object] = {"updated": True}
+        return ok(res_upd)
 
     elif action == 'list_providers':
         rows = await db.fetch("SELECT provider_id, name, email, phone, specialty, timezone, is_active FROM providers ORDER BY name ASC")
-        return ok({"providers": [dict(r) for r in rows]})
+        res_list: Dict[str, object] = {"providers": [dict(r) for r in rows]}
+        return ok(res_list)
     
     return fail(f"ROUTING_ERROR: Action {action} not handled by Provider handler")
 
-async def handle_service_actions(db: DBClient, input_data: InputSchema) -> Result[Dict[str, Any]]:
+async def handle_service_actions(db: DBClient, input_data: InputSchema) -> Result[Dict[str, object]]:
     action = input_data.action
     if action == 'create_service':
         if not input_data.provider_id or not input_data.service_name:
@@ -60,7 +63,8 @@ async def handle_service_actions(db: DBClient, input_data: InputSchema) -> Resul
             input_data.price_cents or 0, input_data.currency or 'MXN'
         )
         if not rows: return fail("DATABASE_ERROR: Failed to create service")
-        return ok({"created": True, "service_id": str(rows[0]["service_id"]), "name": str(rows[0]["name"])})
+        res_create: Dict[str, object] = {"created": True, "service_id": str(rows[0]["service_id"]), "name": str(rows[0]["name"])}
+        return ok(res_create)
 
     elif action == 'update_service':
         if not input_data.service_id: return fail("MISSING_FIELDS: service_id is required")
@@ -80,7 +84,8 @@ async def handle_service_actions(db: DBClient, input_data: InputSchema) -> Resul
             input_data.buffer_minutes, input_data.price_cents, input_data.currency,
             input_data.is_active, input_data.service_id
         )
-        return ok({"updated": True})
+        res_upd: Dict[str, object] = {"updated": True}
+        return ok(res_upd)
 
     elif action == 'list_services':
         rows = await db.fetch(
@@ -91,11 +96,12 @@ async def handle_service_actions(db: DBClient, input_data: InputSchema) -> Resul
             ORDER BY p.name, s.name ASC
             """
         )
-        return ok({"services": [dict(r) for r in rows]})
+        res_list: Dict[str, object] = {"services": [dict(r) for r in rows]}
+        return ok(res_list)
 
     return fail(f"ROUTING_ERROR: Action {action} not handled by Service handler")
 
-async def handle_schedule_actions(db: DBClient, input_data: InputSchema) -> Result[Dict[str, Any]]:
+async def handle_schedule_actions(db: DBClient, input_data: InputSchema) -> Result[Dict[str, object]]:
     action = input_data.action
     if action == 'set_schedule':
         if input_data.provider_id is None or input_data.day_of_week is None or not input_data.start_time or not input_data.end_time:
@@ -109,7 +115,8 @@ async def handle_schedule_actions(db: DBClient, input_data: InputSchema) -> Resu
             """,
             input_data.provider_id, input_data.day_of_week, input_data.start_time, input_data.end_time
         )
-        return ok({"updated": True})
+        res_upd: Dict[str, object] = {"updated": True}
+        return ok(res_upd)
 
     elif action == 'remove_schedule':
         if input_data.provider_id is None or input_data.day_of_week is None:
@@ -118,11 +125,12 @@ async def handle_schedule_actions(db: DBClient, input_data: InputSchema) -> Resu
             "UPDATE provider_schedules SET is_active = false WHERE provider_id = $1::uuid AND day_of_week = $2",
             input_data.provider_id, input_data.day_of_week
         )
-        return ok({"deactivated": True})
+        res_de: Dict[str, object] = {"deactivated": True}
+        return ok(res_de)
 
     return fail(f"ROUTING_ERROR: Action {action} not handled by Schedule handler")
 
-async def handle_override_actions(db: DBClient, input_data: InputSchema) -> Result[Dict[str, Any]]:
+async def handle_override_actions(db: DBClient, input_data: InputSchema) -> Result[Dict[str, object]]:
     action = input_data.action
     if action == 'set_override':
         if not input_data.provider_id or not input_data.override_date:
@@ -140,7 +148,8 @@ async def handle_override_actions(db: DBClient, input_data: InputSchema) -> Resu
             input_data.provider_id, input_data.override_date, input_data.is_blocked or False,
             input_data.start_time, input_data.end_time, input_data.override_reason
         )
-        return ok({"updated": True})
+        res_upd: Dict[str, object] = {"updated": True}
+        return ok(res_upd)
 
     elif action == 'remove_override':
         if not input_data.provider_id or not input_data.override_date:
@@ -149,6 +158,7 @@ async def handle_override_actions(db: DBClient, input_data: InputSchema) -> Resu
             "DELETE FROM schedule_overrides WHERE provider_id = $1::uuid AND override_date = $2::date",
             input_data.provider_id, input_data.override_date
         )
-        return ok({"deleted": True})
+        res_del: Dict[str, object] = {"deleted": True}
+        return ok(res_del)
 
     return fail(f"ROUTING_ERROR: Action {action} not handled by Override handler")

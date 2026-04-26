@@ -1,4 +1,6 @@
+from __future__ import annotations
 import asyncio
+import os
 # ============================================================================
 # PRE-FLIGHT CHECKLIST
 # Mission         : Mark expired confirmed bookings as no_show
@@ -10,7 +12,7 @@ import asyncio
 # Pydantic Schemas: YES — InputSchema validates parameters
 # ============================================================================
 
-from typing import Any, Dict, List
+from typing import Any, List
 from ..internal._wmill_adapter import log
 from ..internal._db_client import create_db_client
 from ..internal._result import Result, ok, fail, with_tenant_context
@@ -19,7 +21,7 @@ from ._noshow_logic import BookingRepository
 
 MODULE = "noshow_trigger"
 
-async def _main_async(args: dict[str, Any]) -> Result[NoShowStats]:
+async def _main_async(args: dict[str, object]) -> Result[NoShowStats]:
     # 1. Validate Input
     try:
         input_data = InputSchema.model_validate(args)
@@ -40,11 +42,13 @@ async def _main_async(args: dict[str, Any]) -> Result[NoShowStats]:
                 repo = BookingRepository(conn)
                 err_fetch, ids = await repo.find_expired_confirmed(input_data.lookback_minutes)
                 if err_fetch: return fail(err_fetch)
-                if not ids: return ok({"processed": 0, "marked": 0, "skipped": 0, "booking_ids": []})
+                if not ids:
+                    res_empty: NoShowStats = {"processed": 0, "marked": 0, "skipped": 0, "booking_ids": []}
+                    return ok(res_empty)
 
                 marked = 0
                 skipped = 0
-                processed_ids = []
+                processed_ids: List[str] = []
 
                 for bid in ids:
                     if input_data.dry_run:
@@ -60,12 +64,13 @@ async def _main_async(args: dict[str, Any]) -> Result[NoShowStats]:
                     marked += 1
                     processed_ids.append(bid)
 
-                return ok({
+                res_batch: NoShowStats = {
                     "processed": len(ids),
                     "marked": marked,
                     "skipped": skipped,
                     "booking_ids": processed_ids
-                })
+                }
+                return ok(res_batch)
 
             err_p, res_p = await with_tenant_context(conn, p_id, provider_batch)
             if not err_p and res_p:
@@ -80,23 +85,22 @@ async def _main_async(args: dict[str, Any]) -> Result[NoShowStats]:
         log("No-Show Trigger Internal Error", error=str(e), module=MODULE)
         return fail(f"internal_error: {e}")
     finally:
-        await conn.close() # pyright: ignore[reportUnknownMemberType]
+        await conn.close()
 
 
-def main(args: dict) -> None:
+def main(args: dict[str, object]) -> NoShowStats | None:
     import traceback
     try:
-        return asyncio.run(_main_async(args))
+        err, result = asyncio.run(_main_async(args))
+        if err:
+            raise err
+        return result
     except Exception as e:
         tb = traceback.format_exc()
-        # Intentamos usar el adaptador local si está disponible, si no print
         try:
-            from ..internal._wmill_adapter import log
-            log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=os.path.basename(os.path.dirname(__file__)))
-        except:
-            from ..internal._wmill_adapter import log
-            log("BARE_EXCEPT_CAUGHT", file="main.py")
-            print(f"CRITICAL ERROR in {__file__}: {e}\n{tb}")
+            log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=MODULE)
+        except Exception:
+            print(f"CRITICAL ERROR in noshow_trigger: {e}\n{tb}")
         
         # Elevamos para que Windmill marque como FAILED
         raise RuntimeError(f"Execution failed: {e}")

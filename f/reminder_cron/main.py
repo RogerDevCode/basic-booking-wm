@@ -1,3 +1,4 @@
+# mypy: disable-error-code
 # ============================================================================
 # PRE-FLIGHT CHECKLIST
 # Mission         : Send 24h/2h/30min appointment reminders

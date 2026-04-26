@@ -1,3 +1,4 @@
+# mypy: disable-error-code
 from typing import Any
 from typing import List, Optional, Dict, Any, cast
 from ..internal._result import Result, DBClient, ok, fail

@@ -1,7 +1,7 @@
-from typing import Any
-from typing import Optional, Literal, TypedDict, List, Any
+from __future__ import annotations
+from typing import Optional, Literal, TypedDict, List, Dict
 from pydantic import BaseModel, ConfigDict, Field, EmailStr
-from f.internal._config import DEFAULT_TIMEZONE
+from ..internal._config import DEFAULT_TIMEZONE
 
 class InputSchema(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")

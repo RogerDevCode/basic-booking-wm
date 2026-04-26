@@ -1,18 +1,18 @@
-# mypy: disable-error-code="misc"
+from __future__ import annotations
 import math
 import re
 import unicodedata
-from typing import Any, Final, Optional, TypedDict
-from f.nlu._constants import INTENT
+from typing import Any, Final, Optional, TypedDict, cast
+from ._constants import INTENT
 
 """
 PRE-FLIGHT
 Mission          : TF-IDF + Cosine Similarity intent classifier.
 DB Tables        : NONE
 Concurrency Risk : NO
-GCal Calls       : NO
+GCal Calls      : NO
 Idempotency Key  : NO
-RLS Tenant ID    : NO
+RLS Tenant ID   : NO
 Zod Schemas      : NO
 """
 
@@ -167,10 +167,15 @@ def _cosine_similarity(a: dict[str, float], b: dict[str, float], idf: dict[str, 
         return 0.0
     return dot / (math.sqrt(mag_a) * math.sqrt(mag_b))
 
-# Model singleton
-_MODEL: Optional[dict[str, Any]] = None
+class ModelData(TypedDict):
+    idf: dict[str, float]
+    intents: list[str]
+    corpus: dict[str, list[list[str]]]
 
-def _get_model() -> dict[str, Any]:
+# Model singleton
+_MODEL: Optional[ModelData] = None
+
+def _get_model() -> ModelData:
     global _MODEL
     if _MODEL is None:
         intents = list(CORPUS.keys())
@@ -188,10 +193,14 @@ def _get_model() -> dict[str, Any]:
         }
     return _MODEL
 
+class ScoreEntry(TypedDict):
+    intent: str
+    score: float
+
 class TfIdfResult(TypedDict):
     intent: str
     confidence: float
-    scores: list[dict[str, Any]]
+    scores: list[ScoreEntry]
 
 def classify_intent(text: str) -> TfIdfResult:
     """Classifies the user intent using TF-IDF and Cosine Similarity."""
@@ -202,7 +211,7 @@ def classify_intent(text: str) -> TfIdfResult:
         return {"intent": INTENT["DESCONOCIDO"], "confidence": 0.0, "scores": []}
 
     query_tf = _compute_tf(query_tokens)
-    scores: list[dict[str, Any]] = []
+    scores: list[ScoreEntry] = []
 
     for intent in model["intents"]:
         max_score = 0.0

@@ -1,5 +1,5 @@
 # Codebase Index
-_git:78aecb36 — 2026-04-26T21:04Z_
+_git:cfd41461 — 2026-04-26T21:06Z_
 
 > Read this file BEFORE exploring the repository.
 
@@ -547,12 +547,14 @@ _git:78aecb36 — 2026-04-26T21:04Z_
 - 📦 `class` `OverrideValidation` (L54)
 
 ### `f/nlu/_tfidf_classifier.py`
-- 📦 `class` `TfIdfResult` (L191)
-- 🔧 `fn` `classify_intent` (L196)
+- 📦 `class` `ModelData` (L170)
+- 📦 `class` `ScoreEntry` (L196)
+- 📦 `class` `TfIdfResult` (L200)
+- 🔧 `fn` `classify_intent` (L205)
 
 ### `f/nlu/main.py`
-- 📦 `class` `ExtractedIntent` (L17)
-- 🔧 `fn` `main` (L60)
+- 📦 `class` `ExtractedIntent` (L19)
+- 🔧 `fn` `main` (L53)
 
 ### `f/noshow_trigger/_noshow_logic.py`
 - 📦 `class` `BookingRepository` (L5)
@@ -565,8 +567,8 @@ _git:78aecb36 — 2026-04-26T21:04Z_
 - 📦 `class` `ProviderRow` (L16)
 
 ### `f/noshow_trigger/main.py`
-- ⚡ `async_fn` `provider_batch` (L39)
-- 🔧 `fn` `main` (L86)
+- ⚡ `async_fn` `provider_batch` (L41)
+- 🔧 `fn` `main` (L91)
 
 ### `f/openrouter_benchmark/_benchmark_logic.py`
 - 🔧 `fn` `extract_json` (L43)
@@ -585,7 +587,7 @@ _git:78aecb36 — 2026-04-26T21:04Z_
 - 📦 `class` `OpenRouterResponse` (L58)
 
 ### `f/openrouter_benchmark/main.py`
-- 🔧 `fn` `main` (L65)
+- 🔧 `fn` `main` (L66)
 
 ### `f/patient_register/_patient_logic.py`
 - ⚡ `async_fn` `upsert_client` (L6)
@@ -595,8 +597,8 @@ _git:78aecb36 — 2026-04-26T21:04Z_
 - 📦 `class` `InputSchema` (L14)
 
 ### `f/patient_register/main.py`
-- ⚡ `async_fn` `operation` (L40)
-- 🔧 `fn` `main` (L52)
+- ⚡ `async_fn` `operation` (L42)
+- 🔧 `fn` `main` (L54)
 
 ### `f/provider_agenda/_agenda_logic.py`
 - ⚡ `async_fn` `get_provider_agenda` (L7)
@@ -615,16 +617,16 @@ _git:78aecb36 — 2026-04-26T21:04Z_
 
 ### `f/provider_manage/_manage_logic.py`
 - ⚡ `async_fn` `handle_provider_actions` (L6)
-- ⚡ `async_fn` `handle_service_actions` (L47)
-- ⚡ `async_fn` `handle_schedule_actions` (L98)
-- ⚡ `async_fn` `handle_override_actions` (L125)
+- ⚡ `async_fn` `handle_service_actions` (L50)
+- ⚡ `async_fn` `handle_schedule_actions` (L104)
+- ⚡ `async_fn` `handle_override_actions` (L133)
 
 ### `f/provider_manage/_manage_models.py`
 - 📦 `class` `InputSchema` (L6)
 
 ### `f/provider_manage/main.py`
-- ⚡ `async_fn` `operation` (L38)
-- 🔧 `fn` `main` (L60)
+- ⚡ `async_fn` `operation` (L41)
+- 🔧 `fn` `main` (L65)
 
 ### `f/rag_query/_rag_logic.py`
 - 📦 `class` `KBRepository` (L5)
@@ -675,8 +677,8 @@ _git:78aecb36 — 2026-04-26T21:04Z_
 - ⚡ `async_fn` `mark_reminder_sent` (L42)
 
 ### `f/reminder_cron/main.py`
-- ⚡ `async_fn` `provider_batch` (L52)
-- 🔧 `fn` `main` (L104)
+- ⚡ `async_fn` `provider_batch` (L53)
+- 🔧 `fn` `main` (L105)
 
 ### `f/telegram_auto_register/_auto_register_logic.py`
 - ⚡ `async_fn` `register_telegram_user` (L7)
@@ -780,7 +782,7 @@ _git:78aecb36 — 2026-04-26T21:04Z_
 - 🔧 `fn` `main` (L33)
 
 ### `f/web_admin_dashboard/_dashboard_logic.py`
-- ⚡ `async_fn` `fetch_dashboard_stats` (L6)
+- ⚡ `async_fn` `fetch_dashboard_stats` (L7)
 
 ### `f/web_admin_dashboard/_dashboard_models.py`
 - 📦 `class` `AdminDashboardResult` (L4)
@@ -818,15 +820,15 @@ _git:78aecb36 — 2026-04-26T21:04Z_
 - 📦 `class` `InputSchema` (L19)
 
 ### `f/web_admin_regions/main.py`
-- 🔧 `fn` `main` (L49)
+- 🔧 `fn` `main` (L50)
 
 ### `f/web_admin_specialties_crud/_specialty_logic.py`
-- 🔧 `fn` `map_row` (L7)
-- ⚡ `async_fn` `list_specialties` (L18)
-- ⚡ `async_fn` `create_specialty` (L25)
-- ⚡ `async_fn` `update_specialty` (L42)
-- ⚡ `async_fn` `delete_specialty` (L66)
-- ⚡ `async_fn` `set_status` (L73)
+- 🔧 `fn` `map_row` (L8)
+- ⚡ `async_fn` `list_specialties` (L19)
+- ⚡ `async_fn` `create_specialty` (L26)
+- ⚡ `async_fn` `update_specialty` (L43)
+- ⚡ `async_fn` `delete_specialty` (L67)
+- ⚡ `async_fn` `set_status` (L74)
 
 ### `f/web_admin_specialties_crud/_specialty_models.py`
 - 📦 `class` `SpecialtyRow` (L5)
@@ -862,8 +864,8 @@ _git:78aecb36 — 2026-04-26T21:04Z_
 - 🔧 `fn` `main` (L86)
 
 ### `f/web_admin_users/_user_logic.py`
-- 🔧 `fn` `map_row` (L7)
-- ⚡ `async_fn` `handle_user_actions` (L21)
+- 🔧 `fn` `map_row` (L8)
+- ⚡ `async_fn` `handle_user_actions` (L22)
 
 ### `f/web_admin_users/_user_models.py`
 - 📦 `class` `UserInfo` (L5)
@@ -945,8 +947,8 @@ _git:78aecb36 — 2026-04-26T21:04Z_
 - 📦 `class` `InputSchema` (L10)
 
 ### `f/web_booking_api/main.py`
-- ⚡ `async_fn` `operation` (L45)
-- 🔧 `fn` `main` (L128)
+- ⚡ `async_fn` `operation` (L46)
+- 🔧 `fn` `main` (L129)
 
 ### `f/web_patient_bookings/_bookings_logic.py`
 - ⚡ `async_fn` `resolve_client_id` (L10)
@@ -972,8 +974,8 @@ _git:78aecb36 — 2026-04-26T21:04Z_
 - 📦 `class` `InputSchema` (L14)
 
 ### `f/web_patient_profile/main.py`
-- ⚡ `async_fn` `operation` (L32)
-- 🔧 `fn` `main` (L58)
+- ⚡ `async_fn` `operation` (L33)
+- 🔧 `fn` `main` (L59)
 
 ### `f/web_provider_dashboard/_provider_dashboard_logic.py`
 - ⚡ `async_fn` `fetch_provider_dashboard` (L7)
@@ -989,15 +991,15 @@ _git:78aecb36 — 2026-04-26T21:04Z_
 - 🔧 `fn` `main` (L44)
 
 ### `f/web_provider_notes/_notes_logic.py`
-- 🔧 `fn` `decrypt_content` (L8)
-- 🔧 `fn` `map_row_to_note` (L17)
-- 📦 `class` `NoteRepository` (L32)
-- ⚡ `async_fn` `get_tags` (L36)
-- ⚡ `async_fn` `assign_tags` (L49)
-- ⚡ `async_fn` `create` (L58)
-- ⚡ `async_fn` `read` (L80)
-- ⚡ `async_fn` `list_notes` (L89)
-- ⚡ `async_fn` `delete` (L123)
+- 🔧 `fn` `decrypt_content` (L9)
+- 🔧 `fn` `map_row_to_note` (L18)
+- 📦 `class` `NoteRepository` (L33)
+- ⚡ `async_fn` `get_tags` (L37)
+- ⚡ `async_fn` `assign_tags` (L50)
+- ⚡ `async_fn` `create` (L59)
+- ⚡ `async_fn` `read` (L81)
+- ⚡ `async_fn` `list_notes` (L90)
+- ⚡ `async_fn` `delete` (L124)
 
 ### `f/web_provider_notes/_notes_models.py`
 - 📦 `class` `Tag` (L5)
@@ -1024,11 +1026,11 @@ _git:78aecb36 — 2026-04-26T21:04Z_
 - 🔧 `fn` `main` (L79)
 
 ### `f/web_waitlist/_waitlist_logic.py`
-- ⚡ `async_fn` `resolve_client_id` (L7)
-- ⚡ `async_fn` `handle_join` (L26)
-- ⚡ `async_fn` `handle_leave` (L69)
-- ⚡ `async_fn` `handle_list` (L86)
-- ⚡ `async_fn` `handle_check_position` (L110)
+- ⚡ `async_fn` `resolve_client_id` (L8)
+- ⚡ `async_fn` `handle_join` (L27)
+- ⚡ `async_fn` `handle_leave` (L70)
+- ⚡ `async_fn` `handle_list` (L87)
+- ⚡ `async_fn` `handle_check_position` (L111)
 
 ### `f/web_waitlist/_waitlist_models.py`
 - 📦 `class` `WaitlistEntry` (L5)
