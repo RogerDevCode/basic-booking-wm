@@ -193,11 +193,11 @@
 - [x] `f/telegram_auto_register/main.py`: 0 errors
 </details>
 
-<details>
-<summary><b>Module: <code>telegram_callback</code> (10 errors)</b></summary>
+<details open>
+<summary><b>Module: <code>telegram_callback</code> (0 errors) ✅</b></summary>
 
-- [ ] `f/telegram_callback/main.py`: 8 errors
-- [ ] `f/telegram_callback/_callback_logic.py`: 2 errors
+- [x] `f/telegram_callback/main.py`: 0 errors
+- [x] `f/telegram_callback/_callback_logic.py`: 0 errors
 </details>
 
 <details>
