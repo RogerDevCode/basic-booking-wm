@@ -1,5 +1,5 @@
 # Codebase Index
-_git:cfd41461 — 2026-04-26T21:06Z_
+_git:a48c772c — 2026-04-26T21:07Z_
 
 > Read this file BEFORE exploring the repository.
 
@@ -464,9 +464,9 @@ _git:cfd41461 — 2026-04-26T21:06Z_
 - 🔧 `fn` `main` (L22)
 
 ### `f/internal/booking_fsm/_fsm_machine.py`
-- 🔧 `fn` `parse_action` (L19)
-- 🔧 `fn` `parse_callback_data` (L40)
-- 🔧 `fn` `apply_transition` (L52)
+- 🔧 `fn` `parse_action` (L21)
+- 🔧 `fn` `parse_callback_data` (L42)
+- 🔧 `fn` `apply_transition` (L54)
 - 🔧 `fn` `flow_step_from_state` (L268)
 
 ### `f/internal/booking_fsm/_fsm_models.py`
@@ -491,19 +491,19 @@ _git:cfd41461 — 2026-04-26T21:06Z_
 - 📦 `class` `TransitionOutcome` (L154)
 
 ### `f/internal/booking_fsm/_fsm_responses.py`
-- 📦 `class` `InlineButton` (L8)
-- 🔧 `fn` `build_header` (L12)
-- 🔧 `fn` `build_specialty_prompt` (L15)
-- 🔧 `fn` `build_doctors_prompt` (L19)
-- 🔧 `fn` `build_slots_prompt` (L23)
-- 🔧 `fn` `build_confirmation_prompt` (L27)
-- 🔧 `fn` `build_loading_doctors_prompt` (L31)
-- 🔧 `fn` `build_loading_slots_prompt` (L34)
-- 🔧 `fn` `chunk_buttons` (L41)
-- 🔧 `fn` `build_specialty_keyboard` (L44)
-- 🔧 `fn` `build_doctor_keyboard` (L49)
-- 🔧 `fn` `build_time_slot_keyboard` (L55)
-- 🔧 `fn` `build_confirmation_keyboard` (L61)
+- 📦 `class` `InlineButton` (L10)
+- 🔧 `fn` `build_header` (L14)
+- 🔧 `fn` `build_specialty_prompt` (L17)
+- 🔧 `fn` `build_doctors_prompt` (L21)
+- 🔧 `fn` `build_slots_prompt` (L25)
+- 🔧 `fn` `build_confirmation_prompt` (L29)
+- 🔧 `fn` `build_loading_doctors_prompt` (L33)
+- 🔧 `fn` `build_loading_slots_prompt` (L36)
+- 🔧 `fn` `chunk_buttons` (L43)
+- 🔧 `fn` `build_specialty_keyboard` (L46)
+- 🔧 `fn` `build_doctor_keyboard` (L51)
+- 🔧 `fn` `build_time_slot_keyboard` (L57)
+- 🔧 `fn` `build_confirmation_keyboard` (L63)
 
 ### `f/internal/debug_db.py`
 - 🔧 `fn` `main` (L20)

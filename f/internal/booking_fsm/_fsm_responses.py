@@ -1,6 +1,8 @@
 from typing import Any
 from typing import List, Optional, Dict, Any, TypedDict
 
+from ._fsm_models import NamedItem, TimeSlotItem
+
 # ============================================================================
 # BOOKING FSM — Response Templates
 # ============================================================================
@@ -12,15 +14,15 @@ class InlineButton(TypedDict):
 def build_header(error: Optional[str] = None) -> str:
     return f"⚠️ {error}\n\n" if error else ""
 
-def build_specialty_prompt(items: List[Dict[str, str]], error: Optional[str] = None) -> str:
+def build_specialty_prompt(items: List[NamedItem], error: Optional[str] = None) -> str:
     header = build_header(error)
     return f"{header}Selecciona la especialidad que necesitas:"
 
-def build_doctors_prompt(specialty_name: str, items: List[Dict[str, str]], error: Optional[str] = None) -> str:
+def build_doctors_prompt(specialty_name: str, items: List[NamedItem], error: Optional[str] = None) -> str:
     header = build_header(error)
     return f"{header}¿Con qué doctor deseas tu cita?"
 
-def build_slots_prompt(doctor_name: str, items: List[Dict[str, str]], error: Optional[str] = None) -> str:
+def build_slots_prompt(doctor_name: str, items: List[TimeSlotItem], error: Optional[str] = None) -> str:
     header = build_header(error)
     return f"{header}¿Qué horario prefieres?"
 
@@ -41,18 +43,18 @@ def build_loading_slots_prompt(doctor_name: str) -> str:
 def chunk_buttons(btns: List[InlineButton], size: int = 2) -> List[List[InlineButton]]:
     return [btns[i:i + size] for i in range(0, len(btns), size)]
 
-def build_specialty_keyboard(items: List[Dict[str, str]]) -> List[List[InlineButton]]:
+def build_specialty_keyboard(items: List[NamedItem]) -> List[List[InlineButton]]:
     list_btns: List[InlineButton] = [InlineButton(text=it["name"], callback_data=f"spec:{it['id']}") for it in items]
     list_btns.append(InlineButton(text="❌ Cancelar", callback_data="cancel"))
     return chunk_buttons(list_btns)
 
-def build_doctor_keyboard(items: List[Dict[str, str]]) -> List[List[InlineButton]]:
+def build_doctor_keyboard(items: List[NamedItem]) -> List[List[InlineButton]]:
     list_btns: List[InlineButton] = [InlineButton(text=it["name"], callback_data=f"doc:{it['id']}") for it in items]
     list_btns.append(InlineButton(text="⬅️ Volver", callback_data="back"))
     list_btns.append(InlineButton(text="❌ Cancelar", callback_data="cancel"))
     return chunk_buttons(list_btns)
 
-def build_time_slot_keyboard(items: List[Dict[str, str]]) -> List[List[InlineButton]]:
+def build_time_slot_keyboard(items: List[TimeSlotItem]) -> List[List[InlineButton]]:
     list_btns: List[InlineButton] = [InlineButton(text=it["label"], callback_data=f"time:{it['id']}") for it in items]
     list_btns.append(InlineButton(text="⬅️ Volver", callback_data="back"))
     list_btns.append(InlineButton(text="❌ Cancelar", callback_data="cancel"))
