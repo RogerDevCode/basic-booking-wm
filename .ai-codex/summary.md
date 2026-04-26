@@ -1,5 +1,5 @@
 # Codebase Index
-_git:07ffde39 — 2026-04-26T21:21Z_
+_git:e9a0e359 — 2026-04-26T21:24Z_
 
 > Read this file BEFORE exploring the repository.
 
@@ -725,8 +725,8 @@ _git:07ffde39 — 2026-04-26T21:21Z_
 ### `f/telegram_gateway/_gateway_logic.py`
 - 📦 `class` `TelegramClient` (L8)
 - ⚡ `async_fn` `send_message` (L13)
-- 📦 `class` `ClientRepository` (L34)
-- ⚡ `async_fn` `ensure_registered` (L38)
+- 📦 `class` `ClientRepository` (L40)
+- ⚡ `async_fn` `ensure_registered` (L44)
 
 ### `f/telegram_gateway/_gateway_models.py`
 - 📦 `class` `TelegramUser` (L9)
@@ -737,11 +737,11 @@ _git:07ffde39 — 2026-04-26T21:21Z_
 - 📦 `class` `SendMessageOptions` (L43)
 
 ### `f/telegram_gateway/main.py`
-- 📦 `class` `TelegramRouter` (L13)
-- ⚡ `async_fn` `route_update` (L18)
-- ⚡ `async_fn` `handle_callback` (L25)
-- ⚡ `async_fn` `handle_message` (L37)
-- 🔧 `fn` `main` (L90)
+- 📦 `class` `TelegramRouter` (L15)
+- ⚡ `async_fn` `route_update` (L20)
+- ⚡ `async_fn` `handle_callback` (L27)
+- ⚡ `async_fn` `handle_message` (L39)
+- 🔧 `fn` `main` (L92)
 
 ### `f/telegram_menu/_menu_logic.py`
 - 📦 `class` `MenuInput` (L4)

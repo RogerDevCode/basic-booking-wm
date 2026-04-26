@@ -1,5 +1,5 @@
-from typing import Any
-from typing import Optional, List, Literal, Union, Dict, Any, Annotated
+from __future__ import annotations
+from typing import Optional, List, Literal, Dict, Any
 from pydantic import BaseModel, ConfigDict, Field
 
 # ============================================================================
@@ -42,4 +42,4 @@ class TelegramUpdate(BaseModel):
 
 class SendMessageOptions(BaseModel):
     parse_mode: Optional[Literal['Markdown', 'HTML', 'MarkdownV2']] = 'Markdown'
-    reply_markup: Optional[Dict[str, Any]] = None
+    reply_markup: Optional[Dict[str, object]] = None

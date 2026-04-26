@@ -1,7 +1,7 @@
-from typing import Any
+from __future__ import annotations
 import httpx
-from typing import Optional, List, Dict, Any, Tuple
-from ..internal._result import Result, DBClient, ok, fail
+from typing import Optional, List, Dict, Any, Tuple, cast
+from ..internal._result import Result, ok, fail
 from ..internal._db_client import create_db_client
 from ._gateway_models import SendMessageOptions
 
@@ -10,7 +10,7 @@ class TelegramClient:
         self.token = token
         self.base_url = f"https://api.telegram.org/bot{token}"
 
-    async def send_message(self, chat_id: str, text: str, options: Optional[SendMessageOptions] = None) -> Result[Dict[str, Any]]:
+    async def send_message(self, chat_id: str, text: str, options: Optional[SendMessageOptions] = None) -> Result[Dict[str, object]]:
         if not self.token:
             return fail("TELEGRAM_BOT_TOKEN_MISSING")
 
@@ -24,10 +24,16 @@ class TelegramClient:
         
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
-                res = await client.post(url, json={k: v for k, v in body.items() if v is not None})
+                payload: Dict[str, object] = {k: v for k, v in body.items() if v is not None}
+                res = await client.post(url, json=payload)
                 if res.status_code >= 400:
                     return fail(f"telegram_api_error: {res.status_code} {res.text[:100]}")
-                return ok(res.json())
+                
+                data_raw: object = res.json()
+                if not isinstance(data_raw, dict):
+                    return fail("telegram_api_error: invalid_response_format")
+                
+                return ok(cast(Dict[str, object], data_raw))
         except Exception as e:
             return fail(f"send_message_failed: {e}")
 

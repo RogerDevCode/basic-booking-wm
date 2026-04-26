@@ -1,5 +1,7 @@
+from __future__ import annotations
 import asyncio
-from typing import Any
+import os
+from typing import Any, Dict, Optional
 
 from ..internal._db_client import _resolve_db_url
 from ..internal._result import Result, fail, ok
@@ -48,13 +50,13 @@ class TelegramRouter:
         return ok("message_received")
 
 
-async def _main_async(args: dict[str, Any]) -> dict[str, object]:
+async def _main_async(args: dict[str, object]) -> dict[str, object]:
     try:
         update = TelegramUpdate.model_validate(args)
     except Exception as e:
         return {"success": False, "error": f"validation_error: {e}"}
 
-    token = get_variable("u/admin/TELEGRAM_BOT_TOKEN") or get_variable("TELEGRAM_BOT_TOKEN") or ""
+    token = str(get_variable("u/admin/TELEGRAM_BOT_TOKEN") or get_variable("TELEGRAM_BOT_TOKEN") or "")
     db_url = _resolve_db_url() or ""
 
     client = TelegramClient(token)
@@ -63,19 +65,19 @@ async def _main_async(args: dict[str, Any]) -> dict[str, object]:
 
     err, res = await router.route_update(update)
 
-    chat_id = None
-    text = ""
-    callback_data = None
-    username = "unknown"
+    chat_id: Optional[str] = None
+    text: str = ""
+    callback_data: Optional[str] = None
+    username: str = "unknown"
 
     if update.message:
         chat_id = str(update.message.chat.id)
         text = update.message.text or ""
-        username = update.message.from_user.username if update.message.from_user else "unknown"
+        username = str(update.message.from_user.username) if update.message.from_user and update.message.from_user.username else "unknown"
     elif update.callback_query:
         chat_id = str(update.callback_query.message.chat.id) if update.callback_query.message else None
         callback_data = update.callback_query.data
-        username = update.callback_query.from_user.username if update.callback_query.from_user else "unknown"
+        username = str(update.callback_query.from_user.username) if update.callback_query.from_user and update.callback_query.from_user.username else "unknown"
 
     return {
         "success": not err,
@@ -87,5 +89,5 @@ async def _main_async(args: dict[str, Any]) -> dict[str, object]:
     }
 
 
-def main(webhook_payload: dict[str, Any]) -> dict[str, object]:
+def main(webhook_payload: dict[str, object]) -> dict[str, object]:
     return asyncio.run(_main_async(webhook_payload))
