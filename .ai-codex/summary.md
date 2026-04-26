@@ -1,5 +1,5 @@
 # Codebase Index
-_git:18962a58 — 2026-04-26T21:02Z_
+_git:5c72ef30 — 2026-04-26T21:04Z_
 
 > Read this file BEFORE exploring the repository.
 
@@ -610,8 +610,8 @@ _git:18962a58 — 2026-04-26T21:02Z_
 - 📦 `class` `InputSchema` (L42)
 
 ### `f/provider_agenda/main.py`
-- ⚡ `async_fn` `operation` (L32)
-- 🔧 `fn` `main` (L44)
+- ⚡ `async_fn` `operation` (L34)
+- 🔧 `fn` `main` (L47)
 
 ### `f/provider_manage/_manage_logic.py`
 - ⚡ `async_fn` `handle_provider_actions` (L6)
