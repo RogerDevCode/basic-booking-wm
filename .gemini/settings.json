@@ -17,18 +17,9 @@
       "args": [
         "-y",
         "mcp-remote",
-        "http://localhost:8080/api/mcp/w/booking-titanium/mcp",
+        "https://titanium.stax.ink/api/mcp/w/booking-titanium/mcp",
         "--header",
         "Authorization:Bearer LJipaz08ZSYDSoQtB4IGJiOxLFR86GBz"
-      ]
-    },
-    "redis": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@smithery-ai/redis",
-        "--uri",
-        "redis://localhost:6379"
       ]
     },
     "postgres-local": {

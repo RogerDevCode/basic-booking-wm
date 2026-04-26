@@ -417,3 +417,75 @@ When implementing a feature:
 
 Do not proceed to step N+1 if step N is not complete.
 
+
+
+<claude-mem-context>
+# Memory Context
+
+# [booking-titanium-wm] recent context, 2026-04-26 12:51pm GMT-4
+
+Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision 🚨security_alert 🔐security_note
+Format: ID TIME TYPE TITLE
+Fetch details: get_observations([IDs]) | Search: mem-search skill
+
+Stats: 46 obs (17,899t read) | 263,463t work | 93% savings
+
+### Apr 24, 2026
+S2 Debuggear flujo Telegram→Booking en Windmill usando Aislamiento Modular Progresivo + Bisección + Stubbing (Apr 24, 8:14 PM)
+S1 Modular isolation debug session for Telegram→Booking Windmill flow — tracking per-module unit test results (Apr 24, 8:14 PM)
+1 8:15p ⚖️ Aislamiento Modular Progresivo como Técnica de Depuración en Windmill
+S24 Full 5-Step telegram_webhook Flow Works End-to-End — /start Message Delivered (Apr 24, 8:16 PM)
+2 8:17p 🔵 booking-titanium-wm Windmill Project Architecture
+3 8:19p 🔵 Windmill Docker Stack Has Unhealthy Extra Container
+4 " 🔵 Non-Standard Docker Compose File Naming in booking-titanium-wm
+5 " 🔵 Windmill CE v1.690.0 Confirmed Running on Port 8080
+6 " 🔐 Credentials Stored in Plaintext .env File
+7 " ✅ Attempted Migration of TELEGRAM_BOT_TOKEN to Workspace-Scoped Secret Variable
+8 8:20p 🔵 WM_TOKEN in .env Is Stale — Default Admin Credentials Still Work
+9 " 🔵 TELEGRAM_BOT_TOKEN Variable Has No Workspace Permissions
+10 9:49p 🔵 Windmill Flow Engine Ignores CLI-Pushed flow.yaml Updates
+11 9:50p 🔄 telegram_send/main.py: Async Wrapper Pattern + Variable Path Fallback
+12 " 🟣 flow.yaml Redesigned: 5-Step Full-Stack Python Pipeline Replaces v9.1
+14 9:51p 🔵 Windmill Flow API: Correct Path is f/flows/telegram_webhook, Trigger Endpoint Returns Empty Job ID
+15 " 🔵 Windmill REST API: Correct Flow Trigger Endpoints Identified from OpenAPI Spec
+16 " 🔵 Flow Executes Successfully — Final Step Fails with TELEGRAM_BOT_TOKEN_MISSING
+17 9:52p 🔵 TELEGRAM_BOT_TOKEN_MISSING Root Cause: Variable Exists but extra_perms is Empty
+18 " 🔐 Telegram Bot Token Stored as Non-Secret Plaintext Variable
+19 9:53p 🔵 Windmill Variable Access Discrepancy: Preview Context vs Script Execution Context
+21 9:54p 🔵 _wmill_adapter.get_variable Implementation is Correct — Bug is Execution Context Permissions
+22 9:55p 🔴 Critical Bug in _wmill_adapter: wmill.get_variable Raises Exception on 404, Not Returns None
+23 " 🔵 _wmill_adapter Exception Fix Deployed but telegram_send Still Returns TELEGRAM_BOT_TOKEN_MISSING
+25 9:56p 🔵 Updated _wmill_adapter Is Live but wmill.get_variable Returns Falsy for g/all Token in Package Context
+27 9:58p 🔴 telegram_send Bypasses _wmill_adapter for Token Lookup — Calls wmill Directly
+28 " 🔵 Direct wmill.get_variable Also Fails in Saved Script Context — Fundamental Windmill Worker Permission Issue
+29 9:59p 🔵 Correct Script Hash Confirmed Running — Variable Access Fundamentally Blocked in Saved Script Context
+30 " 🔵 wmill Module Availability is Path-Dependent in Windmill Previews
+31 10:00p 🔵 Windmill wmill Module Not Available Even in Path-Scoped Previews
+32 " ⚖️ telegram_send Token Resolution Changed to Flow Injection Instead of Windmill Variable Reads
+33 " ✅ telegram_send Function Signature Updated to Accept bot_token Parameter
+34 " ✅ telegram_webhook Flow Updated to Inject bot_token via variable() Function
+35 10:01p 🔵 telegram_send Pydantic Schema Rejects bot_token as Extra Field
+36 " 🔴 telegram_send Extracts bot_token Before Pydantic Validation Using args.pop()
+39 " 🟣 Full 5-Step telegram_webhook Flow Works End-to-End — /start Message Delivered
+S27 Resume booking-titanium-wm project after multi-day stall — diagnose and fix why Telegram webhook flow produces no results (Apr 24, 10:01 PM)
+37 10:02p 🔴 telegram_send Script Successfully Sends Telegram Message — First End-to-End Success
+S28 Root Causes: Silent 404 Errors and wmill.get_variable() Failure in Windmill Workers (Apr 24, 10:03 PM)
+40 10:08p 🔵 Root Causes: Silent 404 Errors and wmill.get_variable() Failure in Windmill Workers
+S29 Code quality discussion — should try/except blocks use else clause to prevent silent errors in booking-titanium-wm (Apr 24, 10:08 PM)
+41 10:16p ⚖️ Global Try/Except Error Wrapping Plan — Full Codebase Coverage
+42 10:17p 🔵 booking-titanium-wm Python Script Inventory
+43 " 🔵 booking-titanium-wm Codebase Size and Existing Except Coverage Baseline
+44 " 🔵 Error Handling Audit: 124 Silent Except Blocks Found Across 190 Python Files
+### Apr 25, 2026
+49 10:35a 🔵 Silent Except Block Audit — 23 Silent, 142 Logging, 2 Unguarded Functions
+50 10:54a 🔵 GitHub MCP Configured via pluginConfigs, Not mcpServers — Token Uses Env Var Reference
+51 10:57a 🟣 mcp-compressor Schema Compression Deployed and Validated for booking-titanium-wm
+52 " 🔵 booking-titanium-wm Has 200+ Uncommitted Files Staged — 5 Commits Ahead of origin/main
+S43 Configure GitHub MCP correctly — session pivoted to full MCP token optimization, delivering Layer 1 schema compression for booking-titanium-wm (Apr 25, 10:58 AM)
+53 10:59a 🔵 claude-mem Already Active on System — 12MB SQLite DB with Live WAL Writes
+54 " 🟣 claude-mem Layer 2 Token Optimization Configured — Progressive Disclosure + HNSW Tuning
+### Apr 26, 2026
+55 12:14p 🔵 Windmill URL Must Use Cloudflare Tunnel Public Address for External Tool Access
+
+Access 263k tokens of past work via get_observations([IDs]) or mem-search skill.
+</claude-mem-context>
