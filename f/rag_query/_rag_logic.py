@@ -1,4 +1,5 @@
-from typing import List, Optional, cast
+from __future__ import annotations
+from typing import List, Optional, cast, Dict, Any, TypedDict
 from ..internal._result import Result, DBClient, ok, fail
 from ._rag_models import KBRow, KBEntry
 
@@ -27,7 +28,7 @@ class KBRepository:
                 )
             
             # Map asyncpg rows to TypedDict
-            result = [
+            result: List[KBRow] = [
                 {
                     "kb_id": str(r["kb_id"]),
                     "category": str(r["category"]),
@@ -40,6 +41,10 @@ class KBRepository:
         except Exception as e:
             return fail(f"kb_fetch_failed: {e}")
 
+class ScoredEntry(TypedDict):
+    entry: KBEntry
+    score: int
+
 def perform_keyword_search(
     query: str,
     entries: List[KBRow],
@@ -49,7 +54,7 @@ def perform_keyword_search(
     if not terms:
         return []
 
-    scored_entries = []
+    scored_entries: List[ScoredEntry] = []
     for row in entries:
         title = row["title"].lower()
         content = row["content"].lower()
@@ -62,15 +67,16 @@ def perform_keyword_search(
             if term in category: score += 2
         
         if score > 0:
-            similarity = min(score / (len(terms) * 3), 1.0)
+            similarity = float(min(score / (len(terms) * 3), 1.0))
+            entry: KBEntry = {
+                "kb_id": row["kb_id"],
+                "category": row["category"],
+                "title": row["title"],
+                "content": row["content"],
+                "similarity": similarity
+            }
             scored_entries.append({
-                "entry": {
-                    "kb_id": row["kb_id"],
-                    "category": row["category"],
-                    "title": row["title"],
-                    "content": row["content"],
-                    "similarity": similarity
-                },
+                "entry": entry,
                 "score": score
             })
 

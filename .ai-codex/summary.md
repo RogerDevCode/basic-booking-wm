@@ -1,5 +1,5 @@
 # Codebase Index
-_git:a48c772c — 2026-04-26T21:07Z_
+_git:dfcaefa6 — 2026-04-26T21:09Z_
 
 > Read this file BEFORE exploring the repository.
 
@@ -629,9 +629,10 @@ _git:a48c772c — 2026-04-26T21:07Z_
 - 🔧 `fn` `main` (L65)
 
 ### `f/rag_query/_rag_logic.py`
-- 📦 `class` `KBRepository` (L5)
-- ⚡ `async_fn` `fetch_active_entries` (L9)
-- 🔧 `fn` `perform_keyword_search` (L43)
+- 📦 `class` `KBRepository` (L6)
+- ⚡ `async_fn` `fetch_active_entries` (L10)
+- 📦 `class` `ScoredEntry` (L44)
+- 🔧 `fn` `perform_keyword_search` (L48)
 
 ### `f/rag_query/_rag_models.py`
 - 📦 `class` `KBEntry` (L4)
