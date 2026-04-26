@@ -1,6 +1,5 @@
-# mypy: disable-error-code
-from typing import Any
-from typing import List, Optional, Dict, Any, cast
+from __future__ import annotations
+from typing import Optional, List, Dict, Any, cast
 from ..internal._result import Result, DBClient, ok, fail
 from ._dashboard_models import AdminDashboardResult, InputSchema
 
@@ -10,7 +9,7 @@ async def fetch_dashboard_stats(db: DBClient, input_data: InputSchema) -> Result
         "SELECT role FROM users WHERE user_id = $1::uuid AND is_active = true LIMIT 1",
         input_data.admin_user_id
     )
-    if not admin_rows or admin_rows[0]["role"] != "admin":
+    if not admin_rows or str(admin_rows[0]["role"]) != "admin":
         return fail("Forbidden: admin access required")
 
     # 2. Main Stats
@@ -46,16 +45,17 @@ async def fetch_dashboard_stats(db: DBClient, input_data: InputSchema) -> Result
     no_show_rate = "0.0"
     if ns_rows:
         ns = ns_rows[0]
-        count = int(ns["no_show_count"])
-        total = int(ns["total_processed"])
+        count = int(cast(Any, ns["no_show_count"]))
+        total = int(cast(Any, ns["total_processed"]))
         if total > 0:
             no_show_rate = f"{(count / total * 100):.1f}"
 
-    return ok({
-        "total_users": int(s["total_users"]),
-        "total_bookings": int(s["total_bookings"]),
-        "total_revenue_cents": int(s["total_revenue_cents"]),
+    res: AdminDashboardResult = {
+        "total_users": int(cast(Any, s["total_users"])),
+        "total_bookings": int(cast(Any, s["total_bookings"])),
+        "total_revenue_cents": int(cast(Any, s["total_revenue_cents"])),
         "no_show_rate": no_show_rate,
-        "active_providers": int(s["active_providers"]),
-        "pending_bookings": int(s["pending_bookings"])
-    })
+        "active_providers": int(cast(Any, s["active_providers"])),
+        "pending_bookings": int(cast(Any, s["pending_bookings"]))
+    }
+    return ok(res)

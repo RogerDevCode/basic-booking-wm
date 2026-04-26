@@ -1,5 +1,5 @@
 # Codebase Index
-_git:7f75c033 — 2026-04-26T21:33Z_
+_git:f7fda98e — 2026-04-26T21:35Z_
 
 > Read this file BEFORE exploring the repository.
 
@@ -781,15 +781,15 @@ _git:7f75c033 — 2026-04-26T21:33Z_
 - 🔧 `fn` `main` (L40)
 
 ### `f/web_admin_dashboard/_dashboard_logic.py`
-- ⚡ `async_fn` `fetch_dashboard_stats` (L7)
+- ⚡ `async_fn` `fetch_dashboard_stats` (L6)
 
 ### `f/web_admin_dashboard/_dashboard_models.py`
 - 📦 `class` `AdminDashboardResult` (L4)
 - 📦 `class` `InputSchema` (L12)
 
 ### `f/web_admin_dashboard/main.py`
-- ⚡ `async_fn` `operation` (L32)
-- 🔧 `fn` `main` (L44)
+- ⚡ `async_fn` `operation` (L34)
+- 🔧 `fn` `main` (L46)
 
 ### `f/web_admin_provider_crud/_provider_logic.py`
 - 📦 `class` `ProviderDBRow` (L9)

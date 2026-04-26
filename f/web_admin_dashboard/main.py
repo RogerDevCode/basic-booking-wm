@@ -1,4 +1,6 @@
+from __future__ import annotations
 import asyncio
+import os
 # ============================================================================
 # PRE-FLIGHT CHECKLIST
 # Mission         : Admin stats and system overview KPIs
@@ -19,7 +21,7 @@ from ._dashboard_logic import fetch_dashboard_stats
 
 MODULE = "web_admin_dashboard"
 
-async def _main_async(args: dict[str, Any]) -> Result[AdminDashboardResult]:
+async def _main_async(args: dict[str, object]) -> Result[AdminDashboardResult]:
     # 1. Validate Input
     try:
         input_data = InputSchema.model_validate(args)
@@ -28,7 +30,7 @@ async def _main_async(args: dict[str, Any]) -> Result[AdminDashboardResult]:
 
     conn = await create_db_client()
     try:
-        # 2. Execute within Tenant Context
+        # 2. Execute within Tenant Context (admin_user_id is the tenant filter for with_tenant_context)
         async def operation() -> Result[AdminDashboardResult]:
             return await fetch_dashboard_stats(conn, input_data)
 
@@ -38,23 +40,22 @@ async def _main_async(args: dict[str, Any]) -> Result[AdminDashboardResult]:
         log("Admin Dashboard Internal Error", error=str(e), module=MODULE)
         return fail(f"internal_error: {e}")
     finally:
-        await conn.close() # pyright: ignore[reportUnknownMemberType]
+        await conn.close()
 
 
-def main(args: dict) -> None:
+def main(args: dict[str, object]) -> AdminDashboardResult | None:
     import traceback
     try:
-        return asyncio.run(_main_async(args))
+        err, result = asyncio.run(_main_async(args))
+        if err:
+            raise err
+        return result
     except Exception as e:
         tb = traceback.format_exc()
-        # Intentamos usar el adaptador local si está disponible, si no print
         try:
-            from ..internal._wmill_adapter import log
-            log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=os.path.basename(os.path.dirname(__file__)))
-        except:
-            from ..internal._wmill_adapter import log
-            log("BARE_EXCEPT_CAUGHT", file="main.py")
-            print(f"CRITICAL ERROR in {__file__}: {e}\n{tb}")
+            log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=MODULE)
+        except Exception:
+            print(f"CRITICAL ERROR in web_admin_dashboard: {e}\n{tb}")
         
         # Elevamos para que Windmill marque como FAILED
         raise RuntimeError(f"Execution failed: {e}")
