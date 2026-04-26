@@ -19,7 +19,7 @@ async def test_ai_agent_llm_success() -> None:
             "user_profile": {"is_first_time": False, "booking_count": 5}
         }
         
-        res = await main(args)
+        res = await main(args["chat_id"], args["text"])
         
         assert res["success"] is True
         assert res["data"]["intent"] == INTENT['CREAR_CITA']
@@ -33,7 +33,7 @@ async def test_ai_agent_social_fast_path() -> None:
         "user_profile": {"is_first_time": True, "booking_count": 0}
     }
     
-    res = await main(args)
+    res = await main(args["chat_id"], args["text"])
     
     assert res["success"] is True
     assert res["data"]["intent"] == INTENT['SALUDO']

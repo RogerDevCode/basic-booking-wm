@@ -23,7 +23,7 @@ async def test_telegram_gateway_message_routing() -> None:
                 }
             }
             
-            err, result = await main(args)
+            result = await main(args)
             
-            assert err is None
-            assert result["message"] == "help_sent"
+            assert result["success"] is True
+            assert result["message"] == "message_received"
