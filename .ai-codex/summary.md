@@ -1,5 +1,5 @@
 # Codebase Index
-_git:3c49487a — 2026-04-26T21:28Z_
+_git:3216c047 — 2026-04-26T21:32Z_
 
 > Read this file BEFORE exploring the repository.
 
@@ -759,11 +759,11 @@ _git:3c49487a — 2026-04-26T21:28Z_
 - 🔧 `fn` `main` (L39)
 
 ### `f/telegram_send/_telegram_logic.py`
-- 📦 `class` `TelegramService` (L12)
-- ⚡ `async_fn` `execute` (L17)
-- 🔧 `fn` `prepare_request` (L40)
-- ⚡ `async_fn` `api_call` (L81)
-- 🔧 `fn` `normalize_keyboard` (L97)
+- 📦 `class` `TelegramService` (L13)
+- ⚡ `async_fn` `execute` (L18)
+- 🔧 `fn` `prepare_request` (L43)
+- ⚡ `async_fn` `api_call` (L84)
+- 🔧 `fn` `normalize_keyboard` (L102)
 
 ### `f/telegram_send/_telegram_models.py`
 - 📦 `class` `InlineButton` (L9)
@@ -778,7 +778,7 @@ _git:3c49487a — 2026-04-26T21:28Z_
 - 📦 `class` `TelegramSendData` (L76)
 
 ### `f/telegram_send/main.py`
-- 🔧 `fn` `main` (L33)
+- 🔧 `fn` `main` (L40)
 
 ### `f/web_admin_dashboard/_dashboard_logic.py`
 - ⚡ `async_fn` `fetch_dashboard_stats` (L7)
