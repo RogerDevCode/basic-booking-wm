@@ -1,56 +1,59 @@
-from typing import Any
-from typing import Optional, List, Literal, TypedDict, Dict, Any
-from pydantic import BaseModel, ConfigDict, Field, EmailStr
+from typing import Literal, TypedDict
+
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
+
 
 class ProviderRow(TypedDict):
     id: str
-    honorific_id: Optional[str]
+    honorific_id: str | None
     name: str
     email: str
-    specialty_id: Optional[str]
-    timezone_id: Optional[int]
-    phone_app: Optional[str]
-    phone_contact: Optional[str]
-    telegram_chat_id: Optional[str]
-    gcal_calendar_id: Optional[str]
-    address_street: Optional[str]
-    address_number: Optional[str]
-    address_complement: Optional[str]
-    address_sector: Optional[str]
-    region_id: Optional[int]
-    commune_id: Optional[int]
+    specialty_id: str | None
+    timezone_id: int | None
+    phone_app: str | None
+    phone_contact: str | None
+    telegram_chat_id: str | None
+    gcal_calendar_id: str | None
+    address_street: str | None
+    address_number: str | None
+    address_complement: str | None
+    address_sector: str | None
+    region_id: int | None
+    commune_id: int | None
     is_active: bool
     has_password: bool
-    last_password_change: Optional[str]
+    last_password_change: str | None
     created_at: str
     updated_at: str
-    honorific_label: Optional[str]
-    specialty_name: Optional[str]
-    timezone_name: Optional[str]
-    region_name: Optional[str]
-    commune_name: Optional[str]
+    honorific_label: str | None
+    specialty_name: str | None
+    timezone_name: str | None
+    region_name: str | None
+    commune_name: str | None
+
 
 class CreateProviderResult(ProviderRow):
     temp_password: str
 
+
 class InputSchema(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
-    
-    action: Literal['list', 'create', 'update', 'activate', 'deactivate', 'reset_password']
-    provider_id: Optional[str] = None
-    name: Optional[str] = Field(None, min_length=2, max_length=200)
-    email: Optional[EmailStr] = None
-    specialty_id: Optional[str] = None
-    honorific_id: Optional[str] = None
-    timezone_id: Optional[int] = None
-    phone_app: Optional[str] = Field(None, max_length=20)
-    phone_contact: Optional[str] = Field(None, max_length=20)
-    telegram_chat_id: Optional[str] = Field(None, max_length=100)
-    gcal_calendar_id: Optional[str] = Field(None, max_length=500)
-    address_street: Optional[str] = Field(None, max_length=300)
-    address_number: Optional[str] = Field(None, max_length=20)
-    address_complement: Optional[str] = Field(None, max_length=200)
-    address_sector: Optional[str] = Field(None, max_length=200)
-    region_id: Optional[int] = None
-    commune_id: Optional[int] = None
-    is_active: Optional[bool] = None
+
+    action: Literal["list", "create", "update", "activate", "deactivate", "reset_password"]
+    provider_id: str | None = None
+    name: str | None = Field(None, min_length=2, max_length=200)
+    email: EmailStr | None = None
+    specialty_id: str | None = None
+    honorific_id: str | None = None
+    timezone_id: int | None = None
+    phone_app: str | None = Field(None, max_length=20)
+    phone_contact: str | None = Field(None, max_length=20)
+    telegram_chat_id: str | None = Field(None, max_length=100)
+    gcal_calendar_id: str | None = Field(None, max_length=500)
+    address_street: str | None = Field(None, max_length=300)
+    address_number: str | None = Field(None, max_length=20)
+    address_complement: str | None = Field(None, max_length=200)
+    address_sector: str | None = Field(None, max_length=200)
+    region_id: int | None = None
+    commune_id: int | None = None
+    is_active: bool | None = None

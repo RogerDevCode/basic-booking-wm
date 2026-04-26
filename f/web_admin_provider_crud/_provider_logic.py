@@ -1,17 +1,20 @@
 from __future__ import annotations
-from typing import List, Optional, Dict, Any, cast, Final
-from ..internal._result import Result, DBClient, ok, fail
-from ._provider_models import ProviderRow, InputSchema
+
+from typing import cast
+
+from ..internal._result import DBClient, Result, fail, ok
+from ._provider_models import InputSchema, ProviderRow
+
 
 def map_row_to_provider(row: object) -> ProviderRow:
-    r = cast(Dict[str, object], row)
+    r = cast("dict[str, object]", row)
     return {
         "id": str(r["id"]),
         "honorific_id": str(r["honorific_id"]) if r.get("honorific_id") else None,
         "name": str(r["name"]),
         "email": str(r["email"]),
         "specialty_id": str(r["specialty_id"]) if r.get("specialty_id") else None,
-        "timezone_id": int(cast(int, r["timezone_id"])) if r.get("timezone_id") is not None else None,
+        "timezone_id": int(cast("int", r["timezone_id"])) if r.get("timezone_id") is not None else None,
         "phone_app": str(r["phone_app"]) if r.get("phone_app") else None,
         "phone_contact": str(r["phone_contact"]) if r.get("phone_contact") else None,
         "telegram_chat_id": str(r["telegram_chat_id"]) if r.get("telegram_chat_id") else None,
@@ -20,8 +23,8 @@ def map_row_to_provider(row: object) -> ProviderRow:
         "address_number": str(r["address_number"]) if r.get("address_number") else None,
         "address_complement": str(r["address_complement"]) if r.get("address_complement") else None,
         "address_sector": str(r["address_sector"]) if r.get("address_sector") else None,
-        "region_id": int(cast(int, r["region_id"])) if r.get("region_id") is not None else None,
-        "commune_id": int(cast(int, r["commune_id"])) if r.get("commune_id") is not None else None,
+        "region_id": int(cast("int", r["region_id"])) if r.get("region_id") is not None else None,
+        "commune_id": int(cast("int", r["commune_id"])) if r.get("commune_id") is not None else None,
         "is_active": bool(r["is_active"]),
         "has_password": bool(r.get("has_password", False)),
         "last_password_change": str(r["last_password_change"]) if r.get("last_password_change") else None,
@@ -34,7 +37,8 @@ def map_row_to_provider(row: object) -> ProviderRow:
         "commune_name": str(r["commune_name"]) if r.get("commune_name") else None,
     }
 
-async def list_providers(db: DBClient) -> Result[List[ProviderRow]]:
+
+async def list_providers(db: DBClient) -> Result[list[ProviderRow]]:
     try:
         rows = await db.fetch(
             """
@@ -58,10 +62,11 @@ async def list_providers(db: DBClient) -> Result[List[ProviderRow]]:
     except Exception as e:
         return fail(f"db_error: {e}")
 
+
 async def create_provider(db: DBClient, input_data: InputSchema) -> Result[ProviderRow]:
     if not input_data.name or not input_data.email:
         return fail("missing_fields: name and email are required")
-    
+
     try:
         rows = await db.fetch(
             """
@@ -75,12 +80,21 @@ async def create_provider(db: DBClient, input_data: InputSchema) -> Result[Provi
                       NULL as honorific_label, NULL as specialty_name, NULL as timezone_name, 
                       NULL as region_name, NULL as commune_name
             """,
-            input_data.name, input_data.email, input_data.honorific_id, 
-            input_data.specialty_id, input_data.timezone_id,
-            input_data.phone_app, input_data.phone_contact, input_data.telegram_chat_id,
-            input_data.gcal_calendar_id, input_data.address_street, input_data.address_number,
-            input_data.address_complement, input_data.address_sector,
-            input_data.region_id, input_data.commune_id
+            input_data.name,
+            input_data.email,
+            input_data.honorific_id,
+            input_data.specialty_id,
+            input_data.timezone_id,
+            input_data.phone_app,
+            input_data.phone_contact,
+            input_data.telegram_chat_id,
+            input_data.gcal_calendar_id,
+            input_data.address_street,
+            input_data.address_number,
+            input_data.address_complement,
+            input_data.address_sector,
+            input_data.region_id,
+            input_data.commune_id,
         )
         if not rows:
             return fail("insert_failed")
@@ -88,10 +102,11 @@ async def create_provider(db: DBClient, input_data: InputSchema) -> Result[Provi
     except Exception as e:
         return fail(f"db_error: {e}")
 
+
 async def update_provider(db: DBClient, input_data: InputSchema) -> Result[ProviderRow]:
     if not input_data.provider_id:
         return fail("missing_provider_id")
-    
+
     try:
         rows = await db.fetch(
             """
@@ -118,13 +133,23 @@ async def update_provider(db: DBClient, input_data: InputSchema) -> Result[Provi
                       NULL as honorific_label, NULL as specialty_name, NULL as timezone_name, 
                       NULL as region_name, NULL as commune_name
             """,
-            input_data.name, input_data.email, input_data.honorific_id,
-            input_data.specialty_id, input_data.timezone_id,
-            input_data.phone_app, input_data.phone_contact, input_data.telegram_chat_id,
-            input_data.gcal_calendar_id, input_data.address_street, input_data.address_number,
-            input_data.address_complement, input_data.address_sector,
-            input_data.region_id, input_data.commune_id, input_data.is_active,
-            input_data.provider_id
+            input_data.name,
+            input_data.email,
+            input_data.honorific_id,
+            input_data.specialty_id,
+            input_data.timezone_id,
+            input_data.phone_app,
+            input_data.phone_contact,
+            input_data.telegram_chat_id,
+            input_data.gcal_calendar_id,
+            input_data.address_street,
+            input_data.address_number,
+            input_data.address_complement,
+            input_data.address_sector,
+            input_data.region_id,
+            input_data.commune_id,
+            input_data.is_active,
+            input_data.provider_id,
         )
         if not rows:
             return fail("update_failed_or_not_found")
@@ -132,16 +157,18 @@ async def update_provider(db: DBClient, input_data: InputSchema) -> Result[Provi
     except Exception as e:
         return fail(f"db_error: {e}")
 
+
 async def reset_provider_password(db: DBClient, provider_id: str) -> Result[ProviderRow]:
-    from ..internal._crypto import hash_password
     import random
     import string
-    
+
+    from ..internal._crypto import hash_password
+
     try:
         chars = string.ascii_letters + string.digits
-        temp_pwd = ''.join(random.choice(chars) for _ in range(8))
+        temp_pwd = "".join(random.choice(chars) for _ in range(8))
         pwd_hash = hash_password(temp_pwd)
-        
+
         rows = await db.fetch(
             """
             UPDATE providers
@@ -153,7 +180,8 @@ async def reset_provider_password(db: DBClient, provider_id: str) -> Result[Prov
                       NULL as honorific_label, NULL as specialty_name, NULL as timezone_name, 
                       NULL as region_name, NULL as commune_name
             """,
-            pwd_hash, provider_id
+            pwd_hash,
+            provider_id,
         )
         if not rows:
             return fail("provider_not_found")

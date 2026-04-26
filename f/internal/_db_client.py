@@ -12,20 +12,15 @@ from ._wmill_adapter import get_variable_safe
 class _AsyncpgConn(Protocol):
     """Internal protocol to contain Any leakage from asyncpg."""
 
-    async def fetch(self, query: str, *args: object) -> list[dict[str, object]]:
-        ...
+    async def fetch(self, query: str, *args: object) -> list[dict[str, object]]: ...
 
-    async def fetchrow(self, query: str, *args: object) -> dict[str, object] | None:
-        ...
+    async def fetchrow(self, query: str, *args: object) -> dict[str, object] | None: ...
 
-    async def fetchval(self, query: str, *args: object) -> object | None:
-        ...
+    async def fetchval(self, query: str, *args: object) -> object | None: ...
 
-    async def execute(self, query: str, *args: object) -> str:
-        ...
+    async def execute(self, query: str, *args: object) -> str: ...
 
-    async def close(self) -> None:
-        ...
+    async def close(self) -> None: ...
 
 
 def _resolve_db_url() -> str | None:
@@ -50,7 +45,7 @@ async def create_db_client() -> DBClient:
     if not db_url:
         raise RuntimeError("DATABASE_URL not configured")
 
-    import asyncpg  # type: ignore[import-untyped]
+    import asyncpg
 
     class AsyncpgWrapper:
         def __init__(self, conn: _AsyncpgConn) -> None:
@@ -58,17 +53,15 @@ async def create_db_client() -> DBClient:
 
         async def fetch(self, query: str, *args: object) -> list[dict[str, object]]:
             # asyncpg rows are record-like, we convert to dicts
-            # Use cast to satisfy protocol even if asyncpg is untyped
             rows = await self.conn.fetch(query, *args)
-            return [dict(r) for r in cast(list[dict[str, object]], rows)]
+            return [dict(r) for r in rows]
 
         async def fetchrow(self, query: str, *args: object) -> dict[str, object] | None:
             row = await self.conn.fetchrow(query, *args)
             return dict(row) if row else None
 
         async def fetchval(self, query: str, *args: object) -> object | None:
-            val = await self.conn.fetchval(query, *args)
-            return cast(object, val)
+            return await self.conn.fetchval(query, *args)
 
         async def execute(self, query: str, *args: object) -> str:
             res = await self.conn.execute(query, *args)
@@ -79,6 +72,5 @@ async def create_db_client() -> DBClient:
 
     # The actual connection from asyncpg is untyped, so we cast it once at the boundary
     conn = await asyncpg.connect(db_url)
-    # Double cast to object then protocol to satisfy mypy's strictness about untyped asyncpg return
-    wrapped_conn = cast(_AsyncpgConn, cast(object, conn))
-    return cast(DBClient, AsyncpgWrapper(wrapped_conn))
+    wrapped_conn = cast("_AsyncpgConn", conn)
+    return cast("DBClient", AsyncpgWrapper(wrapped_conn))

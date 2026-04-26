@@ -1,5 +1,5 @@
 # Codebase Index
-_git:929e7c53 — 2026-04-26T23:17Z_
+_git:28151cf1 — 2026-04-26T23:41Z_
 
 > Read this file BEFORE exploring the repository.
 
@@ -380,17 +380,17 @@ _git:929e7c53 — 2026-04-26T23:17Z_
 
 ### `f/internal/_db_client.py`
 - ⚡ `async_fn` `fetch` (L15)
-- ⚡ `async_fn` `fetchrow` (L18)
-- ⚡ `async_fn` `fetchval` (L21)
-- ⚡ `async_fn` `execute` (L24)
-- ⚡ `async_fn` `close` (L27)
-- ⚡ `async_fn` `create_db_client` (L45)
-- 📦 `class` `AsyncpgWrapper` (L55)
-- ⚡ `async_fn` `fetch` (L59)
-- ⚡ `async_fn` `fetchrow` (L65)
-- ⚡ `async_fn` `fetchval` (L69)
-- ⚡ `async_fn` `execute` (L73)
-- ⚡ `async_fn` `close` (L77)
+- ⚡ `async_fn` `fetchrow` (L17)
+- ⚡ `async_fn` `fetchval` (L19)
+- ⚡ `async_fn` `execute` (L21)
+- ⚡ `async_fn` `close` (L23)
+- ⚡ `async_fn` `create_db_client` (L40)
+- 📦 `class` `AsyncpgWrapper` (L50)
+- ⚡ `async_fn` `fetch` (L54)
+- ⚡ `async_fn` `fetchrow` (L59)
+- ⚡ `async_fn` `fetchval` (L63)
+- ⚡ `async_fn` `execute` (L66)
+- ⚡ `async_fn` `close` (L70)
 
 ### `f/internal/_file_lock.py`
 - 📦 `class` `FileLockError` (L17)
@@ -847,21 +847,21 @@ _git:929e7c53 — 2026-04-26T23:17Z_
 - ⚡ `async_fn` `main` (L46)
 
 ### `f/web_admin_provider_crud/_provider_logic.py`
-- 🔧 `fn` `map_row_to_provider` (L6)
-- ⚡ `async_fn` `list_providers` (L37)
-- ⚡ `async_fn` `create_provider` (L61)
-- ⚡ `async_fn` `update_provider` (L91)
-- ⚡ `async_fn` `reset_provider_password` (L135)
+- 🔧 `fn` `map_row_to_provider` (L9)
+- ⚡ `async_fn` `list_providers` (L41)
+- ⚡ `async_fn` `create_provider` (L66)
+- ⚡ `async_fn` `update_provider` (L106)
+- ⚡ `async_fn` `reset_provider_password` (L161)
 
 ### `f/web_admin_provider_crud/_provider_models.py`
-- 📦 `class` `ProviderRow` (L5)
-- 📦 `class` `CreateProviderResult` (L33)
-- 📦 `class` `InputSchema` (L36)
+- 📦 `class` `ProviderRow` (L6)
+- 📦 `class` `CreateProviderResult` (L35)
+- 📦 `class` `InputSchema` (L39)
 
 ### `f/web_admin_provider_crud/main.py`
-- ⚡ `async_fn` `create_op` (L42)
+- ⚡ `async_fn` `create_op` (L41)
 - ⚡ `async_fn` `operation` (L51)
-- ⚡ `async_fn` `main` (L78)
+- ⚡ `async_fn` `main` (L79)
 
 ### `f/web_admin_regions/_regions_logic.py`
 - ⚡ `async_fn` `list_regions` (L6)
