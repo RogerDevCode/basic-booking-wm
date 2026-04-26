@@ -214,11 +214,11 @@
 - [x] `f/telegram_menu/_menu_logic.py`: 0 errors
 </details>
 
-<details>
-<summary><b>Module: <code>telegram_send</code> (85 errors)</b></summary>
+<details open>
+<summary><b>Module: <code>telegram_send</code> (0 errors) ✅</b></summary>
 
-- [ ] `f/telegram_send/_telegram_logic.py`: 73 errors
-- [ ] `f/telegram_send/main.py`: 12 errors
+- [x] `f/telegram_send/_telegram_logic.py`: 0 errors
+- [x] `f/telegram_send/main.py`: 0 errors
 </details>
 
 <details>
