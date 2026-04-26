@@ -179,12 +179,12 @@
 - [x] `f/reminder_config/_config_logic.py`: 0 errors
 </details>
 
-<details>
-<summary><b>Module: <code>reminder_cron</code> (31 errors)</b></summary>
+<details open>
+<summary><b>Module: <code>reminder_cron</code> (0 errors) ✅</b></summary>
 
-- [ ] `f/reminder_cron/main.py`: 20 errors
-- [ ] `f/reminder_cron/_reminder_logic.py`: 9 errors
-- [ ] `f/reminder_cron/_reminder_repository.py`: 2 errors
+- [x] `f/reminder_cron/main.py`: 0 errors
+- [x] `f/reminder_cron/_reminder_logic.py`: 0 errors
+- [x] `f/reminder_cron/_reminder_repository.py`: 0 errors
 </details>
 
 <details>
