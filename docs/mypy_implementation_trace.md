@@ -221,11 +221,11 @@
 - [x] `f/telegram_send/main.py`: 0 errors
 </details>
 
-<details>
-<summary><b>Module: <code>web_admin_dashboard</code> (29 errors)</b></summary>
+<details open>
+<summary><b>Module: <code>web_admin_dashboard</code> (0 errors) ✅</b></summary>
 
-- [ ] `f/web_admin_dashboard/_dashboard_logic.py`: 23 errors
-- [ ] `f/web_admin_dashboard/main.py`: 6 errors
+- [x] `f/web_admin_dashboard/main.py`: 0 errors
+- [x] `f/web_admin_dashboard/_dashboard_logic.py`: 0 errors
 </details>
 
 <details>
