@@ -1,13 +1,11 @@
-from typing import Any
+from __future__ import annotations
 from datetime import datetime
-from typing import List, Dict, Any, Optional, cast
+from typing import List, Dict, Optional, cast, Any, Tuple
 from ._reminder_models import BookingRecord, ReminderWindow, ReminderPrefs
 
 def format_date_es(dt: datetime) -> str:
-    # Manual format to match Spanish/Argentine style without complex locales
     days = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
     months = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
-    
     day_name = days[dt.weekday()]
     month_name = months[dt.month - 1]
     return f"{day_name}, {dt.day} de {month_name} de {dt.year}"
@@ -22,15 +20,18 @@ def get_client_preference(
 ) -> bool:
     if not prefs: return True
     key = f"{channel}_{window}"
-    return cast(bool, prefs.get(key, True))
+    return bool(cast(Any, prefs).get(key, True))
 
 def build_booking_details(
     booking: BookingRecord,
     tz: str
-) -> Dict[str, str]:
-    st = booking["start_time"]
-    if isinstance(st, str):
-        st = datetime.fromisoformat(st.replace("Z", "+00:00"))
+) -> Dict[str, object]:
+    st_raw = booking["start_time"]
+    st: datetime
+    if isinstance(st_raw, str):
+        st = datetime.fromisoformat(st_raw.replace("Z", "+00:00"))
+    else:
+        st = cast(datetime, st_raw)
         
     return {
         "date": format_date_es(st),
@@ -45,21 +46,20 @@ def build_inline_buttons(
     booking_id: str,
     window: ReminderWindow
 ) -> List[Dict[str, str]]:
-    short_id = booking_id
-    buttons = []
+    buttons: List[Dict[str, str]] = []
 
     if window == '24h':
         buttons.extend([
-            {"text": '✅ Confirmar', "callback_data": f"cnf:{short_id}"},
-            {"text": '❌ Cancelar', "callback_data": f"cxl:{short_id}"},
-            {"text": '🔄 Reprogramar', "callback_data": f"res:{short_id}"}
+            {"text": '✅ Confirmar', "callback_data": f"cnf:{booking_id}"},
+            {"text": '❌ Cancelar', "callback_data": f"cxl:{booking_id}"},
+            {"text": '🔄 Reprogramar', "callback_data": f"res:{booking_id}"}
         ])
     elif window == '2h':
         buttons.extend([
-            {"text": '✅ Voy a asistir', "callback_data": f"ack:{short_id}"},
-            {"text": '❌ Cancelar', "callback_data": f"cxl:{short_id}"}
+            {"text": '✅ Voy a asistir', "callback_data": f"ack:{booking_id}"},
+            {"text": '❌ Cancelar', "callback_data": f"cxl:{booking_id}"}
         ])
     else:
-        buttons.append({"text": '👍 En camino', "callback_data": f"ack:{short_id}"})
+        buttons.append({"text": '👍 En camino', "callback_data": f"ack:{booking_id}"})
 
     return buttons

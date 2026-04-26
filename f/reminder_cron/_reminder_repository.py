@@ -1,5 +1,6 @@
+from __future__ import annotations
 from datetime import datetime
-from typing import List, cast
+from typing import List, cast, Any
 from ..internal._result import DBClient
 from ._reminder_models import BookingRecord, ReminderWindow
 
@@ -17,14 +18,14 @@ async def get_bookings_for_window(
           b.booking_id, b.client_id, b.provider_id,
           b.start_time, b.end_time, b.status,
           b.reminder_24h_sent, b.reminder_2h_sent, b.reminder_30min_sent,
-          p.telegram_chat_id AS client_telegram_chat_id,
-          p.email AS client_email,
-          p.name AS client_name,
-          p.metadata AS reminder_preferences,
+          cl.telegram_chat_id AS client_telegram_chat_id,
+          cl.email AS client_email,
+          cl.name AS client_name,
+          cl.metadata AS reminder_preferences,
           pr.name AS provider_name,
           s.name AS service_name
         FROM bookings b
-        JOIN clients p ON p.client_id = b.client_id
+        JOIN clients cl ON cl.client_id = b.client_id
         LEFT JOIN providers pr ON pr.provider_id = b.provider_id
         LEFT JOIN services s ON s.service_id = b.service_id
         WHERE b.status = 'confirmed'
@@ -37,7 +38,8 @@ async def get_bookings_for_window(
         start, end
     )
     
-    return [cast(BookingRecord, r) for r in rows]
+    # Cast rows to dict[str, object] then to BookingRecord to satisfy mypy --strict
+    return [cast(BookingRecord, dict(r)) for r in rows]
 
 async def mark_reminder_sent(db: DBClient, booking_id: str, window: ReminderWindow) -> None:
     column = f"reminder_{window}_sent"

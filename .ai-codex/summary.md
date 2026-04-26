@@ -1,5 +1,5 @@
 # Codebase Index
-_git:c273905a — 2026-04-26T21:12Z_
+_git:833d248d — 2026-04-26T21:14Z_
 
 > Read this file BEFORE exploring the repository.
 
@@ -662,10 +662,10 @@ _git:c273905a — 2026-04-26T21:12Z_
 
 ### `f/reminder_cron/_reminder_logic.py`
 - 🔧 `fn` `format_date_es` (L6)
-- 🔧 `fn` `format_time_es` (L15)
-- 🔧 `fn` `get_client_preference` (L18)
-- 🔧 `fn` `build_booking_details` (L27)
-- 🔧 `fn` `build_inline_buttons` (L44)
+- 🔧 `fn` `format_time_es` (L13)
+- 🔧 `fn` `get_client_preference` (L16)
+- 🔧 `fn` `build_booking_details` (L25)
+- 🔧 `fn` `build_inline_buttons` (L45)
 
 ### `f/reminder_cron/_reminder_models.py`
 - 📦 `class` `ReminderPrefs` (L6)
@@ -674,12 +674,12 @@ _git:c273905a — 2026-04-26T21:12Z_
 - 📦 `class` `InputSchema` (L39)
 
 ### `f/reminder_cron/_reminder_repository.py`
-- ⚡ `async_fn` `get_bookings_for_window` (L6)
-- ⚡ `async_fn` `mark_reminder_sent` (L42)
+- ⚡ `async_fn` `get_bookings_for_window` (L7)
+- ⚡ `async_fn` `mark_reminder_sent` (L44)
 
 ### `f/reminder_cron/main.py`
-- ⚡ `async_fn` `provider_batch` (L53)
-- 🔧 `fn` `main` (L105)
+- ⚡ `async_fn` `provider_batch` (L54)
+- 🔧 `fn` `main` (L108)
 
 ### `f/telegram_auto_register/_auto_register_logic.py`
 - ⚡ `async_fn` `register_telegram_user` (L7)

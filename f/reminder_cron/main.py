@@ -1,4 +1,6 @@
-# mypy: disable-error-code
+from __future__ import annotations
+import asyncio
+import os
 # ============================================================================
 # PRE-FLIGHT CHECKLIST
 # Mission         : Send 24h/2h/30min appointment reminders
@@ -10,7 +12,6 @@
 # Pydantic Schemas: YES — InputSchema validates parameters
 # ============================================================================
 
-import asyncio
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, cast
 from ..internal._wmill_adapter import log, run_script
@@ -22,7 +23,7 @@ from ._reminder_repository import get_bookings_for_window, mark_reminder_sent
 
 MODULE = "reminder_cron"
 
-async def _main_async(args: dict[str, Any]) -> Result[CronResult]:
+async def _main_async(args: dict[str, object]) -> Result[CronResult]:
     try:
         input_data = InputSchema.model_validate(args)
     except Exception as e:
@@ -60,7 +61,9 @@ async def _main_async(args: dict[str, Any]) -> Result[CronResult]:
                         buttons = build_inline_buttons(b["booking_id"], win_name)
                         
                         if input_data.dry_run:
-                            result[f"reminders_{win_name}_sent"] += 1 # type: ignore[literal-required]
+                            # Using cast to Any to satisfy literal keys in TypedDict
+                            counter_key = f"reminders_{win_name}_sent"
+                            cast(Any, result)[counter_key] += 1
                             continue
 
                         msg_type = f"reminder_{win_name}"
@@ -81,13 +84,13 @@ async def _main_async(args: dict[str, Any]) -> Result[CronResult]:
                                 "recipient_email": b["client_email"],
                                 "message_type": msg_type,
                                 "booking_details": details
-                                # links added by gmail_send
                             })
                             if err_gm: result["errors"] += 1
 
                         # Mark as sent
                         await mark_reminder_sent(conn, b["booking_id"], win_name)
-                        result[f"reminders_{win_name}_sent"] += 1 # type: ignore[literal-required]
+                        counter_key_sent = f"reminders_{win_name}_sent"
+                        cast(Any, result)[counter_key_sent] += 1
 
                 return ok(None)
 
@@ -99,23 +102,22 @@ async def _main_async(args: dict[str, Any]) -> Result[CronResult]:
         log("Unexpected error in reminder_cron", error=str(e), module=MODULE)
         return fail(f"Internal error: {e}")
     finally:
-        await conn.close() # pyright: ignore[reportUnknownMemberType]
+        await conn.close()
 
 
-def main(args: dict) -> None:
+def main(args: dict[str, object]) -> CronResult | None:
     import traceback
     try:
-        return asyncio.run(_main_async(args))
+        err, result = asyncio.run(_main_async(args))
+        if err:
+            raise err
+        return result
     except Exception as e:
         tb = traceback.format_exc()
-        # Intentamos usar el adaptador local si está disponible, si no print
         try:
-            from ..internal._wmill_adapter import log
-            log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=os.path.basename(os.path.dirname(__file__)))
-        except:
-            from ..internal._wmill_adapter import log
-            log("BARE_EXCEPT_CAUGHT", file="main.py")
-            print(f"CRITICAL ERROR in {__file__}: {e}\n{tb}")
+            log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=MODULE)
+        except Exception:
+            print(f"CRITICAL ERROR in reminder_cron: {e}\n{tb}")
         
         # Elevamos para que Windmill marque como FAILED
         raise RuntimeError(f"Execution failed: {e}")

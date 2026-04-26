@@ -1,7 +1,7 @@
-from typing import Any
-from typing import Optional, List, Literal, Dict, Any, TypedDict
+from __future__ import annotations
+from typing import Optional, List, Literal, Dict, TypedDict
 from pydantic import BaseModel, ConfigDict, Field
-from f.internal._config import DEFAULT_TIMEZONE
+from ..internal._config import DEFAULT_TIMEZONE
 
 class ReminderPrefs(TypedDict, total=False):
     telegram_24h: bool
@@ -15,8 +15,8 @@ class BookingRecord(TypedDict):
     booking_id: str
     client_id: str
     provider_id: str
-    start_time: Any
-    end_time: Any
+    start_time: object
+    end_time: object
     status: str
     reminder_24h_sent: bool
     reminder_2h_sent: bool
