@@ -1,5 +1,5 @@
 import pytest
-from f.internal._result import ok, fail, is_ok, is_fail, wrap
+from f.internal._result import ok, fail, is_ok_outcome as is_ok, is_fail_outcome as is_fail, wrap
 
 def test_result_ok() -> None:
     res = ok("data")
@@ -38,7 +38,8 @@ async def test_result_wrap_failure() -> None:
     assert isinstance(res[0], ValueError)
     assert str(res[0]) == "async fail"
 
-from f.internal._wmill_adapter import get_env, get_variable
+from f.internal._config import get_env
+from f.internal._wmill_adapter import get_variable
 
 def test_wmill_adapter_get_env() -> None:
     assert get_env("PATH") is not None

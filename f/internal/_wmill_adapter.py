@@ -50,6 +50,18 @@ def get_resource_safe(path: str, schema: type[T]) -> Result[T, Exception]:
         return Failure(e)
 
 
+def run_script(path: str, args: dict[str, object] | None = None) -> tuple[Exception | None, object]:
+    """
+    Wrapper around wmill.run_script_by_path to capture exceptions
+    and return them in a Result tuple.
+    """
+    try:
+        res = wmill.run_script_by_path(path, args or {})
+        return None, res
+    except Exception as e:
+        return e, None
+
+
 def log(message: str, **kwargs: object) -> None:
     try:
         # Internal non-leaking log

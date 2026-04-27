@@ -422,7 +422,8 @@
 - 🔧 `fn` `get_variable_safe` (L23)
 - 🔧 `fn` `get_variable` (L31)
 - 🔧 `fn` `get_resource_safe` (L42)
-- 🔧 `fn` `log` (L53)
+- 🔧 `fn` `run_script` (L53)
+- 🔧 `fn` `log` (L65)
 
 ### `f/internal/ai_agent/_ai_agent_logic.py`
 - 🔧 `fn` `adjust_intent_with_context` (L28)
