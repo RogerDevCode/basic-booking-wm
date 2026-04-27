@@ -27,7 +27,7 @@ async def test_reminder_cron_success() -> None:
 
     with patch("f.reminder_cron.main.create_db_client", return_value=mock_db), \
          patch("f.reminder_cron.main.with_tenant_context", side_effect=mock_with_tenant), \
-         patch("f.reminder_cron.main.run_script", return_value=(None, {"sent": True})):
+         patch("f.internal._wmill_adapter.wmill.run_script_by_path", return_value=(None, {"sent": True})):
         
         args = {"dry_run": False}
         err, result = await main(args)
