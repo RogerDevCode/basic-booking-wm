@@ -1,7 +1,6 @@
 # Codebase Index
-_git:6a148054 — 2026-04-27T16:10Z_
 
-> Read this file BEFORE exploring the repository.
+> Read this file BEFORE exploring the repository. Use it to map architecture to logic.
 
 ## Module Map
 
@@ -1293,3 +1292,4 @@ _git:6a148054 — 2026-04-27T16:10Z_
 - `f/web_waitlist/_waitlist_logic.script.yaml`
 - `f/web_waitlist/_waitlist_models.script.yaml`
 - `f/web_waitlist/main.script.yaml`
+
