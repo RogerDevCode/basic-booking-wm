@@ -1,8 +1,10 @@
 import json
 from typing import Protocol, cast
+
 from ..internal._result import DBClient
 from ..internal._state_machine import BookingStatus
-from ._booking_cancel_models import BookingLookup, UpdatedBooking, CancelBookingInput
+from ._booking_cancel_models import BookingLookup, CancelBookingInput, UpdatedBooking
+
 
 class BookingCancelRepository(Protocol):
     async def fetch_booking(self, booking_id: str) -> BookingLookup | None: ...
@@ -10,6 +12,7 @@ class BookingCancelRepository(Protocol):
     async def update_booking_status(self, input_data: CancelBookingInput) -> UpdatedBooking | None: ...
     async def insert_audit_trail(self, input_data: CancelBookingInput, booking: BookingLookup) -> None: ...
     async def trigger_gcal_sync(self, booking_id: str) -> None: ...
+
 
 class PostgresBookingCancelRepository:
     def __init__(self, client: DBClient) -> None:
@@ -24,13 +27,13 @@ class PostgresBookingCancelRepository:
             WHERE booking_id = $1::uuid
             LIMIT 1
             """,
-            booking_id
+            booking_id,
         )
         if not row:
             return None
         return {
             "booking_id": str(row["booking_id"]),
-            "status": cast(BookingStatus, str(row["status"])),
+            "status": cast("BookingStatus", str(row["status"])),
             "client_id": str(row["client_id"]),
             "provider_id": str(row["provider_id"]),
             "gcal_provider_event_id": str(row["gcal_provider_event_id"]) if row.get("gcal_provider_event_id") else None,
@@ -44,11 +47,11 @@ class PostgresBookingCancelRepository:
             WHERE booking_id = $1::uuid 
             FOR UPDATE
             """,
-            booking_id
+            booking_id,
         )
         if not row:
             return None
-        return cast(BookingStatus, str(row["status"]))
+        return cast("BookingStatus", str(row["status"]))
 
     async def update_booking_status(self, input_data: CancelBookingInput) -> UpdatedBooking | None:
         row = await self._client.fetchrow(
@@ -63,11 +66,11 @@ class PostgresBookingCancelRepository:
             """,
             input_data.actor,
             input_data.reason,
-            input_data.booking_id
+            input_data.booking_id,
         )
         if not row:
             return None
-            
+
         return {
             "booking_id": str(row["booking_id"]),
             "status": str(row["status"]),
@@ -80,7 +83,7 @@ class PostgresBookingCancelRepository:
             "gcal_provider_event_id": booking["gcal_provider_event_id"],
             "gcal_client_event_id": booking["gcal_client_event_id"],
         }
-        
+
         await self._client.execute(
             """
             INSERT INTO booking_audit (
@@ -99,8 +102,8 @@ class PostgresBookingCancelRepository:
             booking["status"],
             input_data.actor,
             input_data.actor_id,
-            input_data.reason or 'Cancelled via API',
-            json.dumps(metadata)
+            input_data.reason or "Cancelled via API",
+            json.dumps(metadata),
         )
 
     async def trigger_gcal_sync(self, booking_id: str) -> None:
@@ -110,5 +113,5 @@ class PostgresBookingCancelRepository:
             SET gcal_sync_status = 'pending', gcal_retry_count = 0
             WHERE booking_id = $1::uuid
             """,
-            booking_id
+            booking_id,
         )

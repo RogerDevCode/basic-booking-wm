@@ -1,6 +1,7 @@
 import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
+
 import f.telegram_auto_register._auto_register_logic
+
 
 # This is an auto-generated test boilerplate for f.telegram_auto_register._auto_register_logic
 @pytest.mark.asyncio

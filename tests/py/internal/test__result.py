@@ -1,6 +1,7 @@
 import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
+
 import f.internal._result
+
 
 # This is an auto-generated test boilerplate for f.internal._result
 @pytest.mark.asyncio

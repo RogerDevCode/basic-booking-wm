@@ -1,6 +1,5 @@
 from __future__ import annotations
-import asyncio
-import os
+
 # ============================================================================
 # PRE-FLIGHT CHECKLIST
 # Mission         : Log messages to conversations table (incoming/outgoing)
@@ -11,15 +10,14 @@ import os
 # RLS Tenant ID   : YES — provider_id used for isolation context
 # Pydantic Schemas: YES — InputSchema validates all fields
 # ============================================================================
-
-from typing import Any
-from ..internal._wmill_adapter import log
 from ..internal._db_client import create_db_client
 from ..internal._result import Result, fail, with_tenant_context
-from ._logger_models import InputSchema, LogResult
+from ..internal._wmill_adapter import log
 from ._logger_logic import persist_log
+from ._logger_models import InputSchema, LogResult
 
 MODULE = "conversation_logger"
+
 
 async def _main_async(args: dict[str, object]) -> Result[LogResult]:
     # 1. Validate Input

@@ -1,6 +1,5 @@
-import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
 import f.provider_agenda._agenda_models
+
 
 # This is an auto-generated test boilerplate for f.provider_agenda._agenda_models
 def test__agenda_models_basic_import() -> None:

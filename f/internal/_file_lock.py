@@ -5,8 +5,8 @@ Prevents multiple processes from modifying the same file simultaneously.
 
 import os
 import sys
+from collections.abc import Generator
 from contextlib import contextmanager
-from typing import Generator
 
 if sys.platform == "win32":
     import msvcrt
@@ -16,11 +16,12 @@ else:
 
 class FileLockError(Exception):
     """Raised when file lock cannot be acquired."""
+
     pass
 
 
 @contextmanager
-def exclusive_file_lock(file_path: str, timeout_seconds: int = 30) -> Generator[None, None, None]:
+def exclusive_file_lock(file_path: str, timeout_seconds: int = 30) -> Generator[None]:
     """
     Acquire exclusive lock on a file.
 
@@ -47,6 +48,7 @@ def exclusive_file_lock(file_path: str, timeout_seconds: int = 30) -> Generator[
             if sys.platform == "win32":
                 # Windows: lock with timeout
                 import time
+
                 start = time.time()
                 while True:
                     try:
@@ -54,14 +56,14 @@ def exclusive_file_lock(file_path: str, timeout_seconds: int = 30) -> Generator[
                         break
                     except OSError:
                         if time.time() - start > timeout_seconds:
-                            raise FileLockError(f"Cannot acquire lock on {file_path} after {timeout_seconds}s")
+                            raise FileLockError(f"Cannot acquire lock on {file_path} after {timeout_seconds}s")  # noqa: B904
                         time.sleep(0.1)
             else:
                 # Unix: use fcntl
                 try:
                     fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                except IOError:
-                    raise FileLockError(f"Cannot acquire exclusive lock on {file_path}")
+                except OSError:
+                    raise FileLockError(f"Cannot acquire exclusive lock on {file_path}")  # noqa: B904
 
             yield
 
@@ -79,7 +81,7 @@ def exclusive_file_lock(file_path: str, timeout_seconds: int = 30) -> Generator[
             os.close(lock_fd)
 
     except FileExistsError:
-        raise FileLockError(f"File is locked (another process is using {file_path})")
+        raise FileLockError(f"File is locked (another process is using {file_path})")  # noqa: B904
 
     finally:
         try:
@@ -89,7 +91,7 @@ def exclusive_file_lock(file_path: str, timeout_seconds: int = 30) -> Generator[
 
 
 @contextmanager
-def shared_file_lock(file_path: str) -> Generator[None, None, None]:
+def shared_file_lock(file_path: str) -> Generator[None]:
     """
     Acquire shared (read) lock on a file.
     Multiple processes can hold shared locks simultaneously.

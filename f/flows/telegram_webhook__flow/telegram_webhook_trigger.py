@@ -1,28 +1,32 @@
 from __future__ import annotations
-from typing import Any, Optional
+
+from typing import Any
+
 from pydantic import BaseModel, ConfigDict
+
 
 class TriggerOutput(BaseModel):
     model_config = ConfigDict(strict=True)
     chat_id: str
     text: str
     username: str
-    callback_data: Optional[str] = None
-    callback_query_id: Optional[str] = None
-    callback_message_id: Optional[int] = None
+    callback_data: str | None = None
+    callback_query_id: str | None = None
+    callback_message_id: int | None = None
+
 
 async def main(webhook_payload: dict[str, Any]) -> dict[str, Any]:
     # Logic extracted from flow.json and telegram_gateway
     message = webhook_payload.get("message", {})
     callback_query = webhook_payload.get("callback_query", {})
-    
+
     chat_id = ""
     text = ""
     username = "unknown"
     callback_data = None
     callback_query_id = None
     callback_message_id = None
-    
+
     if message:
         chat_id = str(message.get("chat", {}).get("id", ""))
         text = message.get("text", "")
@@ -41,5 +45,5 @@ async def main(webhook_payload: dict[str, Any]) -> dict[str, Any]:
         "username": username,
         "callback_data": callback_data,
         "callback_query_id": callback_query_id,
-        "callback_message_id": callback_message_id
+        "callback_message_id": callback_message_id,
     }

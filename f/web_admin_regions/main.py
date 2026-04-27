@@ -1,5 +1,6 @@
 # mypy: disable-error-code
 import asyncio
+
 # ============================================================================
 # PRE-FLIGHT CHECKLIST
 # Mission         : Read-only reference data for regions and communes
@@ -10,15 +11,16 @@ import asyncio
 # RLS Tenant ID   : NO — public reference data
 # Pydantic Schemas: YES — InputSchema validates action and region_id
 # ============================================================================
+from typing import Any
 
-from typing import Any, Dict
-from ..internal._wmill_adapter import log
 from ..internal._db_client import create_db_client
-from ..internal._result import Result, ok, fail
+from ..internal._result import Result, fail
+from ..internal._wmill_adapter import log
+from ._regions_logic import list_communes, list_regions, search_communes
 from ._regions_models import InputSchema
-from ._regions_logic import list_regions, list_communes, search_communes
 
 MODULE = "web_admin_regions"
+
 
 async def _main_async(args: dict[str, Any]) -> Result[Any]:
     # 1. Validate Input
@@ -29,26 +31,27 @@ async def _main_async(args: dict[str, Any]) -> Result[Any]:
 
     conn = await create_db_client()
     try:
-        if input_data.action == 'list_regions':
+        if input_data.action == "list_regions":
             return await list_regions(conn)
-        
-        elif input_data.action == 'list_communes':
+
+        elif input_data.action == "list_communes":
             return await list_communes(conn, input_data.region_id)
-            
-        elif input_data.action == 'search_communes':
-            return await search_communes(conn, input_data.search or '', input_data.region_id)
-        
+
+        elif input_data.action == "search_communes":
+            return await search_communes(conn, input_data.search or "", input_data.region_id)
+
         return fail(f"Unsupported action: {input_data.action}")
 
     except Exception as e:
         log("Admin Regions Internal Error", error=str(e), module=MODULE)
         return fail(f"internal_error: {e}")
     finally:
-        await conn.close() # pyright: ignore[reportUnknownMemberType]
+        await conn.close()  # pyright: ignore[reportUnknownMemberType]
 
 
 def main(args: dict) -> None:
     import traceback
+
     try:
         return asyncio.run(_main_async(args))
     except Exception as e:
@@ -56,11 +59,18 @@ def main(args: dict) -> None:
         # Intentamos usar el adaptador local si está disponible, si no print
         try:
             from ..internal._wmill_adapter import log
-            log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=os.path.basename(os.path.dirname(__file__)))
-        except:
+
+            log(
+                "CRITICAL_ENTRYPOINT_ERROR",
+                error=str(e),
+                traceback=tb,
+                module=MODULE,
+            )
+        except Exception:
             from ..internal._wmill_adapter import log
+
             log("BARE_EXCEPT_CAUGHT", file="main.py")
             print(f"CRITICAL ERROR in {__file__}: {e}\n{tb}")
-        
+
         # Elevamos para que Windmill marque como FAILED
-        raise RuntimeError(f"Execution failed: {e}")
+        raise RuntimeError(f"Execution failed: {e}") from e

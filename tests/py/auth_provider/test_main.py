@@ -1,6 +1,7 @@
 import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
+
 import f.auth_provider.main
+
 
 # This is an auto-generated test boilerplate for f.auth_provider.main
 @pytest.mark.asyncio

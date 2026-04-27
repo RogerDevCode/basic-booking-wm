@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import time
-from typing import Final, Literal, TypedDict, cast
+from typing import Any, Final, Literal, TypedDict, cast
 
 import httpx
 from pydantic import BaseModel, ConfigDict
@@ -89,7 +89,7 @@ async def call_llm(system_prompt: str, user_message: str) -> tuple[Exception | N
 
                 body: dict[str, object] = {
                     "model": p["model"],
-                    "messages": cast(list[object], messages),
+                    "messages": cast("list[object]", messages),
                     "temperature": 0.0,
                     "max_tokens": 512,
                 }
@@ -104,9 +104,9 @@ async def call_llm(system_prompt: str, user_message: str) -> tuple[Exception | N
                     log(f"LLM Provider {p_key} failed", status=response.status_code, body=response.text)
                     continue
 
-                data = cast(dict[str, Any], response.json())  # httpx.json returns Any
+                data = cast("dict[str, Any]", response.json())  # httpx.json returns Any
                 content = str(data["choices"][0]["message"]["content"])
-                usage = cast(dict[str, int], data.get("usage", {}))
+                usage = cast("dict[str, int]", data.get("usage", {}))
 
                 return None, LLMResponse(
                     content=content,
@@ -124,4 +124,3 @@ async def call_llm(system_prompt: str, user_message: str) -> tuple[Exception | N
 
 
 # To satisfy the data mapping in response.json()
-from typing import Any

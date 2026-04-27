@@ -1,6 +1,9 @@
-from typing import Optional, Callable, Awaitable, cast
+from collections.abc import Awaitable, Callable
+from typing import cast
+
+from f.internal._result import DBClient, Result
+
 from ._orchestrator_models import CanonicalIntent, OrchestratorInput, OrchestratorResult
-from f.internal._result import Result, DBClient
 
 """
 PRE-FLIGHT
@@ -28,14 +31,16 @@ AUTHORIZED_INTENTS = [
     "mis_citas",
 ]
 
-def normalize_intent(intent: str) -> Optional[CanonicalIntent]:
+
+def normalize_intent(intent: str) -> CanonicalIntent | None:
     """Maps legacy or relative intent names to canonical ones."""
     mapped = LEGACY_INTENT_MAP.get(intent)
     if mapped:
         return mapped
     if intent in AUTHORIZED_INTENTS:
-        return cast(CanonicalIntent, intent)
+        return cast("CanonicalIntent", intent)
     return None
+
 
 # Type alias for handlers
 OrchestratorHandler = Callable[[DBClient, OrchestratorInput], Awaitable[Result[OrchestratorResult]]]

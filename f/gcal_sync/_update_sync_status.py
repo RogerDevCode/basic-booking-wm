@@ -1,17 +1,19 @@
-from typing import Optional, List, Literal
-from ..internal._result import Result, DBClient, ok, fail, with_tenant_context
+from typing import Literal
+
+from ..internal._result import DBClient, Result, ok, with_tenant_context
+
 
 async def update_booking_sync_status(
     db: DBClient,
     tenant_id: str,
     booking_id: str,
-    provider_event_id: Optional[str],
-    client_event_id: Optional[str],
-    status: Literal['synced', 'partial', 'pending'],
+    provider_event_id: str | None,
+    client_event_id: str | None,
+    status: Literal["synced", "partial", "pending"],
     retry_count: int,
-    error_msg: Optional[str] = None
+    error_msg: str | None = None,
 ) -> Result[None]:
-    
+
     async def operation() -> Result[None]:
         # 1. Update Booking
         await db.execute(
@@ -24,7 +26,11 @@ async def update_booking_sync_status(
                 updated_at = NOW()
             WHERE booking_id = $5::uuid
             """,
-            provider_event_id, client_event_id, status, retry_count, booking_id
+            provider_event_id,
+            client_event_id,
+            status,
+            retry_count,
+            booking_id,
         )
 
         # 2. Add to Audit if error
@@ -34,10 +40,11 @@ async def update_booking_sync_status(
                 INSERT INTO booking_audit (booking_id, changed_by, reason, metadata)
                 VALUES ($1::uuid, 'system', $2, $3::jsonb)
                 """,
-                booking_id, f"GCal Sync Failure: {status}", 
-                '{"error": "' + error_msg.replace('"', '\\"') + '"}'
+                booking_id,
+                f"GCal Sync Failure: {status}",
+                '{"error": "' + error_msg.replace('"', '\\"') + '"}',
             )
-        
+
         return ok(None)
 
     return await with_tenant_context(db, tenant_id, operation)

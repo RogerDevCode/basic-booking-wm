@@ -2,16 +2,11 @@ from __future__ import annotations
 
 import binascii
 import hashlib
-import json
 import os
 import re
-from typing import TYPE_CHECKING, TypedDict
+from typing import TypedDict
 
-from ._result import fail, ok
-
-if TYPE_CHECKING:
-    from typing import Any
-    from ._result import Result
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 # ============================================================================
 # CRYPTO — Password hashing (Scrypt) + AES-256-GCM data encryption
@@ -23,9 +18,7 @@ if TYPE_CHECKING:
 
 def hash_password(password: str) -> str:
     salt = binascii.hexlify(os.urandom(16)).decode("utf-8")
-    key = hashlib.scrypt(
-        password.encode("utf-8"), salt=salt.encode("utf-8"), n=16384, r=8, p=1, dklen=64
-    )
+    key = hashlib.scrypt(password.encode("utf-8"), salt=salt.encode("utf-8"), n=16384, r=8, p=1, dklen=64)
     return f"{salt}:{binascii.hexlify(key).decode('utf-8')}"
 
 
@@ -35,9 +28,7 @@ def verify_password(password: str, stored_hash: str) -> bool:
         if len(parts) != 2:
             return False
         salt, stored_key = parts
-        key = hashlib.scrypt(
-            password.encode("utf-8"), salt=salt.encode("utf-8"), n=16384, r=8, p=1, dklen=64
-        )
+        key = hashlib.scrypt(password.encode("utf-8"), salt=salt.encode("utf-8"), n=16384, r=8, p=1, dklen=64)
         return binascii.hexlify(key).decode("utf-8") == stored_key
     except Exception as e:
         from ._wmill_adapter import log
@@ -78,16 +69,12 @@ def validate_password_policy(plain: str) -> PasswordPolicyResult:
 # AES-256-GCM DATA ENCRYPTION
 # ============================================================================
 
-from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-
 
 def get_encryption_key() -> bytes:
     key_env = os.getenv("ENCRYPTION_KEY")
     if not key_env:
         db_url = os.getenv("DATABASE_URL") or "fallback-key"
-        return hashlib.scrypt(
-            db_url.encode(), salt=b"booking-titanium-salt", n=16384, r=8, p=1, dklen=32
-        )
+        return hashlib.scrypt(db_url.encode(), salt=b"booking-titanium-salt", n=16384, r=8, p=1, dklen=32)
     return binascii.unhexlify(key_env)
 
 

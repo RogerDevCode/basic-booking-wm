@@ -1,4 +1,5 @@
-from typing import Any, Literal, Optional, TypedDict
+from typing import Literal, TypedDict
+
 from pydantic import BaseModel, ConfigDict, Field
 
 """
@@ -32,50 +33,56 @@ ExtendedIntent = Literal[
     "ver_mis_citas",
 ]
 
+
 class OrchestratorInput(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
-    
-    tenant_id: Optional[str] = None
+
+    tenant_id: str | None = None
     intent: ExtendedIntent
-    entities: dict[str, Optional[str]] = Field(default_factory=dict)
-    client_id: Optional[str] = None
-    provider_id: Optional[str] = None
-    service_id: Optional[str] = None
-    booking_id: Optional[str] = None
-    date: Optional[str] = None
-    time: Optional[str] = None
-    notes: Optional[str] = None
+    entities: dict[str, str | None] = Field(default_factory=dict)
+    client_id: str | None = None
+    provider_id: str | None = None
+    service_id: str | None = None
+    booking_id: str | None = None
+    date: str | None = None
+    time: str | None = None
+    notes: str | None = None
     channel: Literal["telegram", "web", "api"] = "api"
-    telegram_chat_id: Optional[str] = None
-    telegram_name: Optional[str] = None
+    telegram_chat_id: str | None = None
+    telegram_name: str | None = None
+
 
 class OrchestratorResult(TypedDict, total=False):
     action: str
     success: bool
     data: object
     message: str
-    follow_up: Optional[str]
-    inline_buttons: Optional[list[list[dict[str, str]]]]
-    nextState: Optional[object]
-    nextDraft: Optional[object]
+    follow_up: str | None
+    inline_buttons: list[list[dict[str, str]]] | None
+    nextState: object | None
+    nextDraft: object | None
+
 
 class ResolvedContext(TypedDict):
     tenantId: str
-    clientId: Optional[str]
-    providerId: Optional[str]
-    serviceId: Optional[str]
-    date: Optional[str]
-    time: Optional[str]
+    clientId: str | None
+    providerId: str | None
+    serviceId: str | None
+    date: str | None
+    time: str | None
+
 
 class AvailabilitySlot(TypedDict):
     start: str
     available: bool
 
+
 class AvailabilityData(TypedDict, total=False):
     is_blocked: bool
-    block_reason: Optional[str]
+    block_reason: str | None
     total_available: int
     slots: list[AvailabilitySlot]
+
 
 class BookingRow(TypedDict):
     start_time: str

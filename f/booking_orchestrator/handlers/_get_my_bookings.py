@@ -1,9 +1,10 @@
-from typing import cast
 import zoneinfo
 from datetime import datetime
+from typing import cast
+
 from f.booking_orchestrator._orchestrator_models import OrchestratorInput, OrchestratorResult
 from f.internal._db_client import create_db_client
-from f.internal._result import with_tenant_context, Result, DBClient, ok, fail
+from f.internal._result import DBClient, Result, fail, ok, with_tenant_context
 
 """
 PRE-FLIGHT
@@ -16,22 +17,21 @@ RLS Tenant ID    : YES
 Zod Schemas      : NO
 """
 
-async def handle_get_my_bookings(
-    conn: DBClient,
-    input_data: OrchestratorInput
-) -> Result[OrchestratorResult]:
+
+async def handle_get_my_bookings(conn: DBClient, input_data: OrchestratorInput) -> Result[OrchestratorResult]:
     client_id = input_data.client_id
     tenant_id = input_data.tenant_id
-    
+
     if not client_id or not tenant_id:
         return fail("Falta identificación de paciente o establecimiento.")
 
     conn = await create_db_client()
     try:
+
         async def operation() -> Result[list[dict[str, object]]]:
             rows = await conn.fetch(
                 """
-                SELECT b.booking_id, b.status, b.start_time, p.name as provider_name, p.specialty, s.name as service_name
+                SELECT b.booking_id, b.status, b.start_time, p.name as provider_name, p.specialty, s.name as service_name  # noqa: E501
                 FROM bookings b
                 JOIN providers p ON p.provider_id = b.provider_id
                 JOIN services s ON s.service_id = b.service_id
@@ -39,10 +39,10 @@ async def handle_get_my_bookings(
                   AND b.status NOT IN ('cancelled', 'no_show', 'rescheduled')
                   AND b.start_time >= NOW()
                 ORDER BY b.start_time ASC LIMIT 10
-                """,
-                client_id
+                """,  # noqa: E501
+                client_id,
             )
-            return ok(cast(list[dict[str, object]], rows))
+            return ok(cast("list[dict[str, object]]", rows))
 
         err, rows = await with_tenant_context(conn, tenant_id, operation)
         if err or rows is None:
@@ -55,16 +55,16 @@ async def handle_get_my_bookings(
             st = r["start_time"]
             # Handle both datetime objects and ISO strings
             if isinstance(st, str):
-                # asyncpg usually returns datetime objects for TIMESTAMPTZ, 
+                # asyncpg usually returns datetime objects for TIMESTAMPTZ,
                 # but if it was somehow a string, parse it.
                 dt = datetime.fromisoformat(st.replace("Z", "+00:00")).astimezone(tz)
             elif isinstance(st, datetime):
                 dt = st.astimezone(tz)
             else:
                 continue
-            
-            provider_name = cast(str, r.get("provider_name", "Desconocido"))
-            service_name = cast(str, r.get("service_name", "Servicio"))
+
+            provider_name = cast("str", r.get("provider_name", "Desconocido"))
+            service_name = cast("str", r.get("service_name", "Servicio"))
             fmt_str = dt.strftime("%d/%m %H:%M")
             lines.append(f"• {fmt_str}hs - {provider_name}: {service_name}")
 
@@ -74,7 +74,7 @@ async def handle_get_my_bookings(
             "success": True,
             "data": rows,
             "message": f"📋 Tus próximas citas:\n{msg_body}" if lines else "📋 No tienes próximas citas.",
-            "follow_up": input_data.notes
+            "follow_up": input_data.notes,
         }
         return ok(res_data)
     finally:

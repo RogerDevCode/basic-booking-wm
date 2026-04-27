@@ -1,6 +1,7 @@
 import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
+
 import f.distributed_lock._lock_logic
+
 
 # This is an auto-generated test boilerplate for f.distributed_lock._lock_logic
 @pytest.mark.asyncio

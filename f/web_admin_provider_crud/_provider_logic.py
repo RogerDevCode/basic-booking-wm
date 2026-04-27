@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 from ..internal._result import DBClient, Result, fail, ok
-from ._provider_models import InputSchema, ProviderRow
+
+if TYPE_CHECKING:
+    from ._provider_models import InputSchema, ProviderRow
 
 
 def map_row_to_provider(row: object) -> ProviderRow:

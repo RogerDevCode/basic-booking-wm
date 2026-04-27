@@ -1,18 +1,22 @@
 from __future__ import annotations
-from typing import Optional, Any
-from pydantic import BaseModel, ConfigDict, Field
+
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict
+
 
 class ConversationUpdateInput(BaseModel):
     model_config = ConfigDict(strict=True)
-    
+
     chat_id: str
-    active_flow: Optional[str] = None
-    flow_step: Optional[int] = None
-    pending_data: Optional[dict[str, Any]] = None
-    booking_state: Optional[dict[str, Any]] = None
-    booking_draft: Optional[dict[str, Any]] = None
-    message_id: Optional[int] = None
+    active_flow: str | None = None
+    flow_step: int | None = None
+    pending_data: dict[str, Any] | None = None
+    booking_state: dict[str, Any] | None = None
+    booking_draft: dict[str, Any] | None = None
+    message_id: int | None = None
     clear: bool = False
+
 
 class ConversationUpdateResult(BaseModel):
     model_config = ConfigDict(strict=True)

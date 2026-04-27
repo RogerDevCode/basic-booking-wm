@@ -1,6 +1,5 @@
-import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
 import f.internal._date_resolver
+
 
 # This is an auto-generated test boilerplate for f.internal._date_resolver
 def test__date_resolver_basic_import() -> None:

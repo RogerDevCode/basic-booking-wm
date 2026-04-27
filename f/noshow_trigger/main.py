@@ -1,6 +1,5 @@
 from __future__ import annotations
-import asyncio
-import os
+
 # ============================================================================
 # PRE-FLIGHT CHECKLIST
 # Mission         : Mark expired confirmed bookings as no_show
@@ -11,15 +10,14 @@ import os
 # RLS Tenant ID   : YES — with_tenant_context per provider
 # Pydantic Schemas: YES — InputSchema validates parameters
 # ============================================================================
-
-from typing import Any, List
-from ..internal._wmill_adapter import log
 from ..internal._db_client import create_db_client
-from ..internal._result import Result, ok, fail, with_tenant_context
-from ._noshow_models import InputSchema, NoShowStats
+from ..internal._result import Result, fail, ok, with_tenant_context
+from ..internal._wmill_adapter import log
 from ._noshow_logic import BookingRepository
+from ._noshow_models import InputSchema, NoShowStats
 
 MODULE = "noshow_trigger"
+
 
 async def _main_async(args: dict[str, object]) -> Result[NoShowStats]:
     # 1. Validate Input
@@ -32,35 +30,36 @@ async def _main_async(args: dict[str, object]) -> Result[NoShowStats]:
     try:
         # 2. Fetch active providers
         provider_rows = await conn.fetch("SELECT provider_id FROM providers WHERE is_active = True")
-        
+
         aggregate: NoShowStats = {"processed": 0, "marked": 0, "skipped": 0, "booking_ids": []}
 
         for prow in provider_rows:
             p_id = str(prow["provider_id"])
-            
+
             async def provider_batch() -> Result[NoShowStats]:
                 repo = BookingRepository(conn)
                 err_fetch, ids = await repo.find_expired_confirmed(input_data.lookback_minutes)
-                if err_fetch: return fail(err_fetch)
+                if err_fetch:
+                    return fail(err_fetch)
                 if not ids:
                     res_empty: NoShowStats = {"processed": 0, "marked": 0, "skipped": 0, "booking_ids": []}
                     return ok(res_empty)
 
                 marked = 0
                 skipped = 0
-                processed_ids: List[str] = []
+                processed_ids: list[str] = []
 
                 for bid in ids:
                     if input_data.dry_run:
                         skipped += 1
                         processed_ids.append(bid)
                         continue
-                    
+
                     err_mark, _ = await repo.mark_as_no_show(bid)
                     if err_mark:
                         log(f"Failed to mark booking {bid} as no-show", error=str(err_mark), module=MODULE)
                         continue
-                    
+
                     marked += 1
                     processed_ids.append(bid)
 
@@ -68,7 +67,7 @@ async def _main_async(args: dict[str, object]) -> Result[NoShowStats]:
                     "processed": len(ids),
                     "marked": marked,
                     "skipped": skipped,
-                    "booking_ids": processed_ids
+                    "booking_ids": processed_ids,
                 }
                 return ok(res_batch)
 

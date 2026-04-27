@@ -1,6 +1,7 @@
 import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
+
 import f.health_check.main
+
 
 # This is an auto-generated test boilerplate for f.health_check.main
 @pytest.mark.asyncio

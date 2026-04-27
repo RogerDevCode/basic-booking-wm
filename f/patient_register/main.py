@@ -1,6 +1,5 @@
 from __future__ import annotations
-import asyncio
-import os
+
 # ============================================================================
 # PRE-FLIGHT CHECKLIST
 # Mission         : Create or update client records
@@ -11,15 +10,14 @@ import os
 # RLS Tenant ID   : YES — with_tenant_context wraps DB ops
 # Pydantic Schemas: YES — InputSchema validates name, email, phone
 # ============================================================================
-
-from typing import Any
-from ..internal._wmill_adapter import log
 from ..internal._db_client import create_db_client
-from ..internal._result import Result, ok, fail, with_tenant_context
-from ._patient_models import InputSchema, ClientResult
+from ..internal._result import Result, fail, with_tenant_context
+from ..internal._wmill_adapter import log
 from ._patient_logic import upsert_client
+from ._patient_models import ClientResult, InputSchema
 
 MODULE = "patient_register"
+
 
 async def _main_async(args: dict[str, object]) -> Result[ClientResult]:
     # 1. Validate Input

@@ -1,17 +1,19 @@
 from __future__ import annotations
-from datetime import datetime
-from typing import List, cast, Any
-from ..internal._result import DBClient
-from ._reminder_models import BookingRecord, ReminderWindow
+
+from typing import TYPE_CHECKING, cast
+
+if TYPE_CHECKING:
+    from datetime import datetime
+
+    from ..internal._result import DBClient
+    from ._reminder_models import BookingRecord, ReminderWindow
+
 
 async def get_bookings_for_window(
-    db: DBClient,
-    window: ReminderWindow,
-    start: datetime,
-    end: datetime
-) -> List[BookingRecord]:
+    db: DBClient, window: ReminderWindow, start: datetime, end: datetime
+) -> list[BookingRecord]:
     sent_column = f"reminder_{window}_sent"
-    
+
     rows = await db.fetch(
         f"""
         SELECT
@@ -35,15 +37,14 @@ async def get_bookings_for_window(
         ORDER BY b.start_time ASC
         LIMIT 100
         """,
-        start, end
+        start,
+        end,
     )
-    
+
     # Cast rows to dict[str, object] then to BookingRecord to satisfy mypy --strict
-    return [cast(BookingRecord, dict(r)) for r in rows]
+    return [cast("BookingRecord", dict(r)) for r in rows]
+
 
 async def mark_reminder_sent(db: DBClient, booking_id: str, window: ReminderWindow) -> None:
     column = f"reminder_{window}_sent"
-    await db.execute(
-        f"UPDATE bookings SET {column} = true, updated_at = NOW() WHERE booking_id = $1::uuid",
-        booking_id
-    )
+    await db.execute(f"UPDATE bookings SET {column} = true, updated_at = NOW() WHERE booking_id = $1::uuid", booking_id)

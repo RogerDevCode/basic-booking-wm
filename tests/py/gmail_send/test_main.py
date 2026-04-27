@@ -1,6 +1,7 @@
 import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
+
 import f.gmail_send.main
+
 
 # This is an auto-generated test boilerplate for f.gmail_send.main
 @pytest.mark.asyncio

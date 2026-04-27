@@ -1,6 +1,7 @@
 import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
+
 import f.circuit_breaker._circuit_logic
+
 
 # This is an auto-generated test boilerplate for f.circuit_breaker._circuit_logic
 @pytest.mark.asyncio

@@ -1,14 +1,13 @@
-from datetime import timedelta, datetime
+from datetime import datetime, timedelta
 from typing import cast
-from ..internal._result import Result, ok, fail
+
+from ..internal._result import Result, fail, ok
 from ..internal._state_machine import validate_transition
-from ._booking_create_models import InputSchema, BookingCreated, BookingContext
+from ._booking_create_models import BookingContext, BookingCreated, InputSchema
 from ._booking_create_repository import BookingCreateRepository
 
-async def fetch_booking_context(
-    repo: BookingCreateRepository,
-    input_data: InputSchema
-) -> Result[BookingContext]:
+
+async def fetch_booking_context(repo: BookingCreateRepository, input_data: InputSchema) -> Result[BookingContext]:
     client_ctx = await repo.get_client_context(input_data.client_id)
     if not client_ctx:
         return fail(Exception(f"Client {input_data.client_id} not found"))
@@ -21,19 +20,14 @@ async def fetch_booking_context(
     if not service_ctx:
         return fail(Exception(f"Service {input_data.service_id} not found or inactive for this provider"))
 
-    return ok(cast(BookingContext, {
-        "client": client_ctx,
-        "provider": provider_ctx,
-        "service": service_ctx
-    }))
+    return ok(cast("BookingContext", {"client": client_ctx, "provider": provider_ctx, "service": service_ctx}))
+
 
 async def check_availability(
-    repo: BookingCreateRepository,
-    input_data: InputSchema,
-    end_time: datetime
+    repo: BookingCreateRepository, input_data: InputSchema, end_time: datetime
 ) -> Result[None]:
     target_date = input_data.start_time.date()
-    
+
     is_blocked = await repo.is_provider_blocked(input_data.provider_id, target_date)
     if is_blocked:
         return fail(Exception(f"Provider unavailable on {target_date}"))
@@ -48,23 +42,17 @@ async def check_availability(
     if not is_scheduled:
         return fail(Exception(f"Provider not available on day {day_of_week}"))
 
-    has_overlap = await repo.has_overlapping_booking(
-        input_data.provider_id, 
-        input_data.start_time, 
-        end_time
-    )
+    has_overlap = await repo.has_overlapping_booking(input_data.provider_id, input_data.start_time, end_time)
     if has_overlap:
         return fail(Exception("This time slot is already booked"))
 
     return ok(None)
 
+
 async def persist_booking(
-    repo: BookingCreateRepository,
-    input_data: InputSchema,
-    context: BookingContext,
-    end_time: datetime
+    repo: BookingCreateRepository, input_data: InputSchema, context: BookingContext, end_time: datetime
 ) -> Result[BookingCreated]:
-    
+
     err, _ = validate_transition("pending", "confirmed")
     if err is not None:
         return fail(err)
@@ -76,17 +64,15 @@ async def persist_booking(
             "confirmed",
             provider_name=context["provider"]["name"],
             service_name=context["service"]["name"],
-            client_name=context["client"]["name"]
+            client_name=context["client"]["name"],
         )
         return ok(booking)
     except Exception as e:
         return fail(e)
 
-async def execute_create_booking(
-    repo: BookingCreateRepository,
-    input_data: InputSchema
-) -> Result[BookingCreated]:
-    
+
+async def execute_create_booking(repo: BookingCreateRepository, input_data: InputSchema) -> Result[BookingCreated]:
+
     err_ctx, context = await fetch_booking_context(repo, input_data)
     if err_ctx is not None or context is None:
         return fail(err_ctx or Exception("Failed to load booking context"))

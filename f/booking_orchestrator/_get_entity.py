@@ -1,5 +1,3 @@
-from typing import Optional
-
 """
 PRE-FLIGHT
 Mission          : Simple entity extractor helper.
@@ -11,6 +9,7 @@ RLS Tenant ID    : NO
 Zod Schemas      : NO
 """
 
-def get_entity(entities: dict[str, Optional[str]], key: str) -> Optional[str]:
+
+def get_entity(entities: dict[str, str | None], key: str) -> str | None:
     """Extracts a value from the entities dictionary, returning None if not found."""
     return entities.get(key)

@@ -1,5 +1,4 @@
-from typing import Any
-from typing import Literal, get_args
+from typing import Literal
 
 # ============================================================================
 # STATE MACHINE — Booking Status Transition Validator
@@ -8,15 +7,7 @@ from typing import Literal, get_args
 # Single source of truth for booking status transitions.
 # ============================================================================
 
-BookingStatus = Literal[
-    'pending',
-    'confirmed',
-    'in_service',
-    'completed',
-    'cancelled',
-    'no_show',
-    'rescheduled'
-]
+BookingStatus = Literal["pending", "confirmed", "in_service", "completed", "cancelled", "no_show", "rescheduled"]
 
 # ============================================================================
 # VALID_TRANSITIONS — Authoritative transition map (AGENTS.md §5.2)
@@ -24,14 +15,15 @@ BookingStatus = Literal[
 # Any mutation outside this matrix is a catastrophic bug.
 # ============================================================================
 VALID_TRANSITIONS: dict[BookingStatus, list[BookingStatus]] = {
-    'pending': ['confirmed', 'cancelled', 'rescheduled'],
-    'confirmed': ['in_service', 'cancelled', 'rescheduled', 'no_show'],
-    'in_service': ['completed', 'no_show'],
-    'completed': [],
-    'cancelled': [],
-    'no_show': [],
-    'rescheduled': [],
+    "pending": ["confirmed", "cancelled", "rescheduled"],
+    "confirmed": ["in_service", "cancelled", "rescheduled", "no_show"],
+    "in_service": ["completed", "no_show"],
+    "completed": [],
+    "cancelled": [],
+    "no_show": [],
+    "rescheduled": [],
 }
+
 
 # ============================================================================
 # validate_transition — Go-style error tuple return

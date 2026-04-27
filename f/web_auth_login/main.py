@@ -1,4 +1,5 @@
 import asyncio
+
 # ============================================================================
 # PRE-FLIGHT CHECKLIST
 # Mission         : Authenticate email+password, return session + role
@@ -9,15 +10,16 @@ import asyncio
 # RLS Tenant ID   : YES — with_admin_context bypasses RLS for user discovery
 # Pydantic Schemas: YES — InputSchema validates email and password
 # ============================================================================
+from typing import Any
 
-from typing import Any, cast
-from ..internal._wmill_adapter import log
 from ..internal._db_client import create_db_client
-from ..internal._result import with_admin_context, Result, ok, fail
-from ._login_models import InputSchema, LoginResult, UserRow
+from ..internal._result import Result, fail, ok, with_admin_context
+from ..internal._wmill_adapter import log
 from ._login_logic import verify_password_sync
+from ._login_models import InputSchema, LoginResult, UserRow
 
 MODULE = "web_auth_login"
+
 
 async def _main_async(args: dict[str, Any]) -> Result[LoginResult]:
     # 1. Validate Input
@@ -40,7 +42,7 @@ async def _main_async(args: dict[str, Any]) -> Result[LoginResult]:
                 WHERE email = $1
                 LIMIT 1
                 """,
-                input_data.email
+                input_data.email,
             )
 
             if not rows:
@@ -62,25 +64,24 @@ async def _main_async(args: dict[str, Any]) -> Result[LoginResult]:
                 return fail("Account is disabled. Contact support.")
 
             # Verify password
-            if not user["password_hash"] or user["password_hash"] == 'null':
+            if not user["password_hash"] or user["password_hash"] == "null":
                 return fail("Invalid email or password")
 
             if not verify_password_sync(input_data.password, user["password_hash"]):
                 return fail("Invalid email or password")
 
             # Success: Update last login
-            await conn.execute(
-                "UPDATE users SET last_login = NOW() WHERE user_id = $1::uuid",
-                user["user_id"]
-            )
+            await conn.execute("UPDATE users SET last_login = NOW() WHERE user_id = $1::uuid", user["user_id"])
 
-            return ok({
-                "user_id": user["user_id"],
-                "email": user["email"],
-                "full_name": user["full_name"],
-                "role": user["role"],
-                "profile_complete": user["profile_complete"],
-            })
+            return ok(
+                {
+                    "user_id": user["user_id"],
+                    "email": user["email"],
+                    "full_name": user["full_name"],
+                    "role": user["role"],
+                    "profile_complete": user["profile_complete"],
+                }
+            )
 
         return await with_admin_context(conn, operation)
 
@@ -88,11 +89,12 @@ async def _main_async(args: dict[str, Any]) -> Result[LoginResult]:
         log("Internal error in login", error=str(e), module=MODULE)
         return fail(f"Internal error: {e}")
     finally:
-        await conn.close() # pyright: ignore[reportUnknownMemberType]
+        await conn.close()  # pyright: ignore[reportUnknownMemberType]
 
 
 def main(args: dict) -> None:
     import traceback
+
     try:
         return asyncio.run(_main_async(args))
     except Exception as e:
@@ -100,11 +102,18 @@ def main(args: dict) -> None:
         # Intentamos usar el adaptador local si está disponible, si no print
         try:
             from ..internal._wmill_adapter import log
-            log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=os.path.basename(os.path.dirname(__file__)))
-        except:
+
+            log(
+                "CRITICAL_ENTRYPOINT_ERROR",
+                error=str(e),
+                traceback=tb,
+                module=MODULE,
+            )
+        except Exception:
             from ..internal._wmill_adapter import log
+
             log("BARE_EXCEPT_CAUGHT", file="main.py")
             print(f"CRITICAL ERROR in {__file__}: {e}\n{tb}")
-        
+
         # Elevamos para que Windmill marque como FAILED
-        raise RuntimeError(f"Execution failed: {e}")
+        raise RuntimeError(f"Execution failed: {e}") from e

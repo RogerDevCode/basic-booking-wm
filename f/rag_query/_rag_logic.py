@@ -1,13 +1,18 @@
 from __future__ import annotations
-from typing import List, Optional, cast, Dict, Any, TypedDict
-from ..internal._result import Result, DBClient, ok, fail
-from ._rag_models import KBRow, KBEntry
+
+from typing import TYPE_CHECKING, TypedDict
+
+from ..internal._result import DBClient, Result, fail, ok
+
+if TYPE_CHECKING:
+    from ._rag_models import KBEntry, KBRow
+
 
 class KBRepository:
     def __init__(self, db: DBClient) -> None:
         self.db = db
 
-    async def fetch_active_entries(self, category: Optional[str] = None) -> Result[List[KBRow]]:
+    async def fetch_active_entries(self, category: str | None = None) -> Result[list[KBRow]]:
         try:
             if category:
                 rows = await self.db.fetch(
@@ -16,7 +21,7 @@ class KBRepository:
                     FROM knowledge_base
                     WHERE category = $1 AND is_active = true
                     """,
-                    category
+                    category,
                 )
             else:
                 rows = await self.db.fetch(
@@ -26,14 +31,14 @@ class KBRepository:
                     WHERE is_active = true
                     """
                 )
-            
+
             # Map asyncpg rows to TypedDict
-            result: List[KBRow] = [
+            result: list[KBRow] = [
                 {
                     "kb_id": str(r["kb_id"]),
                     "category": str(r["category"]),
                     "title": str(r["title"]),
-                    "content": str(r["content"])
+                    "content": str(r["content"]),
                 }
                 for r in rows
             ]
@@ -41,31 +46,32 @@ class KBRepository:
         except Exception as e:
             return fail(f"kb_fetch_failed: {e}")
 
+
 class ScoredEntry(TypedDict):
     entry: KBEntry
     score: int
 
-def perform_keyword_search(
-    query: str,
-    entries: List[KBRow],
-    top_k: int
-) -> List[KBEntry]:
+
+def perform_keyword_search(query: str, entries: list[KBRow], top_k: int) -> list[KBEntry]:
     terms = [t for t in query.lower().split() if len(t) > 2]
     if not terms:
         return []
 
-    scored_entries: List[ScoredEntry] = []
+    scored_entries: list[ScoredEntry] = []
     for row in entries:
         title = row["title"].lower()
         content = row["content"].lower()
         category = row["category"].lower()
-        
+
         score = 0
         for term in terms:
-            if term in title: score += 3
-            if term in content: score += 1
-            if term in category: score += 2
-        
+            if term in title:
+                score += 3
+            if term in content:
+                score += 1
+            if term in category:
+                score += 2
+
         if score > 0:
             similarity = float(min(score / (len(terms) * 3), 1.0))
             entry: KBEntry = {
@@ -73,12 +79,9 @@ def perform_keyword_search(
                 "category": row["category"],
                 "title": row["title"],
                 "content": row["content"],
-                "similarity": similarity
+                "similarity": similarity,
             }
-            scored_entries.append({
-                "entry": entry,
-                "score": score
-            })
+            scored_entries.append({"entry": entry, "score": score})
 
     # Sort and slice
     scored_entries.sort(key=lambda x: x["score"], reverse=True)

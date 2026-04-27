@@ -1,12 +1,11 @@
 from __future__ import annotations
-import asyncio
-from typing import Any
-from ..internal._wmill_adapter import log
+
 from ..internal._db_client import create_db_client
-from ..internal._result import with_tenant_context, Result
+from ..internal._result import Result, with_tenant_context
+from ..internal._wmill_adapter import log
 from ..internal.scheduling_engine import get_availability
-from ._availability_models import InputSchema, AvailabilityResult
 from ._availability_logic import get_provider, get_provider_service_id
+from ._availability_models import AvailabilityResult, InputSchema
 
 # ============================================================================
 # PRE-FLIGHT CHECKLIST
@@ -21,6 +20,7 @@ from ._availability_logic import get_provider, get_provider_service_id
 
 MODULE = "availability_check"
 
+
 async def main_async(args: dict[str, object]) -> Result[AvailabilityResult]:
     try:
         input_data = InputSchema.model_validate(args)
@@ -29,6 +29,7 @@ async def main_async(args: dict[str, object]) -> Result[AvailabilityResult]:
 
     conn = await create_db_client()
     try:
+
         async def operation() -> Result[AvailabilityResult]:
             provider = await get_provider(conn, input_data.provider_id)
             if not provider:
@@ -38,11 +39,14 @@ async def main_async(args: dict[str, object]) -> Result[AvailabilityResult]:
             if not effective_service_id:
                 return Exception("No services available for this provider"), None
 
-            sched_err, sched_result = await get_availability(conn, {
-                "provider_id": input_data.provider_id,
-                "date": input_data.date,
-                "service_id": effective_service_id,
-            })
+            sched_err, sched_result = await get_availability(
+                conn,
+                {
+                    "provider_id": input_data.provider_id,
+                    "date": input_data.date,
+                    "service_id": effective_service_id,
+                },
+            )
 
             if sched_err:
                 return sched_err, None

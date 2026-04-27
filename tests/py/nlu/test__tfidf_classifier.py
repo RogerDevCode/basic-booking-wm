@@ -1,6 +1,5 @@
-import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
 import f.nlu._tfidf_classifier
+
 
 # This is an auto-generated test boilerplate for f.nlu._tfidf_classifier
 def test__tfidf_classifier_basic_import() -> None:

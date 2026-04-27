@@ -1,8 +1,8 @@
-from typing import Any
-from datetime import datetime, timezone
-from typing import List, Optional, Dict, Any, cast
-from ..internal._result import Result, DBClient, ok, fail
-from ._provider_dashboard_models import DashboardResult, AgendaItem, ProviderStats, InputSchema
+from datetime import UTC, datetime
+
+from ..internal._result import DBClient, Result, fail, ok
+from ._provider_dashboard_models import AgendaItem, DashboardResult, InputSchema, ProviderStats
+
 
 async def fetch_provider_dashboard(db: DBClient, input_data: InputSchema) -> Result[DashboardResult]:
     try:
@@ -15,20 +15,20 @@ async def fetch_provider_dashboard(db: DBClient, input_data: InputSchema) -> Res
                OR p.email = (SELECT email FROM users WHERE user_id = $1::uuid LIMIT 1)
             LIMIT 1
             """,
-            input_data.provider_user_id
+            input_data.provider_user_id,
         )
 
         if not provider_rows:
             return fail("Provider record not found")
-        
+
         p = provider_rows[0]
         p_id = str(p["provider_id"])
         p_name = str(p["name"])
         p_spec = str(p["specialty"])
 
         # 2. Fetch Agenda
-        target_date = input_data.date or datetime.now(timezone.utc).date().isoformat()
-        
+        target_date = input_data.date or datetime.now(UTC).date().isoformat()
+
         agenda_rows = await db.fetch(
             """
             SELECT b.booking_id, b.start_time, b.end_time, b.status,
@@ -42,20 +42,27 @@ async def fetch_provider_dashboard(db: DBClient, input_data: InputSchema) -> Res
               AND b.status NOT IN ('cancelled', 'rescheduled')
             ORDER BY b.start_time ASC
             """,
-            p_id, target_date
+            p_id,
+            target_date,
         )
 
-        agenda: List[AgendaItem] = []
+        agenda: list[AgendaItem] = []
         for r in agenda_rows:
-            agenda.append({
-                "booking_id": str(r["booking_id"]),
-                "client_name": str(r["client_name"]),
-                "client_email": None,
-                "service_name": str(r["service_name"]),
-                "start_time": r["start_time"].isoformat() if isinstance(r["start_time"], datetime) else str(r["start_time"]),
-                "end_time": r["end_time"].isoformat() if isinstance(r["end_time"], datetime) else str(r["end_time"]),
-                "status": str(r["status"]),
-            })
+            agenda.append(
+                {
+                    "booking_id": str(r["booking_id"]),
+                    "client_name": str(r["client_name"]),
+                    "client_email": None,
+                    "service_name": str(r["service_name"]),
+                    "start_time": r["start_time"].isoformat()
+                    if isinstance(r["start_time"], datetime)
+                    else str(r["start_time"]),
+                    "end_time": r["end_time"].isoformat()
+                    if isinstance(r["end_time"], datetime)
+                    else str(r["end_time"]),
+                    "status": str(r["status"]),
+                }
+            )
 
         # 3. Monthly Stats
         stats_rows = await db.fetch(
@@ -68,9 +75,9 @@ async def fetch_provider_dashboard(db: DBClient, input_data: InputSchema) -> Res
             WHERE provider_id = $1::uuid
               AND DATE_TRUNC('month', start_time) = DATE_TRUNC('month', CURRENT_DATE)
             """,
-            p_id
+            p_id,
         )
-        
+
         comp = 0
         ns = 0
         total = 0
@@ -87,16 +94,10 @@ async def fetch_provider_dashboard(db: DBClient, input_data: InputSchema) -> Res
             "month_total": total,
             "month_completed": comp,
             "month_no_show": ns,
-            "attendance_rate": rate
+            "attendance_rate": rate,
         }
 
-        return ok({
-            "provider_id": p_id,
-            "provider_name": p_name,
-            "specialty": p_spec,
-            "agenda": agenda,
-            "stats": stats
-        })
+        return ok({"provider_id": p_id, "provider_name": p_name, "specialty": p_spec, "agenda": agenda, "stats": stats})
 
     except Exception as e:
         return fail(f"dashboard_failed: {e}")

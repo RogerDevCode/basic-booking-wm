@@ -1,26 +1,30 @@
-from typing import Any
-from typing import Optional, List, Literal, TypedDict, Dict, Any
-from pydantic import BaseModel, ConfigDict, Field
+from typing import Any, TypedDict
+
+from pydantic import BaseModel, ConfigDict
+
 
 class ModelCandidate(TypedDict):
     id: str
     name: str
+
 
 class NLUIntent(BaseModel):
     intent: str
     confidence: float
     requires_human: bool
 
+
 class ModelTestResult(TypedDict):
     model: str
     taskId: str
     success: bool
-    rawResponse: Optional[str]
-    parsed: Optional[Dict[str, Any]]
-    error: Optional[str]
-    correct: Optional[bool]
+    rawResponse: str | None
+    parsed: dict[str, Any] | None
+    error: str | None
+    correct: bool | None
     latencyMs: int
-    totalTokens: Optional[int]
+    totalTokens: int | None
+
 
 class ModelSummary(TypedDict):
     model: str
@@ -29,12 +33,14 @@ class ModelSummary(TypedDict):
     failed: int
     correct: int
     avgLatencyMs: int
-    results: List[ModelTestResult]
+    results: list[ModelTestResult]
+
 
 class BenchmarkReport(TypedDict):
     timestamp: str
     modelsTested: int
-    summaries: List[ModelSummary]
+    summaries: list[ModelSummary]
+
 
 class TaskPrompt(TypedDict):
     name: str
@@ -42,21 +48,25 @@ class TaskPrompt(TypedDict):
     expectedIntent: str
     expectedHuman: bool
 
+
 class OpenRouterUsage(BaseModel):
     prompt_tokens: int = 0
     completion_tokens: int = 0
     total_tokens: int = 0
 
+
 class OpenRouterChoiceMessage(BaseModel):
     content: str
-    role: Optional[str] = None
+    role: str | None = None
+
 
 class OpenRouterChoice(BaseModel):
     message: OpenRouterChoiceMessage
-    finish_reason: Optional[str] = None
+    finish_reason: str | None = None
+
 
 class OpenRouterResponse(BaseModel):
     model_config = ConfigDict(strict=True, extra="ignore")
-    id: Optional[str] = None
-    choices: List[OpenRouterChoice]
-    usage: Optional[OpenRouterUsage] = None
+    id: str | None = None
+    choices: list[OpenRouterChoice]
+    usage: OpenRouterUsage | None = None

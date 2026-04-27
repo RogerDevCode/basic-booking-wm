@@ -1,6 +1,7 @@
 import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
+
 import f.telegram_callback._callback_logic
+
 
 # This is an auto-generated test boilerplate for f.telegram_callback._callback_logic
 @pytest.mark.asyncio

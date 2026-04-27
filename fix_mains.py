@@ -2,22 +2,45 @@ import os
 import re
 
 modules = [
-    "auth_provider", "availability_check", "booking_cancel", "booking_create",
-    "booking_orchestrator", "booking_reschedule", "booking_search", "booking_wizard",
-    "circuit_breaker", "conversation_logger", "distributed_lock", "dlq_processor",
-    "gcal_reconcile", "gcal_sync", "gmail_send", "health_check", "nlu",
-    "noshow_trigger", "patient_register", "provider_agenda", "provider_manage",
-    "rag_query", "reminder_config", "reminder_cron", "telegram_auto_register",
-    "telegram_callback", "telegram_gateway", "telegram_menu", "telegram_send",
-    "web_admin_dashboard"
+    "auth_provider",
+    "availability_check",
+    "booking_cancel",
+    "booking_create",
+    "booking_orchestrator",
+    "booking_reschedule",
+    "booking_search",
+    "booking_wizard",
+    "circuit_breaker",
+    "conversation_logger",
+    "distributed_lock",
+    "dlq_processor",
+    "gcal_reconcile",
+    "gcal_sync",
+    "gmail_send",
+    "health_check",
+    "nlu",
+    "noshow_trigger",
+    "patient_register",
+    "provider_agenda",
+    "provider_manage",
+    "rag_query",
+    "reminder_config",
+    "reminder_cron",
+    "telegram_auto_register",
+    "telegram_callback",
+    "telegram_gateway",
+    "telegram_menu",
+    "telegram_send",
+    "web_admin_dashboard",
 ]
 
-def fix_main(file_path):
+
+def fix_main(file_path: str) -> None:
     if not os.path.exists(file_path):
         print(f"File not found: {file_path}")
         return
 
-    with open(file_path, "r") as f:
+    with open(file_path) as f:
         content = f.read()
 
     # Find the async main function name
@@ -36,12 +59,18 @@ def fix_main(file_path):
         return_type = f"Result[{match_async.group(2)}]"
 
     # Pattern for the sync main function
-    sync_main_pattern = re.compile(r"def main\(args: dict\[str, object\]\) -> (?:.+) | None:\n    import traceback\n    try:\n        err, result = asyncio\.run\(([a-zA-Z0-9_]+)\(args\)\)\n        if err:\n            raise err\n        return result\n    except Exception as e:[\s\S]+?raise RuntimeError\(f\"Execution failed: \{e\}\"\) from e", re.MULTILINE)
-    
-    # Simpler pattern for sync main to be more robust
-    sync_main_pattern_simple = re.compile(r"def main\(args: dict\[str, object\]\)[^:]*:\n    import traceback\n    try:\n        err, result = asyncio\.run\(([a-zA-Z0-9_]+)\(args\)\)[\s\S]+?raise RuntimeError\(f\"Execution failed: \{e\}\"\)", re.MULTILINE)
+    re.compile(
+        r"def main\(args: dict\[str, object\]\) -> (?:.+) | None:\n    import traceback\n    try:\n        err, result = asyncio\.run\(([a-zA-Z0-9_]+)\(args\)\)\n        if err:\n            raise err\n        return result\n    except Exception as e:[\s\S]+?raise RuntimeError\(f\"Execution failed: \{e\}\"\) from e",  # noqa: E501
+        re.MULTILINE,
+    )
 
-    new_main = f"async def main(args: dict[str, object]) -> {return_type}:\n    \"\"\"Windmill entrypoint.\"\"\"\n    return await {async_name}(args)"
+    # Simpler pattern for sync main to be more robust
+    sync_main_pattern_simple = re.compile(
+        r"def main\(args: dict\[str, object\]\)[^:]*:\n    import traceback\n    try:\n        err, result = asyncio\.run\(([a-zA-Z0-9_]+)\(args\)\)[\s\S]+?raise RuntimeError\(f\"Execution failed: \{e\}\"\)",  # noqa: E501
+        re.MULTILINE,
+    )
+
+    new_main = f'async def main(args: dict[str, object]) -> {return_type}:\n    """Windmill entrypoint."""\n    return await {async_name}(args)'  # noqa: E501
 
     if sync_main_pattern_simple.search(content):
         new_content = sync_main_pattern_simple.sub(new_main, content)
@@ -50,6 +79,7 @@ def fix_main(file_path):
         print(f"Fixed {file_path}")
     else:
         print(f"Could not find sync main pattern in {file_path}")
+
 
 for mod in modules:
     fix_main(f"f/{mod}/main.py")

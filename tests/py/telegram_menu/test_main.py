@@ -1,6 +1,7 @@
 import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
+
 import f.telegram_menu.main
+
 
 # This is an auto-generated test boilerplate for f.telegram_menu.main
 @pytest.mark.asyncio

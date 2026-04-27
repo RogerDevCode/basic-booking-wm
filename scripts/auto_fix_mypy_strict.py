@@ -4,20 +4,15 @@ Automated mypy strict error fixer.
 Applies common patterns to reduce type errors in bulk.
 """
 
-import re
 import os
+import re
 import subprocess
-from pathlib import Path
-from typing import Pattern
 
 
 def run_mypy() -> tuple[int, str]:
     """Run mypy and return error count + output."""
     result = subprocess.run(
-        ["uv", "run", "mypy", "f/", "--strict", "--no-error-summary"],
-        capture_output=True,
-        text=True,
-        timeout=120
+        ["uv", "run", "mypy", "f/", "--strict", "--no-error-summary"], capture_output=True, text=True, timeout=120
     )
     output = result.stdout + result.stderr
     error_count = output.count(" error:")
@@ -26,7 +21,7 @@ def run_mypy() -> tuple[int, str]:
 
 def fix_missing_imports(file_path: str) -> int:
     """Add missing imports like Literal, TypedDict, etc."""
-    with open(file_path, "r") as f:
+    with open(file_path) as f:
         content = f.read()
 
     fixes = 0
@@ -38,7 +33,7 @@ def fix_missing_imports(file_path: str) -> int:
                 r"(from typing import [^\n]*)",
                 lambda m: m.group(1) if "Literal" in m.group(1) else m.group(1).rstrip(")") + ", Literal)",
                 content,
-                count=1
+                count=1,
             )
             fixes += 1
 
@@ -49,7 +44,7 @@ def fix_missing_imports(file_path: str) -> int:
                 r"(from typing import [^\n]*)",
                 lambda m: m.group(1) if "TypedDict" in m.group(1) else m.group(1).rstrip(")") + ", TypedDict)",
                 content,
-                count=1
+                count=1,
             )
             fixes += 1
 
@@ -62,7 +57,7 @@ def fix_missing_imports(file_path: str) -> int:
 
 def fix_dict_annotations(file_path: str) -> int:
     """Fix bare 'dict' without type parameters."""
-    with open(file_path, "r") as f:
+    with open(file_path) as f:
         content = f.read()
 
     original = content
@@ -86,13 +81,13 @@ def fix_dict_annotations(file_path: str) -> int:
 
 def fix_any_propagation(file_path: str) -> int:
     """Add type: ignore on lines with Any propagation (last resort)."""
-    with open(file_path, "r") as f:
+    with open(file_path) as f:
         lines = f.readlines()
 
     fixed = False
     for i, line in enumerate(lines):
         if "# type: ignore" not in line:
-            if "Expression type contains \"Any\"" in line or "has type \"Any\"" in line:
+            if 'Expression type contains "Any"' in line or 'has type "Any"' in line:
                 # Mark this line as needing ignore
                 lines[i] = line.rstrip() + "  # type: ignore[misc]\n"
                 fixed = True
@@ -105,7 +100,7 @@ def fix_any_propagation(file_path: str) -> int:
     return 0
 
 
-def main():
+def main() -> None:
     """Auto-fix common mypy errors."""
     print("🔍 Running mypy scan...")
     error_count, output = run_mypy()

@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import os
-from typing import Protocol, cast
+from typing import TYPE_CHECKING, Protocol, cast
 
 from returns.result import Success
 
-from ._result import DBClient
 from ._wmill_adapter import get_variable_safe
+
+if TYPE_CHECKING:
+    from ._result import DBClient
 
 
 class _AsyncpgConn(Protocol):

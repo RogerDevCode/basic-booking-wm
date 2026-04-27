@@ -1,6 +1,5 @@
 from __future__ import annotations
-import asyncio
-import os
+
 # ============================================================================
 # PRE-FLIGHT CHECKLIST
 # Mission         : Advisory lock for race condition prevention
@@ -11,15 +10,14 @@ import os
 # RLS Tenant ID   : YES — provider_id used for all queries
 # Pydantic Schemas: YES — InputSchema validates action and key
 # ============================================================================
-
-from typing import Any, cast
-from ..internal._wmill_adapter import log
 from ..internal._db_client import create_db_client
-from ..internal._result import with_tenant_context, Result, ok, fail
+from ..internal._result import Result, fail, with_tenant_context
+from ..internal._wmill_adapter import log
+from ._lock_logic import acquire_lock, check_lock, cleanup_locks, release_lock
 from ._lock_models import InputSchema, LockResult
-from ._lock_logic import acquire_lock, release_lock, check_lock, cleanup_locks
 
 MODULE = "distributed_lock"
+
 
 async def _main_async(args: dict[str, object]) -> Result[LockResult]:
     # 1. Validate Input
@@ -33,15 +31,15 @@ async def _main_async(args: dict[str, object]) -> Result[LockResult]:
     try:
         # 2. Execute within Tenant Context
         async def operation() -> Result[LockResult]:
-            if input_data.action == 'acquire':
+            if input_data.action == "acquire":
                 return await acquire_lock(conn, input_data)
-            elif input_data.action == 'release':
+            elif input_data.action == "release":
                 return await release_lock(conn, input_data)
-            elif input_data.action == 'check':
+            elif input_data.action == "check":
                 return await check_lock(conn, input_data.lock_key)
-            elif input_data.action == 'cleanup':
+            elif input_data.action == "cleanup":
                 return await cleanup_locks(conn)
-            
+
             return fail(f"unsupported_action: {input_data.action}")
 
         return await with_tenant_context(conn, input_data.provider_id, operation)

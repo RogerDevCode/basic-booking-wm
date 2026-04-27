@@ -1,6 +1,9 @@
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
+
 from f.telegram_send.main import main
+
 
 @pytest.mark.asyncio
 async def test_telegram_send_success() -> None:
@@ -14,17 +17,14 @@ async def test_telegram_send_success() -> None:
             mock_res.status_code = 200
             mock_client.post.return_value = mock_res
 
-            args = {
-                "chat_id": "123456",
-                "text": "Hello world",
-                "mode": "send_message"
-            }
+            args = {"chat_id": "123456", "text": "Hello world", "mode": "send_message"}
 
             # main returns result or raises
-            result = await main(args['mode'], args['chat_id'], args['text'])
+            result = await main(args["mode"], args["chat_id"], args["text"])
             assert result is not None
             assert result.sent is True
             assert result.message_id == 12345
+
 
 @pytest.mark.asyncio
 async def test_telegram_send_invalid_input() -> None:

@@ -14,13 +14,13 @@ def map_row(r: dict[str, object]) -> HonorificRow:
     """Maps a database row to a HonorificRow TypedDict."""
     val = r.get("created_at")
     created_at_str = val.isoformat() if isinstance(val, datetime) else str(val)
-    
+
     return {
         "honorific_id": str(r["honorific_id"]),
         "code": str(r["code"]),
         "label": str(r["label"]),
         "gender": str(r["gender"]) if r.get("gender") else None,
-        "sort_order": int(cast(int, r["sort_order"])),
+        "sort_order": int(cast("int", r["sort_order"])),
         "is_active": bool(r["is_active"]),
         "created_at": created_at_str,
     }

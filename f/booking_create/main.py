@@ -1,5 +1,5 @@
 from __future__ import annotations
-import asyncio
+
 # ============================================================================
 # PRE-FLIGHT CHECKLIST
 # Mission         : Create a new medical appointment (SOLID Refactor)
@@ -10,16 +10,17 @@ import asyncio
 # RLS Tenant ID   : YES — with_tenant_context wraps all DB ops
 # Zod Schemas     : YES — InputSchema validates all inputs
 # ============================================================================
-
 from pydantic import ValidationError
-from ..internal._wmill_adapter import log
+
 from ..internal._db_client import create_db_client
-from ..internal._result import with_tenant_context, Result
-from ._booking_create_models import InputSchema, BookingCreated
+from ..internal._result import Result, with_tenant_context
+from ..internal._wmill_adapter import log
+from ._booking_create_models import BookingCreated, InputSchema
 from ._booking_create_repository import PostgresBookingCreateRepository
 from ._create_booking_logic import execute_create_booking
 
 MODULE = "booking_create"
+
 
 async def main_async(args: dict[str, object]) -> Result[BookingCreated]:
     try:
@@ -38,12 +39,12 @@ async def main_async(args: dict[str, object]) -> Result[BookingCreated]:
 
     try:
         repo = PostgresBookingCreateRepository(conn)
-        
+
         async def operation() -> Result[BookingCreated]:
             return await execute_create_booking(repo, input_data)
-        
+
         err, result = await with_tenant_context(conn, input_data.provider_id, operation)
-        
+
         if err is not None:
             msg = str(err)
             log("Transaction failed", error=msg, idempotency_key=input_data.idempotency_key, module=MODULE)
@@ -56,7 +57,7 @@ async def main_async(args: dict[str, object]) -> Result[BookingCreated]:
         if not result:
             log("Transaction succeeded but no result returned", module=MODULE)
             return Exception("Booking creation failed: no result"), None
-            
+
         log("Booking creation complete", booking_id=str(result["booking_id"]), module=MODULE)
         return None, result
 

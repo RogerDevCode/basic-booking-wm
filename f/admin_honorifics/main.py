@@ -1,13 +1,10 @@
 from __future__ import annotations
 
-import asyncio
-import os
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from ..internal._db_client import create_db_client
 from ..internal._result import (
     fail,
-    ok,
     with_admin_context,
     with_tenant_context,
 )
@@ -28,6 +25,7 @@ MODULE = "admin_honorifics"
 
 type HonorificResult = list[HonorificRow] | HonorificRow | dict[str, bool]
 
+
 async def _main_async(args: dict[str, object]) -> Result[HonorificResult]:
     """Main async entrypoint for honorifics management."""
     # 1. Validate Input
@@ -42,6 +40,7 @@ async def _main_async(args: dict[str, object]) -> Result[HonorificResult]:
             # List is global (admin mode)
             async def list_op() -> Result[list[HonorificRow]]:
                 return await list_honorifics(conn)
+
             return await with_admin_context(conn, list_op)
 
         # Mutations require tenant isolation

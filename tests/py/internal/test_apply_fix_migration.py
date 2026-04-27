@@ -1,6 +1,7 @@
 import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
+
 import f.internal.apply_fix_migration
+
 
 # This is an auto-generated test boilerplate for f.internal.apply_fix_migration
 @pytest.mark.asyncio

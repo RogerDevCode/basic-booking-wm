@@ -1,21 +1,22 @@
 from __future__ import annotations
-import re
+
 import httpx
-from typing import Optional, Dict, cast, Any
-from ..internal._result import Result, DBClient, ok, fail
+
+from ..internal._result import DBClient, Result, fail, ok
 from ..internal._wmill_adapter import log
 
-ACTION_MAP: Dict[str, str] = {
-    'cnf': 'confirm',
-    'cxl': 'cancel',
-    'res': 'reagendar_cita',
-    'act': 'activate_reminders',
-    'dea': 'deactivate_reminders',
-    'ack': 'acknowledge',
+ACTION_MAP: dict[str, str] = {
+    "cnf": "confirm",
+    "cxl": "cancel",
+    "res": "reagendar_cita",
+    "act": "activate_reminders",
+    "dea": "deactivate_reminders",
+    "ack": "acknowledge",
 }
 
-def parse_callback_data(data: str) -> Optional[Dict[str, str]]:
-    parts = data.split(':')
+
+def parse_callback_data(data: str) -> dict[str, str] | None:
+    parts = data.split(":")
     if len(parts) != 2:
         return None
     action_code = parts[0]
@@ -27,7 +28,8 @@ def parse_callback_data(data: str) -> Optional[Dict[str, str]]:
         return None
     return {"action": action, "booking_id": booking_id}
 
-async def confirm_booking(db: DBClient, booking_id: str, client_id: Optional[str]) -> Result[bool]:
+
+async def confirm_booking(db: DBClient, booking_id: str, client_id: str | None) -> Result[bool]:
     rows = await db.fetch(
         """
         SELECT booking_id, status, client_id
@@ -36,7 +38,7 @@ async def confirm_booking(db: DBClient, booking_id: str, client_id: Optional[str
           AND status = 'pending'
         LIMIT 1
         """,
-        booking_id
+        booking_id,
     )
     if not rows:
         return fail("Booking not found or not in pending status")
@@ -46,24 +48,22 @@ async def confirm_booking(db: DBClient, booking_id: str, client_id: Optional[str
         return fail("Unauthorized: client mismatch")
 
     await db.execute(
-        "UPDATE bookings SET status = 'confirmed', updated_at = NOW() WHERE booking_id = $1::uuid",
-        booking_id
+        "UPDATE bookings SET status = 'confirmed', updated_at = NOW() WHERE booking_id = $1::uuid", booking_id
     )
     await db.execute(
         """
         INSERT INTO booking_audit (booking_id, from_status, to_status, changed_by, actor_id, reason)
         VALUES ($1::uuid, $2, 'confirmed', 'client', $3::uuid, 'Confirmed via Telegram inline button')
         """,
-        booking_id, row["status"], client_id
+        booking_id,
+        row["status"],
+        client_id,
     )
     return ok(True)
 
+
 async def update_booking_status(
-    db: DBClient, 
-    booking_id: str, 
-    new_status: str, 
-    client_id: Optional[str], 
-    actor: str
+    db: DBClient, booking_id: str, new_status: str, client_id: str | None, actor: str
 ) -> Result[bool]:
     rows = await db.fetch(
         """
@@ -73,7 +73,7 @@ async def update_booking_status(
           AND status NOT IN ('cancelled', 'completed', 'no_show', 'rescheduled')
         LIMIT 1
         """,
-        booking_id
+        booking_id,
     )
     if not rows:
         return fail("Booking not found or already terminal")
@@ -82,7 +82,7 @@ async def update_booking_status(
     if client_id and str(row["client_id"]) != client_id:
         return fail("Unauthorized: client mismatch")
 
-    cancelled_by = actor if new_status == 'cancelled' else None
+    cancelled_by = actor if new_status == "cancelled" else None
     await db.execute(
         """
         UPDATE bookings
@@ -91,18 +91,26 @@ async def update_booking_status(
             updated_at = NOW()
         WHERE booking_id = $3::uuid
         """,
-        new_status, cancelled_by, booking_id
+        new_status,
+        cancelled_by,
+        booking_id,
     )
-    
-    reason = 'Cancelled via Telegram inline button' if new_status == 'cancelled' else 'Status updated via Telegram'
+
+    reason = "Cancelled via Telegram inline button" if new_status == "cancelled" else "Status updated via Telegram"
     await db.execute(
         """
         INSERT INTO booking_audit (booking_id, from_status, to_status, changed_by, actor_id, reason)
         VALUES ($1::uuid, $2, $3, $4, $5::uuid, $6)
         """,
-        booking_id, row["status"], new_status, actor, client_id, reason
+        booking_id,
+        row["status"],
+        new_status,
+        actor,
+        client_id,
+        reason,
     )
     return ok(True)
+
 
 async def answer_callback_query(bot_token: str, callback_query_id: str, text: str, show_alert: bool = False) -> bool:
     url = f"https://api.telegram.org/bot{bot_token}/answerCallbackQuery"
@@ -111,7 +119,7 @@ async def answer_callback_query(bot_token: str, callback_query_id: str, text: st
             payload: dict[str, object] = {
                 "callback_query_id": callback_query_id,
                 "text": text,
-                "show_alert": show_alert
+                "show_alert": show_alert,
             }
             res = await client.post(url, json=payload)
             return res.status_code == 200
@@ -119,15 +127,12 @@ async def answer_callback_query(bot_token: str, callback_query_id: str, text: st
         log("answer_callback_query failed", error=str(e), module="telegram_callback")
         return False
 
+
 async def send_followup_message(bot_token: str, chat_id: str, text: str) -> bool:
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            payload: dict[str, object] = {
-                "chat_id": chat_id,
-                "text": text,
-                "parse_mode": "Markdown" 
-            }
+            payload: dict[str, object] = {"chat_id": chat_id, "text": text, "parse_mode": "Markdown"}
             res = await client.post(url, json=payload)
             return res.status_code == 200
     except Exception as e:

@@ -1,6 +1,7 @@
 import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
+
 import f.patient_register.main
+
 
 # This is an auto-generated test boilerplate for f.patient_register.main
 @pytest.mark.asyncio

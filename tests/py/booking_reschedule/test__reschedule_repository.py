@@ -1,6 +1,7 @@
 import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
+
 import f.booking_reschedule._reschedule_repository
+
 
 # This is an auto-generated test boilerplate for f.booking_reschedule._reschedule_repository
 @pytest.mark.asyncio

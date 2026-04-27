@@ -1,6 +1,7 @@
 import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
+
 import f.web_admin_specialties_crud._specialty_logic
+
 
 # This is an auto-generated test boilerplate for f.web_admin_specialties_crud._specialty_logic
 @pytest.mark.asyncio

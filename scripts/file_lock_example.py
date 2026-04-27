@@ -22,10 +22,11 @@ Usage in any f/*/main.py:
 """
 
 import asyncio
-from f.internal._file_lock import exclusive_file_lock, shared_file_lock, FileLockError
+
+from f.internal._file_lock import FileLockError, exclusive_file_lock, shared_file_lock
 
 
-async def concurrent_modifications():
+async def concurrent_modifications() -> None:
     """
     Demonstrates exclusive locking preventing race conditions.
     Run multiple instances of this script simultaneously to test.
@@ -42,7 +43,7 @@ async def concurrent_modifications():
     try:
         with exclusive_file_lock(test_file, timeout_seconds=5):
             # Read
-            with open(test_file, "r") as f:
+            with open(test_file) as f:
                 count = int(f.read().strip())
 
             print(f"Read count: {count}")
@@ -61,7 +62,7 @@ async def concurrent_modifications():
         print(f"Could not acquire lock: {e}")
 
 
-async def read_with_shared_lock():
+async def read_with_shared_lock() -> None:
     """
     Multiple readers can acquire shared lock simultaneously.
     """
@@ -69,7 +70,7 @@ async def read_with_shared_lock():
 
     try:
         with shared_file_lock(test_file):
-            with open(test_file, "r") as f:
+            with open(test_file) as f:
                 content = f.read()
             print(f"Shared read: {content}")
 

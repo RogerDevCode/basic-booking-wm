@@ -3,20 +3,24 @@
 GEN_SUMMARY — Deterministic AI-Codex Generator
 Principles: Idempotency, Determinism, Atomic Write
 """
+
 from __future__ import annotations
+
 import ast
 from pathlib import Path
 from typing import NamedTuple
 
 # ── Config ────────────────────────────────────────────────────────
-SRC_DIRS = ["f"]                 # Primary source directory
-EXCLUDE  = {"__pycache__", ".venv", "node_modules", ".git", "dist", "build"}
+SRC_DIRS = ["f"]  # Primary source directory
+EXCLUDE = {"__pycache__", ".venv", "node_modules", ".git", "dist", "build"}
 SUMMARY_FILE = Path(".ai-codex/summary.md")
 
+
 class Sym(NamedTuple):
-    kind: str   # "class" | "fn" | "async_fn"
+    kind: str  # "class" | "fn" | "async_fn"
     name: str
     line: int
+
 
 def scan(path: Path) -> list[Sym]:
     """Scans a file for public symbols using AST."""
@@ -24,7 +28,7 @@ def scan(path: Path) -> list[Sym]:
         tree = ast.parse(path.read_text(encoding="utf-8"))
     except (SyntaxError, UnicodeDecodeError):
         return []
-    
+
     syms: list[Sym] = []
     for node in ast.walk(tree):
         # Only extract public symbols (no underscore prefix)
@@ -34,9 +38,10 @@ def scan(path: Path) -> list[Sym]:
             syms.append(Sym("async_fn", node.name, node.lineno))
         elif isinstance(node, ast.FunctionDef) and not node.name.startswith("_"):
             syms.append(Sym("fn", node.name, node.lineno))
-    
+
     # Sort by line number within the file
     return sorted(syms, key=lambda s: s.line)
+
 
 def generate_content() -> str:
     """Generates the Markdown content in memory."""
@@ -46,12 +51,12 @@ def generate_content() -> str:
         "> Read this file BEFORE exploring the repository. Use it to map architecture to logic.",
         "",
         "## Module Map",
-        ""
+        "",
     ]
 
     total_modules = 0
     all_files: list[Path] = []
-    
+
     for src in SRC_DIRS:
         root = Path(src)
         if not root.exists():
@@ -62,11 +67,11 @@ def generate_content() -> str:
     for py in sorted(all_files, key=lambda p: p.as_posix()):
         if any(p in EXCLUDE for p in py.parts):
             continue
-        
+
         syms = scan(py)
         if not syms:
             continue
-            
+
         total_modules += 1
         lines.append(f"### `{py.as_posix()}`")
         for s in syms:
@@ -75,14 +80,11 @@ def generate_content() -> str:
         lines.append("")
 
     # ── Windmill scripts ──────────────────────────────────────────────
-    wm_files = [
-        y for y in Path(".").rglob("*.script.yaml")
-        if not any(p in EXCLUDE for p in y.parts)
-    ]
-    
+    wm_files = [y for y in Path(".").rglob("*.script.yaml") if not any(p in EXCLUDE for p in y.parts)]
+
     # ORDENAMIENTO DETERMINISTA
     wm_sorted = sorted(wm_files, key=lambda p: p.as_posix())
-    
+
     if wm_sorted:
         lines.append("## Windmill Scripts")
         lines.append("")
@@ -91,6 +93,7 @@ def generate_content() -> str:
         lines.append("")
 
     return "\n".join(lines) + "\n"
+
 
 def main() -> None:
     # 1. Crear directorio si no existe
@@ -107,11 +110,12 @@ def main() -> None:
     if new_content != old_content:
         SUMMARY_FILE.write_text(new_content, encoding="utf-8")
         # Contar scripts para el log
-        wm_count = len([l for l in new_content.splitlines() if ".script.yaml" in l])
-        mod_count = len([l for l in new_content.splitlines() if l.startswith("### `f/")])
+        wm_count = len([line for line in new_content.splitlines() if ".script.yaml" in line])
+        mod_count = len([line for line in new_content.splitlines() if line.startswith("### `f/")])
         print(f"✓ .ai-codex/summary.md updated — {mod_count} modules, {wm_count} scripts")
     else:
         print("✓ .ai-codex/summary.md up to date (no changes)")
+
 
 if __name__ == "__main__":
     main()

@@ -1,6 +1,5 @@
 from __future__ import annotations
-import asyncio
-import os
+
 # ============================================================================
 # PRE-FLIGHT CHECKLIST
 # Mission         : CRUD for providers, services, schedules, and overrides
@@ -11,20 +10,21 @@ import os
 # RLS Tenant ID   : YES — with_tenant_context wraps all DB ops
 # Pydantic Schemas: YES — InputSchema validates action and fields
 # ============================================================================
-
-from typing import Any, Dict
-from ..internal._wmill_adapter import log
 from ..internal._db_client import create_db_client
 from ..internal._result import Result, fail, with_tenant_context
-from ._manage_models import InputSchema
+from ..internal._wmill_adapter import log
 from ._manage_logic import (
-    handle_provider_actions, handle_service_actions,
-    handle_schedule_actions, handle_override_actions
+    handle_override_actions,
+    handle_provider_actions,
+    handle_schedule_actions,
+    handle_service_actions,
 )
+from ._manage_models import InputSchema
 
 MODULE = "provider_manage"
 
-async def _main_async(args: dict[str, object]) -> Result[Dict[str, object]]:
+
+async def _main_async(args: dict[str, object]) -> Result[dict[str, object]]:
     # 1. Validate Input
     try:
         input_data = InputSchema.model_validate(args)
@@ -34,21 +34,21 @@ async def _main_async(args: dict[str, object]) -> Result[Dict[str, object]]:
     # For list_providers, provider_id might be None initially, but for others it is required
     # However, list_providers usually runs in admin context or with a specific provider filter.
     # If no provider_id, we default to with_admin_context (if needed) or just with_tenant_context with empty
-    
+
     conn = await create_db_client()
     try:
         # 2. Execute within Tenant Context (if provider_id supplied)
-        async def operation() -> Result[Dict[str, object]]:
+        async def operation() -> Result[dict[str, object]]:
             action = input_data.action
-            if 'provider' in action:
+            if "provider" in action:
                 return await handle_provider_actions(conn, input_data)
-            if 'service' in action:
+            if "service" in action:
                 return await handle_service_actions(conn, input_data)
-            if 'schedule' in action:
+            if "schedule" in action:
                 return await handle_schedule_actions(conn, input_data)
-            if 'override' in action:
+            if "override" in action:
                 return await handle_override_actions(conn, input_data)
-            
+
             return fail(f"ROUTING_ERROR: Unknown action group: {action}")
 
         # If it's a global action like 'list_providers', we could use a dummy tenant or admin context
@@ -62,6 +62,6 @@ async def _main_async(args: dict[str, object]) -> Result[Dict[str, object]]:
         await conn.close()
 
 
-async def main(args: dict[str, object]) -> Result[Dict[str, object]]:
+async def main(args: dict[str, object]) -> Result[dict[str, object]]:
     """Windmill entrypoint."""
     return await _main_async(args)

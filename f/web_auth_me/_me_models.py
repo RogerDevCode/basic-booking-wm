@@ -1,21 +1,24 @@
-from typing import Optional, TypedDict
-from pydantic import BaseModel, ConfigDict, Field
+from typing import TypedDict
+
+from pydantic import BaseModel, ConfigDict
+
 
 class UserProfileResult(TypedDict):
     user_id: str
-    email: Optional[str]
+    email: str | None
     full_name: str
     role: str
-    rut: Optional[str]
-    phone: Optional[str]
-    address: Optional[str]
-    telegram_chat_id: Optional[str]
+    rut: str | None
+    phone: str | None
+    address: str | None
+    telegram_chat_id: str | None
     timezone: str
     is_active: bool
     profile_complete: bool
-    last_login: Optional[str]
+    last_login: str | None
+
 
 class InputSchema(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
-    
+
     user_id: str

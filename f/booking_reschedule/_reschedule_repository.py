@@ -1,16 +1,26 @@
 from __future__ import annotations
+
 import json
-from datetime import datetime
-from typing import Protocol, cast, Any
-from ..internal._result import DBClient
-from ..internal._state_machine import BookingStatus
-from ._reschedule_models import BookingRow, ServiceRow, RescheduleInput, RescheduleWriteResult
+from typing import TYPE_CHECKING, Any, Protocol, cast
+
+if TYPE_CHECKING:
+    from datetime import datetime
+
+    from ..internal._result import DBClient
+    from ..internal._state_machine import BookingStatus
+    from ._reschedule_models import BookingRow, RescheduleInput, RescheduleWriteResult, ServiceRow
+
 
 class RescheduleRepository(Protocol):
     async def fetch_booking(self, booking_id: str) -> BookingRow | None: ...
     async def fetch_service(self, service_id: str) -> ServiceRow | None: ...
-    async def check_overlap(self, provider_id: str, exclude_booking_id: str, new_start: datetime, new_end: datetime) -> bool: ...
-    async def execute_reschedule(self, input_data: RescheduleInput, old_booking: BookingRow, service: ServiceRow, new_end: datetime, new_key: str) -> RescheduleWriteResult | None: ...
+    async def check_overlap(
+        self, provider_id: str, exclude_booking_id: str, new_start: datetime, new_end: datetime
+    ) -> bool: ...
+    async def execute_reschedule(
+        self, input_data: RescheduleInput, old_booking: BookingRow, service: ServiceRow, new_end: datetime, new_key: str
+    ) -> RescheduleWriteResult | None: ...
+
 
 class PostgresRescheduleRepository:
     def __init__(self, client: DBClient) -> None:
@@ -24,7 +34,7 @@ class PostgresRescheduleRepository:
             WHERE booking_id = $1::uuid
             LIMIT 1
             """,
-            booking_id
+            booking_id,
         )
         if not row:
             return None
@@ -33,10 +43,10 @@ class PostgresRescheduleRepository:
             "provider_id": str(row["provider_id"]),
             "client_id": str(row["client_id"]),
             "service_id": str(row["service_id"]),
-            "status": cast(BookingStatus, str(row["status"])),
-            "start_time": cast(datetime, row["start_time"]),
-            "end_time": cast(datetime, row["end_time"]),
-            "idempotency_key": str(row["idempotency_key"])
+            "status": cast("BookingStatus", str(row["status"])),
+            "start_time": cast("datetime", row["start_time"]),
+            "end_time": cast("datetime", row["end_time"]),
+            "idempotency_key": str(row["idempotency_key"]),
         }
 
     async def fetch_service(self, service_id: str) -> ServiceRow | None:
@@ -47,16 +57,18 @@ class PostgresRescheduleRepository:
             WHERE service_id = $1::uuid
             LIMIT 1
             """,
-            service_id
+            service_id,
         )
         if not row:
             return None
-        return cast(ServiceRow, {
-            "service_id": str(row["service_id"]),
-            "duration_minutes": int(cast(Any, row["duration_minutes"]))
-        })
+        return cast(
+            "ServiceRow",
+            {"service_id": str(row["service_id"]), "duration_minutes": int(cast("Any", row["duration_minutes"]))},
+        )
 
-    async def check_overlap(self, provider_id: str, exclude_booking_id: str, new_start: datetime, new_end: datetime) -> bool:
+    async def check_overlap(
+        self, provider_id: str, exclude_booking_id: str, new_start: datetime, new_end: datetime
+    ) -> bool:
         row = await self._client.fetchrow(
             """
             SELECT booking_id FROM bookings
@@ -70,11 +82,13 @@ class PostgresRescheduleRepository:
             provider_id,
             exclude_booking_id,
             new_end.isoformat(),
-            new_start.isoformat()
+            new_start.isoformat(),
         )
         return row is not None
 
-    async def execute_reschedule(self, input_data: RescheduleInput, old_booking: BookingRow, service: ServiceRow, new_end: datetime, new_key: str) -> RescheduleWriteResult | None:
+    async def execute_reschedule(
+        self, input_data: RescheduleInput, old_booking: BookingRow, service: ServiceRow, new_end: datetime, new_key: str
+    ) -> RescheduleWriteResult | None:
         # Create new booking
         new_row = await self._client.fetchrow(
             """
@@ -96,12 +110,12 @@ class PostgresRescheduleRepository:
             input_data.new_start_time.isoformat(),
             new_end.isoformat(),
             new_key,
-            old_booking["booking_id"]
+            old_booking["booking_id"],
         )
-        
+
         if not new_row:
             return None
-            
+
         nb_id = str(new_row["booking_id"])
         nb_status = str(new_row["status"])
         nb_start = str(new_row["start_time"])
@@ -115,13 +129,13 @@ class PostgresRescheduleRepository:
             WHERE booking_id = $1::uuid
             RETURNING booking_id, status
             """,
-            old_booking["booking_id"]
+            old_booking["booking_id"],
         )
-        
+
         if not upd_row:
             # If update fails, it will rollback via with_tenant_context
             return None
-            
+
         ub_id = str(upd_row["booking_id"])
         ub_status = str(upd_row["status"])
 
@@ -140,8 +154,8 @@ class PostgresRescheduleRepository:
             old_booking["status"],
             input_data.actor,
             input_data.actor_id,
-            input_data.reason or 'Rescheduled',
-            json.dumps({"new_booking_id": nb_id})
+            input_data.reason or "Rescheduled",
+            json.dumps({"new_booking_id": nb_id}),
         )
 
         await self._client.execute(
@@ -157,7 +171,7 @@ class PostgresRescheduleRepository:
             nb_id,
             input_data.actor,
             input_data.actor_id,
-            json.dumps({"old_booking_id": old_booking["booking_id"]})
+            json.dumps({"old_booking_id": old_booking["booking_id"]}),
         )
 
         return {

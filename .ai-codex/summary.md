@@ -16,343 +16,343 @@
 - 📦 `class` `InputSchema` (L20)
 
 ### `f/admin_honorifics/main.py`
-- ⚡ `async_fn` `list_op` (L43)
-- ⚡ `async_fn` `operation` (L48)
-- ⚡ `async_fn` `main` (L90)
+- ⚡ `async_fn` `list_op` (L41)
+- ⚡ `async_fn` `operation` (L47)
+- ⚡ `async_fn` `main` (L89)
 
 ### `f/auth_provider/_auth_logic.py`
-- 🔧 `fn` `generate_readable_password` (L15)
-- ⚡ `async_fn` `admin_generate_temp_password` (L20)
-- ⚡ `async_fn` `provider_change_password` (L54)
-- ⚡ `async_fn` `provider_verify` (L90)
+- 🔧 `fn` `generate_readable_password` (L18)
+- ⚡ `async_fn` `admin_generate_temp_password` (L24)
+- ⚡ `async_fn` `provider_change_password` (L61)
+- ⚡ `async_fn` `provider_verify` (L95)
 
 ### `f/auth_provider/_auth_models.py`
-- 📦 `class` `TempPasswordResult` (L4)
-- 📦 `class` `PasswordChangeResult` (L11)
-- 📦 `class` `VerifyResult` (L15)
-- 📦 `class` `InputSchema` (L20)
+- 📦 `class` `TempPasswordResult` (L6)
+- 📦 `class` `PasswordChangeResult` (L14)
+- 📦 `class` `VerifyResult` (L19)
+- 📦 `class` `InputSchema` (L25)
 
 ### `f/auth_provider/main.py`
-- ⚡ `async_fn` `operation` (L40)
-- ⚡ `async_fn` `main` (L59)
+- ⚡ `async_fn` `operation` (L34)
+- ⚡ `async_fn` `main` (L53)
 
 ### `f/availability_check/_availability_logic.py`
 - ⚡ `async_fn` `get_provider_service_id` (L5)
-- ⚡ `async_fn` `get_provider` (L19)
+- ⚡ `async_fn` `get_provider` (L20)
 
 ### `f/availability_check/_availability_models.py`
-- 📦 `class` `InputSchema` (L5)
-- 📦 `class` `AvailabilityResult` (L15)
-- 📦 `class` `ProviderRow` (L26)
+- 📦 `class` `InputSchema` (L8)
+- 📦 `class` `AvailabilityResult` (L19)
+- 📦 `class` `ProviderRow` (L31)
 
 ### `f/availability_check/main.py`
 - ⚡ `async_fn` `main_async` (L24)
-- ⚡ `async_fn` `operation` (L32)
-- ⚡ `async_fn` `main` (L75)
+- ⚡ `async_fn` `operation` (L33)
+- ⚡ `async_fn` `main` (L79)
 
 ### `f/booking_cancel/_booking_cancel_models.py`
-- 📦 `class` `CancelBookingInput` (L5)
-- 📦 `class` `CancelResult` (L14)
-- 📦 `class` `BookingLookup` (L21)
-- 📦 `class` `UpdatedBooking` (L29)
+- 📦 `class` `CancelBookingInput` (L8)
+- 📦 `class` `CancelResult` (L18)
+- 📦 `class` `BookingLookup` (L26)
+- 📦 `class` `UpdatedBooking` (L35)
 
 ### `f/booking_cancel/_booking_cancel_repository.py`
-- 📦 `class` `BookingCancelRepository` (L7)
-- ⚡ `async_fn` `fetch_booking` (L8)
-- ⚡ `async_fn` `lock_booking` (L9)
-- ⚡ `async_fn` `update_booking_status` (L10)
-- ⚡ `async_fn` `insert_audit_trail` (L11)
-- ⚡ `async_fn` `trigger_gcal_sync` (L12)
-- 📦 `class` `PostgresBookingCancelRepository` (L14)
-- ⚡ `async_fn` `fetch_booking` (L18)
-- ⚡ `async_fn` `lock_booking` (L40)
-- ⚡ `async_fn` `update_booking_status` (L53)
-- ⚡ `async_fn` `insert_audit_trail` (L78)
-- ⚡ `async_fn` `trigger_gcal_sync` (L106)
+- 📦 `class` `BookingCancelRepository` (L9)
+- ⚡ `async_fn` `fetch_booking` (L10)
+- ⚡ `async_fn` `lock_booking` (L11)
+- ⚡ `async_fn` `update_booking_status` (L12)
+- ⚡ `async_fn` `insert_audit_trail` (L13)
+- ⚡ `async_fn` `trigger_gcal_sync` (L14)
+- 📦 `class` `PostgresBookingCancelRepository` (L17)
+- ⚡ `async_fn` `fetch_booking` (L21)
+- ⚡ `async_fn` `lock_booking` (L43)
+- ⚡ `async_fn` `update_booking_status` (L56)
+- ⚡ `async_fn` `insert_audit_trail` (L81)
+- ⚡ `async_fn` `trigger_gcal_sync` (L109)
 
 ### `f/booking_cancel/_cancel_booking_logic.py`
-- 🔧 `fn` `authorize_actor` (L6)
-- ⚡ `async_fn` `execute_cancel_booking` (L18)
+- 🔧 `fn` `authorize_actor` (L7)
+- ⚡ `async_fn` `execute_cancel_booking` (L17)
 
 ### `f/booking_cancel/main.py`
-- ⚡ `async_fn` `main_async` (L25)
-- ⚡ `async_fn` `operation` (L60)
-- ⚡ `async_fn` `main` (L96)
+- ⚡ `async_fn` `main_async` (L28)
+- ⚡ `async_fn` `operation` (L63)
+- ⚡ `async_fn` `main` (L99)
 
 ### `f/booking_create/_booking_create_models.py`
-- 📦 `class` `InputSchema` (L6)
-- 🔧 `fn` `parse_datetime` (L20)
-- 📦 `class` `BookingCreated` (L28)
-- 📦 `class` `ClientContext` (L37)
-- 📦 `class` `ProviderContext` (L41)
-- 📦 `class` `ServiceContext` (L46)
-- 📦 `class` `BookingContext` (L51)
+- 📦 `class` `InputSchema` (L9)
+- 🔧 `fn` `parse_datetime` (L23)
+- 📦 `class` `BookingCreated` (L32)
+- 📦 `class` `ClientContext` (L42)
+- 📦 `class` `ProviderContext` (L47)
+- 📦 `class` `ServiceContext` (L53)
+- 📦 `class` `BookingContext` (L59)
 
 ### `f/booking_create/_booking_create_repository.py`
-- 📦 `class` `BookingCreateRepository` (L14)
-- ⚡ `async_fn` `get_client_context` (L15)
-- ⚡ `async_fn` `get_provider_context` (L16)
-- ⚡ `async_fn` `get_service_context` (L17)
-- ⚡ `async_fn` `is_provider_blocked` (L18)
-- ⚡ `async_fn` `is_provider_scheduled` (L19)
-- ⚡ `async_fn` `has_overlapping_booking` (L20)
-- ⚡ `async_fn` `insert_booking` (L21)
-- 📦 `class` `PostgresBookingCreateRepository` (L31)
-- ⚡ `async_fn` `get_client_context` (L35)
-- ⚡ `async_fn` `get_provider_context` (L44)
-- ⚡ `async_fn` `get_service_context` (L62)
-- ⚡ `async_fn` `is_provider_blocked` (L82)
-- ⚡ `async_fn` `is_provider_scheduled` (L96)
-- ⚡ `async_fn` `has_overlapping_booking` (L110)
-- ⚡ `async_fn` `insert_booking` (L126)
+- 📦 `class` `BookingCreateRepository` (L19)
+- ⚡ `async_fn` `get_client_context` (L20)
+- ⚡ `async_fn` `get_provider_context` (L21)
+- ⚡ `async_fn` `get_service_context` (L22)
+- ⚡ `async_fn` `is_provider_blocked` (L23)
+- ⚡ `async_fn` `is_provider_scheduled` (L24)
+- ⚡ `async_fn` `has_overlapping_booking` (L25)
+- ⚡ `async_fn` `insert_booking` (L26)
+- 📦 `class` `PostgresBookingCreateRepository` (L37)
+- ⚡ `async_fn` `get_client_context` (L41)
+- ⚡ `async_fn` `get_provider_context` (L49)
+- ⚡ `async_fn` `get_service_context` (L63)
+- ⚡ `async_fn` `is_provider_blocked` (L86)
+- ⚡ `async_fn` `is_provider_scheduled` (L100)
+- ⚡ `async_fn` `has_overlapping_booking` (L114)
+- ⚡ `async_fn` `insert_booking` (L130)
 
 ### `f/booking_create/_create_booking_logic.py`
-- ⚡ `async_fn` `fetch_booking_context` (L8)
-- ⚡ `async_fn` `check_availability` (L30)
-- ⚡ `async_fn` `persist_booking` (L61)
-- ⚡ `async_fn` `execute_create_booking` (L85)
+- ⚡ `async_fn` `fetch_booking_context` (L10)
+- ⚡ `async_fn` `check_availability` (L26)
+- ⚡ `async_fn` `persist_booking` (L52)
+- ⚡ `async_fn` `execute_create_booking` (L74)
 
 ### `f/booking_create/main.py`
-- ⚡ `async_fn` `main_async` (L24)
-- ⚡ `async_fn` `operation` (L42)
-- ⚡ `async_fn` `main` (L75)
+- ⚡ `async_fn` `main_async` (L25)
+- ⚡ `async_fn` `operation` (L43)
+- ⚡ `async_fn` `main` (L76)
 
 ### `f/booking_orchestrator/_context_resolver.py`
-- ⚡ `async_fn` `resolve_context` (L16)
+- ⚡ `async_fn` `resolve_context` (L17)
 
 ### `f/booking_orchestrator/_get_entity.py`
-- 🔧 `fn` `get_entity` (L14)
+- 🔧 `fn` `get_entity` (L13)
 
 ### `f/booking_orchestrator/_intent_router.py`
-- 🔧 `fn` `normalize_intent` (L31)
+- 🔧 `fn` `normalize_intent` (L35)
 
 ### `f/booking_orchestrator/_orchestrator_models.py`
-- 📦 `class` `OrchestratorInput` (L35)
-- 📦 `class` `OrchestratorResult` (L52)
-- 📦 `class` `ResolvedContext` (L62)
-- 📦 `class` `AvailabilitySlot` (L70)
-- 📦 `class` `AvailabilityData` (L74)
-- 📦 `class` `BookingRow` (L80)
+- 📦 `class` `OrchestratorInput` (L37)
+- 📦 `class` `OrchestratorResult` (L55)
+- 📦 `class` `ResolvedContext` (L66)
+- 📦 `class` `AvailabilitySlot` (L75)
+- 📦 `class` `AvailabilityData` (L80)
+- 📦 `class` `BookingRow` (L87)
 
 ### `f/booking_orchestrator/handlers/_cancel.py`
-- ⚡ `async_fn` `handle_cancel_booking` (L19)
+- ⚡ `async_fn` `handle_cancel_booking` (L20)
 
 ### `f/booking_orchestrator/handlers/_create.py`
-- ⚡ `async_fn` `handle_create_booking` (L18)
+- ⚡ `async_fn` `handle_create_booking` (L20)
 
 ### `f/booking_orchestrator/handlers/_get_my_bookings.py`
-- ⚡ `async_fn` `handle_get_my_bookings` (L19)
+- ⚡ `async_fn` `handle_get_my_bookings` (L21)
 - ⚡ `async_fn` `operation` (L31)
 
 ### `f/booking_orchestrator/handlers/_list_available.py`
-- ⚡ `async_fn` `handle_list_available` (L18)
+- ⚡ `async_fn` `handle_list_available` (L20)
 
 ### `f/booking_orchestrator/handlers/_reschedule.py`
-- ⚡ `async_fn` `handle_reschedule` (L19)
+- ⚡ `async_fn` `handle_reschedule` (L20)
 
 ### `f/booking_orchestrator/main.py`
-- ⚡ `async_fn` `main` (L86)
+- ⚡ `async_fn` `main` (L93)
 
 ### `f/booking_reschedule/_reschedule_logic.py`
-- 🔧 `fn` `authorize` (L7)
-- ⚡ `async_fn` `execute_reschedule_logic` (L16)
+- 🔧 `fn` `authorize` (L9)
+- ⚡ `async_fn` `execute_reschedule_logic` (L19)
 
 ### `f/booking_reschedule/_reschedule_models.py`
-- 📦 `class` `RescheduleInput` (L7)
-- 🔧 `fn` `parse_datetime` (L20)
-- 📦 `class` `RescheduleResult` (L28)
-- 📦 `class` `RescheduleWriteResult` (L37)
-- 📦 `class` `BookingRow` (L45)
-- 📦 `class` `ServiceRow` (L55)
+- 📦 `class` `RescheduleInput` (L12)
+- 🔧 `fn` `parse_datetime` (L25)
+- 📦 `class` `RescheduleResult` (L34)
+- 📦 `class` `RescheduleWriteResult` (L44)
+- 📦 `class` `BookingRow` (L53)
+- 📦 `class` `ServiceRow` (L64)
 
 ### `f/booking_reschedule/_reschedule_repository.py`
-- 📦 `class` `RescheduleRepository` (L9)
-- ⚡ `async_fn` `fetch_booking` (L10)
-- ⚡ `async_fn` `fetch_service` (L11)
-- ⚡ `async_fn` `check_overlap` (L12)
-- ⚡ `async_fn` `execute_reschedule` (L13)
-- 📦 `class` `PostgresRescheduleRepository` (L15)
-- ⚡ `async_fn` `fetch_booking` (L19)
-- ⚡ `async_fn` `fetch_service` (L42)
-- ⚡ `async_fn` `check_overlap` (L59)
-- ⚡ `async_fn` `execute_reschedule` (L77)
+- 📦 `class` `RescheduleRepository` (L14)
+- ⚡ `async_fn` `fetch_booking` (L15)
+- ⚡ `async_fn` `fetch_service` (L16)
+- ⚡ `async_fn` `check_overlap` (L17)
+- ⚡ `async_fn` `execute_reschedule` (L20)
+- 📦 `class` `PostgresRescheduleRepository` (L25)
+- ⚡ `async_fn` `fetch_booking` (L29)
+- ⚡ `async_fn` `fetch_service` (L52)
+- ⚡ `async_fn` `check_overlap` (L69)
+- ⚡ `async_fn` `execute_reschedule` (L89)
 
 ### `f/booking_reschedule/main.py`
 - ⚡ `async_fn` `main_async` (L26)
 - ⚡ `async_fn` `operation` (L69)
-- ⚡ `async_fn` `main` (L103)
+- ⚡ `async_fn` `main` (L108)
 
 ### `f/booking_search/_search_logic.py`
-- ⚡ `async_fn` `execute_search` (L7)
+- ⚡ `async_fn` `execute_search` (L11)
 
 ### `f/booking_search/_search_models.py`
-- 📦 `class` `SearchInput` (L4)
-- 📦 `class` `BookingSearchRow` (L16)
-- 📦 `class` `BookingSearchResult` (L27)
+- 📦 `class` `SearchInput` (L6)
+- 📦 `class` `BookingSearchRow` (L21)
+- 📦 `class` `BookingSearchResult` (L33)
 
 ### `f/booking_search/main.py`
-- ⚡ `async_fn` `main` (L65)
+- ⚡ `async_fn` `main` (L68)
 
 ### `f/booking_wizard/_wizard_logic.py`
-- 📦 `class` `DateUtils` (L13)
-- 🔧 `fn` `format_es` (L15)
-- 🔧 `fn` `get_week_dates` (L22)
-- 🔧 `fn` `generate_time_slots` (L38)
-- 📦 `class` `WizardUI` (L45)
-- 🔧 `fn` `build_date_selection` (L47)
-- 🔧 `fn` `build_time_selection` (L68)
-- 🔧 `fn` `build_confirmation` (L83)
-- 📦 `class` `WizardRepository` (L92)
-- ⚡ `async_fn` `get_service_duration` (L96)
-- ⚡ `async_fn` `get_available_slots` (L101)
-- ⚡ `async_fn` `get_names` (L124)
-- ⚡ `async_fn` `create_booking` (L130)
+- 📦 `class` `DateUtils` (L16)
+- 🔧 `fn` `format_es` (L18)
+- 🔧 `fn` `get_week_dates` (L38)
+- 🔧 `fn` `generate_time_slots` (L52)
+- 📦 `class` `WizardUI` (L60)
+- 🔧 `fn` `build_date_selection` (L62)
+- 🔧 `fn` `build_time_selection` (L84)
+- 🔧 `fn` `build_confirmation` (L100)
+- 📦 `class` `WizardRepository` (L111)
+- ⚡ `async_fn` `get_service_duration` (L115)
+- ⚡ `async_fn` `get_available_slots` (L123)
+- ⚡ `async_fn` `get_names` (L147)
+- ⚡ `async_fn` `create_booking` (L154)
 
 ### `f/booking_wizard/_wizard_models.py`
-- 📦 `class` `WizardState` (L6)
-- 📦 `class` `StepView` (L15)
-- 📦 `class` `InputSchema` (L22)
-- 📦 `class` `WizardResult` (L32)
+- 📦 `class` `WizardState` (L10)
+- 📦 `class` `StepView` (L20)
+- 📦 `class` `InputSchema` (L28)
+- 📦 `class` `WizardResult` (L39)
 
 ### `f/booking_wizard/main.py`
-- ⚡ `async_fn` `operation` (L43)
-- ⚡ `async_fn` `main` (L148)
+- ⚡ `async_fn` `operation` (L42)
+- ⚡ `async_fn` `main` (L153)
 
 ### `f/circuit_breaker/_circuit_logic.py`
-- ⚡ `async_fn` `get_state` (L7)
-- 🔧 `fn` `to_iso` (L26)
-- ⚡ `async_fn` `init_service` (L49)
+- ⚡ `async_fn` `get_state` (L11)
+- 🔧 `fn` `to_iso` (L30)
+- ⚡ `async_fn` `init_service` (L54)
 
 ### `f/circuit_breaker/_circuit_models.py`
-- 📦 `class` `CircuitState` (L4)
-- 📦 `class` `CircuitBreakerResult` (L18)
-- 📦 `class` `InputSchema` (L27)
+- 📦 `class` `CircuitState` (L6)
+- 📦 `class` `CircuitBreakerResult` (L21)
+- 📦 `class` `InputSchema` (L31)
 
 ### `f/circuit_breaker/main.py`
 - ⚡ `async_fn` `operation` (L33)
-- ⚡ `async_fn` `main` (L105)
+- ⚡ `async_fn` `main` (L106)
 
 ### `f/conversation_logger/_logger_logic.py`
-- ⚡ `async_fn` `persist_log` (L7)
+- ⚡ `async_fn` `persist_log` (L12)
 
 ### `f/conversation_logger/_logger_models.py`
-- 📦 `class` `LogResult` (L5)
-- 📦 `class` `InputSchema` (L8)
+- 📦 `class` `LogResult` (L8)
+- 📦 `class` `InputSchema` (L12)
 
 ### `f/conversation_logger/main.py`
-- ⚡ `async_fn` `operation` (L34)
-- ⚡ `async_fn` `main` (L46)
+- ⚡ `async_fn` `operation` (L32)
+- ⚡ `async_fn` `main` (L44)
 
 ### `f/distributed_lock/_lock_logic.py`
-- 🔧 `fn` `map_row_to_lock_info` (L7)
-- 🔧 `fn` `to_iso` (L9)
-- ⚡ `async_fn` `acquire_lock` (L24)
-- ⚡ `async_fn` `release_lock` (L66)
-- ⚡ `async_fn` `check_lock` (L82)
-- ⚡ `async_fn` `cleanup_locks` (L100)
+- 🔧 `fn` `map_row_to_lock_info` (L12)
+- 🔧 `fn` `to_iso` (L15)
+- ⚡ `async_fn` `acquire_lock` (L31)
+- ⚡ `async_fn` `release_lock` (L80)
+- ⚡ `async_fn` `check_lock` (L98)
+- ⚡ `async_fn` `cleanup_locks` (L117)
 
 ### `f/distributed_lock/_lock_models.py`
-- 📦 `class` `LockInfo` (L5)
-- 📦 `class` `LockResult` (L14)
-- 📦 `class` `LockRow` (L24)
-- 📦 `class` `InputSchema` (L33)
+- 📦 `class` `LockInfo` (L8)
+- 📦 `class` `LockResult` (L18)
+- 📦 `class` `LockRow` (L29)
+- 📦 `class` `InputSchema` (L39)
 
 ### `f/distributed_lock/main.py`
-- ⚡ `async_fn` `operation` (L35)
-- ⚡ `async_fn` `main` (L56)
+- ⚡ `async_fn` `operation` (L33)
+- ⚡ `async_fn` `main` (L54)
 
 ### `f/dlq_processor/_dlq_logic.py`
-- 🔧 `fn` `map_row_to_dlq_entry` (L8)
-- 🔧 `fn` `to_iso` (L11)
-- ⚡ `async_fn` `list_dlq` (L45)
-- ⚡ `async_fn` `retry_dlq` (L60)
-- ⚡ `async_fn` `resolve_dlq` (L94)
-- ⚡ `async_fn` `discard_dlq` (L111)
-- ⚡ `async_fn` `get_dlq_status_stats` (L127)
+- 🔧 `fn` `map_row_to_dlq_entry` (L13)
+- 🔧 `fn` `to_iso` (L16)
+- ⚡ `async_fn` `list_dlq` (L51)
+- ⚡ `async_fn` `retry_dlq` (L67)
+- ⚡ `async_fn` `resolve_dlq` (L96)
+- ⚡ `async_fn` `discard_dlq` (L116)
+- ⚡ `async_fn` `get_dlq_status_stats` (L134)
 
 ### `f/dlq_processor/_dlq_models.py`
-- 📦 `class` `DLQEntry` (L5)
-- 📦 `class` `DLQListResult` (L22)
-- 📦 `class` `InputSchema` (L26)
+- 📦 `class` `DLQEntry` (L8)
+- 📦 `class` `DLQListResult` (L26)
+- 📦 `class` `InputSchema` (L31)
 
 ### `f/dlq_processor/main.py`
-- ⚡ `async_fn` `operation` (L33)
-- ⚡ `async_fn` `main` (L60)
+- ⚡ `async_fn` `operation` (L32)
+- ⚡ `async_fn` `main` (L59)
 
 ### `f/flows/telegram_webhook__flow/gates/check_parser_error.py`
-- ⚡ `async_fn` `main` (L4)
+- ⚡ `async_fn` `main` (L6)
 
 ### `f/flows/telegram_webhook__flow/gates/gate_execute_action.py`
-- ⚡ `async_fn` `main` (L4)
+- ⚡ `async_fn` `main` (L6)
 
 ### `f/flows/telegram_webhook__flow/gates/skip_if_router_handled.py`
-- ⚡ `async_fn` `main` (L4)
+- ⚡ `async_fn` `main` (L6)
 
 ### `f/flows/telegram_webhook__flow/telegram_webhook_trigger.py`
-- 📦 `class` `TriggerOutput` (L5)
-- ⚡ `async_fn` `main` (L14)
+- 📦 `class` `TriggerOutput` (L8)
+- ⚡ `async_fn` `main` (L18)
 
 ### `f/gcal_reconcile/_reconcile_logic.py`
-- ⚡ `async_fn` `retry_with_backoff` (L14)
-- ⚡ `async_fn` `call_gcal_api` (L34)
-- ⚡ `async_fn` `sync_booking_to_gcal` (L68)
-- ⚡ `async_fn` `sync_op` (L93)
-- ⚡ `async_fn` `sync_op_cli` (L108)
+- ⚡ `async_fn` `retry_with_backoff` (L21)
+- ⚡ `async_fn` `call_gcal_api` (L39)
+- ⚡ `async_fn` `sync_booking_to_gcal` (L73)
+- ⚡ `async_fn` `sync_op` (L95)
+- ⚡ `async_fn` `sync_op_cli` (L110)
 
 ### `f/gcal_reconcile/_reconcile_models.py`
-- 📦 `class` `InputSchema` (L5)
-- 📦 `class` `ReconcileResult` (L13)
-- 📦 `class` `BookingRow` (L21)
-- 📦 `class` `SyncResult` (L35)
+- 📦 `class` `InputSchema` (L8)
+- 📦 `class` `ReconcileResult` (L17)
+- 📦 `class` `BookingRow` (L26)
+- 📦 `class` `SyncResult` (L41)
 
 ### `f/gcal_reconcile/main.py`
-- ⚡ `async_fn` `provider_batch` (L42)
-- ⚡ `async_fn` `main` (L145)
+- ⚡ `async_fn` `provider_batch` (L47)
+- ⚡ `async_fn` `main` (L168)
 
 ### `f/gcal_sync/_gcal_api_adapter.py`
-- ⚡ `async_fn` `fetch_booking_details` (L10)
-- ⚡ `async_fn` `operation` (L11)
-- ⚡ `async_fn` `call_gcal_api` (L58)
+- ⚡ `async_fn` `fetch_booking_details` (L16)
+- ⚡ `async_fn` `operation` (L17)
+- ⚡ `async_fn` `call_gcal_api` (L73)
 
 ### `f/gcal_sync/_gcal_sync_models.py`
-- 📦 `class` `GCalSyncResult` (L5)
-- 📦 `class` `BookingDetails` (L13)
-- 📦 `class` `InputSchema` (L24)
+- 📦 `class` `GCalSyncResult` (L8)
+- 📦 `class` `BookingDetails` (L17)
+- 📦 `class` `InputSchema` (L29)
 
 ### `f/gcal_sync/_sync_event_logic.py`
-- ⚡ `async_fn` `sync_event` (L8)
+- ⚡ `async_fn` `sync_event` (L13)
 
 ### `f/gcal_sync/_update_sync_status.py`
-- ⚡ `async_fn` `update_booking_sync_status` (L4)
-- ⚡ `async_fn` `operation` (L15)
+- ⚡ `async_fn` `update_booking_sync_status` (L6)
+- ⚡ `async_fn` `operation` (L17)
 
 ### `f/gcal_sync/main.py`
-- ⚡ `async_fn` `main` (L88)
+- ⚡ `async_fn` `main` (L94)
 
 ### `f/gmail_send/_gmail_logic.py`
-- 🔧 `fn` `safe_string` (L10)
-- 🔧 `fn` `build_email_content` (L15)
-- ⚡ `async_fn` `send_with_retry` (L113)
-- 🔧 `fn` `do_send` (L126)
+- 🔧 `fn` `safe_string` (L14)
+- 🔧 `fn` `build_email_content` (L22)
+- ⚡ `async_fn` `send_with_retry` (L121)
+- 🔧 `fn` `do_send` (L129)
 
 ### `f/gmail_send/_gmail_models.py`
-- 📦 `class` `ActionLink` (L5)
-- 📦 `class` `GmailSendData` (L11)
-- 📦 `class` `InputSchema` (L18)
+- 📦 `class` `ActionLink` (L8)
+- 📦 `class` `GmailSendData` (L15)
+- 📦 `class` `InputSchema` (L23)
 
 ### `f/gmail_send/main.py`
-- ⚡ `async_fn` `main` (L83)
+- ⚡ `async_fn` `main` (L68)
 
 ### `f/health_check/_health_logic.py`
-- ⚡ `async_fn` `check_database` (L10)
+- ⚡ `async_fn` `check_database` (L9)
 - ⚡ `async_fn` `check_gcal` (L22)
-- ⚡ `async_fn` `check_telegram` (L41)
-- 🔧 `fn` `check_gmail` (L57)
+- ⚡ `async_fn` `check_telegram` (L52)
+- 🔧 `fn` `check_gmail` (L79)
 
 ### `f/health_check/_health_models.py`
-- 📦 `class` `ComponentStatus` (L5)
-- 📦 `class` `HealthResult` (L11)
-- 📦 `class` `InputSchema` (L16)
+- 📦 `class` `ComponentStatus` (L6)
+- 📦 `class` `HealthResult` (L13)
+- 📦 `class` `InputSchema` (L19)
 
 ### `f/health_check/main.py`
 - ⚡ `async_fn` `main` (L68)
@@ -363,13 +363,13 @@
 - 🔧 `fn` `require_database_url` (L70)
 
 ### `f/internal/_crypto.py`
-- 🔧 `fn` `hash_password` (L24)
-- 🔧 `fn` `verify_password` (L32)
-- 📦 `class` `PasswordPolicyResult` (L49)
-- 🔧 `fn` `validate_password_policy` (L54)
-- 🔧 `fn` `get_encryption_key` (L84)
-- 🔧 `fn` `encrypt_data` (L94)
-- 🔧 `fn` `decrypt_data` (L104)
+- 🔧 `fn` `hash_password` (L19)
+- 🔧 `fn` `verify_password` (L25)
+- 📦 `class` `PasswordPolicyResult` (L40)
+- 🔧 `fn` `validate_password_policy` (L45)
+- 🔧 `fn` `get_encryption_key` (L73)
+- 🔧 `fn` `encrypt_data` (L81)
+- 🔧 `fn` `decrypt_data` (L91)
 
 ### `f/internal/_date_resolver.py`
 - 📦 `class` `ResolveDateOpts` (L21)
@@ -378,52 +378,52 @@
 - 🔧 `fn` `today_ymd` (L170)
 
 ### `f/internal/_db_client.py`
-- ⚡ `async_fn` `fetch` (L15)
-- ⚡ `async_fn` `fetchrow` (L17)
-- ⚡ `async_fn` `fetchval` (L19)
-- ⚡ `async_fn` `execute` (L21)
-- ⚡ `async_fn` `close` (L23)
-- ⚡ `async_fn` `create_db_client` (L40)
-- 📦 `class` `AsyncpgWrapper` (L50)
-- ⚡ `async_fn` `fetch` (L54)
-- ⚡ `async_fn` `fetchrow` (L59)
-- ⚡ `async_fn` `fetchval` (L63)
-- ⚡ `async_fn` `execute` (L66)
-- ⚡ `async_fn` `close` (L70)
+- ⚡ `async_fn` `fetch` (L17)
+- ⚡ `async_fn` `fetchrow` (L19)
+- ⚡ `async_fn` `fetchval` (L21)
+- ⚡ `async_fn` `execute` (L23)
+- ⚡ `async_fn` `close` (L25)
+- ⚡ `async_fn` `create_db_client` (L42)
+- 📦 `class` `AsyncpgWrapper` (L52)
+- ⚡ `async_fn` `fetch` (L56)
+- ⚡ `async_fn` `fetchrow` (L61)
+- ⚡ `async_fn` `fetchval` (L65)
+- ⚡ `async_fn` `execute` (L68)
+- ⚡ `async_fn` `close` (L72)
 
 ### `f/internal/_file_lock.py`
 - 📦 `class` `FileLockError` (L17)
-- 🔧 `fn` `exclusive_file_lock` (L23)
-- 🔧 `fn` `shared_file_lock` (L92)
+- 🔧 `fn` `exclusive_file_lock` (L24)
+- 🔧 `fn` `shared_file_lock` (L94)
 
 ### `f/internal/_redis_client.py`
 - ⚡ `async_fn` `create_redis_client` (L32)
 
 ### `f/internal/_result.py`
-- 🔧 `fn` `ok` (L20)
-- 🔧 `fn` `fail` (L25)
-- 🔧 `fn` `is_ok_outcome` (L31)
-- 🔧 `fn` `is_fail_outcome` (L36)
-- ⚡ `async_fn` `wrap` (L41)
-- 📦 `class` `DBClient` (L50)
-- ⚡ `async_fn` `fetch` (L53)
-- ⚡ `async_fn` `fetchrow` (L56)
-- ⚡ `async_fn` `fetchval` (L59)
-- ⚡ `async_fn` `execute` (L62)
-- ⚡ `async_fn` `close` (L65)
-- ⚡ `async_fn` `with_tenant_context` (L69)
-- ⚡ `async_fn` `with_admin_context` (L107)
+- 🔧 `fn` `ok` (L17)
+- 🔧 `fn` `fail` (L22)
+- 🔧 `fn` `is_ok_outcome` (L28)
+- 🔧 `fn` `is_fail_outcome` (L33)
+- ⚡ `async_fn` `wrap` (L38)
+- 📦 `class` `DBClient` (L47)
+- ⚡ `async_fn` `fetch` (L50)
+- ⚡ `async_fn` `fetchrow` (L52)
+- ⚡ `async_fn` `fetchval` (L54)
+- ⚡ `async_fn` `execute` (L56)
+- ⚡ `async_fn` `close` (L58)
+- ⚡ `async_fn` `with_tenant_context` (L61)
+- ⚡ `async_fn` `with_admin_context` (L97)
 
 ### `f/internal/_state_machine.py`
-- 🔧 `fn` `validate_transition` (L40)
+- 🔧 `fn` `validate_transition` (L32)
 
 ### `f/internal/_wmill_adapter.py`
-- 🔧 `fn` `is_dict_str_obj` (L19)
-- 🔧 `fn` `get_variable_safe` (L23)
-- 🔧 `fn` `get_variable` (L31)
-- 🔧 `fn` `get_resource_safe` (L42)
-- 🔧 `fn` `run_script` (L53)
-- 🔧 `fn` `log` (L65)
+- 🔧 `fn` `is_dict_str_obj` (L20)
+- 🔧 `fn` `get_variable_safe` (L24)
+- 🔧 `fn` `get_variable` (L32)
+- 🔧 `fn` `get_resource_safe` (L43)
+- 🔧 `fn` `run_script` (L54)
+- 🔧 `fn` `log` (L66)
 
 ### `f/internal/ai_agent/_ai_agent_logic.py`
 - 🔧 `fn` `adjust_intent_with_context` (L28)
@@ -435,30 +435,30 @@
 
 ### `f/internal/ai_agent/_ai_agent_models.py`
 - 📦 `class` `ConversationState` (L11)
-- 📦 `class` `UserProfile` (L24)
-- 📦 `class` `AIAgentInput` (L30)
-- 📦 `class` `EntityMap` (L40)
-- 📦 `class` `AvailabilityContext` (L54)
-- 📦 `class` `ContextAdjustment` (L65)
-- 📦 `class` `IntentResult` (L80)
-- 📦 `class` `LLMOutputEntities` (L100)
-- 📦 `class` `LLMOutput` (L107)
+- 📦 `class` `UserProfile` (L30)
+- 📦 `class` `AIAgentInput` (L37)
+- 📦 `class` `EntityMap` (L48)
+- 📦 `class` `AvailabilityContext` (L63)
+- 📦 `class` `ContextAdjustment` (L75)
+- 📦 `class` `IntentResult` (L94)
+- 📦 `class` `LLMOutputEntities` (L115)
+- 📦 `class` `LLMOutput` (L123)
 
 ### `f/internal/ai_agent/_constants.py`
-- 📦 `class` `IntentsStruct` (L14)
-- 📦 `class` `KeywordDef` (L70)
-- 📦 `class` `EscalationThresholdsStruct` (L203)
-- 📦 `class` `RuleConfidenceStruct` (L216)
-- 📦 `class` `SocialConfidenceStruct` (L233)
-- 📦 `class` `ConfidenceBoundariesStruct` (L250)
+- 📦 `class` `IntentsStruct` (L27)
+- 📦 `class` `KeywordDef` (L85)
+- 📦 `class` `EscalationThresholdsStruct` (L548)
+- 📦 `class` `RuleConfidenceStruct` (L563)
+- 📦 `class` `SocialConfidenceStruct` (L582)
+- 📦 `class` `ConfidenceBoundariesStruct` (L601)
 
 ### `f/internal/ai_agent/_guardrails.py`
-- 📦 `class` `GuardrailPass` (L6)
-- 📦 `class` `GuardrailBlocked` (L9)
-- 🔧 `fn` `validate_input` (L35)
-- 🔧 `fn` `validate_output` (L52)
-- 🔧 `fn` `sanitize_json_response` (L65)
-- 🔧 `fn` `verify_urgency` (L78)
+- 📦 `class` `GuardrailPass` (L8)
+- 📦 `class` `GuardrailBlocked` (L12)
+- 🔧 `fn` `validate_input` (L42)
+- 🔧 `fn` `validate_output` (L60)
+- 🔧 `fn` `sanitize_json_response` (L74)
+- 🔧 `fn` `verify_urgency` (L88)
 
 ### `f/internal/ai_agent/_llm_client.py`
 - 📦 `class` `ChatMessage` (L18)
@@ -472,31 +472,31 @@
 
 ### `f/internal/ai_agent/_rag_context.py`
 - 📦 `class` `RAGResult` (L6)
-- ⚡ `async_fn` `build_rag_context` (L11)
-- ⚡ `async_fn` `get_rag_context` (L56)
+- ⚡ `async_fn` `build_rag_context` (L12)
+- ⚡ `async_fn` `get_rag_context` (L54)
 
 ### `f/internal/ai_agent/_tfidf_classifier.py`
-- 🔧 `fn` `normalize` (L100)
-- 🔧 `fn` `compute_tf` (L119)
-- 🔧 `fn` `compute_idf` (L126)
-- 🔧 `fn` `cosine_similarity` (L135)
-- 📦 `class` `TfIdfModel` (L149)
-- 🔧 `fn` `get_model` (L160)
-- 📦 `class` `Score` (L166)
-- 📦 `class` `TfIdfResult` (L170)
-- 🔧 `fn` `classify_intent` (L175)
+- 🔧 `fn` `normalize` (L159)
+- 🔧 `fn` `compute_tf` (L179)
+- 🔧 `fn` `compute_idf` (L187)
+- 🔧 `fn` `cosine_similarity` (L197)
+- 📦 `class` `TfIdfModel` (L213)
+- 🔧 `fn` `get_model` (L226)
+- 📦 `class` `Score` (L233)
+- 📦 `class` `TfIdfResult` (L238)
+- 🔧 `fn` `classify_intent` (L244)
 
 ### `f/internal/ai_agent/main.py`
 - 🔧 `fn` `main` (L132)
 
 ### `f/internal/apply_fix_migration.py`
-- 🔧 `fn` `main` (L22)
+- 🔧 `fn` `main` (L24)
 
 ### `f/internal/booking_fsm/_fsm_machine.py`
-- 🔧 `fn` `parse_action` (L55)
-- 🔧 `fn` `parse_callback_data` (L77)
-- 🔧 `fn` `apply_transition` (L94)
-- 🔧 `fn` `flow_step_from_state` (L339)
+- 🔧 `fn` `parse_action` (L51)
+- 🔧 `fn` `parse_callback_data` (L73)
+- 🔧 `fn` `apply_transition` (L90)
+- 🔧 `fn` `flow_step_from_state` (L345)
 
 ### `f/internal/booking_fsm/_fsm_models.py`
 - 📦 `class` `NamedItem` (L20)
@@ -535,81 +535,81 @@
 - 🔧 `fn` `build_confirmation_keyboard` (L81)
 
 ### `f/internal/conversation_get/_conversation_models.py`
-- 📦 `class` `ConversationState` (L5)
-- 📦 `class` `ConversationGetResult` (L17)
+- 📦 `class` `ConversationState` (L8)
+- 📦 `class` `ConversationGetResult` (L21)
 
 ### `f/internal/conversation_get/main.py`
-- ⚡ `async_fn` `main` (L49)
+- ⚡ `async_fn` `main` (L52)
 
 ### `f/internal/conversation_update/_update_models.py`
-- 📦 `class` `ConversationUpdateInput` (L5)
-- 📦 `class` `ConversationUpdateResult` (L17)
+- 📦 `class` `ConversationUpdateInput` (L8)
+- 📦 `class` `ConversationUpdateResult` (L21)
 
 ### `f/internal/conversation_update/main.py`
-- ⚡ `async_fn` `main` (L57)
+- ⚡ `async_fn` `main` (L60)
 
 ### `f/internal/debug_db.py`
-- 🔧 `fn` `main` (L20)
+- 🔧 `fn` `main` (L22)
 
 ### `f/internal/debug_db_final.py`
-- 🔧 `fn` `main` (L15)
+- 🔧 `fn` `main` (L17)
 
 ### `f/internal/gcal_utils/_gcal_logic.py`
-- 🔧 `fn` `build_gcal_event` (L5)
+- 🔧 `fn` `build_gcal_event` (L7)
 
 ### `f/internal/gcal_utils/_gcal_models.py`
-- 📦 `class` `BookingEventData` (L3)
-- 📦 `class` `GCalTime` (L11)
-- 📦 `class` `GCalReminderOverride` (L15)
-- 📦 `class` `GCalReminders` (L19)
-- 📦 `class` `GoogleCalendarEvent` (L23)
-- 📦 `class` `TokenInfo` (L31)
+- 📦 `class` `BookingEventData` (L4)
+- 📦 `class` `GCalTime` (L13)
+- 📦 `class` `GCalReminderOverride` (L18)
+- 📦 `class` `GCalReminders` (L23)
+- 📦 `class` `GoogleCalendarEvent` (L28)
+- 📦 `class` `TokenInfo` (L37)
 
 ### `f/internal/gcal_utils/_oauth_logic.py`
-- 📦 `class` `TokenResponse` (L7)
-- ⚡ `async_fn` `get_valid_access_token` (L15)
-- ⚡ `async_fn` `refresh_access_token` (L54)
-- ⚡ `async_fn` `persist_new_token` (L84)
+- 📦 `class` `TokenResponse` (L8)
+- ⚡ `async_fn` `get_valid_access_token` (L17)
+- ⚡ `async_fn` `refresh_access_token` (L52)
+- ⚡ `async_fn` `persist_new_token` (L79)
 
 ### `f/internal/message_parser/main.py`
-- 📦 `class` `ParserInput` (L8)
-- 📦 `class` `ParserResult` (L14)
-- ⚡ `async_fn` `main` (L20)
+- 📦 `class` `ParserInput` (L6)
+- 📦 `class` `ParserResult` (L12)
+- ⚡ `async_fn` `main` (L18)
 
 ### `f/internal/scheduling_engine/_scheduling_logic.py`
 - 🔧 `fn` `time_to_minutes` (L20)
 - 🔧 `fn` `generate_slots_for_rule` (L28)
 - ⚡ `async_fn` `get_availability` (L85)
 - ⚡ `async_fn` `get_availability_range` (L219)
-- ⚡ `async_fn` `validate_override` (L246)
+- ⚡ `async_fn` `validate_override` (L244)
 
 ### `f/internal/scheduling_engine/_scheduling_models.py`
 - 📦 `class` `TimeSlot` (L4)
-- 📦 `class` `AvailabilityQuery` (L9)
-- 📦 `class` `AvailabilityResult` (L14)
-- 📦 `class` `ScheduleOverrideRow` (L24)
-- 📦 `class` `ProviderScheduleRow` (L33)
-- 📦 `class` `BookingTimeRow` (L40)
-- 📦 `class` `ServiceRow` (L44)
-- 📦 `class` `AffectedBooking` (L49)
-- 📦 `class` `OverrideValidation` (L54)
+- 📦 `class` `AvailabilityQuery` (L10)
+- 📦 `class` `AvailabilityResult` (L16)
+- 📦 `class` `ScheduleOverrideRow` (L27)
+- 📦 `class` `ProviderScheduleRow` (L37)
+- 📦 `class` `BookingTimeRow` (L45)
+- 📦 `class` `ServiceRow` (L50)
+- 📦 `class` `AffectedBooking` (L56)
+- 📦 `class` `OverrideValidation` (L62)
 
 ### `f/internal/telegram_router/_router_models.py`
-- 📦 `class` `RouterInput` (L5)
-- 📦 `class` `RouterResult` (L12)
+- 📦 `class` `RouterInput` (L8)
+- 📦 `class` `RouterResult` (L16)
 
 ### `f/internal/telegram_router/main.py`
-- ⚡ `async_fn` `main` (L71)
+- ⚡ `async_fn` `main` (L80)
 
 ### `f/nlu/_tfidf_classifier.py`
-- 📦 `class` `ModelData` (L170)
-- 📦 `class` `ScoreEntry` (L196)
-- 📦 `class` `TfIdfResult` (L200)
-- 🔧 `fn` `classify_intent` (L205)
+- 📦 `class` `ModelData` (L234)
+- 📦 `class` `ScoreEntry` (L263)
+- 📦 `class` `TfIdfResult` (L268)
+- 🔧 `fn` `classify_intent` (L274)
 
 ### `f/nlu/main.py`
-- 📦 `class` `ExtractedIntent` (L19)
-- ⚡ `async_fn` `main` (L53)
+- 📦 `class` `ExtractedIntent` (L20)
+- ⚡ `async_fn` `main` (L50)
 
 ### `f/noshow_trigger/_noshow_logic.py`
 - 📦 `class` `BookingRepository` (L5)
@@ -617,241 +617,241 @@
 - ⚡ `async_fn` `mark_as_no_show` (L25)
 
 ### `f/noshow_trigger/_noshow_models.py`
-- 📦 `class` `NoShowStats` (L4)
-- 📦 `class` `InputSchema` (L10)
-- 📦 `class` `ProviderRow` (L16)
+- 📦 `class` `NoShowStats` (L6)
+- 📦 `class` `InputSchema` (L13)
+- 📦 `class` `ProviderRow` (L20)
 
 ### `f/noshow_trigger/main.py`
-- ⚡ `async_fn` `provider_batch` (L41)
-- ⚡ `async_fn` `main` (L91)
+- ⚡ `async_fn` `provider_batch` (L39)
+- ⚡ `async_fn` `main` (L90)
 
 ### `f/openrouter_benchmark/_benchmark_logic.py`
-- 🔧 `fn` `extract_json` (L43)
-- ⚡ `async_fn` `run_benchmark_task` (L73)
+- 🔧 `fn` `extract_json` (L44)
+- ⚡ `async_fn` `run_benchmark_task` (L78)
 
 ### `f/openrouter_benchmark/_benchmark_models.py`
-- 📦 `class` `ModelCandidate` (L5)
-- 📦 `class` `NLUIntent` (L9)
-- 📦 `class` `ModelTestResult` (L14)
-- 📦 `class` `ModelSummary` (L25)
-- 📦 `class` `BenchmarkReport` (L34)
-- 📦 `class` `TaskPrompt` (L39)
-- 📦 `class` `OpenRouterUsage` (L45)
-- 📦 `class` `OpenRouterChoiceMessage` (L50)
-- 📦 `class` `OpenRouterChoice` (L54)
-- 📦 `class` `OpenRouterResponse` (L58)
+- 📦 `class` `ModelCandidate` (L6)
+- 📦 `class` `NLUIntent` (L11)
+- 📦 `class` `ModelTestResult` (L17)
+- 📦 `class` `ModelSummary` (L29)
+- 📦 `class` `BenchmarkReport` (L39)
+- 📦 `class` `TaskPrompt` (L45)
+- 📦 `class` `OpenRouterUsage` (L52)
+- 📦 `class` `OpenRouterChoiceMessage` (L58)
+- 📦 `class` `OpenRouterChoice` (L63)
+- 📦 `class` `OpenRouterResponse` (L68)
 
 ### `f/openrouter_benchmark/main.py`
-- 🔧 `fn` `main` (L66)
+- 🔧 `fn` `main` (L71)
 
 ### `f/patient_register/_patient_logic.py`
-- ⚡ `async_fn` `upsert_client` (L6)
+- ⚡ `async_fn` `upsert_client` (L5)
 
 ### `f/patient_register/_patient_models.py`
-- 📦 `class` `ClientResult` (L5)
-- 📦 `class` `InputSchema` (L14)
+- 📦 `class` `ClientResult` (L8)
+- 📦 `class` `InputSchema` (L18)
 
 ### `f/patient_register/main.py`
-- ⚡ `async_fn` `operation` (L42)
-- ⚡ `async_fn` `main` (L54)
+- ⚡ `async_fn` `operation` (L40)
+- ⚡ `async_fn` `main` (L52)
 
 ### `f/provider_agenda/_agenda_logic.py`
-- ⚡ `async_fn` `get_provider_agenda` (L7)
+- ⚡ `async_fn` `get_provider_agenda` (L12)
 
 ### `f/provider_agenda/_agenda_models.py`
-- 📦 `class` `AgendaRow` (L6)
-- 📦 `class` `AgendaInput` (L15)
-- 📦 `class` `AgendaBooking` (L20)
-- 📦 `class` `AgendaDay` (L28)
-- 📦 `class` `AgendaResult` (L35)
-- 📦 `class` `InputSchema` (L42)
+- 📦 `class` `AgendaRow` (L11)
+- 📦 `class` `AgendaInput` (L21)
+- 📦 `class` `AgendaBooking` (L27)
+- 📦 `class` `AgendaDay` (L36)
+- 📦 `class` `AgendaResult` (L44)
+- 📦 `class` `InputSchema` (L52)
 
 ### `f/provider_agenda/main.py`
-- ⚡ `async_fn` `operation` (L34)
-- ⚡ `async_fn` `main` (L55)
+- ⚡ `async_fn` `operation` (L32)
+- ⚡ `async_fn` `main` (L53)
 
 ### `f/provider_manage/_manage_logic.py`
-- ⚡ `async_fn` `handle_provider_actions` (L6)
-- ⚡ `async_fn` `handle_service_actions` (L50)
-- ⚡ `async_fn` `handle_schedule_actions` (L104)
-- ⚡ `async_fn` `handle_override_actions` (L133)
+- ⚡ `async_fn` `handle_provider_actions` (L11)
+- ⚡ `async_fn` `handle_service_actions` (L71)
+- ⚡ `async_fn` `handle_schedule_actions` (L141)
+- ⚡ `async_fn` `handle_override_actions` (L180)
 
 ### `f/provider_manage/_manage_models.py`
-- 📦 `class` `InputSchema` (L6)
+- 📦 `class` `InputSchema` (L10)
 
 ### `f/provider_manage/main.py`
 - ⚡ `async_fn` `operation` (L41)
 - ⚡ `async_fn` `main` (L65)
 
 ### `f/rag_query/_rag_logic.py`
-- 📦 `class` `KBRepository` (L6)
-- ⚡ `async_fn` `fetch_active_entries` (L10)
-- 📦 `class` `ScoredEntry` (L44)
-- 🔧 `fn` `perform_keyword_search` (L48)
+- 📦 `class` `KBRepository` (L11)
+- ⚡ `async_fn` `fetch_active_entries` (L15)
+- 📦 `class` `ScoredEntry` (L50)
+- 🔧 `fn` `perform_keyword_search` (L55)
 
 ### `f/rag_query/_rag_models.py`
-- 📦 `class` `KBEntry` (L4)
-- 📦 `class` `RAGResult` (L11)
-- 📦 `class` `KBRow` (L16)
-- 📦 `class` `InputSchema` (L22)
+- 📦 `class` `KBEntry` (L6)
+- 📦 `class` `RAGResult` (L14)
+- 📦 `class` `KBRow` (L20)
+- 📦 `class` `InputSchema` (L27)
 
 ### `f/rag_query/main.py`
-- ⚡ `async_fn` `operation` (L34)
-- ⚡ `async_fn` `main` (L63)
+- ⚡ `async_fn` `operation` (L32)
+- ⚡ `async_fn` `main` (L57)
 
 ### `f/reminder_config/_config_logic.py`
-- ⚡ `async_fn` `load_preferences` (L14)
-- ⚡ `async_fn` `save_preferences` (L43)
-- 🔧 `fn` `build_config_message` (L64)
-- 🔧 `fn` `build_window_config` (L81)
-- 🔧 `fn` `set_all` (L100)
+- ⚡ `async_fn` `load_preferences` (L18)
+- ⚡ `async_fn` `save_preferences` (L49)
+- 🔧 `fn` `build_config_message` (L73)
+- 🔧 `fn` `build_window_config` (L91)
+- 🔧 `fn` `set_all` (L108)
 
 ### `f/reminder_config/_config_models.py`
-- 📦 `class` `ReminderPrefs` (L5)
-- 📦 `class` `ReminderConfigResult` (L11)
-- 📦 `class` `InputSchema` (L16)
+- 📦 `class` `ReminderPrefs` (L8)
+- 📦 `class` `ReminderConfigResult` (L15)
+- 📦 `class` `InputSchema` (L21)
 
 ### `f/reminder_config/main.py`
-- ⚡ `async_fn` `operation` (L37)
-- ⚡ `async_fn` `main` (L100)
+- ⚡ `async_fn` `operation` (L34)
+- ⚡ `async_fn` `main` (L96)
 
 ### `f/reminder_cron/_reminder_logic.py`
-- 🔧 `fn` `format_date_es` (L6)
-- 🔧 `fn` `format_time_es` (L13)
-- 🔧 `fn` `get_client_preference` (L16)
-- 🔧 `fn` `build_booking_details` (L25)
-- 🔧 `fn` `build_inline_buttons` (L45)
+- 🔧 `fn` `format_date_es` (L10)
+- 🔧 `fn` `format_time_es` (L31)
+- 🔧 `fn` `get_client_preference` (L35)
+- 🔧 `fn` `build_booking_details` (L42)
+- 🔧 `fn` `build_inline_buttons` (L60)
 
 ### `f/reminder_cron/_reminder_models.py`
-- 📦 `class` `ReminderPrefs` (L6)
-- 📦 `class` `BookingRecord` (L14)
-- 📦 `class` `CronResult` (L31)
-- 📦 `class` `InputSchema` (L39)
+- 📦 `class` `ReminderPrefs` (L10)
+- 📦 `class` `BookingRecord` (L19)
+- 📦 `class` `CronResult` (L37)
+- 📦 `class` `InputSchema` (L46)
 
 ### `f/reminder_cron/_reminder_repository.py`
-- ⚡ `async_fn` `get_bookings_for_window` (L7)
-- ⚡ `async_fn` `mark_reminder_sent` (L44)
+- ⚡ `async_fn` `get_bookings_for_window` (L12)
+- ⚡ `async_fn` `mark_reminder_sent` (L48)
 
 ### `f/reminder_cron/main.py`
-- ⚡ `async_fn` `provider_batch` (L54)
-- ⚡ `async_fn` `main` (L108)
+- ⚡ `async_fn` `provider_batch` (L58)
+- ⚡ `async_fn` `main` (L122)
 
 ### `f/telegram_auto_register/_auto_register_logic.py`
-- ⚡ `async_fn` `register_telegram_user` (L7)
+- ⚡ `async_fn` `register_telegram_user` (L8)
 
 ### `f/telegram_auto_register/_auto_register_models.py`
-- 📦 `class` `RegisterResult` (L4)
-- 📦 `class` `InputSchema` (L8)
+- 📦 `class` `RegisterResult` (L6)
+- 📦 `class` `InputSchema` (L11)
 
 ### `f/telegram_auto_register/main.py`
-- ⚡ `async_fn` `operation` (L34)
-- ⚡ `async_fn` `main` (L46)
+- ⚡ `async_fn` `operation` (L32)
+- ⚡ `async_fn` `main` (L44)
 
 ### `f/telegram_callback/_callback_logic.py`
-- 🔧 `fn` `parse_callback_data` (L17)
-- ⚡ `async_fn` `confirm_booking` (L30)
-- ⚡ `async_fn` `update_booking_status` (L61)
-- ⚡ `async_fn` `answer_callback_query` (L107)
-- ⚡ `async_fn` `send_followup_message` (L122)
+- 🔧 `fn` `parse_callback_data` (L18)
+- ⚡ `async_fn` `confirm_booking` (L32)
+- ⚡ `async_fn` `update_booking_status` (L65)
+- ⚡ `async_fn` `answer_callback_query` (L115)
+- ⚡ `async_fn` `send_followup_message` (L131)
 
 ### `f/telegram_callback/_callback_models.py`
-- 📦 `class` `InputSchema` (L5)
-- 📦 `class` `ActionContext` (L15)
-- 📦 `class` `ActionResult` (L23)
-- 📦 `class` `ActionHandler` (L27)
-- ⚡ `async_fn` `handle` (L28)
+- 📦 `class` `InputSchema` (L8)
+- 📦 `class` `ActionContext` (L19)
+- 📦 `class` `ActionResult` (L28)
+- 📦 `class` `ActionHandler` (L33)
+- ⚡ `async_fn` `handle` (L34)
 
 ### `f/telegram_callback/_callback_router.py`
-- 📦 `class` `ConfirmHandler` (L8)
-- ⚡ `async_fn` `handle` (L9)
+- 📦 `class` `ConfirmHandler` (L7)
+- ⚡ `async_fn` `handle` (L8)
 - ⚡ `async_fn` `operation` (L12)
-- 📦 `class` `CancelHandler` (L35)
-- ⚡ `async_fn` `handle` (L36)
-- ⚡ `async_fn` `operation` (L39)
-- 📦 `class` `AcknowledgeHandler` (L62)
-- ⚡ `async_fn` `handle` (L63)
-- 📦 `class` `TelegramRouter` (L69)
-- 🔧 `fn` `register` (L73)
-- ⚡ `async_fn` `route` (L76)
+- 📦 `class` `CancelHandler` (L39)
+- ⚡ `async_fn` `handle` (L40)
+- ⚡ `async_fn` `operation` (L44)
+- 📦 `class` `AcknowledgeHandler` (L76)
+- ⚡ `async_fn` `handle` (L77)
+- 📦 `class` `TelegramRouter` (L81)
+- 🔧 `fn` `register` (L85)
+- ⚡ `async_fn` `route` (L88)
 
 ### `f/telegram_callback/main.py`
-- ⚡ `async_fn` `main` (L85)
+- ⚡ `async_fn` `main` (L87)
 
 ### `f/telegram_gateway/_gateway_logic.py`
-- 📦 `class` `TelegramClient` (L8)
-- ⚡ `async_fn` `send_message` (L13)
-- 📦 `class` `ClientRepository` (L40)
-- ⚡ `async_fn` `ensure_registered` (L44)
+- 📦 `class` `TelegramClient` (L14)
+- ⚡ `async_fn` `send_message` (L19)
+- 📦 `class` `ClientRepository` (L49)
+- ⚡ `async_fn` `ensure_registered` (L53)
 
 ### `f/telegram_gateway/_gateway_models.py`
-- 📦 `class` `TelegramUser` (L9)
-- 📦 `class` `TelegramChat` (L17)
-- 📦 `class` `TelegramMessage` (L22)
-- 📦 `class` `TelegramCallback` (L30)
-- 📦 `class` `TelegramUpdate` (L37)
-- 📦 `class` `SendMessageOptions` (L43)
+- 📦 `class` `TelegramUser` (L12)
+- 📦 `class` `TelegramChat` (L21)
+- 📦 `class` `TelegramMessage` (L27)
+- 📦 `class` `TelegramCallback` (L36)
+- 📦 `class` `TelegramUpdate` (L44)
+- 📦 `class` `SendMessageOptions` (L51)
 
 ### `f/telegram_gateway/main.py`
-- 📦 `class` `TelegramRouter` (L15)
-- ⚡ `async_fn` `route_update` (L20)
-- ⚡ `async_fn` `handle_callback` (L27)
-- ⚡ `async_fn` `handle_message` (L39)
-- ⚡ `async_fn` `main` (L92)
+- 📦 `class` `TelegramRouter` (L12)
+- ⚡ `async_fn` `route_update` (L17)
+- ⚡ `async_fn` `handle_callback` (L24)
+- ⚡ `async_fn` `handle_message` (L36)
+- ⚡ `async_fn` `main` (L97)
 
 ### `f/telegram_menu/_menu_logic.py`
-- 🔧 `fn` `parse_user_option` (L10)
-- 📦 `class` `MenuController` (L16)
-- ⚡ `async_fn` `handle` (L17)
+- 🔧 `fn` `parse_user_option` (L13)
+- 📦 `class` `MenuController` (L22)
+- ⚡ `async_fn` `handle` (L23)
 
 ### `f/telegram_menu/_menu_models.py`
-- 📦 `class` `InlineButton` (L5)
-- 📦 `class` `MenuInput` (L10)
-- 📦 `class` `MenuResponse` (L16)
-- 📦 `class` `InputSchema` (L22)
-- 📦 `class` `MenuResult` (L23)
+- 📦 `class` `InlineButton` (L6)
+- 📦 `class` `MenuInput` (L12)
+- 📦 `class` `MenuResponse` (L19)
+- 📦 `class` `InputSchema` (L26)
+- 📦 `class` `MenuResult` (L30)
 
 ### `f/telegram_menu/main.py`
-- ⚡ `async_fn` `main` (L39)
-
-### `f/telegram_send/_telegram_logic.py`
-- 📦 `class` `TelegramService` (L13)
-- ⚡ `async_fn` `execute` (L18)
-- 🔧 `fn` `prepare_request` (L43)
-- ⚡ `async_fn` `api_call` (L84)
-- 🔧 `fn` `normalize_keyboard` (L102)
-
-### `f/telegram_send/_telegram_models.py`
-- 📦 `class` `InlineButton` (L9)
-- 📦 `class` `BaseTelegramInput` (L14)
-- 📦 `class` `SendMessageInput` (L19)
-- 📦 `class` `EditMessageInput` (L25)
-- 📦 `class` `DeleteMessageInput` (L31)
-- 📦 `class` `AnswerCallbackInput` (L41)
-- 📦 `class` `TelegramInputRoot` (L63)
-- 📦 `class` `TelegramResponseResult` (L66)
-- 📦 `class` `TelegramResponse` (L69)
-- 📦 `class` `TelegramSendData` (L76)
-
-### `f/telegram_send/main.py`
 - ⚡ `async_fn` `main` (L40)
 
+### `f/telegram_send/_telegram_logic.py`
+- 📦 `class` `TelegramService` (L22)
+- ⚡ `async_fn` `execute` (L27)
+- 🔧 `fn` `prepare_request` (L53)
+- ⚡ `async_fn` `api_call` (L91)
+- 🔧 `fn` `normalize_keyboard` (L109)
+
+### `f/telegram_send/_telegram_models.py`
+- 📦 `class` `InlineButton` (L12)
+- 📦 `class` `BaseTelegramInput` (L18)
+- 📦 `class` `SendMessageInput` (L24)
+- 📦 `class` `EditMessageInput` (L31)
+- 📦 `class` `DeleteMessageInput` (L38)
+- 📦 `class` `AnswerCallbackInput` (L49)
+- 📦 `class` `TelegramInputRoot` (L67)
+- 📦 `class` `TelegramResponseResult` (L71)
+- 📦 `class` `TelegramResponse` (L75)
+- 📦 `class` `TelegramSendData` (L83)
+
+### `f/telegram_send/main.py`
+- ⚡ `async_fn` `main` (L47)
+
 ### `f/web_admin_dashboard/_dashboard_logic.py`
-- ⚡ `async_fn` `fetch_dashboard_stats` (L6)
+- ⚡ `async_fn` `fetch_dashboard_stats` (L11)
 
 ### `f/web_admin_dashboard/_dashboard_models.py`
-- 📦 `class` `AdminDashboardResult` (L4)
-- 📦 `class` `InputSchema` (L12)
+- 📦 `class` `AdminDashboardResult` (L6)
+- 📦 `class` `InputSchema` (L15)
 
 ### `f/web_admin_dashboard/main.py`
-- ⚡ `async_fn` `operation` (L34)
-- ⚡ `async_fn` `main` (L46)
+- ⚡ `async_fn` `operation` (L32)
+- ⚡ `async_fn` `main` (L44)
 
 ### `f/web_admin_provider_crud/_provider_logic.py`
-- 🔧 `fn` `map_row_to_provider` (L9)
-- ⚡ `async_fn` `list_providers` (L41)
-- ⚡ `async_fn` `create_provider` (L66)
-- ⚡ `async_fn` `update_provider` (L106)
-- ⚡ `async_fn` `reset_provider_password` (L161)
+- 🔧 `fn` `map_row_to_provider` (L11)
+- ⚡ `async_fn` `list_providers` (L43)
+- ⚡ `async_fn` `create_provider` (L68)
+- ⚡ `async_fn` `update_provider` (L108)
+- ⚡ `async_fn` `reset_provider_password` (L163)
 
 ### `f/web_admin_provider_crud/_provider_models.py`
 - 📦 `class` `ProviderRow` (L6)
@@ -864,236 +864,236 @@
 - ⚡ `async_fn` `main` (L79)
 
 ### `f/web_admin_regions/_regions_logic.py`
-- ⚡ `async_fn` `list_regions` (L6)
-- ⚡ `async_fn` `list_communes` (L25)
-- ⚡ `async_fn` `search_communes` (L60)
+- ⚡ `async_fn` `list_regions` (L9)
+- ⚡ `async_fn` `list_communes` (L29)
+- ⚡ `async_fn` `search_communes` (L65)
 
 ### `f/web_admin_regions/_regions_models.py`
-- 📦 `class` `RegionRow` (L5)
-- 📦 `class` `CommuneRow` (L12)
-- 📦 `class` `InputSchema` (L19)
+- 📦 `class` `RegionRow` (L6)
+- 📦 `class` `CommuneRow` (L14)
+- 📦 `class` `InputSchema` (L22)
 
 ### `f/web_admin_regions/main.py`
-- 🔧 `fn` `main` (L50)
-
-### `f/web_admin_specialties_crud/_specialty_logic.py`
-- 🔧 `fn` `map_row` (L8)
-- ⚡ `async_fn` `list_specialties` (L19)
-- ⚡ `async_fn` `create_specialty` (L26)
-- ⚡ `async_fn` `update_specialty` (L43)
-- ⚡ `async_fn` `delete_specialty` (L67)
-- ⚡ `async_fn` `set_status` (L74)
-
-### `f/web_admin_specialties_crud/_specialty_models.py`
-- 📦 `class` `SpecialtyRow` (L5)
-- 📦 `class` `InputSchema` (L14)
-
-### `f/web_admin_specialties_crud/main.py`
-- ⚡ `async_fn` `operation` (L32)
-- 🔧 `fn` `main` (L58)
-
-### `f/web_admin_tags/_tags_logic.py`
-- 🔧 `fn` `map_category` (L8)
-- 🔧 `fn` `map_tag` (L19)
-- ⚡ `async_fn` `verify_admin_access` (L32)
-- 📦 `class` `TagRepository` (L38)
-- ⚡ `async_fn` `list_categories` (L42)
-- ⚡ `async_fn` `create_category` (L58)
-- ⚡ `async_fn` `update_category` (L69)
-- ⚡ `async_fn` `set_category_status` (L89)
-- ⚡ `async_fn` `delete_category` (L100)
-- ⚡ `async_fn` `list_tags` (L107)
-- ⚡ `async_fn` `create_tag` (L131)
-- ⚡ `async_fn` `update_tag` (L146)
-- ⚡ `async_fn` `set_tag_status` (L171)
-- ⚡ `async_fn` `delete_tag` (L182)
-
-### `f/web_admin_tags/_tags_models.py`
-- 📦 `class` `CategoryRow` (L5)
-- 📦 `class` `TagRow` (L14)
-- 📦 `class` `InputSchema` (L25)
-
-### `f/web_admin_tags/main.py`
-- ⚡ `async_fn` `operation` (L32)
-- 🔧 `fn` `main` (L86)
-
-### `f/web_admin_users/_user_logic.py`
-- 🔧 `fn` `map_row` (L8)
-- ⚡ `async_fn` `handle_user_actions` (L22)
-
-### `f/web_admin_users/_user_models.py`
-- 📦 `class` `UserInfo` (L5)
-- 📦 `class` `UsersListResult` (L17)
-- 📦 `class` `InputSchema` (L21)
-
-### `f/web_admin_users/main.py`
-- ⚡ `async_fn` `operation` (L32)
 - 🔧 `fn` `main` (L52)
 
+### `f/web_admin_specialties_crud/_specialty_logic.py`
+- 🔧 `fn` `map_row` (L9)
+- ⚡ `async_fn` `list_specialties` (L23)
+- ⚡ `async_fn` `create_specialty` (L31)
+- ⚡ `async_fn` `update_specialty` (L53)
+- ⚡ `async_fn` `delete_specialty` (L80)
+- ⚡ `async_fn` `set_status` (L88)
+
+### `f/web_admin_specialties_crud/_specialty_models.py`
+- 📦 `class` `SpecialtyRow` (L6)
+- 📦 `class` `InputSchema` (L16)
+
+### `f/web_admin_specialties_crud/main.py`
+- ⚡ `async_fn` `operation` (L34)
+- 🔧 `fn` `main` (L63)
+
+### `f/web_admin_tags/_tags_logic.py`
+- 🔧 `fn` `map_category` (L9)
+- 🔧 `fn` `map_tag` (L23)
+- ⚡ `async_fn` `verify_admin_access` (L39)
+- 📦 `class` `TagRepository` (L48)
+- ⚡ `async_fn` `list_categories` (L52)
+- ⚡ `async_fn` `create_category` (L68)
+- ⚡ `async_fn` `update_category` (L82)
+- ⚡ `async_fn` `set_category_status` (L104)
+- ⚡ `async_fn` `delete_category` (L117)
+- ⚡ `async_fn` `list_tags` (L124)
+- ⚡ `async_fn` `create_tag` (L148)
+- ⚡ `async_fn` `update_tag` (L170)
+- ⚡ `async_fn` `set_tag_status` (L197)
+- ⚡ `async_fn` `delete_tag` (L210)
+
+### `f/web_admin_tags/_tags_models.py`
+- 📦 `class` `CategoryRow` (L6)
+- 📦 `class` `TagRow` (L16)
+- 📦 `class` `InputSchema` (L28)
+
+### `f/web_admin_tags/main.py`
+- ⚡ `async_fn` `operation` (L34)
+- 🔧 `fn` `main` (L107)
+
+### `f/web_admin_users/_user_logic.py`
+- 🔧 `fn` `map_row` (L9)
+- ⚡ `async_fn` `handle_user_actions` (L30)
+
+### `f/web_admin_users/_user_models.py`
+- 📦 `class` `UserInfo` (L6)
+- 📦 `class` `UsersListResult` (L19)
+- 📦 `class` `InputSchema` (L24)
+
+### `f/web_admin_users/main.py`
+- ⚡ `async_fn` `operation` (L34)
+- 🔧 `fn` `main` (L53)
+
 ### `f/web_auth_change_role/_change_role_models.py`
-- 📦 `class` `ChangeRoleResult` (L4)
-- 📦 `class` `InputSchema` (L10)
+- 📦 `class` `ChangeRoleResult` (L6)
+- 📦 `class` `InputSchema` (L13)
 
 ### `f/web_auth_change_role/main.py`
-- ⚡ `async_fn` `operation` (L31)
-- 🔧 `fn` `main` (L89)
-
-### `f/web_auth_complete_profile/_complete_profile_models.py`
-- 📦 `class` `CompleteProfileResult` (L5)
-- 📦 `class` `UserRow` (L12)
-- 📦 `class` `InputSchema` (L19)
-
-### `f/web_auth_complete_profile/main.py`
-- ⚡ `async_fn` `operation` (L42)
-- 🔧 `fn` `main` (L111)
-
-### `f/web_auth_login/_login_logic.py`
-- 🔧 `fn` `verify_password_sync` (L4)
-
-### `f/web_auth_login/_login_models.py`
-- 📦 `class` `LoginResult` (L4)
-- 📦 `class` `UserRow` (L11)
-- 📦 `class` `InputSchema` (L20)
-
-### `f/web_auth_login/main.py`
-- ⚡ `async_fn` `operation` (L32)
+- ⚡ `async_fn` `operation` (L33)
 - 🔧 `fn` `main` (L94)
 
+### `f/web_auth_complete_profile/_complete_profile_models.py`
+- 📦 `class` `CompleteProfileResult` (L8)
+- 📦 `class` `UserRow` (L16)
+- 📦 `class` `InputSchema` (L24)
+
+### `f/web_auth_complete_profile/main.py`
+- ⚡ `async_fn` `operation` (L45)
+- 🔧 `fn` `main` (L123)
+
+### `f/web_auth_login/_login_logic.py`
+- 🔧 `fn` `verify_password_sync` (L5)
+
+### `f/web_auth_login/_login_models.py`
+- 📦 `class` `LoginResult` (L6)
+- 📦 `class` `UserRow` (L14)
+- 📦 `class` `InputSchema` (L24)
+
+### `f/web_auth_login/main.py`
+- ⚡ `async_fn` `operation` (L34)
+- 🔧 `fn` `main` (L95)
+
 ### `f/web_auth_me/_me_logic.py`
-- ⚡ `async_fn` `get_user_profile` (L6)
+- ⚡ `async_fn` `get_user_profile` (L7)
 
 ### `f/web_auth_me/_me_models.py`
-- 📦 `class` `UserProfileResult` (L4)
-- 📦 `class` `InputSchema` (L18)
+- 📦 `class` `UserProfileResult` (L6)
+- 📦 `class` `InputSchema` (L21)
 
 ### `f/web_auth_me/main.py`
-- ⚡ `async_fn` `operation` (L32)
-- 🔧 `fn` `main` (L44)
+- ⚡ `async_fn` `operation` (L34)
+- 🔧 `fn` `main` (L46)
 
 ### `f/web_auth_register/_register_logic.py`
 - 🔧 `fn` `validate_rut` (L7)
-- 🔧 `fn` `validate_password_strength` (L31)
-- 🔧 `fn` `hash_password_sync` (L42)
+- 🔧 `fn` `validate_password_strength` (L32)
+- 🔧 `fn` `hash_password_sync` (L44)
 
 ### `f/web_auth_register/_register_models.py`
-- 📦 `class` `RegisterResult` (L5)
-- 📦 `class` `InputSchema` (L11)
+- 📦 `class` `RegisterResult` (L8)
+- 📦 `class` `InputSchema` (L15)
 
 ### `f/web_auth_register/main.py`
-- ⚡ `async_fn` `operation` (L41)
-- 🔧 `fn` `main` (L90)
+- ⚡ `async_fn` `operation` (L44)
+- 🔧 `fn` `main` (L99)
 
 ### `f/web_booking_api/_booking_logic.py`
 - 🔧 `fn` `derive_idempotency_key` (L8)
-- 🔧 `fn` `calculate_end_time` (L12)
-- 📦 `class` `BookingRepository` (L22)
-- ⚡ `async_fn` `resolve_tenant_for_booking` (L26)
-- ⚡ `async_fn` `resolve_client_id` (L31)
-- ⚡ `async_fn` `lock_provider` (L45)
-- ⚡ `async_fn` `get_service_duration` (L50)
-- ⚡ `async_fn` `check_overlap` (L55)
-- ⚡ `async_fn` `insert_booking` (L73)
-- ⚡ `async_fn` `get_booking` (L94)
-- ⚡ `async_fn` `update_status` (L99)
+- 🔧 `fn` `calculate_end_time` (L13)
+- 📦 `class` `BookingRepository` (L25)
+- ⚡ `async_fn` `resolve_tenant_for_booking` (L29)
+- ⚡ `async_fn` `resolve_client_id` (L35)
+- ⚡ `async_fn` `lock_provider` (L52)
+- ⚡ `async_fn` `get_service_duration` (L61)
+- ⚡ `async_fn` `check_overlap` (L69)
+- ⚡ `async_fn` `insert_booking` (L88)
+- ⚡ `async_fn` `get_booking` (L114)
+- ⚡ `async_fn` `update_status` (L128)
 
 ### `f/web_booking_api/_booking_models.py`
-- 📦 `class` `BookingResult` (L5)
-- 📦 `class` `InputSchema` (L10)
+- 📦 `class` `BookingResult` (L6)
+- 📦 `class` `InputSchema` (L12)
 
 ### `f/web_booking_api/main.py`
-- ⚡ `async_fn` `operation` (L46)
-- 🔧 `fn` `main` (L129)
+- ⚡ `async_fn` `operation` (L51)
+- 🔧 `fn` `main` (L172)
 
 ### `f/web_patient_bookings/_bookings_logic.py`
-- ⚡ `async_fn` `resolve_client_id` (L10)
-- ⚡ `async_fn` `get_patient_bookings` (L28)
+- ⚡ `async_fn` `resolve_client_id` (L11)
+- ⚡ `async_fn` `get_patient_bookings` (L31)
 
 ### `f/web_patient_bookings/_bookings_models.py`
-- 📦 `class` `BookingInfo` (L5)
-- 📦 `class` `BookingsResult` (L17)
-- 📦 `class` `InputSchema` (L22)
+- 📦 `class` `BookingInfo` (L6)
+- 📦 `class` `BookingsResult` (L19)
+- 📦 `class` `InputSchema` (L25)
 
 ### `f/web_patient_bookings/main.py`
-- ⚡ `async_fn` `operation` (L32)
-- 🔧 `fn` `main` (L47)
+- ⚡ `async_fn` `operation` (L34)
+- 🔧 `fn` `main` (L50)
 
 ### `f/web_patient_profile/_profile_logic.py`
 - 🔧 `fn` `map_to_profile` (L8)
-- ⚡ `async_fn` `find_user` (L19)
-- ⚡ `async_fn` `find_or_create_client` (L27)
-- ⚡ `async_fn` `update_profile` (L48)
+- ⚡ `async_fn` `find_user` (L20)
+- ⚡ `async_fn` `find_or_create_client` (L30)
+- ⚡ `async_fn` `update_profile` (L57)
 
 ### `f/web_patient_profile/_profile_models.py`
-- 📦 `class` `ProfileResult` (L5)
-- 📦 `class` `InputSchema` (L14)
+- 📦 `class` `ProfileResult` (L6)
+- 📦 `class` `InputSchema` (L16)
 
 ### `f/web_patient_profile/main.py`
-- ⚡ `async_fn` `operation` (L33)
-- 🔧 `fn` `main` (L59)
+- ⚡ `async_fn` `operation` (L35)
+- 🔧 `fn` `main` (L64)
 
 ### `f/web_provider_dashboard/_provider_dashboard_logic.py`
 - ⚡ `async_fn` `fetch_provider_dashboard` (L7)
 
 ### `f/web_provider_dashboard/_provider_dashboard_models.py`
-- 📦 `class` `AgendaItem` (L5)
-- 📦 `class` `ProviderStats` (L14)
-- 📦 `class` `DashboardResult` (L21)
-- 📦 `class` `InputSchema` (L28)
+- 📦 `class` `AgendaItem` (L6)
+- 📦 `class` `ProviderStats` (L16)
+- 📦 `class` `DashboardResult` (L24)
+- 📦 `class` `InputSchema` (L32)
 
 ### `f/web_provider_dashboard/main.py`
-- ⚡ `async_fn` `operation` (L32)
-- 🔧 `fn` `main` (L44)
+- ⚡ `async_fn` `operation` (L34)
+- 🔧 `fn` `main` (L46)
 
 ### `f/web_provider_notes/_notes_logic.py`
-- 🔧 `fn` `decrypt_content` (L9)
-- 🔧 `fn` `map_row_to_note` (L18)
-- 📦 `class` `NoteRepository` (L33)
-- ⚡ `async_fn` `get_tags` (L37)
-- ⚡ `async_fn` `assign_tags` (L50)
-- ⚡ `async_fn` `create` (L59)
-- ⚡ `async_fn` `read` (L81)
-- ⚡ `async_fn` `list_notes` (L90)
-- ⚡ `async_fn` `delete` (L124)
+- 🔧 `fn` `decrypt_content` (L10)
+- 🔧 `fn` `map_row_to_note` (L22)
+- 📦 `class` `NoteRepository` (L44)
+- ⚡ `async_fn` `get_tags` (L48)
+- ⚡ `async_fn` `assign_tags` (L61)
+- ⚡ `async_fn` `create` (L72)
+- ⚡ `async_fn` `read` (L101)
+- ⚡ `async_fn` `list_notes` (L112)
+- ⚡ `async_fn` `delete` (L144)
 
 ### `f/web_provider_notes/_notes_models.py`
-- 📦 `class` `Tag` (L5)
-- 📦 `class` `NoteRow` (L10)
-- 📦 `class` `InputSchema` (L22)
+- 📦 `class` `Tag` (L6)
+- 📦 `class` `NoteRow` (L12)
+- 📦 `class` `InputSchema` (L25)
 
 ### `f/web_provider_notes/main.py`
-- ⚡ `async_fn` `operation` (L32)
-- 🔧 `fn` `main` (L69)
+- ⚡ `async_fn` `operation` (L34)
+- 🔧 `fn` `main` (L77)
 
 ### `f/web_provider_profile/_profile_logic.py`
-- 📦 `class` `ProfileRepository` (L8)
-- ⚡ `async_fn` `find_by_id` (L12)
-- ⚡ `async_fn` `update` (L63)
-- ⚡ `async_fn` `get_password_hash` (L89)
-- ⚡ `async_fn` `update_password` (L96)
+- 📦 `class` `ProfileRepository` (L7)
+- ⚡ `async_fn` `find_by_id` (L11)
+- ⚡ `async_fn` `update` (L67)
+- ⚡ `async_fn` `get_password_hash` (L103)
+- ⚡ `async_fn` `update_password` (L112)
 
 ### `f/web_provider_profile/_profile_models.py`
-- 📦 `class` `ProfileRow` (L5)
-- 📦 `class` `InputSchema` (L26)
+- 📦 `class` `ProfileRow` (L6)
+- 📦 `class` `InputSchema` (L28)
 
 ### `f/web_provider_profile/main.py`
-- ⚡ `async_fn` `operation` (L33)
-- 🔧 `fn` `main` (L79)
+- ⚡ `async_fn` `operation` (L35)
+- 🔧 `fn` `main` (L84)
 
 ### `f/web_waitlist/_waitlist_logic.py`
 - ⚡ `async_fn` `resolve_client_id` (L8)
-- ⚡ `async_fn` `handle_join` (L27)
-- ⚡ `async_fn` `handle_leave` (L70)
-- ⚡ `async_fn` `handle_list` (L87)
-- ⚡ `async_fn` `handle_check_position` (L111)
+- ⚡ `async_fn` `handle_join` (L30)
+- ⚡ `async_fn` `handle_leave` (L81)
+- ⚡ `async_fn` `handle_list` (L101)
+- ⚡ `async_fn` `handle_check_position` (L130)
 
 ### `f/web_waitlist/_waitlist_models.py`
-- 📦 `class` `WaitlistEntry` (L5)
-- 📦 `class` `WaitlistResult` (L14)
-- 📦 `class` `InputSchema` (L19)
+- 📦 `class` `WaitlistEntry` (L6)
+- 📦 `class` `WaitlistResult` (L16)
+- 📦 `class` `InputSchema` (L22)
 
 ### `f/web_waitlist/main.py`
-- ⚡ `async_fn` `operation` (L34)
-- 🔧 `fn` `main` (L61)
+- ⚡ `async_fn` `operation` (L36)
+- 🔧 `fn` `main` (L64)
 
 ## Windmill Scripts
 

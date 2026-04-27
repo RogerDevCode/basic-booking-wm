@@ -1,17 +1,23 @@
 from __future__ import annotations
-from typing import List, Dict, Optional, Final
+
+from typing import Final
+
 from ._menu_models import MenuInput, MenuResponse
 
-MAIN_MENU_INLINE: Final[List[List[Dict[str, str]]]] = [
+MAIN_MENU_INLINE: Final[list[list[dict[str, str]]]] = [
     [{"text": "📅 Agendar Cita", "callback_data": "cmd:book"}],
-    [{"text": "📋 Mis Citas", "callback_data": "cmd:mybookings"}]
+    [{"text": "📋 Mis Citas", "callback_data": "cmd:mybookings"}],
 ]
 
-def parse_user_option(text: str) -> Optional[str]:
+
+def parse_user_option(text: str) -> str | None:
     lower = text.lower().strip()
-    if lower == "cmd:book" or "agendar" in lower: return "book_appointment"
-    if lower == "cmd:mybookings" or "mis citas" in lower: return "my_bookings"
+    if lower == "cmd:book" or "agendar" in lower:
+        return "book_appointment"
+    if lower == "cmd:mybookings" or "mis citas" in lower:
+        return "my_bookings"
     return None
+
 
 class MenuController:
     async def handle(self, input_data: MenuInput) -> MenuResponse:
@@ -19,13 +25,13 @@ class MenuController:
             return MenuResponse(
                 handled=True,
                 response_text="🏥 *AutoAgenda - Menú Principal*\n\n¿Cómo podemos ayudarte hoy?",
-                inline_buttons=MAIN_MENU_INLINE
+                inline_buttons=MAIN_MENU_INLINE,
             )
-            
+
         if input_data.action == "select_option":
             user_input = input_data.user_input or ""
             parsed = parse_user_option(user_input)
-            
+
             if parsed:
                 # Si reconoció la acción, cedemos el control al orquestador
                 return MenuResponse(handled=False, response_text="", inline_buttons=[])
@@ -33,8 +39,8 @@ class MenuController:
                 # Opción inválida, repite el menú
                 return MenuResponse(
                     handled=True,
-                    response_text="⚠️ Opción no reconocida.\n\n🏥 *AutoAgenda - Menú Principal*\n\nSelecciona una opción:",
-                    inline_buttons=MAIN_MENU_INLINE
+                    response_text="⚠️ Opción no reconocida.\n\n🏥 *AutoAgenda - Menú Principal*\n\nSelecciona una opción:",  # noqa: E501
+                    inline_buttons=MAIN_MENU_INLINE,
                 )
-                
+
         return MenuResponse(handled=False, response_text="", inline_buttons=[])

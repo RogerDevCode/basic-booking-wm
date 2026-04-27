@@ -1,5 +1,6 @@
 # mypy: disable-error-code
 import asyncio
+
 # ============================================================================
 # PRE-FLIGHT CHECKLIST
 # Mission         : Client profile CRUD (get/update)
@@ -10,15 +11,16 @@ import asyncio
 # RLS Tenant ID   : YES — with_tenant_context wraps all DB ops
 # Pydantic Schemas: YES — InputSchema validates parameters
 # ============================================================================
+from typing import Any
 
-from typing import Any, Dict
-from ..internal._wmill_adapter import log
 from ..internal._db_client import create_db_client
-from ..internal._result import Result, ok, fail, with_tenant_context
+from ..internal._result import Result, fail, ok, with_tenant_context
+from ..internal._wmill_adapter import log
+from ._profile_logic import find_or_create_client, find_user, map_to_profile, update_profile
 from ._profile_models import InputSchema, ProfileResult
-from ._profile_logic import find_user, find_or_create_client, update_profile, map_to_profile
 
 MODULE = "web_patient_profile"
+
 
 async def _main_async(args: dict[str, Any]) -> Result[ProfileResult]:
     # 1. Validate Input
@@ -33,16 +35,19 @@ async def _main_async(args: dict[str, Any]) -> Result[ProfileResult]:
         async def operation() -> Result[ProfileResult]:
             # Resolve User
             err_u, user = await find_user(conn, input_data.user_id)
-            if err_u or not user: return fail(err_u or "user_not_found")
+            if err_u or not user:
+                return fail(err_u or "user_not_found")
 
             # Find or Auto-Create Client
             err_c, client = await find_or_create_client(conn, input_data.user_id, user)
-            if err_c or not client: return fail(err_c or "client_not_found")
+            if err_c or not client:
+                return fail(err_c or "client_not_found")
 
             final_client = client
-            if input_data.action == 'update':
+            if input_data.action == "update":
                 err_up, updated = await update_profile(conn, str(final_client["client_id"]), input_data)
-                if err_up or not updated: return fail(err_up or "update_failed")
+                if err_up or not updated:
+                    return fail(err_up or "update_failed")
                 final_client = updated
 
             return ok(map_to_profile(final_client))
@@ -53,11 +58,12 @@ async def _main_async(args: dict[str, Any]) -> Result[ProfileResult]:
         log("Patient Profile Internal Error", error=str(e), module=MODULE)
         return fail(f"fatal_error: {e}")
     finally:
-        await conn.close() # pyright: ignore[reportUnknownMemberType]
+        await conn.close()  # pyright: ignore[reportUnknownMemberType]
 
 
 def main(args: dict) -> None:
     import traceback
+
     try:
         return asyncio.run(_main_async(args))
     except Exception as e:
@@ -65,11 +71,18 @@ def main(args: dict) -> None:
         # Intentamos usar el adaptador local si está disponible, si no print
         try:
             from ..internal._wmill_adapter import log
-            log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=os.path.basename(os.path.dirname(__file__)))
-        except:
+
+            log(
+                "CRITICAL_ENTRYPOINT_ERROR",
+                error=str(e),
+                traceback=tb,
+                module=MODULE,
+            )
+        except Exception:
             from ..internal._wmill_adapter import log
+
             log("BARE_EXCEPT_CAUGHT", file="main.py")
             print(f"CRITICAL ERROR in {__file__}: {e}\n{tb}")
-        
+
         # Elevamos para que Windmill marque como FAILED
-        raise RuntimeError(f"Execution failed: {e}")
+        raise RuntimeError(f"Execution failed: {e}") from e

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from typing import TYPE_CHECKING, Any, Final, TypeIs, cast
+from typing import Any, Final, TypeIs
 
 from pydantic import TypeAdapter
 
@@ -11,7 +11,6 @@ from ._fsm_models import (
     BackAction,
     BookingAction,
     BookingState,
-    BookingStateRoot,
     CancelAction,
     CompletedState,
     ConfirmingState,
@@ -37,9 +36,6 @@ from ._fsm_responses import (
     build_slots_prompt,
     build_specialty_prompt,
 )
-
-if TYPE_CHECKING:
-    pass
 
 MAIN_MENU_TEXT: Final[str] = "📱 *Menú Principal*\n\n1️⃣ Agendar cita\n2️⃣ Mis citas\n3️⃣ Recordatorios\n4️⃣ Información"
 
@@ -92,7 +88,10 @@ def parse_callback_data(data: str) -> BookingAction | None:
 
 
 def apply_transition(
-    current_state: BookingState, action: BookingAction | dict[str, Any], draft: DraftBooking, items: list[Any] | None = None
+    current_state: BookingState,
+    action: BookingAction | dict[str, Any],
+    draft: DraftBooking,
+    items: list[Any] | None = None,
 ) -> Result[TransitionOutcome]:
     # 0. Ensure action is a Pydantic model
     if isinstance(action, dict):
@@ -144,7 +143,9 @@ def apply_transition(
 
             return ok(
                 TransitionOutcome(
-                    nextState=SelectingDoctorState(specialtyId=specialty["id"], specialtyName=specialty["name"], items=[]),
+                    nextState=SelectingDoctorState(
+                        specialtyId=specialty["id"], specialtyName=specialty["name"], items=[]
+                    ),
                     responseText=build_loading_doctors_prompt(specialty["name"]),
                     advance=True,
                 )
@@ -184,7 +185,9 @@ def apply_transition(
                             items=doctor_items,
                             error="Opción inválida.",
                         ),
-                        responseText=build_doctors_prompt(current_state.specialtyName, doctor_items, "⚠️ Opción inválida."),
+                        responseText=build_doctors_prompt(
+                            current_state.specialtyName, doctor_items, "⚠️ Opción inválida."
+                        ),
                         advance=False,
                     )
                 )
@@ -192,7 +195,10 @@ def apply_transition(
             return ok(
                 TransitionOutcome(
                     nextState=SelectingTimeState(
-                        specialtyId=current_state.specialtyId, doctorId=doctor["id"], doctorName=doctor["name"], items=[]
+                        specialtyId=current_state.specialtyId,
+                        doctorId=doctor["id"],
+                        doctorName=doctor["name"],
+                        items=[],
                     ),
                     responseText=build_loading_slots_prompt(doctor["name"]),
                     advance=True,
@@ -297,7 +303,7 @@ def apply_transition(
             return ok(
                 TransitionOutcome(
                     nextState=CompletedState(bookingId="pending"),
-                    responseText="✅ *Reserva Confirmada*\n\nTu cita ha sido agendada correctamente.\nRecibirás un recordatorio antes de tu cita.",
+                    responseText="✅ *Reserva Confirmada*\n\nTu cita ha sido agendada correctamente.\nRecibirás un recordatorio antes de tu cita.",  # noqa: E501
                     advance=True,
                 )
             )

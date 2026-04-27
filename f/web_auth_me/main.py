@@ -1,4 +1,5 @@
 import asyncio
+
 # ============================================================================
 # PRE-FLIGHT CHECKLIST
 # Mission         : Get current user profile + role by user_id
@@ -9,15 +10,16 @@ import asyncio
 # RLS Tenant ID   : YES — with_tenant_context wraps all DB ops
 # Pydantic Schemas: YES — InputSchema validates user_id
 # ============================================================================
-
 from typing import Any
-from ..internal._wmill_adapter import log
+
 from ..internal._db_client import create_db_client
-from ..internal._result import with_tenant_context, Result, ok, fail
-from ._me_models import InputSchema, UserProfileResult
+from ..internal._result import Result, fail, with_tenant_context
+from ..internal._wmill_adapter import log
 from ._me_logic import get_user_profile
+from ._me_models import InputSchema, UserProfileResult
 
 MODULE = "web_auth_me"
+
 
 async def _main_async(args: dict[str, Any]) -> Result[UserProfileResult]:
     # 1. Validate Input
@@ -38,11 +40,12 @@ async def _main_async(args: dict[str, Any]) -> Result[UserProfileResult]:
         log("Internal error in web_auth_me", error=str(e), module=MODULE)
         return fail(f"Internal error: {e}")
     finally:
-        await conn.close() # pyright: ignore[reportUnknownMemberType]
+        await conn.close()  # pyright: ignore[reportUnknownMemberType]
 
 
 def main(args: dict) -> None:
     import traceback
+
     try:
         return asyncio.run(_main_async(args))
     except Exception as e:
@@ -50,11 +53,18 @@ def main(args: dict) -> None:
         # Intentamos usar el adaptador local si está disponible, si no print
         try:
             from ..internal._wmill_adapter import log
-            log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=os.path.basename(os.path.dirname(__file__)))
-        except:
+
+            log(
+                "CRITICAL_ENTRYPOINT_ERROR",
+                error=str(e),
+                traceback=tb,
+                module=MODULE,
+            )
+        except Exception:
             from ..internal._wmill_adapter import log
+
             log("BARE_EXCEPT_CAUGHT", file="main.py")
             print(f"CRITICAL ERROR in {__file__}: {e}\n{tb}")
-        
+
         # Elevamos para que Windmill marque como FAILED
-        raise RuntimeError(f"Execution failed: {e}")
+        raise RuntimeError(f"Execution failed: {e}") from e

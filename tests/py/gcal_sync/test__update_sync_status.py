@@ -1,6 +1,7 @@
 import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
+
 import f.gcal_sync._update_sync_status
+
 
 # This is an auto-generated test boilerplate for f.gcal_sync._update_sync_status
 @pytest.mark.asyncio

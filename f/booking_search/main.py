@@ -1,6 +1,5 @@
 from __future__ import annotations
-import asyncio
-import os
+
 # ============================================================================
 # PRE-FLIGHT CHECKLIST
 # Mission         : Search and filter bookings
@@ -11,16 +10,20 @@ import os
 # RLS Tenant ID   : YES (if provider_id is supplied, but since it is optional, we might query globally if authorized)
 # Zod Schemas     : YES — SearchInput validates all inputs
 # ============================================================================
+from typing import TYPE_CHECKING
 
-from typing import Any
 from pydantic import ValidationError
-from ..internal._wmill_adapter import log
+
 from ..internal._db_client import create_db_client
-from ..internal._result import Result
-from ._search_models import SearchInput, BookingSearchResult
+from ..internal._wmill_adapter import log
 from ._search_logic import execute_search
+from ._search_models import BookingSearchResult, SearchInput
+
+if TYPE_CHECKING:
+    from ..internal._result import Result
 
 MODULE = "booking_search"
+
 
 async def _main_async(args: dict[str, object]) -> Result[BookingSearchResult]:
     raw_input: object
@@ -49,7 +52,7 @@ async def _main_async(args: dict[str, object]) -> Result[BookingSearchResult]:
         err, result = await execute_search(conn, input_data)
         if err is not None:
             return err, None
-            
+
         if not result:
             return Exception("Search failed: no result returned"), None
 

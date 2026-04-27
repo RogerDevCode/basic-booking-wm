@@ -1,4 +1,5 @@
 import asyncio
+
 # ============================================================================
 # PRE-FLIGHT CHECKLIST
 # Mission         : User management CRUD + role change (admin-only)
@@ -9,15 +10,16 @@ import asyncio
 # RLS Tenant ID   : YES — with_tenant_context for isolation
 # Pydantic Schemas: YES — InputSchema validates action and fields
 # ============================================================================
+from typing import Any
 
-from typing import Any, Dict
-from ..internal._wmill_adapter import log
 from ..internal._db_client import create_db_client
-from ..internal._result import Result, ok, fail, with_tenant_context
-from ._user_models import InputSchema
+from ..internal._result import Result, fail, with_tenant_context
+from ..internal._wmill_adapter import log
 from ._user_logic import handle_user_actions
+from ._user_models import InputSchema
 
 MODULE = "web_admin_users"
+
 
 async def _main_async(args: dict[str, Any]) -> Result[Any]:
     # 1. Validate Input
@@ -32,8 +34,7 @@ async def _main_async(args: dict[str, Any]) -> Result[Any]:
         async def operation() -> Result[Any]:
             # Verify Requesting Admin
             admin_rows = await conn.fetch(
-                "SELECT role FROM users WHERE user_id = $1::uuid AND is_active = true LIMIT 1",
-                input_data.admin_user_id
+                "SELECT role FROM users WHERE user_id = $1::uuid AND is_active = true LIMIT 1", input_data.admin_user_id
             )
             if not admin_rows or admin_rows[0]["role"] != "admin":
                 return fail("Forbidden: admin access required")
@@ -46,11 +47,12 @@ async def _main_async(args: dict[str, Any]) -> Result[Any]:
         log("Admin Users Internal Error", error=str(e), module=MODULE)
         return fail(f"internal_error: {e}")
     finally:
-        await conn.close() # pyright: ignore[reportUnknownMemberType]
+        await conn.close()  # pyright: ignore[reportUnknownMemberType]
 
 
 def main(args: dict) -> None:
     import traceback
+
     try:
         return asyncio.run(_main_async(args))
     except Exception as e:
@@ -58,11 +60,18 @@ def main(args: dict) -> None:
         # Intentamos usar el adaptador local si está disponible, si no print
         try:
             from ..internal._wmill_adapter import log
-            log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=os.path.basename(os.path.dirname(__file__)))
-        except:
+
+            log(
+                "CRITICAL_ENTRYPOINT_ERROR",
+                error=str(e),
+                traceback=tb,
+                module=MODULE,
+            )
+        except Exception:
             from ..internal._wmill_adapter import log
+
             log("BARE_EXCEPT_CAUGHT", file="main.py")
             print(f"CRITICAL ERROR in {__file__}: {e}\n{tb}")
-        
+
         # Elevamos para que Windmill marque como FAILED
-        raise RuntimeError(f"Execution failed: {e}")
+        raise RuntimeError(f"Execution failed: {e}") from e

@@ -1,6 +1,9 @@
-from typing import Optional, TypedDict
+from typing import TypedDict
+
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
+
 from f.internal._config import DEFAULT_TIMEZONE
+
 
 class CompleteProfileResult(TypedDict):
     user_id: str
@@ -9,16 +12,18 @@ class CompleteProfileResult(TypedDict):
     rut: str
     role: str
 
+
 class UserRow(TypedDict):
     user_id: str
     full_name: str
-    email: Optional[str]
-    rut: Optional[str]
+    email: str | None
+    rut: str | None
     role: str
+
 
 class InputSchema(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
-    
+
     chat_id: str = Field(min_length=1)
     rut: str = Field(min_length=1, max_length=12)
     email: EmailStr

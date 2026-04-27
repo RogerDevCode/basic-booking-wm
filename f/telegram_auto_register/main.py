@@ -1,6 +1,5 @@
 from __future__ import annotations
-import asyncio
-import os
+
 # ============================================================================
 # PRE-FLIGHT CHECKLIST
 # Mission         : Auto-register user from Telegram webhook payload
@@ -11,15 +10,14 @@ import os
 # RLS Tenant ID   : YES — with_admin_context bypasses RLS for user discovery
 # Pydantic Schemas: YES — InputSchema validates Telegram webhook structure
 # ============================================================================
-
-from typing import Any
-from ..internal._wmill_adapter import log
 from ..internal._db_client import create_db_client
-from ..internal._result import Result, ok, fail, with_admin_context
-from ._auto_register_models import InputSchema, RegisterResult
+from ..internal._result import Result, fail, with_admin_context
+from ..internal._wmill_adapter import log
 from ._auto_register_logic import register_telegram_user
+from ._auto_register_models import InputSchema, RegisterResult
 
 MODULE = "telegram_auto_register"
+
 
 async def _main_async(args: dict[str, object]) -> Result[RegisterResult]:
     # 1. Validate Input

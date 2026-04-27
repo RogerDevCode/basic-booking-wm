@@ -1,6 +1,5 @@
 from __future__ import annotations
-import asyncio
-import os
+
 # ============================================================================
 # PRE-FLIGHT CHECKLIST
 # Mission         : Semantic search against knowledge base (keyword-based fallback)
@@ -11,15 +10,14 @@ import os
 # RLS Tenant ID   : YES — with_tenant_context wraps all DB ops
 # Pydantic Schemas: YES — InputSchema validates query and top_k
 # ============================================================================
-
-from typing import Any, Dict, cast
-from ..internal._wmill_adapter import log
 from ..internal._db_client import create_db_client
-from ..internal._result import with_tenant_context, Result, ok, fail
-from ._rag_models import InputSchema, RAGResult
+from ..internal._result import Result, fail, ok, with_tenant_context
+from ..internal._wmill_adapter import log
 from ._rag_logic import KBRepository, perform_keyword_search
+from ._rag_models import InputSchema, RAGResult
 
 MODULE = "rag_query"
+
 
 async def _main_async(args: dict[str, object]) -> Result[RAGResult]:
     # 1. Validate Input
@@ -33,7 +31,7 @@ async def _main_async(args: dict[str, object]) -> Result[RAGResult]:
         # 2. Execute within Tenant Context
         async def operation() -> Result[RAGResult]:
             repo = KBRepository(conn)
-            
+
             err_fetch, rows = await repo.fetch_active_entries(input_data.category)
             if err_fetch:
                 return fail(err_fetch)
@@ -43,12 +41,8 @@ async def _main_async(args: dict[str, object]) -> Result[RAGResult]:
                 return ok(res_empty)
 
             entries = perform_keyword_search(input_data.query, rows, input_data.top_k)
-            
-            res_full: RAGResult = {
-                "entries": entries,
-                "count": len(entries),
-                "method": "keyword"
-            }
+
+            res_full: RAGResult = {"entries": entries, "count": len(entries), "method": "keyword"}
             return ok(res_full)
 
         return await with_tenant_context(conn, input_data.provider_id, operation)

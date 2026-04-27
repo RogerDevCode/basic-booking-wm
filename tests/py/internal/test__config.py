@@ -1,6 +1,5 @@
-import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
 import f.internal._config
+
 
 # This is an auto-generated test boilerplate for f.internal._config
 def test__config_basic_import() -> None:

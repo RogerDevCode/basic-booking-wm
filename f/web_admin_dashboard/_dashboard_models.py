@@ -1,5 +1,7 @@
-from typing import Optional, TypedDict
-from pydantic import BaseModel, ConfigDict, Field
+from typing import TypedDict
+
+from pydantic import BaseModel, ConfigDict
+
 
 class AdminDashboardResult(TypedDict):
     total_users: int
@@ -9,7 +11,8 @@ class AdminDashboardResult(TypedDict):
     active_providers: int
     pending_bookings: int
 
+
 class InputSchema(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
-    
+
     admin_user_id: str

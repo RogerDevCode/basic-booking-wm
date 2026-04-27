@@ -1,8 +1,8 @@
-from typing import Optional, cast
 from ..internal._result import DBClient
 from ._availability_models import ProviderRow
 
-async def get_provider_service_id(db: DBClient, provider_id: str) -> Optional[str]:
+
+async def get_provider_service_id(db: DBClient, provider_id: str) -> str | None:
     rows = await db.fetch(
         """
         SELECT service_id FROM services
@@ -10,23 +10,21 @@ async def get_provider_service_id(db: DBClient, provider_id: str) -> Optional[st
         ORDER BY service_id
         LIMIT 1
         """,
-        provider_id
+        provider_id,
     )
     if not rows:
         return None
     return str(rows[0]["service_id"])
 
-async def get_provider(
-    db: DBClient,
-    provider_id: str
-) -> Optional[ProviderRow]:
+
+async def get_provider(db: DBClient, provider_id: str) -> ProviderRow | None:
     rows = await db.fetch(
         """
         SELECT provider_id, name, timezone FROM providers
         WHERE provider_id = $1::uuid AND is_active = true
         LIMIT 1
         """,
-        provider_id
+        provider_id,
     )
     if not rows:
         return None

@@ -1,19 +1,22 @@
-from typing import Any
-from typing import Optional, List, Literal, TypedDict, Dict, Any
-from pydantic import BaseModel, ConfigDict, Field
+from typing import Literal, TypedDict
+
+from pydantic import BaseModel, ConfigDict
+
 
 class ComponentStatus(TypedDict):
     component: str
-    status: Literal['healthy', 'degraded', 'unhealthy', 'not_configured']
+    status: Literal["healthy", "degraded", "unhealthy", "not_configured"]
     latency_ms: int
     message: str
 
+
 class HealthResult(TypedDict):
-    overall: Literal['healthy', 'degraded', 'unhealthy']
+    overall: Literal["healthy", "degraded", "unhealthy"]
     timestamp: str
-    components: List[ComponentStatus]
+    components: list[ComponentStatus]
+
 
 class InputSchema(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
-    
-    component: Literal['all', 'database', 'gcal', 'telegram', 'gmail'] = 'all'
+
+    component: Literal["all", "database", "gcal", "telegram", "gmail"] = "all"

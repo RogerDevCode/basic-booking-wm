@@ -1,5 +1,5 @@
 from __future__ import annotations
-import asyncio
+
 # ============================================================================
 # PRE-FLIGHT CHECKLIST
 # Mission         : Cancel old booking + create new one atomically (reschedule)
@@ -10,18 +10,18 @@ import asyncio
 # RLS Tenant ID   : YES — with_tenant_context wraps all DB ops
 # Zod Schemas     : YES — InputSchema validates all inputs
 # ============================================================================
-
-from typing import Any
 from pydantic import ValidationError
-from ..internal._wmill_adapter import log
+
 from ..internal._db_client import create_db_client
-from ..internal._result import with_tenant_context, Result
+from ..internal._result import Result, with_tenant_context
 from ..internal._state_machine import validate_transition
+from ..internal._wmill_adapter import log
+from ._reschedule_logic import authorize, execute_reschedule_logic
 from ._reschedule_models import RescheduleInput, RescheduleResult, RescheduleWriteResult
 from ._reschedule_repository import PostgresRescheduleRepository
-from ._reschedule_logic import execute_reschedule_logic, authorize
 
 MODULE = "booking_reschedule"
+
 
 async def main_async(args: dict[str, object]) -> Result[RescheduleResult]:
     raw_input: object
@@ -48,7 +48,7 @@ async def main_async(args: dict[str, object]) -> Result[RescheduleResult]:
 
     try:
         repo = PostgresRescheduleRepository(conn)
-        
+
         old_booking = await repo.fetch_booking(input_data.booking_id)
         if not old_booking:
             return Exception("Booking not found"), None
@@ -58,7 +58,7 @@ async def main_async(args: dict[str, object]) -> Result[RescheduleResult]:
         if not service:
             return Exception("Service not found"), None
 
-        err_trans, _ = validate_transition(old_booking["status"], 'rescheduled')
+        err_trans, _ = validate_transition(old_booking["status"], "rescheduled")
         if err_trans is not None:
             return err_trans, None
 
@@ -68,16 +68,16 @@ async def main_async(args: dict[str, object]) -> Result[RescheduleResult]:
 
         async def operation() -> Result[RescheduleWriteResult]:
             return await execute_reschedule_logic(repo, input_data, old_booking, service)
-        
+
         err, write = await with_tenant_context(conn, old_booking["provider_id"], operation)
-        
+
         if err is not None or not write:
             log("Reschedule failed", error=str(err), booking_id=input_data.booking_id, module=MODULE)
-            msg = str(err) if err else 'Transaction error'
-            if 'duplicate' in msg or 'unique' in msg:
-                return Exception('Idempotency conflict'), None
-            if 'overlap' in msg or 'exclusion' in msg:
-                return Exception('Slot already occupied'), None
+            msg = str(err) if err else "Transaction error"
+            if "duplicate" in msg or "unique" in msg:
+                return Exception("Idempotency conflict"), None
+            if "overlap" in msg or "exclusion" in msg:
+                return Exception("Slot already occupied"), None
             return (err or Exception(msg)), None
 
         result: RescheduleResult = {
@@ -87,10 +87,15 @@ async def main_async(args: dict[str, object]) -> Result[RescheduleResult]:
             "new_status": str(write["new_status"]),
             "old_start_time": old_booking["start_time"].isoformat(),
             "new_start_time": str(write["new_start_time"]),
-            "new_end_time": str(write["new_end_time"])
+            "new_end_time": str(write["new_end_time"]),
         }
 
-        log("Booking rescheduled successfully", old=result["old_booking_id"], new=result["new_booking_id"], module=MODULE)
+        log(
+            "Booking rescheduled successfully",
+            old=result["old_booking_id"],
+            new=result["new_booking_id"],
+            module=MODULE,
+        )
         return None, result
 
     except Exception as e:

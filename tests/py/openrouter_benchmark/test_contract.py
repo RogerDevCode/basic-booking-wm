@@ -1,6 +1,9 @@
+from unittest.mock import AsyncMock, patch
+
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
+
 from f.openrouter_benchmark.main import main
+
 
 @pytest.mark.asyncio
 async def test_openrouter_benchmark_success() -> None:
@@ -14,21 +17,26 @@ async def test_openrouter_benchmark_success() -> None:
         "error": None,
         "correct": True,
         "latencyMs": 100,
-        "totalTokens": 50
+        "totalTokens": 50,
     }
-    
-    with patch("f.openrouter_benchmark.main.get_variable", return_value="fake-key"), \
-         patch("f.openrouter_benchmark.main.run_benchmark_task", AsyncMock(return_value=(None, mock_res))):
-        
-        # Limit models and tasks for test speed if possible, 
+
+    with (
+        patch("f.openrouter_benchmark.main.get_variable", return_value="fake-key"),
+        patch("f.openrouter_benchmark.main.run_benchmark_task", AsyncMock(return_value=(None, mock_res))),
+    ):
+        # Limit models and tasks for test speed if possible,
         # but here we test the orchestration of the list
-        
+
         # Inject small lists for testing
-        with patch("f.openrouter_benchmark.main.MODELS", [{"id": "m1", "name": "M1"}]), \
-             patch("f.openrouter_benchmark.main.TASKS", [{"name": "t1", "userMessage": "hi", "expectedIntent": "i", "expectedHuman": False}]):
-            
+        with (
+            patch("f.openrouter_benchmark.main.MODELS", [{"id": "m1", "name": "M1"}]),
+            patch(
+                "f.openrouter_benchmark.main.TASKS",
+                [{"name": "t1", "userMessage": "hi", "expectedIntent": "i", "expectedHuman": False}],
+            ),
+        ):
             err, result = await main({})
-            
+
             assert err is None
             assert result is not None
             assert result["modelsTested"] == 1

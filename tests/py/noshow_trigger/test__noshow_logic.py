@@ -1,6 +1,7 @@
 import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
+
 import f.noshow_trigger._noshow_logic
+
 
 # This is an auto-generated test boilerplate for f.noshow_trigger._noshow_logic
 @pytest.mark.asyncio

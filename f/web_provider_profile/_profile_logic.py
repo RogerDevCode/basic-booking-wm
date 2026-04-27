@@ -1,9 +1,8 @@
-from typing import Any
 from datetime import datetime
-from typing import List, Optional, Dict, Any, cast, Tuple
-from ..internal._result import Result, DBClient, ok, fail
-from ..internal._crypto import hash_password, verify_password, validate_password_policy
-from ._profile_models import ProfileRow, InputSchema
+
+from ..internal._result import DBClient, Result, fail, ok
+from ._profile_models import InputSchema, ProfileRow
+
 
 class ProfileRepository:
     def __init__(self, db: DBClient) -> None:
@@ -30,10 +29,11 @@ class ProfileRepository:
                 WHERE p.id = $1::uuid
                 LIMIT 1
                 """,
-                provider_id
+                provider_id,
             )
-            if not rows: return fail("profile_not_found")
-            
+            if not rows:
+                return fail("profile_not_found")
+
             r = rows[0]
             res: ProfileRow = {
                 "id": str(r["id"]),
@@ -54,7 +54,11 @@ class ProfileRepository:
                 "commune_name": str(r["commune_name"]) if r.get("commune_name") else None,
                 "is_active": bool(r["is_active"]),
                 "has_password": bool(r.get("password_hash")),
-                "last_password_change": r["last_password_change"].isoformat() if isinstance(r.get("last_password_change"), datetime) else str(r.get("last_password_change")) if r.get("last_password_change") else None,
+                "last_password_change": r["last_password_change"].isoformat()
+                if isinstance(r.get("last_password_change"), datetime)
+                else str(r.get("last_password_change"))
+                if r.get("last_password_change")
+                else None,
             }
             return ok(res)
         except Exception as e:
@@ -62,9 +66,18 @@ class ProfileRepository:
 
     async def update(self, provider_id: str, data: InputSchema) -> Result[None]:
         allowed = [
-            'name', 'email', 'phone_app', 'phone_contact', 'telegram_chat_id',
-            'gcal_calendar_id', 'address_street', 'address_number',
-            'address_complement', 'address_sector', 'region_id', 'commune_id'
+            "name",
+            "email",
+            "phone_app",
+            "phone_contact",
+            "telegram_chat_id",
+            "gcal_calendar_id",
+            "address_street",
+            "address_number",
+            "address_complement",
+            "address_sector",
+            "region_id",
+            "commune_id",
         ]
         fields = []
         params = []
@@ -75,9 +88,10 @@ class ProfileRepository:
                 fields.append(f"{f} = ${idx}")
                 params.append(val)
                 idx += 1
-        
-        if not fields: return fail("no_changes_provided")
-        
+
+        if not fields:
+            return fail("no_changes_provided")
+
         params.append(provider_id)
         query = f"UPDATE providers SET {', '.join(fields)}, updated_at = NOW() WHERE id = ${idx}::uuid"
         try:
@@ -88,16 +102,19 @@ class ProfileRepository:
 
     async def get_password_hash(self, provider_id: str) -> Result[str]:
         rows = await self.db.fetch("SELECT password_hash FROM providers WHERE id = $1::uuid LIMIT 1", provider_id)
-        if not rows: return fail("provider_not_found")
+        if not rows:
+            return fail("provider_not_found")
         h = rows[0].get("password_hash")
-        if not h: return fail("no_password_set")
+        if not h:
+            return fail("no_password_set")
         return ok(str(h))
 
     async def update_password(self, provider_id: str, new_hash: str) -> Result[None]:
         try:
             await self.db.execute(
-                "UPDATE providers SET password_hash = $1, last_password_change = NOW(), updated_at = NOW() WHERE id = $2::uuid",
-                new_hash, provider_id
+                "UPDATE providers SET password_hash = $1, last_password_change = NOW(), updated_at = NOW() WHERE id = $2::uuid",  # noqa: E501
+                new_hash,
+                provider_id,
             )
             return ok(None)
         except Exception as e:

@@ -3,15 +3,12 @@ from __future__ import annotations
 import re
 from typing import (
     TYPE_CHECKING,
-    Awaitable,
-    Callable,
     Protocol,
     TypeIs,
-    cast,
 )
 
 if TYPE_CHECKING:
-    pass
+    from collections.abc import Awaitable, Callable
 
 # PEP 695 Type Alias
 type Result[T] = tuple[Exception | None, T | None]
@@ -50,29 +47,22 @@ async def wrap[T](coro: Awaitable[T]) -> Result[T]:
 class DBClient(Protocol):
     """Protocol for database client operations."""
 
-    async def fetch(self, query: str, *args: object) -> list[dict[str, object]]:
-        ...
+    async def fetch(self, query: str, *args: object) -> list[dict[str, object]]: ...
 
-    async def fetchrow(self, query: str, *args: object) -> dict[str, object] | None:
-        ...
+    async def fetchrow(self, query: str, *args: object) -> dict[str, object] | None: ...
 
-    async def fetchval(self, query: str, *args: object) -> object | None:
-        ...
+    async def fetchval(self, query: str, *args: object) -> object | None: ...
 
-    async def execute(self, query: str, *args: object) -> str:
-        ...
+    async def execute(self, query: str, *args: object) -> str: ...
 
-    async def close(self) -> None:
-        ...
+    async def close(self) -> None: ...
 
 
 async def with_tenant_context[T](
     client: DBClient, tenant_id: str, operation: Callable[[], Awaitable[Result[T]]]
 ) -> Result[T]:
     """Executes DB logic within a tenant context."""
-    uuid_re = re.compile(
-        r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I
-    )
+    uuid_re = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
     if not uuid_re.match(tenant_id):
         return fail(f'invalid_tenant_id: "{tenant_id}"')
 
@@ -91,7 +81,7 @@ async def with_tenant_context[T](
         # we can check is_fail_outcome
         if is_fail_outcome(res):
             return fail(res[0])
-        
+
         return fail("unknown_transaction_failure")
 
     except Exception as error:
@@ -101,12 +91,10 @@ async def with_tenant_context[T](
             from ._wmill_adapter import log
 
             log("SILENT_ERROR_CAUGHT", error=str(e), file="_result.py")
-        return fail(f"transaction_failed: {str(error)}")
+        return fail(f"transaction_failed: {error!s}")
 
 
-async def with_admin_context[T](
-    client: DBClient, operation: Callable[[], Awaitable[Result[T]]]
-) -> Result[T]:
+async def with_admin_context[T](client: DBClient, operation: Callable[[], Awaitable[Result[T]]]) -> Result[T]:
     """Executes DB logic with app.admin_override = 'true' to bypass RLS."""
     try:
         await client.execute("BEGIN")
@@ -121,7 +109,7 @@ async def with_admin_context[T](
         await client.execute("ROLLBACK")
         if is_fail_outcome(res):
             return fail(res[0])
-            
+
         return fail("unknown_admin_transaction_failure")
 
     except Exception as error:
@@ -131,4 +119,4 @@ async def with_admin_context[T](
             from ._wmill_adapter import log
 
             log("SILENT_ERROR_CAUGHT", error=str(e), file="_result.py")
-        return fail(f"transaction_failed: {str(error)}")
+        return fail(f"transaction_failed: {error!s}")

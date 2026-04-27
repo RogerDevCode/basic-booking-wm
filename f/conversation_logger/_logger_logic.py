@@ -1,8 +1,13 @@
 from __future__ import annotations
+
 import json
-from typing import cast, Any
-from ..internal._result import Result, DBClient, ok, fail
-from ._logger_models import LogResult, InputSchema
+from typing import TYPE_CHECKING
+
+from ..internal._result import DBClient, Result, fail, ok
+
+if TYPE_CHECKING:
+    from ._logger_models import InputSchema, LogResult
+
 
 async def persist_log(db: DBClient, input_data: InputSchema) -> Result[LogResult]:
     try:
@@ -14,9 +19,13 @@ async def persist_log(db: DBClient, input_data: InputSchema) -> Result[LogResult
               $1::uuid, $2, $3, $4, $5, $6::jsonb, $7::uuid
             ) RETURNING message_id
             """,
-            input_data.client_id, input_data.channel, input_data.direction,
-            input_data.content, input_data.intent, json.dumps(input_data.metadata),
-            input_data.provider_id
+            input_data.client_id,
+            input_data.channel,
+            input_data.direction,
+            input_data.content,
+            input_data.intent,
+            json.dumps(input_data.metadata),
+            input_data.provider_id,
         )
 
         if not rows:

@@ -1,20 +1,23 @@
-from typing import Any
-from typing import List, Optional, Dict, Any, cast
-from ..internal._result import Result, DBClient, ok, fail
-from ._regions_models import RegionRow, CommuneRow
+from typing import TYPE_CHECKING, Any
 
-async def list_regions(db: DBClient) -> Result[Dict[str, Any]]:
+from ..internal._result import DBClient, Result, fail, ok
+
+if TYPE_CHECKING:
+    from ._regions_models import CommuneRow, RegionRow
+
+
+async def list_regions(db: DBClient) -> Result[dict[str, Any]]:
     try:
         rows = await db.fetch(
-            "SELECT region_id, name, code, is_active, sort_order FROM regions WHERE is_active = true ORDER BY sort_order ASC, name ASC"
+            "SELECT region_id, name, code, is_active, sort_order FROM regions WHERE is_active = true ORDER BY sort_order ASC, name ASC"  # noqa: E501
         )
-        regions: List[RegionRow] = [
+        regions: list[RegionRow] = [
             {
                 "region_id": int(r["region_id"]),
                 "name": str(r["name"]),
                 "code": str(r["code"]),
                 "is_active": bool(r["is_active"]),
-                "sort_order": int(r["sort_order"])
+                "sort_order": int(r["sort_order"]),
             }
             for r in rows
         ]
@@ -22,7 +25,8 @@ async def list_regions(db: DBClient) -> Result[Dict[str, Any]]:
     except Exception as e:
         return fail(f"list_regions_failed: {e}")
 
-async def list_communes(db: DBClient, region_id: Optional[int]) -> Result[Dict[str, Any]]:
+
+async def list_communes(db: DBClient, region_id: int | None) -> Result[dict[str, Any]]:
     try:
         if region_id is not None:
             rows = await db.fetch(
@@ -32,7 +36,7 @@ async def list_communes(db: DBClient, region_id: Optional[int]) -> Result[Dict[s
                 WHERE c.is_active = true AND c.region_id = $1
                 ORDER BY c.name ASC
                 """,
-                region_id
+                region_id,
             )
         else:
             rows = await db.fetch(
@@ -42,14 +46,14 @@ async def list_communes(db: DBClient, region_id: Optional[int]) -> Result[Dict[s
                 WHERE c.is_active = true ORDER BY r.sort_order ASC, c.name ASC
                 """
             )
-        
-        communes: List[CommuneRow] = [
+
+        communes: list[CommuneRow] = [
             {
                 "commune_id": int(r["commune_id"]),
                 "name": str(r["name"]),
                 "region_id": int(r["region_id"]),
                 "is_active": bool(r["is_active"]),
-                "region_name": str(r["region_name"])
+                "region_name": str(r["region_name"]),
             }
             for r in rows
         ]
@@ -57,7 +61,8 @@ async def list_communes(db: DBClient, region_id: Optional[int]) -> Result[Dict[s
     except Exception as e:
         return fail(f"list_communes_failed: {e}")
 
-async def search_communes(db: DBClient, search: str, region_id: Optional[int]) -> Result[Dict[str, Any]]:
+
+async def search_communes(db: DBClient, search: str, region_id: int | None) -> Result[dict[str, Any]]:
     try:
         pattern = f"%{search}%"
         if region_id is not None:
@@ -69,7 +74,8 @@ async def search_communes(db: DBClient, search: str, region_id: Optional[int]) -
                   AND c.name ILIKE $2
                 ORDER BY c.name ASC LIMIT 50
                 """,
-                region_id, pattern
+                region_id,
+                pattern,
             )
         else:
             rows = await db.fetch(
@@ -79,16 +85,16 @@ async def search_communes(db: DBClient, search: str, region_id: Optional[int]) -
                 WHERE c.is_active = true AND c.name ILIKE $1
                 ORDER BY r.sort_order ASC, c.name ASC LIMIT 50
                 """,
-                pattern
+                pattern,
             )
 
-        communes: List[CommuneRow] = [
+        communes: list[CommuneRow] = [
             {
                 "commune_id": int(r["commune_id"]),
                 "name": str(r["name"]),
                 "region_id": int(r["region_id"]),
                 "is_active": bool(r["is_active"]),
-                "region_name": str(r["region_name"])
+                "region_name": str(r["region_name"]),
             }
             for r in rows
         ]

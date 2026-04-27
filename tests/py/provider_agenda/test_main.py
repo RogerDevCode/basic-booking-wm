@@ -1,6 +1,7 @@
 import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
+
 import f.provider_agenda.main
+
 
 # This is an auto-generated test boilerplate for f.provider_agenda.main
 @pytest.mark.asyncio

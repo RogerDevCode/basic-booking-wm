@@ -1,6 +1,5 @@
 from __future__ import annotations
-import asyncio
-import os
+
 # ============================================================================
 # PRE-FLIGHT CHECKLIST
 # Mission         : Handle Telegram inline keyboard button actions
@@ -11,17 +10,20 @@ import os
 # RLS Tenant ID   : YES — with_tenant_context wraps all DB ops
 # Pydantic Schemas: YES — InputSchema validates callback_data format
 # ============================================================================
+from typing import TYPE_CHECKING
 
-from typing import Any, Dict, Optional
-from ..internal._wmill_adapter import log, get_variable
-from ..internal._result import Result
-from ._callback_models import InputSchema, ActionContext, ActionResult
-from ._callback_logic import parse_callback_data, answer_callback_query, send_followup_message
-from ._callback_router import TelegramRouter, ConfirmHandler, CancelHandler, AcknowledgeHandler
+from ..internal._wmill_adapter import get_variable
+from ._callback_logic import answer_callback_query, parse_callback_data, send_followup_message
+from ._callback_models import ActionContext, InputSchema
+from ._callback_router import AcknowledgeHandler, CancelHandler, ConfirmHandler, TelegramRouter
+
+if TYPE_CHECKING:
+    from ..internal._result import Result
 
 MODULE = "telegram_callback"
 
-async def _main_async(args: dict[str, object]) -> Result[Dict[str, object]]:
+
+async def _main_async(args: dict[str, object]) -> Result[dict[str, object]]:
     # 1. Validate Input
     try:
         input_data = InputSchema.model_validate(args)
@@ -50,9 +52,9 @@ async def _main_async(args: dict[str, object]) -> Result[Dict[str, object]]:
 
     # 5. Route and execute action
     router = TelegramRouter()
-    router.register('confirm', ConfirmHandler())
-    router.register('cancel', CancelHandler())
-    router.register('acknowledge', AcknowledgeHandler())
+    router.register("confirm", ConfirmHandler())
+    router.register("cancel", CancelHandler())
+    router.register("acknowledge", AcknowledgeHandler())
 
     context: ActionContext = {
         "botToken": bot_token,
@@ -60,7 +62,7 @@ async def _main_async(args: dict[str, object]) -> Result[Dict[str, object]]:
         "booking_id": booking_id,
         "client_id": input_data.client_id,
         "chat_id": input_data.chat_id,
-        "callback_query_id": input_data.callback_query_id
+        "callback_query_id": input_data.callback_query_id,
     }
 
     err_route, result = await router.route(action, context)
@@ -73,15 +75,15 @@ async def _main_async(args: dict[str, object]) -> Result[Dict[str, object]]:
     if result.get("followUpText"):
         await send_followup_message(bot_token, input_data.chat_id, str(result["followUpText"]))
 
-    res: Dict[str, object] = {
+    res: dict[str, object] = {
         "action": action,
         "booking_id": booking_id,
         "callback_query_id": input_data.callback_query_id,
-        "response_text": result["responseText"]
+        "response_text": result["responseText"],
     }
     return None, res
 
 
-async def main(args: dict[str, object]) -> Result[Dict[str, object]]:
+async def main(args: dict[str, object]) -> Result[dict[str, object]]:
     """Windmill entrypoint."""
     return await _main_async(args)

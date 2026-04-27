@@ -1,15 +1,20 @@
 from __future__ import annotations
+
 import json
-from datetime import datetime, date
-from typing import Protocol, Any, cast
-from ._booking_create_models import (
-    ClientContext,
-    ProviderContext,
-    ServiceContext,
-    InputSchema,
-    BookingCreated,
-)
-from ..internal._result import DBClient
+from typing import TYPE_CHECKING, Any, Protocol, cast
+
+if TYPE_CHECKING:
+    from datetime import date, datetime
+
+    from ..internal._result import DBClient
+    from ._booking_create_models import (
+        BookingCreated,
+        ClientContext,
+        InputSchema,
+        ProviderContext,
+        ServiceContext,
+    )
+
 
 class BookingCreateRepository(Protocol):
     async def get_client_context(self, client_id: str) -> ClientContext | None: ...
@@ -19,14 +24,15 @@ class BookingCreateRepository(Protocol):
     async def is_provider_scheduled(self, provider_id: str, day_of_week: int) -> bool: ...
     async def has_overlapping_booking(self, provider_id: str, start_time: datetime, end_time: datetime) -> bool: ...
     async def insert_booking(
-        self, 
-        input_data: InputSchema, 
-        end_time: datetime, 
+        self,
+        input_data: InputSchema,
+        end_time: datetime,
         target_status: str,
         provider_name: str,
         service_name: str,
-        client_name: str
+        client_name: str,
     ) -> BookingCreated: ...
+
 
 class PostgresBookingCreateRepository:
     def __init__(self, client: DBClient) -> None:
@@ -34,8 +40,7 @@ class PostgresBookingCreateRepository:
 
     async def get_client_context(self, client_id: str) -> ClientContext | None:
         row = await self._client.fetchrow(
-            "SELECT client_id, name FROM clients WHERE client_id = $1::uuid LIMIT 1",
-            client_id
+            "SELECT client_id, name FROM clients WHERE client_id = $1::uuid LIMIT 1", client_id
         )
         if not row:
             return None
@@ -49,15 +54,11 @@ class PostgresBookingCreateRepository:
             LIMIT 1
             FOR UPDATE
             """,
-            provider_id
+            provider_id,
         )
         if not row:
             return None
-        return {
-            "id": str(row["provider_id"]), 
-            "name": str(row["name"]), 
-            "timezone": str(row["timezone"])
-        }
+        return {"id": str(row["provider_id"]), "name": str(row["name"]), "timezone": str(row["timezone"])}
 
     async def get_service_context(self, service_id: str, provider_id: str) -> ServiceContext | None:
         row = await self._client.fetchrow(
@@ -69,15 +70,18 @@ class PostgresBookingCreateRepository:
             LIMIT 1
             """,
             service_id,
-            provider_id
+            provider_id,
         )
         if not row:
             return None
-        return cast(ServiceContext, {
-            "id": str(row["service_id"]),
-            "name": str(row["name"]),
-            "duration": int(cast(Any, row["duration_minutes"]))
-        })
+        return cast(
+            "ServiceContext",
+            {
+                "id": str(row["service_id"]),
+                "name": str(row["name"]),
+                "duration": int(cast("Any", row["duration_minutes"])),
+            },
+        )
 
     async def is_provider_blocked(self, provider_id: str, target_date: date) -> bool:
         row = await self._client.fetchrow(
@@ -89,7 +93,7 @@ class PostgresBookingCreateRepository:
             LIMIT 1
             """,
             provider_id,
-            target_date
+            target_date,
         )
         return row is not None
 
@@ -103,7 +107,7 @@ class PostgresBookingCreateRepository:
             LIMIT 1
             """,
             provider_id,
-            day_of_week
+            day_of_week,
         )
         return row is not None
 
@@ -119,18 +123,18 @@ class PostgresBookingCreateRepository:
             """,
             provider_id,
             end_time,
-            start_time
+            start_time,
         )
         return row is not None
 
     async def insert_booking(
-        self, 
-        input_data: InputSchema, 
-        end_time: datetime, 
+        self,
+        input_data: InputSchema,
+        end_time: datetime,
         target_status: str,
         provider_name: str,
         service_name: str,
-        client_name: str
+        client_name: str,
     ) -> BookingCreated:
         row = await self._client.fetchrow(
             """
@@ -157,11 +161,11 @@ class PostgresBookingCreateRepository:
             end_time,
             target_status,
             input_data.idempotency_key,
-            input_data.notes
+            input_data.notes,
         )
 
         if not row:
-            raise RuntimeError('INSERT returned no rows')
+            raise RuntimeError("INSERT returned no rows")
 
         booking_id_str = str(row["booking_id"])
 
@@ -179,7 +183,7 @@ class PostgresBookingCreateRepository:
             input_data.actor,
             input_data.client_id,
             "Booking created",
-            json.dumps({"channel": input_data.channel})
+            json.dumps({"channel": input_data.channel}),
         )
 
         return {

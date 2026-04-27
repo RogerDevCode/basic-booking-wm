@@ -1,6 +1,5 @@
-import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
 import f.booking_search._search_models
+
 
 # This is an auto-generated test boilerplate for f.booking_search._search_models
 def test__search_models_basic_import() -> None:

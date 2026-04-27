@@ -1,6 +1,7 @@
 import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
+
 import f.openrouter_benchmark.main
+
 
 # This is an auto-generated test boilerplate for f.openrouter_benchmark.main
 @pytest.mark.asyncio

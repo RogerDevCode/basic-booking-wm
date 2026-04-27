@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from typing import Final, Literal, cast
+from typing import Literal, cast
 
 from ._ai_agent_models import AvailabilityContext, ConversationState, EntityMap, EscalationLevel
 from ._constants import (

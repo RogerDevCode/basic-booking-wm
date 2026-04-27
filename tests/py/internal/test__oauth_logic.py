@@ -1,6 +1,7 @@
 import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
+
 import f.internal.gcal_utils._oauth_logic
+
 
 # This is an auto-generated test boilerplate for f.internal.gcal_utils._oauth_logic
 @pytest.mark.asyncio

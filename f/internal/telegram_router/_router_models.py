@@ -1,18 +1,22 @@
 from __future__ import annotations
-from typing import Optional, Any, List
-from pydantic import BaseModel, ConfigDict, Field
+
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict
+
 
 class RouterInput(BaseModel):
     model_config = ConfigDict(strict=True)
-    
+
     chat_id: str
     user_input: str
-    state: Optional[dict[str, Any]] = None
+    state: dict[str, Any] | None = None
+
 
 class RouterResult(BaseModel):
     model_config = ConfigDict(strict=True)
     handled: bool
-    response_text: Optional[str] = None
-    nextState: Optional[dict[str, Any]] = None
-    nextDraft: Optional[dict[str, Any]] = None
-    inline_buttons: Optional[List[dict[str, Any]]] = None
+    response_text: str | None = None
+    nextState: dict[str, Any] | None = None
+    nextDraft: dict[str, Any] | None = None
+    inline_buttons: list[dict[str, Any]] | None = None

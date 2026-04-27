@@ -1,6 +1,6 @@
-from typing import Optional, cast
-from f.internal._result import Result, DBClient, ok, fail
 from f.internal._date_resolver import resolve_date, resolve_time
+from f.internal._result import DBClient, Result, fail, ok
+
 from ._get_entity import get_entity
 from ._orchestrator_models import OrchestratorInput, ResolvedContext
 
@@ -13,22 +13,20 @@ RLS Tenant ID    : NO — discovery mode
 Zod Schemas      : NO
 """
 
-async def resolve_context(
-    db: DBClient,
-    input_data: OrchestratorInput
-) -> Result[ResolvedContext]:
+
+async def resolve_context(db: DBClient, input_data: OrchestratorInput) -> Result[ResolvedContext]:
     """
     Intelligently resolves missing IDs and normalises date/time.
     """
     try:
-        tenant_id: Optional[str] = input_data.tenant_id
-        client_id: Optional[str] = input_data.client_id
-        
+        tenant_id: str | None = input_data.tenant_id
+        client_id: str | None = input_data.client_id
+
         # Try to get from entities if not explicitly provided
-        provider_id: Optional[str] = input_data.provider_id or get_entity(input_data.entities, "provider_id")
-        service_id: Optional[str] = input_data.service_id or get_entity(input_data.entities, "service_id")
-        res_date: Optional[str] = input_data.date or get_entity(input_data.entities, "date")
-        res_time: Optional[str] = input_data.time or get_entity(input_data.entities, "time")
+        provider_id: str | None = input_data.provider_id or get_entity(input_data.entities, "provider_id")
+        service_id: str | None = input_data.service_id or get_entity(input_data.entities, "service_id")
+        res_date: str | None = input_data.date or get_entity(input_data.entities, "date")
+        res_time: str | None = input_data.time or get_entity(input_data.entities, "time")
 
         provider_name = get_entity(input_data.entities, "provider_name")
         specialty_name = get_entity(input_data.entities, "specialty_name")
@@ -36,10 +34,7 @@ async def resolve_context(
         # 1. Intelligent Provider Resolution by Name
         if not provider_id and provider_name:
             # Note: ILIKE used for case-insensitive search
-            rows = await db.fetch(
-                "SELECT provider_id FROM providers WHERE name ILIKE $1 LIMIT 1",
-                f"%{provider_name}%"
-            )
+            rows = await db.fetch("SELECT provider_id FROM providers WHERE name ILIKE $1 LIMIT 1", f"%{provider_name}%")
             if rows:
                 provider_id = str(rows[0]["provider_id"])
 
@@ -53,7 +48,7 @@ async def resolve_context(
                 WHERE sp.name ILIKE $1
                 LIMIT 1
                 """,
-                f"%{specialty_name}%"
+                f"%{specialty_name}%",
             )
             if rows:
                 service_id = str(rows[0]["service_id"])
@@ -63,7 +58,7 @@ async def resolve_context(
             abs_date = resolve_date(res_date)
             if abs_date:
                 res_date = abs_date
-                
+
         if res_time:
             abs_time = resolve_time(res_time)
             if abs_time:
@@ -86,8 +81,7 @@ async def resolve_context(
         # 5. Client Resolution by Telegram Chat ID
         if not client_id and input_data.telegram_chat_id:
             rows = await db.fetch(
-                "SELECT client_id FROM clients WHERE telegram_chat_id = $1 LIMIT 1",
-                input_data.telegram_chat_id
+                "SELECT client_id FROM clients WHERE telegram_chat_id = $1 LIMIT 1", input_data.telegram_chat_id
             )
             if rows:
                 client_id = str(rows[0]["client_id"])
@@ -96,17 +90,15 @@ async def resolve_context(
                 name = input_data.telegram_name or "Usuario Telegram"
                 rows = await db.fetch(
                     "INSERT INTO clients (name, telegram_chat_id) VALUES ($1, $2) RETURNING client_id",
-                    name, input_data.telegram_chat_id
+                    name,
+                    input_data.telegram_chat_id,
                 )
                 if rows:
                     client_id = str(rows[0]["client_id"])
 
         # 6. Service Fallback (Pick first service of the provider)
         if not service_id and provider_id:
-            rows = await db.fetch(
-                "SELECT service_id FROM services WHERE provider_id = $1::uuid LIMIT 1",
-                provider_id
-            )
+            rows = await db.fetch("SELECT service_id FROM services WHERE provider_id = $1::uuid LIMIT 1", provider_id)
             if rows:
                 service_id = str(rows[0]["service_id"])
 

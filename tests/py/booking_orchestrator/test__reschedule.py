@@ -1,6 +1,7 @@
 import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
+
 import f.booking_orchestrator.handlers._reschedule
+
 
 # This is an auto-generated test boilerplate for f.booking_orchestrator.handlers._reschedule
 @pytest.mark.asyncio

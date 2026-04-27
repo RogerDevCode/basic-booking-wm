@@ -1,6 +1,7 @@
-from typing import Any
-from typing import Optional, List, Literal, TypedDict, Dict, Any
+from typing import Literal, TypedDict
+
 from pydantic import BaseModel, ConfigDict, Field
+
 
 class RegionRow(TypedDict):
     region_id: int
@@ -9,6 +10,7 @@ class RegionRow(TypedDict):
     is_active: bool
     sort_order: int
 
+
 class CommuneRow(TypedDict):
     commune_id: int
     name: str
@@ -16,9 +18,10 @@ class CommuneRow(TypedDict):
     region_name: str
     is_active: bool
 
+
 class InputSchema(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
-    
-    action: Literal['list_regions', 'list_communes', 'search_communes']
-    region_id: Optional[int] = None
-    search: Optional[str] = Field(None, max_length=100)
+
+    action: Literal["list_regions", "list_communes", "search_communes"]
+    region_id: int | None = None
+    search: str | None = Field(None, max_length=100)

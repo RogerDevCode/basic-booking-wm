@@ -1,6 +1,7 @@
 import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
+
 import f.booking_cancel._booking_cancel_repository
+
 
 # This is an auto-generated test boilerplate for f.booking_cancel._booking_cancel_repository
 @pytest.mark.asyncio

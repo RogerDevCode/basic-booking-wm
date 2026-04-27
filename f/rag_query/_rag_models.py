@@ -1,5 +1,7 @@
-from typing import Optional, List, Literal, TypedDict
+from typing import Literal, TypedDict
+
 from pydantic import BaseModel, ConfigDict, Field
+
 
 class KBEntry(TypedDict):
     kb_id: str
@@ -8,10 +10,12 @@ class KBEntry(TypedDict):
     content: str
     similarity: float
 
+
 class RAGResult(TypedDict):
-    entries: List[KBEntry]
+    entries: list[KBEntry]
     count: int
-    method: Literal['keyword', 'vector']
+    method: Literal["keyword", "vector"]
+
 
 class KBRow(TypedDict):
     kb_id: str
@@ -19,11 +23,14 @@ class KBRow(TypedDict):
     title: str
     content: str
 
+
 class InputSchema(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
-    
+
     query: str = Field(min_length=1, max_length=500)
     top_k: int = Field(default=5, ge=1, le=20)
-    category: Optional[str] = None
+    category: str | None = None
     provider_id: str
+
+
 # Note: provider_id is used for RLS context

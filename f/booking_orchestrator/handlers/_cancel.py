@@ -1,9 +1,9 @@
-from typing import cast
-from f.booking_orchestrator._orchestrator_models import OrchestratorInput, OrchestratorResult
-from f.booking_orchestrator._get_entity import get_entity
-from ._get_my_bookings import handle_get_my_bookings
 from f.booking_cancel.main import main_async as cancel_booking
-from f.internal._result import Result, DBClient, ok, fail
+from f.booking_orchestrator._get_entity import get_entity
+from f.booking_orchestrator._orchestrator_models import OrchestratorInput, OrchestratorResult
+from f.internal._result import DBClient, Result, ok
+
+from ._get_my_bookings import handle_get_my_bookings
 
 """
 PRE-FLIGHT
@@ -16,10 +16,8 @@ RLS Tenant ID    : YES (delegated)
 Zod Schemas      : NO
 """
 
-async def handle_cancel_booking(
-    conn: DBClient,
-    input_data: OrchestratorInput
-) -> Result[OrchestratorResult]:
+
+async def handle_cancel_booking(conn: DBClient, input_data: OrchestratorInput) -> Result[OrchestratorResult]:
     booking_id = input_data.booking_id or get_entity(input_data.entities, "booking_id")
 
     if not booking_id:

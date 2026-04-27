@@ -1,7 +1,7 @@
 from __future__ import annotations
-import asyncio
-import os
-from typing import Any, TypedDict, cast
+
+from typing import TypedDict
+
 from ._constants import INTENT
 from ._tfidf_classifier import classify_intent
 
@@ -16,11 +16,13 @@ RLS Tenant ID    : NO
 Zod Schemas      : NO — manual dict validation for wmill compatibility
 """
 
+
 class ExtractedIntent(TypedDict):
     intent: str
     confidence: float
     entities: dict[str, object]
     requires_human: bool
+
 
 async def _main_async(args: dict[str, object]) -> ExtractedIntent:
     """
@@ -29,16 +31,11 @@ async def _main_async(args: dict[str, object]) -> ExtractedIntent:
     """
     text = str(args.get("text", ""))
     if not text:
-        return {
-            "intent": INTENT["DESCONOCIDO"],
-            "confidence": 0.0,
-            "entities": {},
-            "requires_human": False
-        }
+        return {"intent": INTENT["DESCONOCIDO"], "confidence": 0.0, "entities": {}, "requires_human": False}
 
     # 1. Intent Classification
     result = classify_intent(text)
-    
+
     # 2. Determine if human escalation is required
     requires_human = result["intent"] == INTENT["URGENCIA"] or result["confidence"] < 0.4
 
@@ -46,21 +43,23 @@ async def _main_async(args: dict[str, object]) -> ExtractedIntent:
         "intent": result["intent"],
         "confidence": result["confidence"],
         "entities": {},
-        "requires_human": requires_human
+        "requires_human": requires_human,
     }
 
 
 async def main(args: dict[str, object]) -> ExtractedIntent | None:
     import traceback
+
     try:
         return await _main_async(args)
     except Exception as e:
         tb = traceback.format_exc()
         try:
             from ..internal._wmill_adapter import log
+
             log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module="nlu")
         except Exception:
             print(f"CRITICAL ERROR in nlu: {e}\n{tb}")
-        
+
         # Elevamos para que Windmill marque como FAILED
-        raise RuntimeError(f"Execution failed: {e}")
+        raise RuntimeError(f"Execution failed: {e}") from e

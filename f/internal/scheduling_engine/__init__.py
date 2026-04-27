@@ -1,4 +1,11 @@
 from ._scheduling_logic import get_availability, get_availability_range, validate_override
-from ._scheduling_models import AvailabilityResult, TimeSlot, AvailabilityQuery
+from ._scheduling_models import AvailabilityQuery, AvailabilityResult, TimeSlot
 
-__all__ = ["get_availability", "get_availability_range", "validate_override", "AvailabilityResult", "TimeSlot", "AvailabilityQuery"]
+__all__ = [
+    "AvailabilityQuery",
+    "AvailabilityResult",
+    "TimeSlot",
+    "get_availability",
+    "get_availability_range",
+    "validate_override",
+]

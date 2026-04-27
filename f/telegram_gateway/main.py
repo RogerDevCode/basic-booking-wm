@@ -1,7 +1,4 @@
 from __future__ import annotations
-import asyncio
-import os
-from typing import Any, Dict, Optional
 
 from ..internal._db_client import _resolve_db_url
 from ..internal._result import Result, fail, ok
@@ -65,19 +62,27 @@ async def _main_async(args: dict[str, object]) -> dict[str, object]:
 
     err, res = await router.route_update(update)
 
-    chat_id: Optional[str] = None
+    chat_id: str | None = None
     text: str = ""
-    callback_data: Optional[str] = None
+    callback_data: str | None = None
     username: str = "unknown"
 
     if update.message:
         chat_id = str(update.message.chat.id)
         text = update.message.text or ""
-        username = str(update.message.from_user.username) if update.message.from_user and update.message.from_user.username else "unknown"
+        username = (
+            str(update.message.from_user.username)
+            if update.message.from_user and update.message.from_user.username
+            else "unknown"
+        )
     elif update.callback_query:
         chat_id = str(update.callback_query.message.chat.id) if update.callback_query.message else None
         callback_data = update.callback_query.data
-        username = str(update.callback_query.from_user.username) if update.callback_query.from_user and update.callback_query.from_user.username else "unknown"
+        username = (
+            str(update.callback_query.from_user.username)
+            if update.callback_query.from_user and update.callback_query.from_user.username
+            else "unknown"
+        )
 
     return {
         "success": not err,

@@ -1,6 +1,5 @@
 from __future__ import annotations
-import asyncio
-import os
+
 # ============================================================================
 # PRE-FLIGHT CHECKLIST
 # Mission         : Cron job to retry pending GCal syncs (every 5 minutes)
@@ -11,15 +10,16 @@ import os
 # RLS Tenant ID   : YES — with_tenant_context wraps each provider's batch
 # Pydantic Schemas: YES — InputSchema validates all inputs
 # ============================================================================
+from typing import Any, cast
 
-from typing import Any, List, Dict, cast
-from ..internal._wmill_adapter import log
 from ..internal._db_client import create_db_client
-from ..internal._result import Result, with_tenant_context, ok, fail
-from ._reconcile_models import InputSchema, ReconcileResult, BookingRow
+from ..internal._result import Result, ok, with_tenant_context
+from ..internal._wmill_adapter import log
 from ._reconcile_logic import sync_booking_to_gcal
+from ._reconcile_models import BookingRow, InputSchema, ReconcileResult
 
 MODULE = "gcal_reconcile"
+
 
 async def _main_async(args: dict[str, object]) -> Result[ReconcileResult]:
     try:
@@ -31,14 +31,19 @@ async def _main_async(args: dict[str, object]) -> Result[ReconcileResult]:
     try:
         # 1. Fetch all active providers (admin mode - no RLS)
         providers = await conn.fetch("SELECT provider_id FROM providers WHERE is_active = True")
-        
+
         aggregate: ReconcileResult = {
-            "processed": 0, "synced": 0, "partial": 0, "failed": 0, "skipped": 0, "errors": []
+            "processed": 0,
+            "synced": 0,
+            "partial": 0,
+            "failed": 0,
+            "skipped": 0,
+            "errors": [],
         }
 
         for p in providers:
             p_id = str(p["provider_id"])
-            
+
             async def provider_batch() -> Result[ReconcileResult]:
                 # Fetch pending bookings for this provider
                 booking_rows = await conn.fetch(
@@ -59,48 +64,66 @@ async def _main_async(args: dict[str, object]) -> Result[ReconcileResult]:
                     ORDER BY b.created_at ASC
                     LIMIT $3
                     """,
-                    p_id, input_data.max_gcal_retries, input_data.batch_size
+                    p_id,  # noqa: B023
+                    input_data.max_gcal_retries,
+                    input_data.batch_size,
                 )
-                
+
                 res: ReconcileResult = {
-                    "processed": 0, "synced": 0, "partial": 0, "failed": 0, "skipped": 0, "errors": []
+                    "processed": 0,
+                    "synced": 0,
+                    "partial": 0,
+                    "failed": 0,
+                    "skipped": 0,
+                    "errors": [],
                 }
-                
+
                 for row_raw in booking_rows:
                     res["processed"] += 1
                     if input_data.dry_run:
                         res["skipped"] += 1
                         continue
-                    
-                    row = cast(Dict[str, object], row_raw)
-                    booking = cast(BookingRow, {
-                        "booking_id": str(row["booking_id"]),
-                        "status": str(row["status"]),
-                        "start_time": str(row["start_time"]),
-                        "end_time": str(row["end_time"]),
-                        "gcal_provider_event_id": str(row["gcal_provider_event_id"]) if row.get("gcal_provider_event_id") else None,
-                        "gcal_client_event_id": str(row["gcal_client_event_id"]) if row.get("gcal_client_event_id") else None,
-                        "gcal_retry_count": int(cast(Any, row["gcal_retry_count"])),
-                        "provider_name": str(row["provider_name"]),
-                        "provider_calendar_id": str(row["provider_calendar_id"]) if row.get("provider_calendar_id") else None,
-                        "client_name": str(row["client_name"]),
-                        "client_calendar_id": str(row["client_calendar_id"]) if row.get("client_calendar_id") else None,
-                        "service_name": str(row["service_name"])
-                    })
-                    
+
+                    row = cast("dict[str, object]", row_raw)
+                    booking = cast(
+                        "BookingRow",
+                        {
+                            "booking_id": str(row["booking_id"]),
+                            "status": str(row["status"]),
+                            "start_time": str(row["start_time"]),
+                            "end_time": str(row["end_time"]),
+                            "gcal_provider_event_id": str(row["gcal_provider_event_id"])
+                            if row.get("gcal_provider_event_id")
+                            else None,
+                            "gcal_client_event_id": str(row["gcal_client_event_id"])
+                            if row.get("gcal_client_event_id")
+                            else None,
+                            "gcal_retry_count": int(cast("Any", row["gcal_retry_count"])),
+                            "provider_name": str(row["provider_name"]),
+                            "provider_calendar_id": str(row["provider_calendar_id"])
+                            if row.get("provider_calendar_id")
+                            else None,
+                            "client_name": str(row["client_name"]),
+                            "client_calendar_id": str(row["client_calendar_id"])
+                            if row.get("client_calendar_id")
+                            else None,
+                            "service_name": str(row["service_name"]),
+                        },
+                    )
+
                     sync_res = await sync_booking_to_gcal(booking, input_data.max_retries)
-                    
+
                     status: str
                     if not sync_res["errors"]:
-                        status = 'synced'
+                        status = "synced"
                         res["synced"] += 1
                     elif sync_res["providerEventId"] or sync_res["clientEventId"]:
-                        status = 'partial'
+                        status = "partial"
                         res["partial"] += 1
                     else:
-                        status = 'pending'
+                        status = "pending"
                         res["failed"] += 1
-                        
+
                     if sync_res["errors"]:
                         res["errors"].append(f"Booking {booking['booking_id']}: {'; '.join(sync_res['errors'])}")
 
@@ -117,7 +140,7 @@ async def _main_async(args: dict[str, object]) -> Result[ReconcileResult]:
                         sync_res["providerEventId"],
                         sync_res["clientEventId"],
                         status,
-                        booking["booking_id"]
+                        booking["booking_id"],
                     )
                 return ok(res)
 
@@ -125,7 +148,7 @@ async def _main_async(args: dict[str, object]) -> Result[ReconcileResult]:
             if err_batch or not res_batch:
                 aggregate["errors"].append(f"Provider {p_id}: {err_batch}")
                 continue
-            
+
             aggregate["processed"] += res_batch["processed"]
             aggregate["synced"] += res_batch["synced"]
             aggregate["partial"] += res_batch["partial"]

@@ -1,6 +1,7 @@
 import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
+
 import f.dlq_processor._dlq_logic
+
 
 # This is an auto-generated test boilerplate for f.dlq_processor._dlq_logic
 @pytest.mark.asyncio

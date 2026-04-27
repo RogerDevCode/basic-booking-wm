@@ -1,6 +1,7 @@
 import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
+
 import f.web_waitlist.main
+
 
 # This is an auto-generated test boilerplate for f.web_waitlist.main
 @pytest.mark.asyncio

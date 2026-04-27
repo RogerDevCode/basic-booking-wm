@@ -1,29 +1,33 @@
 from __future__ import annotations
+
 from datetime import datetime
-from typing import Literal, TypedDict, Any
+from typing import Literal, TypedDict
+
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
 
 class InputSchema(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
-    
+
     client_id: str
     provider_id: str
     service_id: str
     start_time: datetime
     idempotency_key: str = Field(min_length=1)
     notes: str | None = None
-    actor: Literal['client', 'provider', 'system'] = 'client'
-    channel: Literal['telegram', 'web', 'api'] = 'api'
+    actor: Literal["client", "provider", "system"] = "client"
+    channel: Literal["telegram", "web", "api"] = "api"
 
-    @field_validator('start_time', mode='before')
+    @field_validator("start_time", mode="before")
     @classmethod
     def parse_datetime(cls, v: object) -> datetime | object:
         if isinstance(v, str):
             try:
-                return datetime.fromisoformat(v.replace('Z', '+00:00'))
+                return datetime.fromisoformat(v.replace("Z", "+00:00"))
             except ValueError:
                 return v
         return v
+
 
 class BookingCreated(TypedDict):
     booking_id: str
@@ -34,19 +38,23 @@ class BookingCreated(TypedDict):
     service_name: str
     client_name: str
 
+
 class ClientContext(TypedDict):
     id: str
     name: str
+
 
 class ProviderContext(TypedDict):
     id: str
     name: str
     timezone: str
 
+
 class ServiceContext(TypedDict):
     id: str
     name: str
     duration: int
+
 
 class BookingContext(TypedDict):
     client: ClientContext

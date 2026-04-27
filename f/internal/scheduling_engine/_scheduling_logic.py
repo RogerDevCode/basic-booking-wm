@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from typing import cast
 
 from .._result import DBClient, Result, fail, ok
@@ -50,18 +50,18 @@ def generate_slots_for_rule(
         if isinstance(b_start, str):
             b_start_dt = datetime.fromisoformat(b_start.replace("Z", "+00:00"))
         else:
-            b_start_dt = cast(datetime, b_start)
+            b_start_dt = cast("datetime", b_start)
 
         if isinstance(b_end, str):
             b_end_dt = datetime.fromisoformat(b_end.replace("Z", "+00:00"))
         else:
-            b_end_dt = cast(datetime, b_end)
+            b_end_dt = cast("datetime", b_end)
 
         booking_ranges.append((b_start_dt.timestamp(), b_end_dt.timestamp()))
 
     current_min = start_min
     while current_min + slot_duration_min <= end_min:
-        slot_start_dt = datetime(y, m, d, current_min // 60, current_min % 60, tzinfo=timezone.utc)
+        slot_start_dt = datetime(y, m, d, current_min // 60, current_min % 60, tzinfo=UTC)
         slot_end_dt = slot_start_dt + timedelta(minutes=slot_duration_min)
 
         slot_start_ts = slot_start_dt.timestamp()
@@ -103,7 +103,7 @@ async def get_availability(db: DBClient, query: AvailabilityQuery) -> Result[Ava
             target_date,
         )
 
-        overrides = cast(list[ScheduleOverrideRow], override_rows)
+        overrides = cast("list[ScheduleOverrideRow]", override_rows)
         blocking_override = next((o for o in overrides if o["is_blocked"]), None)
 
         if blocking_override:
@@ -132,8 +132,8 @@ async def get_availability(db: DBClient, query: AvailabilityQuery) -> Result[Ava
                     "id": 0,
                     "provider_id": query["provider_id"],
                     "day_of_week": day_of_week,
-                    "start_time": cast(str, special_override["start_time"]),
-                    "end_time": cast(str, special_override["end_time"]),
+                    "start_time": cast("str", special_override["start_time"]),
+                    "end_time": cast("str", special_override["end_time"]),
                 }
             ]
         else:
@@ -149,7 +149,7 @@ async def get_availability(db: DBClient, query: AvailabilityQuery) -> Result[Ava
                 query["provider_id"],
                 day_of_week,
             )
-            rules = cast(list[ProviderScheduleRow], rule_rows)
+            rules = cast("list[ProviderScheduleRow]", rule_rows)
 
         if not rules:
             return ok(
@@ -177,7 +177,7 @@ async def get_availability(db: DBClient, query: AvailabilityQuery) -> Result[Ava
             query["provider_id"],
             target_date,
         )
-        bookings = cast(list[BookingTimeRow], booking_rows)
+        bookings = cast("list[BookingTimeRow]", booking_rows)
 
         # 4. Service details
         service_rows = await db.fetch(
@@ -187,7 +187,7 @@ async def get_availability(db: DBClient, query: AvailabilityQuery) -> Result[Ava
         if not service_rows:
             return fail(f"Service not found: {query['service_id']}")
 
-        service = cast(ServiceRow, service_rows[0])
+        service = cast("ServiceRow", service_rows[0])
         slot_duration = service["duration_minutes"] + service["buffer_minutes"]
 
         # 5. Generate slots
@@ -230,9 +230,7 @@ async def get_availability_range(
     iter_date = curr_dt
     while iter_date <= end_dt:
         date_str = iter_date.isoformat()
-        err, res = await get_availability(
-            db, {"provider_id": provider_id, "date": date_str, "service_id": service_id}
-        )
+        err, res = await get_availability(db, {"provider_id": provider_id, "date": date_str, "service_id": service_id})
         if err:
             return fail(err)
         if res:
@@ -243,7 +241,9 @@ async def get_availability_range(
     return ok(results)
 
 
-async def validate_override(db: DBClient, provider_id: str, date_start: str, date_end: str) -> Result[OverrideValidation]:
+async def validate_override(
+    db: DBClient, provider_id: str, date_start: str, date_end: str
+) -> Result[OverrideValidation]:
     try:
         rows = await db.fetch(
             """

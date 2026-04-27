@@ -1,13 +1,18 @@
 from __future__ import annotations
+
 import json
 from datetime import datetime
-from typing import List, Optional, Dict, Any, cast, Literal, Union
-from ..internal._result import Result, DBClient, ok, fail
-from ._dlq_models import DLQEntry, DLQListResult
+from typing import TYPE_CHECKING, Any, Literal, cast
+
+from ..internal._result import DBClient, Result, fail, ok
+
+if TYPE_CHECKING:
+    from ._dlq_models import DLQEntry, DLQListResult
+
 
 def map_row_to_dlq_entry(row: object) -> DLQEntry:
-    r = cast(Dict[str, object], row)
-    
+    r = cast("dict[str, object]", row)
+
     def to_iso(val: object) -> str:
         if isinstance(val, datetime):
             return val.isoformat()
@@ -15,17 +20,17 @@ def map_row_to_dlq_entry(row: object) -> DLQEntry:
 
     # Cast payload to Dict[str, object]
     raw_payload = r.get("original_payload")
-    payload: Dict[str, object] = {}
+    payload: dict[str, object] = {}
     if isinstance(raw_payload, dict):
-        payload = cast(Dict[str, object], raw_payload)
+        payload = cast("dict[str, object]", raw_payload)
     elif isinstance(raw_payload, str):
         try:
-            payload = cast(Dict[str, object], json.loads(raw_payload))
+            payload = cast("dict[str, object]", json.loads(raw_payload))
         except Exception:
             payload = {}
 
     return {
-        "dlq_id": int(cast(Any, r["dlq_id"])),
+        "dlq_id": int(cast("Any", r["dlq_id"])),
         "booking_id": str(r["booking_id"]) if r.get("booking_id") else None,
         "provider_id": str(r["provider_id"]) if r.get("provider_id") else None,
         "service_id": str(r["service_id"]) if r.get("service_id") else None,
@@ -34,7 +39,7 @@ def map_row_to_dlq_entry(row: object) -> DLQEntry:
         "last_error_stack": str(r["last_error_stack"]) if r.get("last_error_stack") else None,
         "original_payload": payload,
         "idempotency_key": str(r["idempotency_key"]),
-        "status": cast(Literal['pending', 'resolved', 'discarded'], str(r["status"])),
+        "status": cast("Literal['pending', 'resolved', 'discarded']", str(r["status"])),
         "created_at": to_iso(r.get("created_at")),
         "updated_at": to_iso(r.get("updated_at")),
         "resolved_at": to_iso(r.get("resolved_at")) if r.get("resolved_at") else None,
@@ -42,8 +47,9 @@ def map_row_to_dlq_entry(row: object) -> DLQEntry:
         "resolution_notes": str(r["resolution_notes"]) if r.get("resolution_notes") else None,
     }
 
-async def list_dlq(db: DBClient, status_filter: Optional[str]) -> Result[DLQListResult]:
-    status = status_filter if status_filter in ['pending', 'resolved', 'discarded'] else 'pending'
+
+async def list_dlq(db: DBClient, status_filter: str | None) -> Result[DLQListResult]:
+    status = status_filter if status_filter in ["pending", "resolved", "discarded"] else "pending"
     rows = await db.fetch(
         """
         SELECT * FROM booking_dlq
@@ -51,13 +57,14 @@ async def list_dlq(db: DBClient, status_filter: Optional[str]) -> Result[DLQList
         ORDER BY created_at ASC
         LIMIT 100
         """,
-        status
+        status,
     )
     entries = [map_row_to_dlq_entry(r) for r in rows]
     res: DLQListResult = {"entries": entries, "total": len(entries)}
     return ok(res)
 
-async def retry_dlq(db: DBClient, dlq_id: Optional[int]) -> Result[Dict[str, Any]]:
+
+async def retry_dlq(db: DBClient, dlq_id: int | None) -> Result[dict[str, Any]]:
     if dlq_id is None:
         # Batch retry
         rows = await db.fetch(
@@ -71,27 +78,22 @@ async def retry_dlq(db: DBClient, dlq_id: Optional[int]) -> Result[Dict[str, Any
         )
         retried_ids = []
         for r in rows:
-            await db.execute(
-                "UPDATE booking_dlq SET updated_at = NOW() WHERE dlq_id = $1",
-                r["dlq_id"]
-            )
-            retried_ids.append(int(cast(Any, r["dlq_id"])))
+            await db.execute("UPDATE booking_dlq SET updated_at = NOW() WHERE dlq_id = $1", r["dlq_id"])
+            retried_ids.append(int(cast("Any", r["dlq_id"])))
         res_batch: dict[str, Any] = {"retried": retried_ids, "count": len(retried_ids)}
-        return ok(cast(Dict[str, Any], res_batch))
+        return ok(cast("dict[str, Any]", res_batch))
 
     # Single retry
-    rows = await db.fetch(
-        "SELECT dlq_id FROM booking_dlq WHERE dlq_id = $1 AND status = 'pending' FOR UPDATE",
-        dlq_id
-    )
+    rows = await db.fetch("SELECT dlq_id FROM booking_dlq WHERE dlq_id = $1 AND status = 'pending' FOR UPDATE", dlq_id)
     if not rows:
         return fail(f"dlq_entry_not_found_or_not_pending: ID {dlq_id}")
 
     await db.execute("UPDATE booking_dlq SET updated_at = NOW() WHERE dlq_id = $1", dlq_id)
     res_single: dict[str, Any] = {"retried": [dlq_id]}
-    return ok(cast(Dict[str, Any], res_single))
+    return ok(cast("dict[str, Any]", res_single))
 
-async def resolve_dlq(db: DBClient, dlq_id: int, resolved_by: Optional[str], notes: Optional[str]) -> Result[Dict[str, int]]:
+
+async def resolve_dlq(db: DBClient, dlq_id: int, resolved_by: str | None, notes: str | None) -> Result[dict[str, int]]:
     res = await db.execute(
         """
         UPDATE booking_dlq
@@ -102,13 +104,16 @@ async def resolve_dlq(db: DBClient, dlq_id: int, resolved_by: Optional[str], not
             updated_at = NOW()
         WHERE dlq_id = $3
         """,
-        resolved_by, notes, dlq_id
+        resolved_by,
+        notes,
+        dlq_id,
     )
     if "UPDATE 1" not in res:
         return fail(f"dlq_entry_not_found: ID {dlq_id}")
     return ok({"resolved": dlq_id})
 
-async def discard_dlq(db: DBClient, dlq_id: int, notes: Optional[str]) -> Result[Dict[str, int]]:
+
+async def discard_dlq(db: DBClient, dlq_id: int, notes: str | None) -> Result[dict[str, int]]:
     res = await db.execute(
         """
         UPDATE booking_dlq
@@ -118,13 +123,15 @@ async def discard_dlq(db: DBClient, dlq_id: int, notes: Optional[str]) -> Result
             updated_at = NOW()
         WHERE dlq_id = $2
         """,
-        notes or "Discarded manually", dlq_id
+        notes or "Discarded manually",
+        dlq_id,
     )
     if "UPDATE 1" not in res:
         return fail(f"dlq_entry_not_found: ID {dlq_id}")
     return ok({"discarded": dlq_id})
 
-async def get_dlq_status_stats(db: DBClient) -> Result[Dict[str, int]]:
+
+async def get_dlq_status_stats(db: DBClient) -> Result[dict[str, int]]:
     rows = await db.fetch("SELECT status, COUNT(*) as count FROM booking_dlq GROUP BY status")
-    stats: Dict[str, int] = {str(r["status"]): int(cast(Any, r["count"])) for r in rows}
+    stats: dict[str, int] = {str(r["status"]): int(cast("Any", r["count"])) for r in rows}
     return ok(stats)

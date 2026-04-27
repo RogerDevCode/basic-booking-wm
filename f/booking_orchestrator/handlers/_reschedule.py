@@ -1,9 +1,9 @@
-from typing import cast
-from f.booking_orchestrator._orchestrator_models import OrchestratorInput, OrchestratorResult
 from f.booking_orchestrator._get_entity import get_entity
-from ._get_my_bookings import handle_get_my_bookings
+from f.booking_orchestrator._orchestrator_models import OrchestratorInput, OrchestratorResult
 from f.booking_reschedule.main import main_async as reschedule_booking
-from f.internal._result import Result, DBClient, ok, fail
+from f.internal._result import DBClient, Result, ok
+
+from ._get_my_bookings import handle_get_my_bookings
 
 """
 PRE-FLIGHT
@@ -16,16 +16,16 @@ RLS Tenant ID    : YES (delegated)
 Zod Schemas      : NO
 """
 
-async def handle_reschedule(
-    conn: DBClient,
-    input_data: OrchestratorInput
-) -> Result[OrchestratorResult]:
+
+async def handle_reschedule(conn: DBClient, input_data: OrchestratorInput) -> Result[OrchestratorResult]:
     booking_id = input_data.booking_id or get_entity(input_data.entities, "booking_id")
     date = input_data.date
     time = input_data.time
 
     if not booking_id:
-        cloned_input = input_data.model_copy(update={"notes": "Dime el ID de la cita que quieres mover y la nueva fecha/hora."})
+        cloned_input = input_data.model_copy(
+            update={"notes": "Dime el ID de la cita que quieres mover y la nueva fecha/hora."}
+        )
         return await handle_get_my_bookings(conn, cloned_input)
 
     if not date or not time:
@@ -35,15 +35,25 @@ async def handle_reschedule(
             "data": None,
             "message": "Necesito la nueva fecha y hora para reagendar.",
             "follow_up": "¿Para cuándo te gustaría moverla?",
-            "nextState": {"name": "selecting_time", "specialtyId": "", "doctorId": "", "doctorName": "", "targetDate": date, "error": None, "items": []},
+            "nextState": {
+                "name": "selecting_time",
+                "specialtyId": "",
+                "doctorId": "",
+                "doctorName": "",
+                "targetDate": date,
+                "error": None,
+                "items": [],
+            },
             "nextDraft": {
-                "specialty_id": None, "specialty_name": None,
+                "specialty_id": None,
+                "specialty_name": None,
                 "doctor_id": input_data.provider_id,
                 "doctor_name": get_entity(input_data.entities, "provider_name"),
                 "target_date": date,
-                "start_time": None, "time_label": None,
+                "start_time": None,
+                "time_label": None,
                 "client_id": input_data.client_id,
-            }
+            },
         }
         return ok(res)
 

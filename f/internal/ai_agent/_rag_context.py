@@ -1,18 +1,15 @@
-from typing import Any
-from typing import Optional, List, Dict, Any, TypedDict
-from .._result import DBClient, Result, ok, fail
+from typing import TypedDict
+
 from .._db_client import create_db_client
+
 
 class RAGResult(TypedDict):
     context: str
     count: int
     hasProviderSpecific: bool
 
-async def build_rag_context(
-    provider_id: Optional[str],
-    text: str,
-    limit: int = 3
-) -> RAGResult:
+
+async def build_rag_context(provider_id: str | None, text: str, limit: int = 3) -> RAGResult:
     # 1. Fetch relevant FAQs from knowledge_base
     # (Semantic search simplified to keyword search for now as in TS)
     conn = await create_db_client()
@@ -28,7 +25,9 @@ async def build_rag_context(
             ORDER BY provider_id DESC NULLS LAST
             LIMIT $3
             """,
-            provider_id, f"%{text[:20]}%", limit
+            provider_id,
+            f"%{text[:20]}%",
+            limit,
         )
 
         if not rows:
@@ -38,21 +37,20 @@ async def build_rag_context(
         has_provider = False
         for r in rows:
             context_parts.append(f"- {r['content']}")
-            if r['provider_id']: has_provider = True
+            if r["provider_id"]:
+                has_provider = True
         context_parts.append("</KNOWLEDGE_BASE_CONTEXT>")
 
-        return {
-            "context": "\n".join(context_parts),
-            "count": len(rows),
-            "hasProviderSpecific": has_provider
-        }
+        return {"context": "\n".join(context_parts), "count": len(rows), "hasProviderSpecific": has_provider}
     except Exception as e:
         from ..internal._wmill_adapter import log
+
         log("SILENT_ERROR_CAUGHT", error=str(e), file="_rag_context.py")
         return {"context": "", "count": 0, "hasProviderSpecific": False}
     finally:
         await conn.close()
-        
-async def get_rag_context(provider_id: Optional[str], text: str) -> str:
+
+
+async def get_rag_context(provider_id: str | None, text: str) -> str:
     res = await build_rag_context(provider_id, text)
     return res["context"]

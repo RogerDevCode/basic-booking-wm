@@ -1,17 +1,20 @@
 from __future__ import annotations
-import asyncio
-from typing import Any
-from ..internal._wmill_adapter import log
+
+from typing import TYPE_CHECKING, Any
+
 from ..internal._db_client import create_db_client
-from ..internal._result import Result
-from ._orchestrator_models import OrchestratorInput, OrchestratorResult
-from ._intent_router import normalize_intent, OrchestratorHandler
+from ..internal._wmill_adapter import log
 from ._context_resolver import resolve_context
-from .handlers._create import handle_create_booking
+from ._intent_router import OrchestratorHandler, normalize_intent
+from ._orchestrator_models import OrchestratorInput, OrchestratorResult
 from .handlers._cancel import handle_cancel_booking
-from .handlers._reschedule import handle_reschedule
-from .handlers._list_available import handle_list_available
+from .handlers._create import handle_create_booking
 from .handlers._get_my_bookings import handle_get_my_bookings
+from .handlers._list_available import handle_list_available
+from .handlers._reschedule import handle_reschedule
+
+if TYPE_CHECKING:
+    from ..internal._result import Result
 
 # ============================================================================
 # PRE-FLIGHT CHECKLIST
@@ -35,6 +38,7 @@ HANDLER_MAP: dict[str, OrchestratorHandler] = {
     "mis_citas": handle_get_my_bookings,
 }
 
+
 async def _main_async(args: dict[str, object]) -> Result[OrchestratorResult]:
     try:
         input_data = OrchestratorInput.model_validate(args)
@@ -53,14 +57,16 @@ async def _main_async(args: dict[str, object]) -> Result[OrchestratorResult]:
             return res_err or Exception("Context resolution failed"), None
 
         # Enrich input with resolved context
-        enriched_input = input_data.model_copy(update={
-            "tenant_id": ctx["tenantId"],
-            "client_id": ctx["clientId"],
-            "provider_id": ctx["providerId"],
-            "service_id": ctx["serviceId"],
-            "date": ctx["date"],
-            "time": ctx["time"],
-        })
+        enriched_input = input_data.model_copy(
+            update={
+                "tenant_id": ctx["tenantId"],
+                "client_id": ctx["clientId"],
+                "provider_id": ctx["providerId"],
+                "service_id": ctx["serviceId"],
+                "date": ctx["date"],
+                "time": ctx["time"],
+            }
+        )
 
         handler = HANDLER_MAP[intent]
         exec_err, result = await handler(conn, enriched_input)
@@ -76,6 +82,7 @@ async def _main_async(args: dict[str, object]) -> Result[OrchestratorResult]:
 
     except Exception as e:
         import traceback
+
         tb = traceback.format_exc()
         log("Unexpected orchestrator error", error=str(e), traceback=tb, module=MODULE)
         return Exception(f"Internal orchestrator error: {e}"), None
@@ -88,11 +95,7 @@ async def main(telegram_chat_id: str, intent: str, entities: dict[str, object] |
     Entrypoint asincrónico para la ejecución en Windmill.
     """
     try:
-        args: dict[str, object] = {
-            "telegram_chat_id": telegram_chat_id, 
-            "intent": intent, 
-            "entities": entities or {}
-        }
+        args: dict[str, object] = {"telegram_chat_id": telegram_chat_id, "intent": intent, "entities": entities or {}}
         err, result = await _main_async(args)
         if err:
             raise err
@@ -100,7 +103,8 @@ async def main(telegram_chat_id: str, intent: str, entities: dict[str, object] |
         return {"data": dict(result) if result else {}}
     except Exception as e:
         import traceback
+
         tb = traceback.format_exc()
         log("CRITICAL_ORCHESTRATOR_ERROR", error=str(e), traceback=tb, module=MODULE)
         # Raise to let Windmill know it failed
-        raise RuntimeError(f"Orchestrator failed: {e}")
+        raise RuntimeError(f"Orchestrator failed: {e}") from e

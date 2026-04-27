@@ -1,7 +1,8 @@
-from typing import Optional, cast
 from datetime import datetime
-from ..internal._result import Result, DBClient, ok, fail
+
+from ..internal._result import DBClient, Result, fail, ok
 from ._me_models import UserProfileResult
+
 
 async def get_user_profile(db: DBClient, user_id: str) -> Result[UserProfileResult]:
     rows = await db.fetch(
@@ -14,7 +15,7 @@ async def get_user_profile(db: DBClient, user_id: str) -> Result[UserProfileResu
         WHERE user_id = $1::uuid
         LIMIT 1
         """,
-        user_id
+        user_id,
     )
 
     if not rows:
@@ -36,7 +37,11 @@ async def get_user_profile(db: DBClient, user_id: str) -> Result[UserProfileResu
         "timezone": str(r["timezone"]),
         "is_active": bool(r["is_active"]),
         "profile_complete": bool(r["profile_complete"]),
-        "last_login": r["last_login"].isoformat() if isinstance(r.get("last_login"), datetime) else str(r.get("last_login")) if r.get("last_login") else None,
+        "last_login": r["last_login"].isoformat()
+        if isinstance(r.get("last_login"), datetime)
+        else str(r.get("last_login"))
+        if r.get("last_login")
+        else None,
     }
 
     return ok(result)

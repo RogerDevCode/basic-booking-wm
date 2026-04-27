@@ -1,8 +1,10 @@
 from __future__ import annotations
+
 import math
 import re
 import unicodedata
-from typing import Any, Final, Optional, TypedDict, cast
+from typing import Final, TypedDict
+
 from ._constants import INTENT
 
 """
@@ -89,38 +91,96 @@ CORPUS: Final[dict[str, list[str]]] = {
 }
 
 STOP_WORDS: Final[set[str]] = {
-    "el", "la", "los", "las", "un", "una", "unos", "unas",
-    "de", "del", "al", "para", "por", "con", "sin", "sobre",
-    "es", "son", "esta", "estan", "fue", "ser", "hay",
-    "que", "se", "no", "me", "te", "le", "les", "lo", "la",
-    "mi", "tu", "su", "nuestro", "sus",
-    "y", "o", "pero", "si", "como", "donde", "cuando",
-    "muy", "mas", "menos", "bien", "asi",
-    "necesito", "quiero", "puedo", "debo",
+    "el",
+    "la",
+    "los",
+    "las",
+    "un",
+    "una",
+    "unos",
+    "unas",
+    "de",
+    "del",
+    "al",
+    "para",
+    "por",
+    "con",
+    "sin",
+    "sobre",
+    "es",
+    "son",
+    "esta",
+    "estan",
+    "fue",
+    "ser",
+    "hay",
+    "que",
+    "se",
+    "no",
+    "me",
+    "te",
+    "le",
+    "les",
+    "lo",
+    "mi",
+    "tu",
+    "su",
+    "nuestro",
+    "sus",
+    "y",
+    "o",
+    "pero",
+    "si",
+    "como",
+    "donde",
+    "cuando",
+    "muy",
+    "mas",
+    "menos",
+    "bien",
+    "asi",
+    "necesito",
+    "quiero",
+    "puedo",
+    "debo",
 }
 
 TYPO_MAP: Final[dict[str, str]] = {
-    "kiero": "quiero", "ora": "hora", "lune": "lunes", "vierne": "viernes",
-    "kansela": "cancela", "kanselame": "cancelame", "reprograma": "reprograma",
-    "kambiar": "cambiar", "sita": "cita", "truno": "turno", "konsulta": "consulta",
-    "agendar": "agendar", "manana": "mañana", "atencion": "atencion",
-    "configuro": "configurar", "agendada": "agendada", "reservada": "reservada",
-    "bieres": "viernes", "pal": "para el", "orita": "ahora", "po": "",
-    "weon": "", "libre": "disponible",
+    "kiero": "quiero",
+    "ora": "hora",
+    "lune": "lunes",
+    "vierne": "viernes",
+    "kansela": "cancela",
+    "kanselame": "cancelame",
+    "reprograma": "reprograma",
+    "kambiar": "cambiar",
+    "sita": "cita",
+    "truno": "turno",
+    "konsulta": "consulta",
+    "agendar": "agendar",
+    "manana": "mañana",
+    "atencion": "atencion",
+    "configuro": "configurar",
+    "agendada": "agendada",
+    "reservada": "reservada",
+    "bieres": "viernes",
+    "pal": "para el",
+    "orita": "ahora",
+    "po": "",
+    "weon": "",
+    "libre": "disponible",
 }
+
 
 def _normalize(text: str) -> list[str]:
     """Light normalization handles Chilean slang and common typos."""
     text = text.lower().strip()
     # Normalize unicode (accents)
-    text = "".join(
-        c for c in unicodedata.normalize("NFD", text)
-        if unicodedata.category(c) != "Mn"
-    )
+    text = "".join(c for c in unicodedata.normalize("NFD", text) if unicodedata.category(c) != "Mn")
     # Remove punctuation
     text = re.sub(r"[?¿!¡.,;:()]", " ", text)
     tokens = text.split()
-    
+
     result = []
     for w in tokens:
         mapped = TYPO_MAP.get(w, w)
@@ -128,15 +188,17 @@ def _normalize(text: str) -> list[str]:
             result.append(mapped)
     return result
 
+
 def _compute_tf(tokens: list[str]) -> dict[str, float]:
     tf: dict[str, float] = {}
     for t in tokens:
         tf[t] = tf.get(t, 0.0) + 1.0
-    
+
     length = len(tokens) or 1
     for t in tf:
         tf[t] = tf[t] / length
     return tf
+
 
 def _compute_idf(documents: list[list[str]]) -> dict[str, float]:
     idf: dict[str, float] = {}
@@ -145,10 +207,11 @@ def _compute_idf(documents: list[list[str]]) -> dict[str, float]:
         seen = set(doc)
         for t in seen:
             idf[t] = idf.get(t, 0.0) + 1.0
-    
+
     for t in idf:
         idf[t] = math.log(n / (1.0 + idf[t]))
     return idf
+
 
 def _cosine_similarity(a: dict[str, float], b: dict[str, float], idf: dict[str, float]) -> float:
     all_terms = set(a.keys()) | set(b.keys())
@@ -167,13 +230,16 @@ def _cosine_similarity(a: dict[str, float], b: dict[str, float], idf: dict[str, 
         return 0.0
     return dot / (math.sqrt(mag_a) * math.sqrt(mag_b))
 
+
 class ModelData(TypedDict):
     idf: dict[str, float]
     intents: list[str]
     corpus: dict[str, list[list[str]]]
 
+
 # Model singleton
-_MODEL: Optional[ModelData] = None
+_MODEL: ModelData | None = None
+
 
 def _get_model() -> ModelData:
     global _MODEL
@@ -184,29 +250,32 @@ def _get_model() -> ModelData:
             docs = CORPUS[intent]
             for doc in docs:
                 intent_docs_arr.append(_normalize(doc))
-        
+
         idf = _compute_idf(intent_docs_arr)
         _MODEL = {
             "idf": idf,
             "intents": intents,
-            "corpus": {intent: [_normalize(d) for d in docs] for intent, docs in CORPUS.items()}
+            "corpus": {intent: [_normalize(d) for d in docs] for intent, docs in CORPUS.items()},
         }
     return _MODEL
+
 
 class ScoreEntry(TypedDict):
     intent: str
     score: float
+
 
 class TfIdfResult(TypedDict):
     intent: str
     confidence: float
     scores: list[ScoreEntry]
 
+
 def classify_intent(text: str) -> TfIdfResult:
     """Classifies the user intent using TF-IDF and Cosine Similarity."""
     model = _get_model()
     query_tokens = _normalize(text)
-    
+
     if not query_tokens:
         return {"intent": INTENT["DESCONOCIDO"], "confidence": 0.0, "scores": []}
 
@@ -221,7 +290,7 @@ def classify_intent(text: str) -> TfIdfResult:
             sim = _cosine_similarity(query_tf, doc_tf, model["idf"])
             if sim > max_score:
                 max_score = sim
-        
+
         scores.append({"intent": intent, "score": max_score})
 
     # Sort descending
@@ -236,5 +305,5 @@ def classify_intent(text: str) -> TfIdfResult:
     return {
         "intent": scores[0]["intent"] if scores else INTENT["DESCONOCIDO"],
         "confidence": confidence,
-        "scores": scores[:3]
+        "scores": scores[:3],
     }

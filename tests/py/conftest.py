@@ -1,6 +1,9 @@
-import sys
 import asyncio
+import sys
 from unittest.mock import MagicMock
+
+import pytest
+import wmill
 
 # Inject a dummy wmill module before any tests are collected
 mock_wmill_module = MagicMock()
@@ -16,22 +19,25 @@ sys.modules["wmill"] = mock_wmill_module
 
 # Patch asyncio.run before anything else imports it
 orig_run = asyncio.run
-def mock_run(coro):
+
+
+def mock_run(coro: object) -> object:
     try:
         asyncio.get_running_loop()
         return coro
     except RuntimeError:
         return orig_run(coro)
+
+
 asyncio.run = mock_run
 
-import pytest
-import wmill
 
 @pytest.fixture(autouse=True)
 def windmill_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("WM_WORKSPACE", "test")
-    monkeypatch.setenv("WM_TOKEN",     "test")
-    monkeypatch.setenv("WM_BASE_URL",  "http://localhost:8000")
+    monkeypatch.setenv("WM_TOKEN", "test")
+    monkeypatch.setenv("WM_BASE_URL", "http://localhost:8000")
+
 
 @pytest.fixture
 def mock_wmill() -> MagicMock:

@@ -1,6 +1,5 @@
 from __future__ import annotations
-import asyncio
-import os
+
 # ============================================================================
 # PRE-FLIGHT CHECKLIST
 # Mission         : Synchronize medical booking with Google Calendar
@@ -11,17 +10,20 @@ import os
 # RLS Tenant ID   : YES — with_tenant_context wraps all DB ops
 # Pydantic Schemas: YES — InputSchema validates all inputs
 # ============================================================================
+from typing import TYPE_CHECKING, Literal
 
-from typing import Any, List, Optional, cast, Literal
-from ..internal._wmill_adapter import log
 from ..internal._db_client import create_db_client
-from ..internal._result import Result
-from ._gcal_sync_models import InputSchema, GCalSyncResult
+from ..internal._wmill_adapter import log
 from ._gcal_api_adapter import fetch_booking_details
+from ._gcal_sync_models import GCalSyncResult, InputSchema
 from ._sync_event_logic import sync_event
 from ._update_sync_status import update_booking_sync_status
 
+if TYPE_CHECKING:
+    from ..internal._result import Result
+
 MODULE = "gcal_sync"
+
 
 async def _main_async(args: dict[str, object]) -> Result[GCalSyncResult]:
     try:
@@ -36,12 +38,12 @@ async def _main_async(args: dict[str, object]) -> Result[GCalSyncResult]:
         if err_details or not details:
             return err_details or Exception("Booking details not found"), None
 
-        errors: List[str] = []
-        provider_event_id: Optional[str] = details["gcal_provider_event_id"]
-        client_event_id: Optional[str] = details["gcal_client_event_id"]
+        errors: list[str] = []
+        provider_event_id: str | None = details["gcal_provider_event_id"]
+        client_event_id: str | None = details["gcal_client_event_id"]
 
         # 2. Sync Provider Calendar
-        err_prov, new_prov_id = await sync_event(conn, details, 'provider', input_data.action)
+        err_prov, new_prov_id = await sync_event(conn, details, "provider", input_data.action)
         if err_prov:
             errors.append(f"Provider sync failed: {err_prov}")
         else:
@@ -49,22 +51,26 @@ async def _main_async(args: dict[str, object]) -> Result[GCalSyncResult]:
 
         # 3. Sync Client Calendar (if available)
         if details["client_calendar_id"]:
-            err_cli, new_cli_id = await sync_event(conn, details, 'client', input_data.action)
+            err_cli, new_cli_id = await sync_event(conn, details, "client", input_data.action)
             if err_cli:
                 errors.append(f"Client sync failed: {err_cli}")
             else:
                 client_event_id = new_cli_id or client_event_id
 
         # 4. Finalize Status
-        sync_status: Literal['synced', 'partial', 'pending'] = 'synced'
+        sync_status: Literal["synced", "partial", "pending"] = "synced"
         if errors:
-            sync_status = 'partial' if provider_event_id or client_event_id else 'pending'
-        
+            sync_status = "partial" if provider_event_id or client_event_id else "pending"
+
         await update_booking_sync_status(
-            conn, input_data.tenant_id, input_data.booking_id,
-            provider_event_id, client_event_id,
-            sync_status, 0, # retry_count managed by reconcile
-            "\n".join(errors) if errors else None
+            conn,
+            input_data.tenant_id,
+            input_data.booking_id,
+            provider_event_id,
+            client_event_id,
+            sync_status,
+            0,  # retry_count managed by reconcile
+            "\n".join(errors) if errors else None,
         )
 
         result: GCalSyncResult = {
@@ -73,7 +79,7 @@ async def _main_async(args: dict[str, object]) -> Result[GCalSyncResult]:
             "client_event_id": client_event_id,
             "sync_status": sync_status,
             "retry_count": 0,
-            "errors": errors
+            "errors": errors,
         }
 
         return None, result

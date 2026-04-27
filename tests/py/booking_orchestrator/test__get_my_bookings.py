@@ -1,6 +1,7 @@
 import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
+
 import f.booking_orchestrator.handlers._get_my_bookings
+
 
 # This is an auto-generated test boilerplate for f.booking_orchestrator.handlers._get_my_bookings
 @pytest.mark.asyncio

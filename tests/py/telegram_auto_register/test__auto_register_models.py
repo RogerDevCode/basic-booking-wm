@@ -1,6 +1,5 @@
-import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
 import f.telegram_auto_register._auto_register_models
+
 
 # This is an auto-generated test boilerplate for f.telegram_auto_register._auto_register_models
 def test__auto_register_models_basic_import() -> None:

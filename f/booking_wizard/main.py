@@ -1,7 +1,7 @@
 from __future__ import annotations
-import asyncio
-import os
+
 import re
+
 # ============================================================================
 # PRE-FLIGHT CHECKLIST
 # Mission         : Multi-step appointment booking flow (availability → confirmation → creation)
@@ -12,15 +12,14 @@ import re
 # RLS Tenant ID   : YES — with_tenant_context wraps all DB ops
 # Pydantic Schemas: YES — InputSchema validates parameters
 # ============================================================================
-
-from typing import Any, cast, Optional
-from ..internal._wmill_adapter import log
 from ..internal._db_client import create_db_client
 from ..internal._result import Result, fail, with_tenant_context
-from ._wizard_models import InputSchema, WizardState, StepView
+from ..internal._wmill_adapter import log
 from ._wizard_logic import WizardRepository, WizardUI
+from ._wizard_models import InputSchema, StepView, WizardState
 
 MODULE = "booking_wizard"
+
 
 async def _main_async(args: dict[str, object]) -> Result[dict[str, object]]:
     # 1. Validate Input
@@ -32,17 +31,17 @@ async def _main_async(args: dict[str, object]) -> Result[dict[str, object]]:
     conn = await create_db_client()
     try:
         # Determine Tenant
-        tenant_id: Optional[str] = input_data.provider_id
+        tenant_id: str | None = input_data.provider_id
         if not tenant_id and input_data.wizard_state:
             tenant_id = str(input_data.wizard_state.get("client_id", ""))
-        
+
         if not tenant_id:
             return fail("authentication_error: tenant_id_required")
 
         # 2. Execute within Tenant Context
         async def operation() -> Result[dict[str, object]]:
             repo = WizardRepository(conn)
-            
+
             # Initial state
             raw_state = input_data.wizard_state or {}
             state = WizardState(
@@ -50,7 +49,7 @@ async def _main_async(args: dict[str, object]) -> Result[dict[str, object]]:
                 client_id=str(raw_state.get("client_id", "")),
                 chat_id=str(raw_state.get("chat_id", "")),
                 selected_date=str(raw_state.get("selected_date")) if raw_state.get("selected_date") else None,
-                selected_time=str(raw_state.get("selected_time")) if raw_state.get("selected_time") else None
+                selected_time=str(raw_state.get("selected_time")) if raw_state.get("selected_time") else None,
             )
 
             # Resolve Service Duration
@@ -60,13 +59,13 @@ async def _main_async(args: dict[str, object]) -> Result[dict[str, object]]:
                 if not err_dur and d:
                     duration = d
 
-            view: Optional[StepView] = None
+            view: StepView | None = None
             action = input_data.action
 
-            if action == 'start':
+            if action == "start":
                 view = WizardUI.build_date_selection(state, 0)
-            
-            elif action == 'select_date':
+
+            elif action == "select_date":
                 if input_data.user_input and "Semana" in input_data.user_input:
                     offset = 7 if "siguiente" in input_data.user_input else 0
                     view = WizardUI.build_date_selection(state, offset)
@@ -82,46 +81,52 @@ async def _main_async(args: dict[str, object]) -> Result[dict[str, object]]:
                     else:
                         view = WizardUI.build_date_selection(state, 0)
 
-            elif action == 'select_time':
+            elif action == "select_time":
                 state.selected_time = input_data.user_input
                 err_names, names = await repo.get_names(input_data.provider_id or "", input_data.service_id or "")
                 if err_names:
                     return fail(err_names)
                 view = WizardUI.build_confirmation(state, names["provider"], names["service"])
 
-            elif action == 'confirm':
+            elif action == "confirm":
                 if not input_data.provider_id or not input_data.service_id:
                     return fail("missing_data_for_confirm")
-                
-                err_create, bid = await repo.create_booking(
-                    state.client_id, input_data.provider_id, input_data.service_id,
-                    state.selected_date or "", state.selected_time or "",
-                    input_data.timezone, duration
+
+                err_create, _bid = await repo.create_booking(
+                    state.client_id,
+                    input_data.provider_id,
+                    input_data.service_id,
+                    state.selected_date or "",
+                    state.selected_time or "",
+                    input_data.timezone,
+                    duration,
                 )
                 if err_create:
                     return fail(err_create)
-                
+
                 state.step = 99
                 view = {
                     "message": "✅ *Cita confirmada!*\n\nTu cita ha sido agendada. Recibirás un recordatorio.",
                     "reply_keyboard": [["« Volver al menú"]],
                     "new_state": state,
-                    "force_reply": False, "reply_placeholder": ""
+                    "force_reply": False,
+                    "reply_placeholder": "",
                 }
 
-            elif action == 'cancel':
+            elif action == "cancel":
                 state.step = 0
                 view = {
                     "message": "❌ Proceso cancelado. ¿En qué más puedo ayudarte?",
                     "reply_keyboard": [["📅 Agendar cita", "📋 Mis citas"]],
                     "new_state": state,
-                    "force_reply": False, "reply_placeholder": ""
+                    "force_reply": False,
+                    "reply_placeholder": "",
                 }
 
-            elif action == 'back':
+            elif action == "back":
                 prev_step = max(0, state.step - 1)
                 state.step = prev_step
-                view = WizardUI.build_date_selection(state, 0) 
+                view = WizardUI.build_date_selection(state, 0)
 
             if not view:
                 return fail("no_view_generated")
@@ -132,7 +137,7 @@ async def _main_async(args: dict[str, object]) -> Result[dict[str, object]]:
                 "force_reply": view["force_reply"],
                 "reply_placeholder": view["reply_placeholder"],
                 "wizard_state": view["new_state"].model_dump(),
-                "is_complete": view["new_state"].step == 99
+                "is_complete": view["new_state"].step == 99,
             }
             return None, res
 

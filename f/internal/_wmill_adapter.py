@@ -9,6 +9,7 @@ except ImportError:
     # This allows the code to be imported in CI/Local Dev environments
     # where the Windmill SDK is not present.
     from unittest.mock import MagicMock
+
     wmill = MagicMock()
 
 from returns.result import Failure, Result, Success
@@ -39,13 +40,13 @@ def get_variable(path: str) -> str | None:
     return None
 
 
-def get_resource_safe(path: str, schema: type[T]) -> Result[T, Exception]:
+def get_resource_safe[T](path: str, schema: type[T]) -> Result[T, Exception]:
     try:
         raw: object = wmill.get_resource(path)
         if not is_dict_str_obj(raw):
             return Failure(TypeError(f"Resource at {path} is not a valid dictionary"))
 
-        return Success(cast(T, raw))
+        return Success(cast("T", raw))
     except Exception as e:
         return Failure(e)
 

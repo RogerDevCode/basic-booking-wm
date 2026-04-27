@@ -3,10 +3,9 @@ from __future__ import annotations
 import asyncio
 import json
 import time
-from typing import Any, Dict, Final, Literal, cast
+from typing import Any, Final, Literal, cast
 
 from .._wmill_adapter import log
-from ._ai_agent_models import AIAgentInput, IntentResult, LLMOutput
 from ._ai_agent_logic import (
     adjust_intent_with_context,
     detect_context,
@@ -15,6 +14,7 @@ from ._ai_agent_logic import (
     extract_entities,
     generate_ai_response,
 )
+from ._ai_agent_models import AIAgentInput, IntentResult, LLMOutput
 from ._constants import ESCALATION_THRESHOLDS, INTENT
 from ._guardrails import sanitize_json_response, validate_input, verify_urgency
 from ._llm_client import call_llm
@@ -67,7 +67,7 @@ async def _main_async(args: dict[str, Any]) -> dict[str, Any]:
         if intent in [INTENT["PREGUNTA_GENERAL"], INTENT["DESCONOCIDO"]]:
             if input_data.provider_id:
                 rag_res = await build_rag_context(input_data.provider_id, text)
-                rag_context = cast(str, rag_res["context"])
+                rag_context = cast("str", rag_res["context"])
 
         sys_prompt = build_system_prompt(rag_context)
         user_msg = build_user_message(text)
@@ -89,7 +89,7 @@ async def _main_async(args: dict[str, Any]) -> dict[str, Any]:
     adj = adjust_intent_with_context(text, intent, confidence, input_data.conversation_state)
     if adj["adjusted"]:
         intent = str(adj["intent"])
-        confidence = cast(float, adj["confidence"])
+        confidence = cast("float", adj["confidence"])
         cot_reasoning = str(adj["reason"])
 
     # 3. Entities & Context Logic
