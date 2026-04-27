@@ -193,7 +193,7 @@ profile-*
 # TEST & COVERAGE
 # =============================================================================
 # Test directory
-tests/
+# tests/  <-- REMOVED FROM IGNORE
 
 # Coverage reports
 coverage/
