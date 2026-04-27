@@ -2,7 +2,15 @@ from __future__ import annotations
 
 from typing import TypeIs, TypeVar, cast
 
-import wmill
+try:
+    import wmill
+except ImportError:
+    # ─── WMILL FALLBACK MOCK ───
+    # This allows the code to be imported in CI/Local Dev environments
+    # where the Windmill SDK is not present.
+    from unittest.mock import MagicMock
+    wmill = MagicMock()
+
 from returns.result import Failure, Result, Success
 
 T = TypeVar("T")
@@ -37,8 +45,6 @@ def get_resource_safe(path: str, schema: type[T]) -> Result[T, Exception]:
         if not is_dict_str_obj(raw):
             return Failure(TypeError(f"Resource at {path} is not a valid dictionary"))
 
-        # Boundary validation via cast + TypeGuard (simplified for brevity,
-        # normally you'd use Pydantic here)
         return Success(cast(T, raw))
     except Exception as e:
         return Failure(e)

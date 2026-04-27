@@ -418,11 +418,11 @@
 - 🔧 `fn` `validate_transition` (L40)
 
 ### `f/internal/_wmill_adapter.py`
-- 🔧 `fn` `is_dict_str_obj` (L11)
-- 🔧 `fn` `get_variable_safe` (L15)
-- 🔧 `fn` `get_variable` (L23)
-- 🔧 `fn` `get_resource_safe` (L34)
-- 🔧 `fn` `log` (L47)
+- 🔧 `fn` `is_dict_str_obj` (L19)
+- 🔧 `fn` `get_variable_safe` (L23)
+- 🔧 `fn` `get_variable` (L31)
+- 🔧 `fn` `get_resource_safe` (L42)
+- 🔧 `fn` `log` (L53)
 
 ### `f/internal/ai_agent/_ai_agent_logic.py`
 - 🔧 `fn` `adjust_intent_with_context` (L28)
