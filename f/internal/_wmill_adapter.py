@@ -1,6 +1,12 @@
 from __future__ import annotations
 
-from typing import TypeIs, TypeVar, cast
+import sys
+from typing import TypeVar, cast
+
+if sys.version_info >= (3, 13):
+    from typing import TypeIs
+else:
+    from typing_extensions import TypeIs
 
 try:
     import wmill

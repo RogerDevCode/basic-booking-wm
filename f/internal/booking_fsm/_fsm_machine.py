@@ -1,7 +1,13 @@
 from __future__ import annotations
 
 import re
-from typing import Any, Final, TypeIs
+import sys
+from typing import Any, Final
+
+if sys.version_info >= (3, 13):
+    from typing import TypeIs
+else:
+    from typing_extensions import TypeIs
 
 from pydantic import TypeAdapter
 

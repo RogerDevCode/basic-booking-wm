@@ -400,30 +400,30 @@
 - ⚡ `async_fn` `create_redis_client` (L32)
 
 ### `f/internal/_result.py`
-- 🔧 `fn` `ok` (L17)
-- 🔧 `fn` `fail` (L22)
-- 🔧 `fn` `is_ok_outcome` (L33)
-- 🔧 `fn` `is_fail_outcome` (L38)
-- ⚡ `async_fn` `wrap` (L43)
-- 📦 `class` `DBClient` (L52)
-- ⚡ `async_fn` `fetch` (L55)
-- ⚡ `async_fn` `fetchrow` (L57)
-- ⚡ `async_fn` `fetchval` (L59)
-- ⚡ `async_fn` `execute` (L61)
-- ⚡ `async_fn` `close` (L63)
-- ⚡ `async_fn` `with_tenant_context` (L66)
-- ⚡ `async_fn` `with_admin_context` (L102)
+- 🔧 `fn` `ok` (L22)
+- 🔧 `fn` `fail` (L27)
+- 🔧 `fn` `is_ok_outcome` (L38)
+- 🔧 `fn` `is_fail_outcome` (L43)
+- ⚡ `async_fn` `wrap` (L48)
+- 📦 `class` `DBClient` (L57)
+- ⚡ `async_fn` `fetch` (L60)
+- ⚡ `async_fn` `fetchrow` (L62)
+- ⚡ `async_fn` `fetchval` (L64)
+- ⚡ `async_fn` `execute` (L66)
+- ⚡ `async_fn` `close` (L68)
+- ⚡ `async_fn` `with_tenant_context` (L71)
+- ⚡ `async_fn` `with_admin_context` (L107)
 
 ### `f/internal/_state_machine.py`
 - 🔧 `fn` `validate_transition` (L32)
 
 ### `f/internal/_wmill_adapter.py`
-- 🔧 `fn` `is_dict_str_obj` (L20)
-- 🔧 `fn` `get_variable_safe` (L24)
-- 🔧 `fn` `get_variable` (L32)
-- 🔧 `fn` `get_resource_safe` (L43)
-- 🔧 `fn` `run_script` (L54)
-- 🔧 `fn` `log` (L66)
+- 🔧 `fn` `is_dict_str_obj` (L26)
+- 🔧 `fn` `get_variable_safe` (L30)
+- 🔧 `fn` `get_variable` (L38)
+- 🔧 `fn` `get_resource_safe` (L49)
+- 🔧 `fn` `run_script` (L60)
+- 🔧 `fn` `log` (L72)
 
 ### `f/internal/ai_agent/_ai_agent_logic.py`
 - 🔧 `fn` `adjust_intent_with_context` (L28)
@@ -493,10 +493,10 @@
 - 🔧 `fn` `main` (L24)
 
 ### `f/internal/booking_fsm/_fsm_machine.py`
-- 🔧 `fn` `parse_action` (L51)
-- 🔧 `fn` `parse_callback_data` (L73)
-- 🔧 `fn` `apply_transition` (L90)
-- 🔧 `fn` `flow_step_from_state` (L345)
+- 🔧 `fn` `parse_action` (L57)
+- 🔧 `fn` `parse_callback_data` (L79)
+- 🔧 `fn` `apply_transition` (L96)
+- 🔧 `fn` `flow_step_from_state` (L351)
 
 ### `f/internal/booking_fsm/_fsm_models.py`
 - 📦 `class` `NamedItem` (L20)
@@ -1166,6 +1166,8 @@
 - `f/internal/_crypto.script.yaml`
 - `f/internal/_date_resolver.script.yaml`
 - `f/internal/_db_client.script.yaml`
+- `f/internal/_file_lock.script.yaml`
+- `f/internal/_redis_client.script.yaml`
 - `f/internal/_result.script.yaml`
 - `f/internal/_state_machine.script.yaml`
 - `f/internal/_wmill_adapter.script.yaml`
@@ -1184,7 +1186,9 @@
 - `f/internal/booking_fsm/_fsm_machine.script.yaml`
 - `f/internal/booking_fsm/_fsm_models.script.yaml`
 - `f/internal/booking_fsm/_fsm_responses.script.yaml`
+- `f/internal/conversation_get/_conversation_models.script.yaml`
 - `f/internal/conversation_get/main.script.yaml`
+- `f/internal/conversation_update/_update_models.script.yaml`
 - `f/internal/conversation_update/main.script.yaml`
 - `f/internal/debug_db.script.yaml`
 - `f/internal/debug_db_final.script.yaml`
@@ -1192,9 +1196,12 @@
 - `f/internal/gcal_utils/_gcal_logic.script.yaml`
 - `f/internal/gcal_utils/_gcal_models.script.yaml`
 - `f/internal/gcal_utils/_oauth_logic.script.yaml`
+- `f/internal/message_parser/main.script.yaml`
 - `f/internal/scheduling_engine/__init__.script.yaml`
 - `f/internal/scheduling_engine/_scheduling_logic.script.yaml`
 - `f/internal/scheduling_engine/_scheduling_models.script.yaml`
+- `f/internal/telegram_router/_router_models.script.yaml`
+- `f/internal/telegram_router/main.script.yaml`
 - `f/internal/test_var.script.yaml`
 - `f/nlu/__init__.script.yaml`
 - `f/nlu/_constants.script.yaml`
@@ -1235,6 +1242,7 @@
 - `f/telegram_gateway/_gateway_logic.script.yaml`
 - `f/telegram_gateway/_gateway_models.script.yaml`
 - `f/telegram_gateway/main.script.yaml`
+- `f/telegram_gateway/set_webhook.script.yaml`
 - `f/telegram_menu/_menu_logic.script.yaml`
 - `f/telegram_menu/_menu_models.script.yaml`
 - `f/telegram_menu/main.script.yaml`

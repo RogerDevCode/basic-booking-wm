@@ -1,0 +1,12 @@
+script_path: f/flows/telegram_webhook
+is_flow: true
+route_path: telegram
+http_method: post
+is_async: true
+requires_auth: false
+request_type: sync
+authentication_method: none
+is_static_website: false
+workspaced_route: false
+wrap_body: true
+raw_string: false
