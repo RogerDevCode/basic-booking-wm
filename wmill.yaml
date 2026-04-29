@@ -18,7 +18,7 @@ skipFlows: false
 skipApps: false
 skipFolders: false
 includeSchedules: false
-includeTriggers: false
+includeTriggers: true
 includeUsers: false
 includeGroups: false
 includeSettings: false
