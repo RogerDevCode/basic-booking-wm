@@ -1,3 +1,5 @@
+from typing import Any
+from typing import cast
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -37,7 +39,7 @@ async def test_gcal_sync_success() -> None:
         patch("f.gcal_sync.main.create_db_client", return_value=mock_db),
         patch("f.gcal_sync._sync_event_logic.call_gcal_api", AsyncMock(return_value=(None, {"id": "new-event-123"}))),
     ):
-        args = {"booking_id": VALID_BOOKING_ID, "tenant_id": VALID_TENANT_ID, "action": "create"}
+        args: dict[str, Any] = {"booking_id": VALID_BOOKING_ID, "tenant_id": VALID_TENANT_ID, "action": "create"}
 
         err, result = await main(args)
 
@@ -74,7 +76,7 @@ async def test_gcal_sync_failure() -> None:
         patch("f.gcal_sync.main.create_db_client", return_value=mock_db),
         patch("f.gcal_sync._sync_event_logic.call_gcal_api", AsyncMock(return_value=(Exception("API Error"), None))),
     ):
-        args = {"booking_id": VALID_BOOKING_ID, "tenant_id": VALID_TENANT_ID, "action": "create"}
+        args: dict[str, Any] = {"booking_id": VALID_BOOKING_ID, "tenant_id": VALID_TENANT_ID, "action": "create"}
 
         err, result = await main(args)
 

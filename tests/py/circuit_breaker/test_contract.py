@@ -1,3 +1,5 @@
+from typing import Any
+from typing import cast
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -28,12 +30,13 @@ async def test_circuit_breaker_check_closed() -> None:
     ]
 
     with patch("f.circuit_breaker.main.create_db_client", return_value=mock_db):
-        args = {"action": "check", "service_id": "test"}
+        args: dict[str, Any] = {"action": "check", "service_id": "test"}
         err, result = await main(args)
-
         assert err is None
-        assert result["allowed"] is True
-        assert result["state"] == "closed"
+        assert result is not None
+        result_dict = cast(dict[str, object], result)
+        assert result_dict["allowed"] is True
+        assert result_dict["state"] == "closed"
 
 
 @pytest.mark.asyncio
@@ -58,11 +61,12 @@ async def test_circuit_breaker_record_failure_opens() -> None:
     ]
 
     with patch("f.circuit_breaker.main.create_db_client", return_value=mock_db):
-        args = {"action": "record_failure", "service_id": "test", "error_message": "Fail"}
+        args: dict[str, Any] = {"action": "record_failure", "service_id": "test", "error_message": "Fail"}
         err, result = await main(args)
-
         assert err is None
-        assert result["state"] == "opened"
+        assert result is not None
+        result_dict = cast(dict[str, object], result)
+        assert result_dict["state"] == "opened"
         # Verify update to 'open' state was called
         calls = [c[0][0] for c in mock_db.execute.call_args_list]
         assert any("SET state = 'open'" in q for q in calls)

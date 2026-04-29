@@ -1,3 +1,4 @@
+from typing import Any
 import pytest
 
 from f.booking_search._search_logic import execute_search
@@ -5,14 +6,17 @@ from f.booking_search._search_models import SearchInput
 
 
 class MockDBClient:
-    async def fetchrow(self, query: str, *args: object) -> dict[str, object] | None:
+    async def fetchrow(self, query: str, *args: object) -> dict[str, Any] | None:
         return None
 
-    async def fetch(self, query: str, *args: object) -> list[dict[str, object]]:
+    async def fetch(self, query: str, *args: object) -> list[dict[str, Any]]:
         return []
 
     async def execute(self, query: str, *args: object) -> str:
         return "OK"
+
+    async def fetchval(self, query: str, *args: object) -> Any | None:
+        return 0
 
     async def close(self) -> None:
         pass

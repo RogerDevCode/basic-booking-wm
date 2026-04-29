@@ -1,3 +1,5 @@
+from typing import Any
+from typing import cast, Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -13,18 +15,19 @@ async def test_auth_provider_generate_temp() -> None:
     # 1. SELECT provider
     mock_db.fetch.return_value = [{"name": "Dr. Test", "email": "test@test.com"}]
 
-    async def mock_with_tenant(db: object, tid: str, op: object) -> object:
+    async def mock_with_tenant(db: object, tid: str, op: Any) -> object:
         return await op()
 
     with (
         patch("f.auth_provider.main.create_db_client", return_value=mock_db),
         patch("f.auth_provider.main.with_tenant_context", side_effect=mock_with_tenant),
     ):
-        args = {"action": "admin_generate_temp", "provider_id": VALID_ID, "tenant_id": VALID_ID}
+        args: dict[str, Any] = {"action": "admin_generate_temp", "provider_id": VALID_ID, "tenant_id": VALID_ID}
 
         err, result = await main(args)
 
         assert err is None
+        assert result is not None
         assert result["provider_id"] == VALID_ID
-        assert len(result["tempPassword"]) == 4
+        assert len(str(cast(dict[str, object], result).get("tempPassword"))) == 4
         assert mock_db.execute.called  # Update password_hash

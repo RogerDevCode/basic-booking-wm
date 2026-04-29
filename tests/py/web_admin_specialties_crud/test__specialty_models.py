@@ -1,3 +1,4 @@
+from typing import Any
 import f.web_admin_specialties_crud._specialty_models
 
 

@@ -1,3 +1,5 @@
+from typing import Any
+from typing import cast, Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -33,7 +35,7 @@ async def test_gcal_reconcile_success() -> None:
     ]
 
     # Mock with_tenant_context
-    async def mock_with_tenant(db: object, tid: str, op: object) -> object:
+    async def mock_with_tenant(db: object, tid: str, op: Any) -> object:
         return await op()
 
     # Mock sync_booking_to_gcal logic (the internal call in main)
@@ -47,7 +49,7 @@ async def test_gcal_reconcile_success() -> None:
             AsyncMock(return_value={"providerEventId": "new-p-123", "clientEventId": None, "errors": []}),
         ),
     ):
-        args = {"dry_run": False, "batch_size": 10}
+        args: dict[str, Any] = {"dry_run": False, "batch_size": 10}
 
         err, result = await main(args)
 

@@ -1,3 +1,5 @@
+from typing import Any
+from typing import cast
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -14,7 +16,7 @@ async def test_register_success() -> None:
     ]
 
     with patch("f.web_auth_register.main.create_db_client", return_value=mock_db):
-        args = {
+        args: dict[str, Any] = {
             "full_name": "New User",
             "rut": "12345678-5",
             "email": "new@example.com",
@@ -24,7 +26,7 @@ async def test_register_success() -> None:
             "password_confirm": "Password123!",
         }
 
-        err, result = await main(args)
+        err, result = main(args)
 
         assert err is None
         assert result is not None
@@ -33,7 +35,7 @@ async def test_register_success() -> None:
 
 @pytest.mark.asyncio
 async def test_register_invalid_rut() -> None:
-    args = {
+    args: dict[str, Any] = {
         "full_name": "New User",
         "rut": "12345678-0",  # Invalid DV
         "email": "new@example.com",
@@ -42,6 +44,6 @@ async def test_register_invalid_rut() -> None:
         "password": "Password123!",
         "password_confirm": "Password123!",
     }
-    err, _result = await main(args)
+    err, _result = main(args)
     assert err is not None
     assert "Invalid Chilean RUT" in str(err)

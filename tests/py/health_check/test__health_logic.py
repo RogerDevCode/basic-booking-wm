@@ -1,3 +1,4 @@
+from typing import Any
 import pytest
 
 import f.health_check._health_logic

@@ -1,3 +1,5 @@
+from typing import Any
+from typing import cast
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -14,9 +16,10 @@ async def test_admin_regions_list_success() -> None:
     ]
 
     with patch("f.web_admin_regions.main.create_db_client", return_value=mock_db):
-        args = {"action": "list_regions"}
-        err, result = await main(args)
+        args: dict[str, Any] = {"action": "list_regions"}
+        err, result = main(args)
 
         assert err is None
+        assert result is not None
         assert result["count"] == 1
         assert result["regions"][0]["name"] == "Metropolitana"

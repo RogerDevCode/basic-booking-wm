@@ -1,3 +1,5 @@
+from typing import Any
+from typing import cast, Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -20,16 +22,17 @@ async def test_admin_provider_list_success() -> None:
         }
     ]
 
-    async def mock_with_admin(db: object, op: object) -> object:
+    async def mock_with_admin(db: object, op: Any) -> object:
         return await op()
 
     with (
         patch("f.web_admin_provider_crud.main.create_db_client", return_value=mock_db),
         patch("f.web_admin_provider_crud.main.with_admin_context", side_effect=mock_with_admin),
     ):
-        args = {"action": "list"}
+        args: dict[str, Any] = {"action": "list"}
         # main returns result now, not (err, result)
         result = await main(args)
+        assert result is not None
 
         assert result is not None
         assert isinstance(result, list)

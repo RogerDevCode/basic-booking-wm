@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import cast
 
 from ..internal._result import DBClient, Result, fail, ok
 from ._me_models import UserProfileResult
@@ -38,9 +39,7 @@ async def get_user_profile(db: DBClient, user_id: str) -> Result[UserProfileResu
         "is_active": bool(r["is_active"]),
         "profile_complete": bool(r["profile_complete"]),
         "last_login": r["last_login"].isoformat()
-        if isinstance(r.get("last_login"), datetime)
-        else str(r.get("last_login"))
-        if r.get("last_login")
+        if r.get("last_login") and isinstance(r["last_login"], datetime)
         else None,
     }
 

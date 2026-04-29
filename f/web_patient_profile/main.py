@@ -1,4 +1,3 @@
-# mypy: disable-error-code
 import asyncio
 
 # ============================================================================
@@ -61,7 +60,7 @@ async def _main_async(args: dict[str, Any]) -> Result[ProfileResult]:
         await conn.close()  # pyright: ignore[reportUnknownMemberType]
 
 
-def main(args: dict) -> None:
+def main(args: dict[str, Any]) -> Result[ProfileResult]:
     import traceback
 
     try:

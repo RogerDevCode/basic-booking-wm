@@ -1,3 +1,4 @@
+from typing import Any
 import pytest
 
 import f.distributed_lock._lock_logic

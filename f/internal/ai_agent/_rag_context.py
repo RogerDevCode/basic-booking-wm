@@ -43,7 +43,7 @@ async def build_rag_context(provider_id: str | None, text: str, limit: int = 3) 
 
         return {"context": "\n".join(context_parts), "count": len(rows), "hasProviderSpecific": has_provider}
     except Exception as e:
-        from ..internal._wmill_adapter import log
+        from .._wmill_adapter import log
 
         log("SILENT_ERROR_CAUGHT", error=str(e), file="_rag_context.py")
         return {"context": "", "count": 0, "hasProviderSpecific": False}

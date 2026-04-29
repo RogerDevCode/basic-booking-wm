@@ -1,3 +1,5 @@
+from typing import Any
+from typing import cast, Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -35,7 +37,7 @@ async def test_reminder_cron_success() -> None:
         [],  # 30min window bookings
     ]
 
-    async def mock_with_tenant(db: object, tid: str, op: object) -> object:
+    async def mock_with_tenant(db: object, tid: str, op: Any) -> object:
         return await op()
 
     with (
@@ -43,10 +45,11 @@ async def test_reminder_cron_success() -> None:
         patch("f.reminder_cron.main.with_tenant_context", side_effect=mock_with_tenant),
         patch("f.internal._wmill_adapter.wmill.run_script_by_path", return_value=(None, {"sent": True})),
     ):
-        args = {"dry_run": False}
+        args: dict[str, Any] = {"dry_run": False}
         err, result = await main(args)
 
         assert err is None
+        assert result is not None
         assert result["reminders_24h_sent"] == 1
         assert result["reminders_2h_sent"] == 0
         assert result["reminders_30min_sent"] == 0

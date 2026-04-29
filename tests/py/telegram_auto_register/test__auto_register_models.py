@@ -1,3 +1,4 @@
+from typing import Any
 import f.telegram_auto_register._auto_register_models
 
 

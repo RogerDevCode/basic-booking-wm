@@ -91,7 +91,7 @@ async def _main_async(args: dict[str, Any]) -> Result[ChangeRoleResult]:
         await conn.close()  # pyright: ignore[reportUnknownMemberType]
 
 
-def main(args: dict) -> None:
+def main(args: dict[str, Any]) -> Result[ChangeRoleResult]:
     import traceback
 
     try:

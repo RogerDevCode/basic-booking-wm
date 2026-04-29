@@ -1,3 +1,5 @@
+from typing import Any
+from typing import cast
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -35,7 +37,7 @@ async def test_availability_check_success() -> None:
     ]
 
     with patch("f.availability_check.main.create_db_client", return_value=mock_db):
-        args = {
+        args: dict[str, Any] = {
             "tenant_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
             "provider_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567891",
             "date": "2026-05-01",  # Friday
@@ -62,7 +64,7 @@ async def test_availability_check_blocked() -> None:
     ]
 
     with patch("f.availability_check.main.create_db_client", return_value=mock_db):
-        args = {
+        args: dict[str, Any] = {
             "tenant_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
             "provider_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567891",
             "date": "2026-05-01",

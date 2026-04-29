@@ -1,3 +1,4 @@
+from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -35,7 +36,7 @@ async def test_openrouter_benchmark_success() -> None:
                 [{"name": "t1", "userMessage": "hi", "expectedIntent": "i", "expectedHuman": False}],
             ),
         ):
-            err, result = await main({})
+            err, result = main({})
 
             assert err is None
             assert result is not None

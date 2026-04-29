@@ -1,3 +1,4 @@
+from typing import Any
 import pytest
 
 import f.circuit_breaker._circuit_logic

@@ -1,3 +1,5 @@
+from typing import Any
+from typing import cast, Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -37,17 +39,18 @@ async def test_provider_profile_get_success() -> None:
         }
     ]
 
-    async def mock_with_tenant(db: object, tid: str, op: object) -> object:
+    async def mock_with_tenant(db: object, tid: str, op: Any) -> object:
         return await op()
 
     with (
         patch("f.web_provider_profile.main.create_db_client", return_value=mock_db),
         patch("f.web_provider_profile.main.with_tenant_context", side_effect=mock_with_tenant),
     ):
-        args = {"action": "get_profile", "provider_id": VALID_ID}
-        err, result = await main(args)
+        args: dict[str, Any] = {"action": "get_profile", "provider_id": VALID_ID}
+        err, result = main(args)
 
         assert err is None
+        assert result is not None
         assert result["id"] == VALID_ID
         assert result["name"] == "Dr. Smith"
         assert result["has_password"] is True

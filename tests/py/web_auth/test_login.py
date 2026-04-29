@@ -1,3 +1,5 @@
+from typing import Any
+from typing import cast
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -26,8 +28,8 @@ async def test_login_success() -> None:
     ]
 
     with patch("f.web_auth_login.main.create_db_client", return_value=mock_db):
-        args = {"email": VALID_EMAIL, "password": VALID_PASSWORD}
-        err, result = await main(args)
+        args: dict[str, Any] = {"email": VALID_EMAIL, "password": VALID_PASSWORD}
+        err, result = main(args)
 
         assert err is None
         assert result is not None
@@ -51,8 +53,8 @@ async def test_login_invalid_password() -> None:
     ]
 
     with patch("f.web_auth_login.main.create_db_client", return_value=mock_db):
-        args = {"email": VALID_EMAIL, "password": "WrongPassword"}
-        err, _result = await main(args)
+        args: dict[str, Any] = {"email": VALID_EMAIL, "password": "WrongPassword"}
+        err, _result = main(args)
 
         assert err is not None
         assert "Invalid email or password" in str(err)

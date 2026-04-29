@@ -21,15 +21,20 @@ sys.modules["wmill"] = mock_wmill_module
 orig_run = asyncio.run
 
 
-def mock_run(coro: object) -> object:
+from typing import Any, cast
+
+def mock_run(coro: Any, *, debug: Any = None, loop_factory: Any = None) -> Any:
     try:
         asyncio.get_running_loop()
         return coro
     except RuntimeError:
-        return orig_run(coro)
+        kwargs: dict[str, Any] = {}
+        if debug is not None: kwargs["debug"] = debug
+        if loop_factory is not None: kwargs["loop_factory"] = loop_factory
+        return orig_run(coro, **kwargs)
 
 
-asyncio.run = mock_run
+asyncio.run = cast(Any, mock_run)
 
 
 @pytest.fixture(autouse=True)
@@ -41,4 +46,4 @@ def windmill_env(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.fixture
 def mock_wmill() -> MagicMock:
-    return wmill
+    return cast(MagicMock, wmill)

@@ -19,9 +19,14 @@ def ok[T](data: T) -> tuple[None, T]:
     return (None, data)
 
 
-def fail(error: Exception | str) -> tuple[Exception, None]:
+def fail(error: Exception | str | None) -> tuple[Exception, None]:
     """Creates a failed result tuple, ensuring the error is an Exception object."""
-    err = error if isinstance(error, Exception) else Exception(str(error))
+    if error is None:
+        err = Exception("unknown_error")
+    elif isinstance(error, Exception):
+        err = error
+    else:
+        err = Exception(str(error))
     return (err, None)
 
 

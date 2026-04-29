@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import cast
 
 from ..internal._result import DBClient, Result, fail, ok
 from ._profile_models import InputSchema, ProfileRow
@@ -55,9 +56,7 @@ class ProfileRepository:
                 "is_active": bool(r["is_active"]),
                 "has_password": bool(r.get("password_hash")),
                 "last_password_change": r["last_password_change"].isoformat()
-                if isinstance(r.get("last_password_change"), datetime)
-                else str(r.get("last_password_change"))
-                if r.get("last_password_change")
+                if r.get("last_password_change") and isinstance(r["last_password_change"], datetime)
                 else None,
             }
             return ok(res)

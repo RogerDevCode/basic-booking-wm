@@ -1,4 +1,3 @@
-# mypy: disable-error-code
 from datetime import datetime
 from typing import Any
 
@@ -42,7 +41,7 @@ async def handle_user_actions(db: DBClient, input_data: InputSchema) -> Result[U
         )
         users = [map_row(r) for r in rows]
         count_rows = await db.fetch("SELECT COUNT(*) AS total FROM users")
-        total = int(count_rows[0]["total"]) if count_rows else 0
+        total = int(count_rows[0]["total"]) if count_rows else 0  # type: ignore[call-overload]
         return ok({"users": users, "total": total})
 
     if not input_data.target_user_id:

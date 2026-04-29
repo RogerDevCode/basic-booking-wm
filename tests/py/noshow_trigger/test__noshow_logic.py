@@ -1,3 +1,4 @@
+from typing import Any
 import pytest
 
 import f.noshow_trigger._noshow_logic

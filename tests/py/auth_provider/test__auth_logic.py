@@ -1,3 +1,4 @@
+from typing import Any
 import pytest
 
 import f.auth_provider._auth_logic

@@ -1,3 +1,5 @@
+from typing import Any
+from typing import cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -19,7 +21,7 @@ async def test_telegram_gateway_message_routing() -> None:
             mock_client = mock_client_class.return_value.__aenter__.return_value
             mock_client.post.return_value = MagicMock(status_code=200, json=lambda: {"ok": True})
 
-            args = {
+            args: dict[str, Any] = {
                 "update_id": 1,
                 "message": {
                     "message_id": 100,
@@ -30,6 +32,8 @@ async def test_telegram_gateway_message_routing() -> None:
             }
 
             result = await main(args)
+
+            assert result is not None
 
             assert result["success"] is True
             assert result["message"] == "message_received"

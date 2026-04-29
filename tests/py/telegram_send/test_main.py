@@ -1,3 +1,4 @@
+from typing import Any
 import pytest
 
 import f.telegram_send.main

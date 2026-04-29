@@ -1,3 +1,4 @@
+from typing import Any
 import pytest
 
 import f.gmail_send._gmail_logic

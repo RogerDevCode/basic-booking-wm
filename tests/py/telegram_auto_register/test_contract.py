@@ -1,3 +1,5 @@
+from typing import Any
+from typing import cast, Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -15,18 +17,19 @@ async def test_telegram_auto_register_success() -> None:
         [{"user_id": "u123"}],  # insert result
     ]
 
-    async def mock_with_admin(db: object, op: object) -> object:
+    async def mock_with_admin(db: object, op: Any) -> object:
         return await op()
 
     with (
         patch("f.telegram_auto_register.main.create_db_client", return_value=mock_db),
         patch("f.telegram_auto_register.main.with_admin_context", side_effect=mock_with_admin),
     ):
-        args = {"chat_id": "123456", "first_name": "Test", "last_name": "User"}
+        args: dict[str, Any] = {"chat_id": "123456", "first_name": "Test", "last_name": "User"}
 
         err, result = await main(args)
 
         assert err is None
+        assert result is not None
         assert result["user_id"] == "u123"
         assert result["is_new"] is True
         # Verify fetch was called twice (lookup + insert)

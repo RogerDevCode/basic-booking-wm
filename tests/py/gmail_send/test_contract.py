@@ -1,3 +1,5 @@
+from typing import Any
+from typing import cast
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -15,7 +17,7 @@ async def test_gmail_send_success() -> None:
         patch.dict("os.environ", env_vars),
         patch("f.gmail_send.main.send_with_retry", AsyncMock(return_value=(None, "msg-123"))),
     ):
-        args = {
+        args: dict[str, Any] = {
             "recipient_email": "client@example.com",
             "message_type": "booking_created",
             "booking_details": {"provider_name": "Dr. House", "date": "2026-05-01"},
@@ -31,7 +33,7 @@ async def test_gmail_send_success() -> None:
 
 @pytest.mark.asyncio
 async def test_gmail_send_invalid_input() -> None:
-    args = {"recipient_email": "invalid-email", "message_type": "booking_created"}
+    args: dict[str, Any] = {"recipient_email": "invalid-email", "message_type": "booking_created"}
     err, result = await main(args)
     assert err is not None
     assert result is None

@@ -1,3 +1,4 @@
+from typing import Any
 import pytest
 
 import f.web_provider_dashboard.main

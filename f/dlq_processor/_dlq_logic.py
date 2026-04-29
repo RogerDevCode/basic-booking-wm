@@ -81,7 +81,7 @@ async def retry_dlq(db: DBClient, dlq_id: int | None) -> Result[dict[str, Any]]:
             await db.execute("UPDATE booking_dlq SET updated_at = NOW() WHERE dlq_id = $1", r["dlq_id"])
             retried_ids.append(int(cast("Any", r["dlq_id"])))
         res_batch: dict[str, Any] = {"retried": retried_ids, "count": len(retried_ids)}
-        return ok(cast("dict[str, Any]", res_batch))
+        return ok(res_batch)
 
     # Single retry
     rows = await db.fetch("SELECT dlq_id FROM booking_dlq WHERE dlq_id = $1 AND status = 'pending' FOR UPDATE", dlq_id)
@@ -90,7 +90,7 @@ async def retry_dlq(db: DBClient, dlq_id: int | None) -> Result[dict[str, Any]]:
 
     await db.execute("UPDATE booking_dlq SET updated_at = NOW() WHERE dlq_id = $1", dlq_id)
     res_single: dict[str, Any] = {"retried": [dlq_id]}
-    return ok(cast("dict[str, Any]", res_single))
+    return ok(res_single)
 
 
 async def resolve_dlq(db: DBClient, dlq_id: int, resolved_by: str | None, notes: str | None) -> Result[dict[str, int]]:

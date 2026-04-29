@@ -83,9 +83,9 @@ async def fetch_provider_dashboard(db: DBClient, input_data: InputSchema) -> Res
         total = 0
         if stats_rows:
             s = stats_rows[0]
-            comp = int(s["month_completed"])
-            ns = int(s["month_no_show"])
-            total = int(s["month_total"])
+            comp = int(s["month_completed"])  # type: ignore[call-overload]
+            ns = int(s["month_no_show"])  # type: ignore[call-overload]
+            total = int(s["month_total"])  # type: ignore[call-overload]
 
         rate = f"{(comp / (comp + ns) * 100):.1f}" if (comp + ns) > 0 else "0.0"
 

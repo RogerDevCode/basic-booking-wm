@@ -109,7 +109,8 @@ async def check_lock(db: DBClient, lock_key: str) -> Result[LockResult]:
         return ok(res_no)
 
     r = rows[0]
-    exp = r["expires_at"].isoformat() if isinstance(r.get("expires_at"), datetime) else str(r.get("expires_at"))
+    exp_raw = r.get("expires_at")
+    exp = exp_raw.isoformat() if isinstance(exp_raw, datetime) else str(exp_raw)
     res_yes: LockResult = {"locked": True, "owner": str(r["owner_token"]), "expires_at": exp}
     return ok(res_yes)
 

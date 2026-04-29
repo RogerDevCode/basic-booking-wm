@@ -1,3 +1,4 @@
+from typing import Any
 from f.nlu._constants import (
     CONFIDENCE_BOUNDARIES,
     CONFIDENCE_THRESHOLDS,

@@ -1,3 +1,5 @@
+from typing import Any
+from typing import cast, Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -21,16 +23,17 @@ async def test_admin_specialty_list_success() -> None:
         }
     ]
 
-    async def mock_with_tenant(db: object, tid: str, op: object) -> object:
+    async def mock_with_tenant(db: object, tid: str, op: Any) -> object:
         return await op()
 
     with (
         patch("f.web_admin_specialties_crud.main.create_db_client", return_value=mock_db),
         patch("f.web_admin_specialties_crud.main.with_tenant_context", side_effect=mock_with_tenant),
     ):
-        args = {"action": "list", "admin_user_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"}
-        err, result = await main(args)
+        args: dict[str, Any] = {"action": "list", "admin_user_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"}
+        err, result = main(args)
 
         assert err is None
-        assert len(result) == 1
+        assert len(result or []) == 1
+        assert result is not None
         assert result[0]["name"] == "Cardiología"

@@ -1,3 +1,5 @@
+from typing import Any
+from typing import cast, Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -15,7 +17,7 @@ async def test_telegram_callback_confirm_success() -> None:
     mock_db.fetch.return_value = [{"booking_id": VALID_BOOKING_ID, "status": "pending", "client_id": VALID_TENANT_ID}]
 
     # Mock with_tenant_context
-    async def mock_with_tenant(db: object, tid: str, op: object) -> object:
+    async def mock_with_tenant(db: object, tid: str, op: Any) -> object:
         return await op()
 
     with (
@@ -25,7 +27,7 @@ async def test_telegram_callback_confirm_success() -> None:
         patch("f.telegram_callback._callback_logic.answer_callback_query", AsyncMock(return_value=True)),
         patch("f.telegram_callback._callback_logic.send_followup_message", AsyncMock(return_value=True)),
     ):
-        args = {
+        args: dict[str, Any] = {
             "callback_query_id": "q123",
             "callback_data": f"cnf:{VALID_BOOKING_ID}",
             "chat_id": "123456",
@@ -35,9 +37,9 @@ async def test_telegram_callback_confirm_success() -> None:
         err, result = await main(args)
 
         assert err is None
-        assert result is not None
+        assert isinstance(result, dict)
         assert result["action"] == "confirm"
-        assert "Cita confirmada" in result["response_text"]
+        assert "Cita confirmada" in str(result["response_text"])
         assert mock_db.execute.called  # Update + Audit
 
 
@@ -47,7 +49,7 @@ async def test_telegram_callback_invalid_data() -> None:
         patch("f.telegram_callback.main.get_variable", return_value="fake-token"),
         patch("f.telegram_callback._callback_logic.answer_callback_query", AsyncMock(return_value=True)),
     ):
-        args = {
+        args: dict[str, Any] = {
             "callback_query_id": "q123",
             "callback_data": "invalid_format",
             "chat_id": "123456",

@@ -45,7 +45,7 @@ async def _main_async(args: dict[str, object]) -> Result[dict[str, object]]:
             # Initial state
             raw_state = input_data.wizard_state or {}
             state = WizardState(
-                step=int(raw_state.get("step", 0)),
+                step=int(raw_state.get("step", 0)),  # type: ignore[call-overload]
                 client_id=str(raw_state.get("client_id", "")),
                 chat_id=str(raw_state.get("chat_id", "")),
                 selected_date=str(raw_state.get("selected_date")) if raw_state.get("selected_date") else None,
@@ -84,8 +84,8 @@ async def _main_async(args: dict[str, object]) -> Result[dict[str, object]]:
             elif action == "select_time":
                 state.selected_time = input_data.user_input
                 err_names, names = await repo.get_names(input_data.provider_id or "", input_data.service_id or "")
-                if err_names:
-                    return fail(err_names)
+                if err_names or not names:
+                    return fail(err_names or "names_not_found")
                 view = WizardUI.build_confirmation(state, names["provider"], names["service"])
 
             elif action == "confirm":

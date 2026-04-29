@@ -1,3 +1,4 @@
+from typing import Any
 import f.telegram_send._telegram_models
 
 

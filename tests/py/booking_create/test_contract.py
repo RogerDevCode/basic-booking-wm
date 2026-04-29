@@ -1,3 +1,4 @@
+from typing import Any
 from datetime import UTC, datetime
 
 import pytest
@@ -22,7 +23,7 @@ class MockBookingRepository:
     async def get_service_context(self, service_id: str, provider_id: str) -> ServiceContext | None:
         return {"id": service_id, "name": "General Checkup", "duration": 30}
 
-    async def is_provider_blocked(self, provider_id: str, target_date: datetime.date) -> bool:
+    async def is_provider_blocked(self, provider_id: str, target_date: Any) -> bool:
         return False
 
     async def is_provider_scheduled(self, provider_id: str, day_of_week: int) -> bool:

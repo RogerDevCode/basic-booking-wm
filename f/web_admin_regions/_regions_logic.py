@@ -13,11 +13,11 @@ async def list_regions(db: DBClient) -> Result[dict[str, Any]]:
         )
         regions: list[RegionRow] = [
             {
-                "region_id": int(r["region_id"]),
+                "region_id": int(r["region_id"]),  # type: ignore[call-overload]
                 "name": str(r["name"]),
                 "code": str(r["code"]),
                 "is_active": bool(r["is_active"]),
-                "sort_order": int(r["sort_order"]),
+                "sort_order": int(r["sort_order"]),  # type: ignore[call-overload]
             }
             for r in rows
         ]
@@ -49,9 +49,9 @@ async def list_communes(db: DBClient, region_id: int | None) -> Result[dict[str,
 
         communes: list[CommuneRow] = [
             {
-                "commune_id": int(r["commune_id"]),
+                "commune_id": int(r["commune_id"]),  # type: ignore[call-overload]
                 "name": str(r["name"]),
-                "region_id": int(r["region_id"]),
+                "region_id": int(r["region_id"]),  # type: ignore[call-overload]
                 "is_active": bool(r["is_active"]),
                 "region_name": str(r["region_name"]),
             }
@@ -90,9 +90,9 @@ async def search_communes(db: DBClient, search: str, region_id: int | None) -> R
 
         communes: list[CommuneRow] = [
             {
-                "commune_id": int(r["commune_id"]),
+                "commune_id": int(r["commune_id"]),  # type: ignore[call-overload]
                 "name": str(r["name"]),
-                "region_id": int(r["region_id"]),
+                "region_id": int(r["region_id"]),  # type: ignore[call-overload]
                 "is_active": bool(r["is_active"]),
                 "region_name": str(r["region_name"]),
             }

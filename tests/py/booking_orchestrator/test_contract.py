@@ -1,3 +1,4 @@
+from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -32,6 +33,7 @@ async def test_orchestrator_create_booking_wizard_handoff() -> None:
             patch("f.booking_orchestrator.main.resolve_context", AsyncMock(return_value=(None, ctx))),
         ):
             result = await main("123456", "crear_cita", {"date": "2026-05-01", "time": "10:00"})
+            assert result is not None
 
             assert result is not None
             assert result["data"]["action"] == "crear_cita"

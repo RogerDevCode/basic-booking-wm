@@ -24,7 +24,7 @@ class BaseTelegramInput(BaseModel):
 class SendMessageInput(BaseTelegramInput):
     mode: Literal["send_message"] = "send_message"
     text: str = Field(min_length=1)
-    inline_buttons: list[object] | None = Field(default_factory=list)
+    inline_buttons: list[object] | None = Field(default_factory=lambda: [])
     message_id: int | None = None
 
 
@@ -32,7 +32,7 @@ class EditMessageInput(BaseTelegramInput):
     mode: Literal["edit_message"] = "edit_message"
     message_id: int
     text: str = Field(min_length=1)
-    inline_buttons: list[object] | None = Field(default_factory=list)
+    inline_buttons: list[object] | None = Field(default_factory=lambda: [])
 
 
 class DeleteMessageInput(BaseModel):

@@ -1,4 +1,3 @@
-# mypy: disable-error-code="misc"
 from typing import Any
 
 from ..internal._result import DBClient, Result, fail, ok

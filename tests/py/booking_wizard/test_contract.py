@@ -1,3 +1,5 @@
+from typing import Any
+from typing import cast, Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -12,20 +14,23 @@ async def test_booking_wizard_start() -> None:
     mock_db = AsyncMock()
     # Mock resolve_tenant (none needed for start usually, but let's mock it)
 
-    async def mock_with_tenant(db: object, tid: str, op: object) -> object:
+    async def mock_with_tenant(db: object, tid: str, op: Any) -> object:
         return await op()
 
     with (
         patch("f.booking_wizard.main.create_db_client", return_value=mock_db),
         patch("f.booking_wizard.main.with_tenant_context", side_effect=mock_with_tenant),
     ):
-        args = {"action": "start", "provider_id": VALID_ID, "wizard_state": {"client_id": "c1", "chat_id": "123"}}
+        args: dict[str, Any] = {"action": "start", "provider_id": VALID_ID, "wizard_state": {"client_id": "c1", "chat_id": "123"}}
 
         err, result = await main(args)
 
         assert err is None
-        assert "Elige una fecha" in result["message"]
-        assert result["wizard_state"]["step"] == 1
+        assert result is not None
+        message = str(result["message"])
+        assert "Elige una fecha" in message
+        wizard_state = cast(dict[str, object], result["wizard_state"])
+        assert wizard_state["step"] == 1
 
 
 @pytest.mark.asyncio
@@ -38,14 +43,14 @@ async def test_booking_wizard_select_date_success() -> None:
         [{"start_time": "2026-05-01T09:00:00Z"}],  # already booked
     ]
 
-    async def mock_with_tenant(db: object, tid: str, op: object) -> object:
+    async def mock_with_tenant(db: object, tid: str, op: Any) -> object:
         return await op()
 
     with (
         patch("f.booking_wizard.main.create_db_client", return_value=mock_db),
         patch("f.booking_wizard.main.with_tenant_context", side_effect=mock_with_tenant),
     ):
-        args = {
+        args: dict[str, Any] = {
             "action": "select_date",
             "user_input": "2026-05-01",
             "provider_id": VALID_ID,
@@ -56,6 +61,10 @@ async def test_booking_wizard_select_date_success() -> None:
         err, result = await main(args)
 
         assert err is None
-        assert "Elige un horario" in result["message"]
-        assert result["wizard_state"]["selected_date"] == "2026-05-01"
-        assert result["wizard_state"]["step"] == 2
+        assert result is not None
+        message = str(result["message"])
+        assert "Elige un horario" in message
+        wizard_state = cast(dict[str, object], result["wizard_state"])
+        assert wizard_state["selected_date"] == "2026-05-01"
+        wizard_state = cast(dict[str, object], result["wizard_state"])
+        assert wizard_state["step"] == 2

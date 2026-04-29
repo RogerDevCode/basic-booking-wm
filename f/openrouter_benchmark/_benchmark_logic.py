@@ -1,4 +1,3 @@
-# mypy: disable-error-code
 import json
 import re
 import time

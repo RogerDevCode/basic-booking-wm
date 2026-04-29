@@ -1,3 +1,5 @@
+from typing import Any
+from typing import cast, Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -28,18 +30,20 @@ async def test_provider_dashboard_success() -> None:
         [{"month_completed": 10, "month_no_show": 1, "month_total": 11}],  # stats
     ]
 
-    async def mock_with_tenant(db: object, tid: str, op: object) -> object:
+    async def mock_with_tenant(db: object, tid: str, op: Any) -> object:
         return await op()
 
     with (
         patch("f.web_provider_dashboard.main.create_db_client", return_value=mock_db),
         patch("f.web_provider_dashboard.main.with_tenant_context", side_effect=mock_with_tenant),
     ):
-        args = {"provider_user_id": VALID_ID, "date": "2026-05-01"}
-        err, result = await main(args)
+        args: dict[str, Any] = {"provider_user_id": VALID_ID, "date": "2026-05-01"}
+        err, result = main(args)
 
         assert err is None
+        assert result is not None
         assert result["provider_id"] == "p1"
         assert len(result["agenda"]) == 1
+        assert result is not None
         assert result["stats"]["month_completed"] == 10
         assert result["stats"]["attendance_rate"] == "90.9"

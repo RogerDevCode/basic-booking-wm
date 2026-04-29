@@ -1,3 +1,4 @@
+from typing import Any
 from __future__ import annotations
 
 import pytest
@@ -38,7 +39,7 @@ class TestParseUserOption:
 class TestMenuController:
     @pytest.mark.asyncio
     async def test_start_action_shows_menu(self) -> None:
-        from f.telegram_menu._menu_logic import MenuInput
+        from f.telegram_menu._menu_models import MenuInput
 
         ctrl = MenuController()
         resp = await ctrl.handle(MenuInput(action="start", chat_id="123"))
@@ -49,7 +50,7 @@ class TestMenuController:
     @pytest.mark.asyncio
     async def test_select_option_cmd_book_not_handled_by_menu(self) -> None:
         """When callback_data=cmd:book arrives as user_input, menu must yield control (handled=False)."""
-        from f.telegram_menu._menu_logic import MenuInput
+        from f.telegram_menu._menu_models import MenuInput
 
         ctrl = MenuController()
         resp = await ctrl.handle(MenuInput(action="select_option", chat_id="123", user_input="cmd:book"))
@@ -57,7 +58,7 @@ class TestMenuController:
 
     @pytest.mark.asyncio
     async def test_select_option_unknown_shows_error_menu(self) -> None:
-        from f.telegram_menu._menu_logic import MenuInput
+        from f.telegram_menu._menu_models import MenuInput
 
         ctrl = MenuController()
         resp = await ctrl.handle(MenuInput(action="select_option", chat_id="123", user_input=""))

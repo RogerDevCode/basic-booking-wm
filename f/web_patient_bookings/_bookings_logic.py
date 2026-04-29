@@ -56,22 +56,33 @@ async def get_patient_bookings(db: DBClient, client_id: str, input_data: InputSc
 
         rows = await db.fetch(query, *params)
         count_rows = await db.fetch(count_query, *params[:-2])
-        total = int(count_rows[0]["count"]) if count_rows else 0
+        total = int(count_rows[0]["count"]) if count_rows else 0  # type: ignore[call-overload]
 
         now = datetime.now(UTC)
         upcoming: list[BookingInfo] = []
         past: list[BookingInfo] = []
 
         for r in rows:
-            st = r["start_time"]
-            if isinstance(st, str):
-                st = datetime.fromisoformat(st.replace("Z", "+00:00"))
+            st_raw = r["start_time"]
+            st: datetime
+            if isinstance(st_raw, str):
+                st = datetime.fromisoformat(st_raw.replace("Z", "+00:00"))
+            elif isinstance(st_raw, datetime):
+                st = st_raw
+            else:
+                st = datetime.now(UTC)
 
             status = str(r["status"])
+            et_raw = r["end_time"]
+            et: datetime | str
+            if isinstance(et_raw, datetime):
+                et = et_raw.isoformat()
+            else:
+                et = str(et_raw)
             info: BookingInfo = {
                 "booking_id": str(r["booking_id"]),
                 "start_time": st.isoformat().replace("+00:00", "Z"),
-                "end_time": r["end_time"].isoformat() if isinstance(r["end_time"], datetime) else str(r["end_time"]),
+                "end_time": et,
                 "status": status,
                 "cancellation_reason": str(r["cancellation_reason"]) if r.get("cancellation_reason") else None,
                 "provider_name": str(r["provider_name"]) if r.get("provider_name") else None,

@@ -42,7 +42,7 @@ async def handle_get_my_bookings(conn: DBClient, input_data: OrchestratorInput) 
                 """,  # noqa: E501
                 client_id,
             )
-            return ok(cast("list[dict[str, object]]", rows))
+            return None, rows
 
         err, rows = await with_tenant_context(conn, tenant_id, operation)
         if err or rows is None:

@@ -1,3 +1,4 @@
+from typing import Any
 import pytest
 
 import f.internal.gcal_utils._oauth_logic

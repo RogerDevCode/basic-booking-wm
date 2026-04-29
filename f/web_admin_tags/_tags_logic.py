@@ -1,4 +1,3 @@
-# mypy: disable-error-code="misc"
 from datetime import datetime
 from typing import Any
 

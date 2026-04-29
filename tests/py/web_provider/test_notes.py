@@ -1,3 +1,5 @@
+from typing import Any
+from typing import cast, Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -28,7 +30,7 @@ async def test_provider_notes_create_success() -> None:
         [],  # get_tags
     ]
 
-    async def mock_with_tenant(db: object, tid: str, op: object) -> object:
+    async def mock_with_tenant(db: object, tid: str, op: Any) -> object:
         return await op()
 
     with (
@@ -37,7 +39,7 @@ async def test_provider_notes_create_success() -> None:
         patch("f.web_provider_notes._notes_logic.encrypt_data", return_value="hex-data"),
         patch("f.web_provider_notes._notes_logic.decrypt_data", return_value="Test Content"),
     ):
-        args = {
+        args: dict[str, Any] = {
             "action": "create",
             "provider_id": VALID_ID,
             "booking_id": VALID_ID,
@@ -45,9 +47,10 @@ async def test_provider_notes_create_success() -> None:
             "content": "Test Content",
             "tag_ids": ["t1"],
         }
-        err, result = await main(args)
+        err, result = main(args)
 
         assert err is None
+        assert result is not None
         assert result["note_id"] == "n1"
         assert result["content"] == "Test Content"
         assert mock_db.execute.called  # assign_tags

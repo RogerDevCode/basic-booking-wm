@@ -1,3 +1,5 @@
+from typing import Any
+from typing import cast, Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -23,14 +25,14 @@ async def test_acquire_lock_success() -> None:
         }
     ]
 
-    async def mock_with_tenant(db: object, tid: str, op: object) -> object:
+    async def mock_with_tenant(db: object, tid: str, op: Any) -> object:
         return await op()
 
     with (
         patch("f.distributed_lock.main.create_db_client", return_value=mock_db),
         patch("f.distributed_lock.main.with_tenant_context", side_effect=mock_with_tenant),
     ):
-        args = {
+        args: dict[str, Any] = {
             "action": "acquire",
             "lock_key": "k1",
             "owner_token": "o1",
@@ -41,6 +43,7 @@ async def test_acquire_lock_success() -> None:
         err, result = await main(args)
 
         assert err is None
+        assert result is not None
         assert result["acquired"] is True
         assert result["lock"]["lock_key"] == "k1"
 
@@ -51,14 +54,14 @@ async def test_acquire_lock_already_held() -> None:
     # Mock INSERT RETURNING None (conflict) and UPDATE RETURNING None (not expired)
     mock_db.fetch.return_value = []
 
-    async def mock_with_tenant(db: object, tid: str, op: object) -> object:
+    async def mock_with_tenant(db: object, tid: str, op: Any) -> object:
         return await op()
 
     with (
         patch("f.distributed_lock.main.create_db_client", return_value=mock_db),
         patch("f.distributed_lock.main.with_tenant_context", side_effect=mock_with_tenant),
     ):
-        args = {
+        args: dict[str, Any] = {
             "action": "acquire",
             "lock_key": "k1",
             "owner_token": "o1",
@@ -69,5 +72,6 @@ async def test_acquire_lock_already_held() -> None:
         err, result = await main(args)
 
         assert err is None
+        assert result is not None
         assert result["acquired"] is False
         assert result["reason"] == "lock_already_held"

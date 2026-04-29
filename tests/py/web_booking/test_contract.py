@@ -1,3 +1,5 @@
+from typing import Any
+from typing import cast, Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -23,14 +25,14 @@ async def test_web_booking_crear_success() -> None:
         [{"booking_id": "b1", "status": "pending"}],  # insert result
     ]
 
-    async def mock_with_tenant(db: object, tid: str, op: object) -> object:
+    async def mock_with_tenant(db: object, tid: str, op: Any) -> object:
         return await op()
 
     with (
         patch("f.web_booking_api.main.create_db_client", return_value=mock_db),
         patch("f.web_booking_api.main.with_tenant_context", side_effect=mock_with_tenant),
     ):
-        args = {
+        args: dict[str, Any] = {
             "action": "crear",
             "user_id": VALID_ID,
             "provider_id": VALID_ID,
@@ -38,8 +40,9 @@ async def test_web_booking_crear_success() -> None:
             "start_time": "2026-05-01T10:00:00Z",
         }
 
-        err, result = await main(args)
+        err, result = main(args)
 
         assert err is None
+        assert result is not None
         assert result["booking_id"] == "b1"
         assert result["status"] == "pending"

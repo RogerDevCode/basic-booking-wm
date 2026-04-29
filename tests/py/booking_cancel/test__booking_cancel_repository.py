@@ -1,3 +1,4 @@
+from typing import Any
 import pytest
 
 import f.booking_cancel._booking_cancel_repository

@@ -1,5 +1,5 @@
-# mypy: disable-error-code
 from datetime import datetime
+from typing import cast
 
 from ..internal._result import DBClient, Result, fail, ok
 from ._waitlist_models import InputSchema, WaitlistEntry, WaitlistResult
@@ -53,7 +53,7 @@ async def handle_join(db: DBClient, client_id: str, data: InputSchema) -> Result
     count_rows = await db.fetch(
         "SELECT COUNT(*) as cnt FROM waitlist WHERE service_id = $1::uuid AND status = 'waiting'", data.service_id
     )
-    position = int(count_rows[0]["cnt"]) + 1 if count_rows else 1
+    position = int(count_rows[0]["cnt"]) + 1 if count_rows else 1  # type: ignore[call-overload]
 
     # Insert
     ins = await db.fetch(
@@ -118,8 +118,8 @@ async def handle_list(db: DBClient, client_id: str) -> Result[WaitlistResult]:
                 "preferred_date": str(r["preferred_date"]) if r.get("preferred_date") else None,
                 "preferred_start_time": str(r["preferred_start_time"]) if r.get("preferred_start_time") else None,
                 "status": str(r["status"]),
-                "position": int(r["position"]),
-                "created_at": r["created_at"].isoformat()
+                "position": int(r["position"]),  # type: ignore[call-overload]
+                "created_at": cast("datetime", r["created_at"]).isoformat()
                 if isinstance(r.get("created_at"), datetime)
                 else str(r.get("created_at")),
             }
@@ -137,5 +137,5 @@ async def handle_check_position(db: DBClient, client_id: str, waitlist_id: str |
     )
     if not rows:
         return fail("entry_not_found")
-    pos = int(rows[0]["position"])
+    pos = int(rows[0]["position"])  # type: ignore[call-overload]
     return ok({"entries": [], "position": pos, "message": f"Your position: {pos}"})

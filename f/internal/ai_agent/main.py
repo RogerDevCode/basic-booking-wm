@@ -67,7 +67,7 @@ async def _main_async(args: dict[str, Any]) -> dict[str, Any]:
         if intent in [INTENT["PREGUNTA_GENERAL"], INTENT["DESCONOCIDO"]]:
             if input_data.provider_id:
                 rag_res = await build_rag_context(input_data.provider_id, text)
-                rag_context = cast("str", rag_res["context"])
+                rag_context = rag_res["context"]
 
         sys_prompt = build_system_prompt(rag_context)
         user_msg = build_user_message(text)

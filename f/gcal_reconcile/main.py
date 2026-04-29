@@ -84,7 +84,7 @@ async def _main_async(args: dict[str, object]) -> Result[ReconcileResult]:
                         res["skipped"] += 1
                         continue
 
-                    row = cast("dict[str, object]", row_raw)
+                    row = row_raw
                     booking = cast(
                         "BookingRow",
                         {

@@ -1,3 +1,4 @@
+from typing import Any
 import pytest
 
 import f.gcal_sync._update_sync_status

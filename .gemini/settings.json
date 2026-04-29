@@ -19,7 +19,7 @@
         "mcp-remote",
         "https://titanium.stax.ink/api/mcp/w/booking-titanium/mcp",
         "--header",
-        "Authorization:Bearer LJipaz08ZSYDSoQtB4IGJiOxLFR86GBz"
+        "Authorization:Bearer wKQ2y16Zmiu1zUgRiYlRU6UekJz1F2jY"
       ]
     },
     "postgres-local": {

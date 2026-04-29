@@ -64,7 +64,7 @@ class BookingRepository:
         )
         if not rows:
             return fail("servicio_no_encontrado")
-        return ok(int(rows[0]["duration_minutes"]))
+        return ok(int(rows[0]["duration_minutes"]))  # type: ignore[call-overload]
 
     async def check_overlap(self, provider_id: str, start: str, end: str, ignore_id: str | None = None) -> Result[bool]:
         # Using English statuses from standardized migration

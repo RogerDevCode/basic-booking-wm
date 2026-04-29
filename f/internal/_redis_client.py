@@ -29,15 +29,12 @@ def _resolve_redis_url() -> str | None:
     return None
 
 
-async def create_redis_client() -> Redis:  # type: ignore[type-arg]
+async def create_redis_client() -> Redis:
     """
     Factory for Redis client.
     """
     redis_url = _resolve_redis_url()
     if not redis_url:
-        # Default for local docker-compose
         redis_url = "redis://redis:6379"
 
-    # Use Redis.from_url. We suppress type-arg because redis-py async types
-    # are problematic in some environments/stubs.
-    return Redis.from_url(redis_url, decode_responses=True)  # type: ignore[no-any-return]
+    return Redis.from_url(redis_url, decode_responses=True)

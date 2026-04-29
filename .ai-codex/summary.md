@@ -249,7 +249,7 @@
 - ⚡ `async_fn` `acquire_lock` (L31)
 - ⚡ `async_fn` `release_lock` (L80)
 - ⚡ `async_fn` `check_lock` (L98)
-- ⚡ `async_fn` `cleanup_locks` (L117)
+- ⚡ `async_fn` `cleanup_locks` (L118)
 
 ### `f/distributed_lock/_lock_models.py`
 - 📦 `class` `LockInfo` (L8)
@@ -402,17 +402,17 @@
 ### `f/internal/_result.py`
 - 🔧 `fn` `ok` (L17)
 - 🔧 `fn` `fail` (L22)
-- 🔧 `fn` `is_ok_outcome` (L28)
-- 🔧 `fn` `is_fail_outcome` (L33)
-- ⚡ `async_fn` `wrap` (L38)
-- 📦 `class` `DBClient` (L47)
-- ⚡ `async_fn` `fetch` (L50)
-- ⚡ `async_fn` `fetchrow` (L52)
-- ⚡ `async_fn` `fetchval` (L54)
-- ⚡ `async_fn` `execute` (L56)
-- ⚡ `async_fn` `close` (L58)
-- ⚡ `async_fn` `with_tenant_context` (L61)
-- ⚡ `async_fn` `with_admin_context` (L97)
+- 🔧 `fn` `is_ok_outcome` (L33)
+- 🔧 `fn` `is_fail_outcome` (L38)
+- ⚡ `async_fn` `wrap` (L43)
+- 📦 `class` `DBClient` (L52)
+- ⚡ `async_fn` `fetch` (L55)
+- ⚡ `async_fn` `fetchrow` (L57)
+- ⚡ `async_fn` `fetchval` (L59)
+- ⚡ `async_fn` `execute` (L61)
+- ⚡ `async_fn` `close` (L63)
+- ⚡ `async_fn` `with_tenant_context` (L66)
+- ⚡ `async_fn` `with_admin_context` (L102)
 
 ### `f/internal/_state_machine.py`
 - 🔧 `fn` `validate_transition` (L32)
@@ -626,8 +626,8 @@
 - ⚡ `async_fn` `main` (L90)
 
 ### `f/openrouter_benchmark/_benchmark_logic.py`
-- 🔧 `fn` `extract_json` (L44)
-- ⚡ `async_fn` `run_benchmark_task` (L78)
+- 🔧 `fn` `extract_json` (L43)
+- ⚡ `async_fn` `run_benchmark_task` (L77)
 
 ### `f/openrouter_benchmark/_benchmark_models.py`
 - 📦 `class` `ModelCandidate` (L6)
@@ -642,7 +642,7 @@
 - 📦 `class` `OpenRouterResponse` (L68)
 
 ### `f/openrouter_benchmark/main.py`
-- 🔧 `fn` `main` (L71)
+- 🔧 `fn` `main` (L70)
 
 ### `f/patient_register/_patient_logic.py`
 - ⚡ `async_fn` `upsert_client` (L5)
@@ -874,15 +874,15 @@
 - 📦 `class` `InputSchema` (L22)
 
 ### `f/web_admin_regions/main.py`
-- 🔧 `fn` `main` (L52)
+- 🔧 `fn` `main` (L51)
 
 ### `f/web_admin_specialties_crud/_specialty_logic.py`
-- 🔧 `fn` `map_row` (L9)
-- ⚡ `async_fn` `list_specialties` (L23)
-- ⚡ `async_fn` `create_specialty` (L31)
-- ⚡ `async_fn` `update_specialty` (L53)
-- ⚡ `async_fn` `delete_specialty` (L80)
-- ⚡ `async_fn` `set_status` (L88)
+- 🔧 `fn` `map_row` (L8)
+- ⚡ `async_fn` `list_specialties` (L22)
+- ⚡ `async_fn` `create_specialty` (L30)
+- ⚡ `async_fn` `update_specialty` (L52)
+- ⚡ `async_fn` `delete_specialty` (L79)
+- ⚡ `async_fn` `set_status` (L87)
 
 ### `f/web_admin_specialties_crud/_specialty_models.py`
 - 📦 `class` `SpecialtyRow` (L6)
@@ -893,20 +893,20 @@
 - 🔧 `fn` `main` (L63)
 
 ### `f/web_admin_tags/_tags_logic.py`
-- 🔧 `fn` `map_category` (L9)
-- 🔧 `fn` `map_tag` (L23)
-- ⚡ `async_fn` `verify_admin_access` (L39)
-- 📦 `class` `TagRepository` (L48)
-- ⚡ `async_fn` `list_categories` (L52)
-- ⚡ `async_fn` `create_category` (L68)
-- ⚡ `async_fn` `update_category` (L82)
-- ⚡ `async_fn` `set_category_status` (L104)
-- ⚡ `async_fn` `delete_category` (L117)
-- ⚡ `async_fn` `list_tags` (L124)
-- ⚡ `async_fn` `create_tag` (L148)
-- ⚡ `async_fn` `update_tag` (L170)
-- ⚡ `async_fn` `set_tag_status` (L197)
-- ⚡ `async_fn` `delete_tag` (L210)
+- 🔧 `fn` `map_category` (L8)
+- 🔧 `fn` `map_tag` (L22)
+- ⚡ `async_fn` `verify_admin_access` (L38)
+- 📦 `class` `TagRepository` (L47)
+- ⚡ `async_fn` `list_categories` (L51)
+- ⚡ `async_fn` `create_category` (L67)
+- ⚡ `async_fn` `update_category` (L81)
+- ⚡ `async_fn` `set_category_status` (L103)
+- ⚡ `async_fn` `delete_category` (L116)
+- ⚡ `async_fn` `list_tags` (L123)
+- ⚡ `async_fn` `create_tag` (L147)
+- ⚡ `async_fn` `update_tag` (L169)
+- ⚡ `async_fn` `set_tag_status` (L196)
+- ⚡ `async_fn` `delete_tag` (L209)
 
 ### `f/web_admin_tags/_tags_models.py`
 - 📦 `class` `CategoryRow` (L6)
@@ -918,8 +918,8 @@
 - 🔧 `fn` `main` (L107)
 
 ### `f/web_admin_users/_user_logic.py`
-- 🔧 `fn` `map_row` (L9)
-- ⚡ `async_fn` `handle_user_actions` (L30)
+- 🔧 `fn` `map_row` (L8)
+- ⚡ `async_fn` `handle_user_actions` (L29)
 
 ### `f/web_admin_users/_user_models.py`
 - 📦 `class` `UserInfo` (L6)
@@ -960,7 +960,7 @@
 - 🔧 `fn` `main` (L95)
 
 ### `f/web_auth_me/_me_logic.py`
-- ⚡ `async_fn` `get_user_profile` (L7)
+- ⚡ `async_fn` `get_user_profile` (L8)
 
 ### `f/web_auth_me/_me_models.py`
 - 📦 `class` `UserProfileResult` (L6)
@@ -1001,8 +1001,8 @@
 - 📦 `class` `InputSchema` (L12)
 
 ### `f/web_booking_api/main.py`
-- ⚡ `async_fn` `operation` (L51)
-- 🔧 `fn` `main` (L172)
+- ⚡ `async_fn` `operation` (L50)
+- 🔧 `fn` `main` (L171)
 
 ### `f/web_patient_bookings/_bookings_logic.py`
 - ⚡ `async_fn` `resolve_client_id` (L11)
@@ -1018,18 +1018,18 @@
 - 🔧 `fn` `main` (L50)
 
 ### `f/web_patient_profile/_profile_logic.py`
-- 🔧 `fn` `map_to_profile` (L8)
-- ⚡ `async_fn` `find_user` (L20)
-- ⚡ `async_fn` `find_or_create_client` (L30)
-- ⚡ `async_fn` `update_profile` (L57)
+- 🔧 `fn` `map_to_profile` (L7)
+- ⚡ `async_fn` `find_user` (L19)
+- ⚡ `async_fn` `find_or_create_client` (L29)
+- ⚡ `async_fn` `update_profile` (L56)
 
 ### `f/web_patient_profile/_profile_models.py`
 - 📦 `class` `ProfileResult` (L6)
 - 📦 `class` `InputSchema` (L16)
 
 ### `f/web_patient_profile/main.py`
-- ⚡ `async_fn` `operation` (L35)
-- 🔧 `fn` `main` (L64)
+- ⚡ `async_fn` `operation` (L34)
+- 🔧 `fn` `main` (L63)
 
 ### `f/web_provider_dashboard/_provider_dashboard_logic.py`
 - ⚡ `async_fn` `fetch_provider_dashboard` (L7)
@@ -1045,15 +1045,15 @@
 - 🔧 `fn` `main` (L46)
 
 ### `f/web_provider_notes/_notes_logic.py`
-- 🔧 `fn` `decrypt_content` (L10)
-- 🔧 `fn` `map_row_to_note` (L22)
-- 📦 `class` `NoteRepository` (L44)
-- ⚡ `async_fn` `get_tags` (L48)
-- ⚡ `async_fn` `assign_tags` (L61)
-- ⚡ `async_fn` `create` (L72)
-- ⚡ `async_fn` `read` (L101)
-- ⚡ `async_fn` `list_notes` (L112)
-- ⚡ `async_fn` `delete` (L144)
+- 🔧 `fn` `decrypt_content` (L9)
+- 🔧 `fn` `map_row_to_note` (L21)
+- 📦 `class` `NoteRepository` (L43)
+- ⚡ `async_fn` `get_tags` (L47)
+- ⚡ `async_fn` `assign_tags` (L60)
+- ⚡ `async_fn` `create` (L71)
+- ⚡ `async_fn` `read` (L100)
+- ⚡ `async_fn` `list_notes` (L111)
+- ⚡ `async_fn` `delete` (L143)
 
 ### `f/web_provider_notes/_notes_models.py`
 - 📦 `class` `Tag` (L6)
@@ -1065,11 +1065,11 @@
 - 🔧 `fn` `main` (L77)
 
 ### `f/web_provider_profile/_profile_logic.py`
-- 📦 `class` `ProfileRepository` (L7)
-- ⚡ `async_fn` `find_by_id` (L11)
-- ⚡ `async_fn` `update` (L67)
-- ⚡ `async_fn` `get_password_hash` (L103)
-- ⚡ `async_fn` `update_password` (L112)
+- 📦 `class` `ProfileRepository` (L8)
+- ⚡ `async_fn` `find_by_id` (L12)
+- ⚡ `async_fn` `update` (L66)
+- ⚡ `async_fn` `get_password_hash` (L102)
+- ⚡ `async_fn` `update_password` (L111)
 
 ### `f/web_provider_profile/_profile_models.py`
 - 📦 `class` `ProfileRow` (L6)

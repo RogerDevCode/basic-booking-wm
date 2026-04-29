@@ -1,3 +1,4 @@
+from typing import Any
 import pytest
 
 import f.web_auth_complete_profile.main

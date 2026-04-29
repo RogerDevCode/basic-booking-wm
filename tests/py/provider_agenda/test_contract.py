@@ -1,3 +1,5 @@
+from typing import Any
+from typing import cast, Any
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, patch
 
@@ -29,17 +31,18 @@ async def test_provider_agenda_success() -> None:
 
     mock_db.fetch.return_value = [booking_row]
 
-    async def mock_with_tenant(db: object, tid: str, op: object) -> object:
+    async def mock_with_tenant(db: object, tid: str, op: Any) -> object:
         return await op()
 
     with (
         patch("f.provider_agenda.main.create_db_client", return_value=mock_db),
         patch("f.provider_agenda.main.with_tenant_context", side_effect=mock_with_tenant),
     ):
-        args = {"provider_id": VALID_ID, "date_from": "2026-05-01", "date_to": "2026-05-01"}
+        args: dict[str, Any] = {"provider_id": VALID_ID, "date_from": "2026-05-01", "date_to": "2026-05-01"}
 
         # main returns result or raises
         result = await main(args)
+        assert result is not None
         assert result is not None
         assert isinstance(result, list)
         assert len(result) == 1

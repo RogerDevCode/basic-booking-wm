@@ -1,3 +1,5 @@
+from typing import Any
+from typing import cast, Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -23,17 +25,18 @@ async def test_waitlist_join_success() -> None:
         [{"waitlist_id": "w1"}],  # insert result
     ]
 
-    async def mock_with_tenant(db: object, tid: str, op: object) -> object:
+    async def mock_with_tenant(db: object, tid: str, op: Any) -> object:
         return await op()
 
     with (
         patch("f.web_waitlist.main.create_db_client", return_value=mock_db),
         patch("f.web_waitlist.main.with_tenant_context", side_effect=mock_with_tenant),
     ):
-        args = {"action": "join", "user_id": VALID_ID, "service_id": VALID_ID}
+        args: dict[str, Any] = {"action": "join", "user_id": VALID_ID, "service_id": VALID_ID}
 
-        err, result = await main(args)
+        err, result = main(args)
 
         assert err is None
+        assert result is not None
         assert result["position"] == 6
         assert "Joined waitlist" in result["message"]

@@ -1,4 +1,3 @@
-# mypy: disable-error-code
 import asyncio
 
 # ============================================================================
@@ -68,7 +67,7 @@ async def _main_async(args: dict[str, Any] | None = None) -> Result[BenchmarkRep
     return ok(report)
 
 
-def main(args: dict) -> None:
+def main(args: dict[str, Any]) -> Result[BenchmarkReport]:
     import traceback
 
     try:

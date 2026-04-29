@@ -1,3 +1,5 @@
+from typing import Any
+from typing import cast
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -26,10 +28,11 @@ async def test_health_check_success() -> None:
             return_value={"component": "gmail", "status": "healthy", "latency_ms": 0, "message": "OK"},
         ),
     ):
-        args = {"component": "all"}
+        args: dict[str, Any] = {"component": "all"}
         err, result = await main(args)
 
         assert err is None
+        assert result is not None
         assert result["overall"] == "healthy"
         assert len(result["components"]) == 4
 
@@ -62,8 +65,9 @@ async def test_health_check_unhealthy() -> None:
             return_value={"component": "gmail", "status": "healthy", "latency_ms": 0, "message": "OK"},
         ),
     ):
-        args = {"component": "all"}
+        args: dict[str, Any] = {"component": "all"}
         err, result = await main(args)
 
         assert err is None
+        assert result is not None
         assert result["overall"] == "unhealthy"

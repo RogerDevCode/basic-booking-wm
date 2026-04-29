@@ -1,3 +1,5 @@
+from typing import Any
+from typing import cast, Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -25,16 +27,17 @@ async def test_admin_dashboard_success() -> None:
         [{"no_show_count": 1, "total_processed": 10}],  # no-show rate
     ]
 
-    async def mock_with_tenant(db: object, tid: str, op: object) -> object:
+    async def mock_with_tenant(db: object, tid: str, op: Any) -> object:
         return await op()
 
     with (
         patch("f.web_admin_dashboard.main.create_db_client", return_value=mock_db),
         patch("f.web_admin_dashboard.main.with_tenant_context", side_effect=mock_with_tenant),
     ):
-        args = {"admin_user_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"}
+        args: dict[str, Any] = {"admin_user_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"}
         err, result = await main(args)
 
         assert err is None
+        assert result is not None
         assert result["total_users"] == 10
         assert result["no_show_rate"] == "10.0"

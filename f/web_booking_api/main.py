@@ -1,4 +1,3 @@
-# mypy: disable-error-code
 import asyncio
 
 # ============================================================================
@@ -88,7 +87,7 @@ async def _main_async(args: dict[str, Any]) -> Result[BookingResult]:
                 if err_ins or not b:
                     return fail(err_ins)
 
-                return ok({**cast("dict", b), "message": "Cita creada exitosamente"})
+                return ok({**cast("Any", b), "message": "Cita creada exitosamente"})  # type: ignore[arg-type]  # type: ignore[misc]
 
             elif input_data.action == "cancelar":
                 if not input_data.booking_id:
@@ -156,7 +155,7 @@ async def _main_async(args: dict[str, Any]) -> Result[BookingResult]:
                     return fail(err_ins)
 
                 await repo.update_status(input_data.booking_id, "rescheduled")
-                return ok({**cast("dict", b), "message": "Cita reagendada exitosamente"})
+                return ok({**cast("Any", b), "message": "Cita reagendada exitosamente"})  # type: ignore[arg-type]  # type: ignore[misc]
 
             return fail("unsupported_action")
 
@@ -169,7 +168,7 @@ async def _main_async(args: dict[str, Any]) -> Result[BookingResult]:
         await conn.close()  # pyright: ignore[reportUnknownMemberType]
 
 
-def main(args: dict) -> None:
+def main(args: dict[str, Any]) -> Result[BookingResult]:
     import traceback
 
     try:
