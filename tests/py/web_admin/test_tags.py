@@ -1,10 +1,14 @@
-from typing import Any
-from typing import cast, Any
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from f.web_admin_tags.main import main
+from f.web_admin_tags.main import _main_async as main
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Coroutine
 
 
 @pytest.mark.asyncio
@@ -27,7 +31,7 @@ async def test_admin_tags_list_categories_success() -> None:
         ],
     ]
 
-    async def mock_with_tenant(db: object, tid: str, op: Any) -> object:
+    async def mock_with_tenant(db: object, tid: str, op: Callable[[], Coroutine[Any, Any, object]]) -> object:
         return await op()
 
     with (
@@ -35,7 +39,7 @@ async def test_admin_tags_list_categories_success() -> None:
         patch("f.web_admin_tags.main.with_tenant_context", side_effect=mock_with_tenant),
     ):
         args: dict[str, Any] = {"action": "list_categories", "admin_user_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"}
-        err, result = main(args)
+        err, result = await main(args)
 
         assert err is None
         assert len(result or []) == 1

@@ -1,10 +1,9 @@
 from typing import Any
-from typing import cast
 from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from f.availability_check.main import main
+from f.availability_check.main import _main_async as main
 
 
 @pytest.mark.asyncio

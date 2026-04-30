@@ -1,4 +1,3 @@
-from typing import Any
 import pytest
 
 import f.gcal_sync._gcal_api_adapter

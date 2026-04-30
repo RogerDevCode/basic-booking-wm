@@ -1,4 +1,3 @@
-from typing import Any
 import f.health_check._health_models
 
 

@@ -1,11 +1,15 @@
-from typing import Any
-from typing import cast, Any
+from __future__ import annotations
+
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from f.provider_agenda.main import main
+from f.provider_agenda.main import _main_async as main
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Coroutine
 
 VALID_ID = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
 
@@ -31,7 +35,7 @@ async def test_provider_agenda_success() -> None:
 
     mock_db.fetch.return_value = [booking_row]
 
-    async def mock_with_tenant(db: object, tid: str, op: Any) -> object:
+    async def mock_with_tenant(db: object, tid: str, op: Callable[[], Coroutine[Any, Any, object]]) -> object:
         return await op()
 
     with (
@@ -41,8 +45,8 @@ async def test_provider_agenda_success() -> None:
         args: dict[str, Any] = {"provider_id": VALID_ID, "date_from": "2026-05-01", "date_to": "2026-05-01"}
 
         # main returns result or raises
-        result = await main(args)
-        assert result is not None
+        err, result = await main(args)
+        assert err is None
         assert result is not None
         assert isinstance(result, list)
         assert len(result) == 1

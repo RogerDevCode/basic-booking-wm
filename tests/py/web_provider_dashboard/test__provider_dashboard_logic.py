@@ -1,4 +1,3 @@
-from typing import Any
 import pytest
 
 import f.web_provider_dashboard._provider_dashboard_logic

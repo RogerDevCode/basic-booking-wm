@@ -1,4 +1,3 @@
-from typing import Any
 import f.web_booking_api._booking_models
 
 

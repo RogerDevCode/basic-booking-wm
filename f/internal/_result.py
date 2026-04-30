@@ -1,16 +1,15 @@
 from __future__ import annotations
 
 import re
-import sys
+try:
+    from typing import TypeIs
+except ImportError:
+    from typing_extensions import TypeIs
+
 from typing import (
     TYPE_CHECKING,
     Protocol,
 )
-
-if sys.version_info >= (3, 13):
-    from typing import TypeIs
-else:
-    from typing_extensions import TypeIs
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable

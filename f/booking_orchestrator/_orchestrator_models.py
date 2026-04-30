@@ -38,7 +38,7 @@ class OrchestratorInput(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
 
     tenant_id: str | None = None
-    intent: ExtendedIntent
+    intent: str
     entities: dict[str, str | None] = Field(default_factory=dict)
     client_id: str | None = None
     provider_id: str | None = None

@@ -1,4 +1,3 @@
-from typing import Any
 import f.web_patient_bookings._bookings_models
 
 

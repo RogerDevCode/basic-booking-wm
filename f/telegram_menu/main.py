@@ -1,3 +1,17 @@
+# /// script
+# requires-python = ">=3.12"
+# dependencies = [
+#   "httpx>=0.28.1",
+#   "pydantic>=2.10.0",
+#   "email-validator>=2.2.0",
+#   "asyncpg>=0.30.0",
+#   "cryptography>=44.0.0",
+#   "beartype>=0.19.0",
+#   "returns>=0.24.0",
+#   "redis>=7.4.0",
+#   "typing-extensions>=4.12.0"
+# ]
+# ///
 from __future__ import annotations
 
 import traceback
@@ -37,10 +51,12 @@ async def _main_async(args: dict[str, object]) -> dict[str, object]:
         }
 
 
-async def main(action: str, chat_id: str, user_input: str | None = None) -> dict[str, object]:
+def main(action: str, chat_id: str, user_input: str | None = None) -> dict[str, object]:
+    import asyncio
+
     args: dict[str, object] = {"action": action, "chat_id": chat_id, "user_input": user_input}
     try:
-        return await _main_async(args)
+        return asyncio.run(_main_async(args))
     except Exception as e:
         tb = traceback.format_exc()
         try:

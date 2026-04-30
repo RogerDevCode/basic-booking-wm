@@ -1,6 +1,7 @@
-summary: Telegram Webhook - FULL STACK (Python §PY 2025)
-description: Flujo principal para el bot de Telegram, manejando estados y
-  hand-off de AI a Wizard.
+summary: Telegram Webhook - ECO MODE + REDIS (Phase 2 Reconstruction)
+description: |
+  Fase 2 de la reconstrucción incremental. 
+  Añade nodos para obtener y actualizar el estado en Redis, implementando un contador simple.
 value:
   modules:
     - id: webhook_trigger
@@ -8,12 +9,12 @@ value:
       value:
         type: rawscript
         content: '!inline telegram_webhook_trigger.py'
-        lock: '!inline telegram_webhook_trigger.script.lock'
-        language: python3
         input_transforms:
           webhook_payload:
             type: javascript
-            expr: flow_input.webhook_payload ?? flow_input
+            expr: 'flow_input'
+        lock: '!inline telegram_webhook_trigger.lock'
+        language: python3
     - id: get_conversation_state
       summary: Obtener estado conversacional de Redis
       value:
@@ -22,101 +23,59 @@ value:
           chat_id:
             type: javascript
             expr: results.webhook_trigger.chat_id
+          redis_url:
+            type: javascript
+            expr: variable("u/admin/REDIS_URL")
         path: f/internal/conversation_get/main
-    - id: telegram_router
-      summary: Router con InlineKeyboard + FSM wizard
-      value:
-        type: script
-        input_transforms:
-          chat_id:
-            type: javascript
-            expr: results.webhook_trigger.chat_id
-          state:
-            type: javascript
-            expr: results.get_conversation_state.data
-          user_input:
-            type: javascript
-            expr: results.webhook_trigger.callback_data || results.webhook_trigger.text
-        path: f/internal/telegram_router/main
-    - id: answer_callback
-      summary: AnswerCallbackQuery — quita el "cargando" del botón
-      value:
-        type: script
-        input_transforms:
-          bot_token:
-            type: javascript
-            expr: variable("u/admin/TELEGRAM_BOT_TOKEN")
-          callback_query_id:
-            type: javascript
-            expr: results.webhook_trigger.callback_query_id || ''
-          chat_id:
-            type: javascript
-            expr: results.webhook_trigger.chat_id
-          mode:
-            type: static
-            value: answer_callback
-        path: f/telegram_send/main
       skip_if:
-        expr: '!results.webhook_trigger.callback_query_id'
-    - id: gate_skip_if_router_handled
-      summary: Gate — si el router manejó, saltar AI Agent y orchestrator
+        expr: '!results.webhook_trigger.chat_id'
+    - id: echo_logic
+      summary: Lógica de Eco con Contador (Nodo de Validación)
       value:
         type: rawscript
-        language: python3
         content: |
           from __future__ import annotations
           from typing import Any
-          async def main(args: dict[str, Any]) -> dict[str, bool]:
-              return {"skip": True}
-        input_transforms: {}
-      skip_if:
-        expr: results.telegram_router.data?.handled === true
-    - id: parse_message
-      summary: Parsear mensaje
+
+          async def _main_async(args: dict[str, Any]) -> dict[str, Any]:
+              chat_id = args.get("chat_id")
+              text = args.get("text") or "Sin texto"
+              state = args.get("state") or {}
+              
+              # Extract counter from state or initialize to 0
+              pending_data = state.get("pending_data") or {}
+              count = pending_data.get("echo_count", 0) + 1
+              
+              return {
+                  "text": f"ECO #{count}: {text}",
+                  "chat_id": chat_id,
+                  "new_count": count
+              }
+
+          def main(args: dict[str, Any]) -> dict[str, Any]:
+              import asyncio
+              return asyncio.run(_main_async(args))
+        input_transforms:
+          args:
+            type: javascript
+            expr: '{ "chat_id": results.webhook_trigger.chat_id, "text": results.webhook_trigger.text, "state": results.get_conversation_state.data }'
+        language: python3
+    - id: update_conversation_state
+      summary: Guardar nuevo contador en Redis
       value:
         type: script
         input_transforms:
-          chat_id:
+          args:
             type: javascript
-            expr: results.webhook_trigger.chat_id
-          text:
+            expr: '{ "chat_id": results.echo_logic.chat_id, "pending_data": { "echo_count": results.echo_logic.new_count } }'
+          redis_url:
             type: javascript
-            expr: results.webhook_trigger.text
-        path: f/internal/message_parser/main
-    - id: ai_agent
-      summary: AI Agent con contexto conversacional
-      value:
-        type: script
-        input_transforms:
-          chat_id:
-            type: javascript
-            expr: results.webhook_trigger.chat_id
-          conversation_state:
-            type: javascript
-            expr: results.get_conversation_state.data
-          text:
-            type: javascript
-            expr: results.webhook_trigger.text
-        path: f/internal/ai_agent/main
-    - id: execute_action
-      summary: Ejecutar acción de booking (via orchestrator flow)
-      value:
-        type: flow
-        input_transforms:
-          entities:
-            type: javascript
-            expr: results.ai_agent.data?.entities || {}
-          intent:
-            type: javascript
-            expr: results.ai_agent.data?.intent || 'duda_general'
-          telegram_chat_id:
-            type: javascript
-            expr: results.webhook_trigger.chat_id
-        path: f/flows/booking_orchestrator
+            expr: variable("u/admin/REDIS_URL")
+        path: f/internal/conversation_update/main
       skip_if:
-        expr: results.ai_agent.data?.intent === 'duda_general'
+        expr: '!results.echo_logic.chat_id'
     - id: send_telegram_response
-      summary: Enviar respuesta (sendMessage o editMessageText)
+      summary: Enviar Eco a Telegram
       value:
         type: script
         input_transforms:
@@ -125,49 +84,13 @@ value:
             expr: variable("u/admin/TELEGRAM_BOT_TOKEN")
           chat_id:
             type: javascript
-            expr: results.webhook_trigger.chat_id
-          inline_buttons_json:
-            type: javascript
-            expr: 'JSON.stringify(results.telegram_router.data?.handled ?
-              (results.telegram_router.data.inline_buttons || []) :
-              ((results.execute_action?.data &&
-              results.execute_action.data.inline_buttons) ?
-              results.execute_action.data.inline_buttons : []))'
+            expr: results.echo_logic.chat_id
           mode:
-            type: javascript
-            expr: "results.telegram_router.data?.handled ? 'send_message' : 'send_message'"
+            type: static
+            value: send_message
           text:
             type: javascript
-            expr: "results.telegram_router.data?.handled ?
-              results.telegram_router.data.response_text :
-              ((results.execute_action?.data && !results.execute_action.skip) ?
-              results.execute_action.data.message :
-              (results.ai_agent?.data?.ai_response || 'Lo siento, error de orquestación.'))"
+            expr: results.echo_logic.text
         path: f/telegram_send/main
-    - id: update_conversation_state
-      summary: Actualizar estado conversacional en Redis (soporta hand-off de AI a
-        wizard)
-      value:
-        type: script
-        input_transforms:
-          active_flow:
-            type: javascript
-            expr: "(results.execute_action?.data?.nextState ||
-              results.telegram_router.data?.nextState) ? 'booking' :
-              (results.get_conversation_state.data?.active_flow || null)"
-          booking_draft:
-            type: javascript
-            expr: results.telegram_router.data?.nextDraft ||
-              results.execute_action?.data?.nextDraft || null
-          booking_state:
-            type: javascript
-            expr: results.telegram_router.data?.nextState ||
-              results.execute_action?.data?.nextState || null
-          chat_id:
-            type: javascript
-            expr: results.webhook_trigger.chat_id
-          message_id:
-            type: javascript
-            expr: results.send_telegram_response.message_id ||
-              results.get_conversation_state.data?.message_id || null
-        path: f/internal/conversation_update/main
+      skip_if:
+        expr: '!results.echo_logic.chat_id'

@@ -1,4 +1,3 @@
-from typing import Any
 import f.nlu._tfidf_classifier
 
 

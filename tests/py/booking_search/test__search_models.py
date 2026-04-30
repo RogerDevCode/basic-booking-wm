@@ -1,4 +1,3 @@
-from typing import Any
 import f.booking_search._search_models
 
 

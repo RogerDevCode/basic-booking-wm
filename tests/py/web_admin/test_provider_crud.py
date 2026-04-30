@@ -1,10 +1,14 @@
-from typing import Any
-from typing import cast, Any
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from f.web_admin_provider_crud.main import main
+from f.web_admin_provider_crud.main import _main_async as main
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Coroutine
 
 
 @pytest.mark.asyncio
@@ -22,7 +26,7 @@ async def test_admin_provider_list_success() -> None:
         }
     ]
 
-    async def mock_with_admin(db: object, op: Any) -> object:
+    async def mock_with_admin(db: object, op: Callable[[], Coroutine[Any, Any, object]]) -> object:
         return await op()
 
     with (
@@ -31,7 +35,8 @@ async def test_admin_provider_list_success() -> None:
     ):
         args: dict[str, Any] = {"action": "list"}
         # main returns result now, not (err, result)
-        result = await main(args)
+        err, result = await main(args)
+        assert err is None
         assert result is not None
 
         assert result is not None

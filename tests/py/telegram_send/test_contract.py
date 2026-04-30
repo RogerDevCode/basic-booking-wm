@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from f.telegram_send.main import main
+from f.telegram_send.main import _main_async as main
 
 
 @pytest.mark.asyncio
@@ -21,8 +21,8 @@ async def test_telegram_send_success() -> None:
             args: dict[str, Any] = {"chat_id": "123456", "text": "Hello world", "mode": "send_message"}
 
             # main returns result or raises
-            result = await main(args["mode"], args["chat_id"], args["text"])
-            assert result is not None
+            err, result = await main({"chat_id": args["chat_id"], "text": args["text"], "mode": args["mode"]})
+            assert err is None
             assert result is not None
             assert result.sent is True
             assert result.message_id == 12345
@@ -30,7 +30,7 @@ async def test_telegram_send_success() -> None:
 
 @pytest.mark.asyncio
 async def test_telegram_send_invalid_input() -> None:
-    # main raises RuntimeError (wrapping Pydantic ValidationError)
-    with pytest.raises(RuntimeError):
-        from typing import cast
-        await main("send_message", cast(Any, None), cast(Any, None))
+    err, result = await main({"mode": "send_message", "chat_id": None, "text": None})
+    assert err is None
+    assert result is not None
+    assert result.sent is False

@@ -1,4 +1,3 @@
-from typing import Any
 import f.provider_agenda._agenda_models
 
 

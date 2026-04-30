@@ -1,5 +1,5 @@
-from typing import cast, Any
 from datetime import UTC, datetime, timedelta
+from typing import Any, cast
 
 import pytest
 
@@ -26,7 +26,7 @@ class MockRescheduleRepository:
 
 @pytest.mark.asyncio
 async def test_reschedule_success() -> None:
-    repo = cast(Any, MockRescheduleRepository())
+    repo = cast("Any", MockRescheduleRepository())
     input_data = RescheduleInput.model_validate(
         {
             "booking_id": "old_b",
@@ -48,7 +48,7 @@ async def test_reschedule_success() -> None:
 
     service = {"service_id": "s1", "duration_minutes": 30}
 
-    err, result = await execute_reschedule_logic(repo, input_data, cast(Any, old_booking), cast(Any, service))
+    err, result = await execute_reschedule_logic(repo, input_data, cast("Any", old_booking), cast("Any", service))
 
     assert err is None
     assert result is not None

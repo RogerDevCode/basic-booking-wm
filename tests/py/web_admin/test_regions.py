@@ -1,10 +1,9 @@
 from typing import Any
-from typing import cast
 from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from f.web_admin_regions.main import main
+from f.web_admin_regions.main import _main_async as main
 
 
 @pytest.mark.asyncio
@@ -17,7 +16,7 @@ async def test_admin_regions_list_success() -> None:
 
     with patch("f.web_admin_regions.main.create_db_client", return_value=mock_db):
         args: dict[str, Any] = {"action": "list_regions"}
-        err, result = main(args)
+        err, result = await main(args)
 
         assert err is None
         assert result is not None

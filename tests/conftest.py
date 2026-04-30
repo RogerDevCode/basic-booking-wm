@@ -1,4 +1,3 @@
-from typing import Any
 import sys
 from unittest.mock import MagicMock
 

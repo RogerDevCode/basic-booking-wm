@@ -1,3 +1,17 @@
+# /// script
+# requires-python = ">=3.12"
+# dependencies = [
+#   "httpx>=0.28.1",
+#   "pydantic>=2.10.0",
+#   "email-validator>=2.2.0",
+#   "asyncpg>=0.30.0",
+#   "cryptography>=44.0.0",
+#   "beartype>=0.19.0",
+#   "returns>=0.24.0",
+#   "redis>=7.4.0",
+#   "typing-extensions>=4.12.0"
+# ]
+# ///
 from __future__ import annotations
 
 from typing import Final, cast
@@ -77,7 +91,7 @@ async def _route(input_data: RouterInput) -> Result[RouterResult, str]:
         return Success(RouterResult(handled=False))
 
 
-async def main(args: dict[str, object]) -> dict[str, object]:
+async def _main_async(args: dict[str, object]) -> dict[str, object]:
     """Windmill entrypoint."""
     try:
         input_data = RouterInput.model_validate(args)
@@ -92,3 +106,9 @@ async def main(args: dict[str, object]) -> dict[str, object]:
             return {"data": {"handled": False, "error": str(err)}}
 
     return {"data": {"handled": False}}
+
+
+def main(args: dict[str, object]) -> dict[str, object]:
+    import asyncio
+
+    return asyncio.run(_main_async(args))

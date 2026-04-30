@@ -1,4 +1,3 @@
-from typing import Any
 import pytest
 
 import f.web_patient_bookings._bookings_logic

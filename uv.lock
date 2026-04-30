@@ -117,6 +117,8 @@ dependencies = [
     { name = "python-dotenv" },
     { name = "redis" },
     { name = "returns" },
+    { name = "typing-extensions" },
+    { name = "wmill" },
 ]
 
 [package.dev-dependencies]
@@ -128,6 +130,7 @@ dev = [
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "ruff" },
+    { name = "token-savior" },
 ]
 
 [package.metadata]
@@ -141,6 +144,8 @@ requires-dist = [
     { name = "python-dotenv", specifier = ">=1.0.1" },
     { name = "redis", specifier = ">=7.4.0" },
     { name = "returns", specifier = ">=0.24.0" },
+    { name = "typing-extensions", specifier = ">=4.15.0" },
+    { name = "wmill", specifier = ">=1.693.3" },
 ]
 
 [package.metadata.requires-dev]
@@ -152,6 +157,7 @@ dev = [
     { name = "pytest", specifier = ">=8.3.0" },
     { name = "pytest-asyncio", specifier = ">=0.25.0" },
     { name = "ruff", specifier = ">=0.9.0" },
+    { name = "token-savior", specifier = ">=1.0.0" },
 ]
 
 [[package]]
@@ -1083,6 +1089,18 @@ wheels = [
 ]
 
 [[package]]
+name = "token-savior"
+version = "1.0.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pyyaml" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/82/5e/54a8c37f00734e95b994dce6f726f46506873d3337eadbd7bd43f26079a9/token_savior-1.0.0.tar.gz", hash = "sha256:9da22b83ed9bfaa3e7ddb709b15f0958e7d1753e7d701d20313ae91a56cfd14c", size = 553372, upload-time = "2026-04-11T15:35:53.298Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ca/5f/1bcfb7ed1c39d71bdd50772217da0a63580352c8c646b85106433abf2042/token_savior-1.0.0-py3-none-any.whl", hash = "sha256:719b955edb457fc1246acbc696fefbbccb43fa6b6500fdd6c4cd47ca66538e55", size = 144050, upload-time = "2026-04-11T15:35:52.219Z" },
+]
+
+[[package]]
 name = "typing-extensions"
 version = "4.15.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1129,4 +1147,16 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/0c/98/3a7e644e19cb26133488caff231be390579860bbbb3da35913c49a1d0a46/virtualenv-21.2.4.tar.gz", hash = "sha256:b294ef68192638004d72524ce7ef303e9d0cf5a44c95ce2e54a7500a6381cada", size = 5850742, upload-time = "2026-04-14T22:15:31.438Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/27/8d/edd0bd910ff803c308ee9a6b7778621af0d10252219ad9f19ef4d4982a61/virtualenv-21.2.4-py3-none-any.whl", hash = "sha256:29d21e941795206138d0f22f4e45ff7050e5da6c6472299fb7103318763861ac", size = 5831232, upload-time = "2026-04-14T22:15:29.342Z" },
+]
+
+[[package]]
+name = "wmill"
+version = "1.693.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "httpx" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/93/5c/d78a9f12e8cf255b296715fbabb21323c60fee5546d5443e22346559a74e/wmill-1.693.3.tar.gz", hash = "sha256:b2f4823abdda8c6e51d1d0268dd73de11edda1df91873fcc928d5a45eb260666", size = 24678, upload-time = "2026-04-30T14:25:55.433Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/6f/05/58b2d1a26ee3dd272a6f75f0c43ecb1fdf841b231309c59d4feec6c7080d/wmill-1.693.3-py3-none-any.whl", hash = "sha256:216a46e2e72f3339a11157dcbfd15f381cee03fb73399276c50da894089bc3c8", size = 24977, upload-time = "2026-04-30T14:25:53.444Z" },
 ]

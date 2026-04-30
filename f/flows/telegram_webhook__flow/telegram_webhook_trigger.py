@@ -15,10 +15,21 @@ class TriggerOutput(BaseModel):
     callback_message_id: int | None = None
 
 
-async def main(webhook_payload: dict[str, Any]) -> dict[str, Any]:
-    # Logic extracted from flow.json and telegram_gateway
-    message = webhook_payload.get("message", {})
-    callback_query = webhook_payload.get("callback_query", {})
+async def _main_async(webhook_payload: dict[str, Any]) -> dict[str, Any]:
+    # Extract the actual Telegram payload from Windmill's wrapper if present
+    # Windmill raw webhooks often place the payload in 'body' or 'data'
+    payload = webhook_payload
+    if "body" in webhook_payload and isinstance(webhook_payload["body"], dict):
+        payload = webhook_payload["body"]
+    elif "message" not in webhook_payload and "callback_query" not in webhook_payload:
+        # Fallback: maybe it's under another key?
+        for key in ["webhook_payload", "data", "event"]:
+            if key in webhook_payload and isinstance(webhook_payload[key], dict):
+                payload = webhook_payload[key]
+                break
+
+    message = payload.get("message", {})
+    callback_query = payload.get("callback_query", {})
 
     chat_id = ""
     text = ""
@@ -47,3 +58,9 @@ async def main(webhook_payload: dict[str, Any]) -> dict[str, Any]:
         "callback_query_id": callback_query_id,
         "callback_message_id": callback_message_id,
     }
+
+
+def main(webhook_payload: dict[str, Any]) -> dict[str, Any]:
+    import asyncio
+
+    return asyncio.run(_main_async(webhook_payload))

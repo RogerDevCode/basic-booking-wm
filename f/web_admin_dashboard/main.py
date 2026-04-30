@@ -1,3 +1,17 @@
+# /// script
+# requires-python = ">=3.12"
+# dependencies = [
+#   "httpx>=0.28.1",
+#   "pydantic>=2.10.0",
+#   "email-validator>=2.2.0",
+#   "asyncpg>=0.30.0",
+#   "cryptography>=44.0.0",
+#   "beartype>=0.19.0",
+#   "returns>=0.24.0",
+#   "redis>=7.4.0",
+#   "typing-extensions>=4.12.0"
+# ]
+# ///
 from __future__ import annotations
 
 # ============================================================================
@@ -41,6 +55,8 @@ async def _main_async(args: dict[str, object]) -> Result[AdminDashboardResult]:
         await conn.close()
 
 
-async def main(args: dict[str, object]) -> Result[AdminDashboardResult]:
+def main(args: dict[str, object]) -> Result[AdminDashboardResult]:
+    import asyncio
+
     """Windmill entrypoint."""
-    return await _main_async(args)
+    return asyncio.run(_main_async(args))

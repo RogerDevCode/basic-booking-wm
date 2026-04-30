@@ -1,10 +1,14 @@
-from typing import Any
-from typing import cast, Any
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from f.reminder_config.main import main
+from f.reminder_config.main import _main_async as main
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Coroutine
 
 
 @pytest.mark.asyncio
@@ -13,7 +17,7 @@ async def test_reminder_config_show() -> None:
     # Mock load_preferences (metadata lookup)
     mock_db.fetch.return_value = [{"metadata": {"reminder_preferences": {"telegram_24h": True}}}]
 
-    async def mock_with_tenant(db: object, tid: str, op: Any) -> object:
+    async def mock_with_tenant(db: object, tid: str, op: Callable[[], Coroutine[Any, Any, object]]) -> object:
         return await op()
 
     with (

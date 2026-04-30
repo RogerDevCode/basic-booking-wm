@@ -36,9 +36,10 @@ schema:
       default: null
       originalType: string
     text:
-      type: string
+      type: object
       description: ''
       default: null
+      format: resource-object
       originalType: string
   required:
     - mode

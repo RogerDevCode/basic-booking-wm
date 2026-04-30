@@ -1,4 +1,3 @@
-from typing import Any
 import pytest
 
 import f.web_admin_provider_crud._provider_logic

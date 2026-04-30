@@ -1,10 +1,9 @@
 from typing import Any
-from typing import cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from f.telegram_gateway.main import main
+from f.telegram_gateway.main import _main_async as main
 
 
 @pytest.mark.asyncio

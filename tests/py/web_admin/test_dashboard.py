@@ -1,10 +1,14 @@
-from typing import Any
-from typing import cast, Any
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from f.web_admin_dashboard.main import main
+from f.web_admin_dashboard.main import _main_async as main
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Coroutine
 
 
 @pytest.mark.asyncio
@@ -27,7 +31,7 @@ async def test_admin_dashboard_success() -> None:
         [{"no_show_count": 1, "total_processed": 10}],  # no-show rate
     ]
 
-    async def mock_with_tenant(db: object, tid: str, op: Any) -> object:
+    async def mock_with_tenant(db: object, tid: str, op: Callable[[], Coroutine[Any, Any, object]]) -> object:
         return await op()
 
     with (

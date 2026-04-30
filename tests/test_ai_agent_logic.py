@@ -1,12 +1,10 @@
-from typing import Any
 from __future__ import annotations
 
-import pytest
 from f.internal.ai_agent._ai_agent_logic import (
     adjust_intent_with_context,
     detect_context,
-    extract_entities,
     detect_social,
+    extract_entities,
 )
 from f.internal.ai_agent._ai_agent_models import ConversationState, EntityMap
 from f.internal.ai_agent._constants import INTENT

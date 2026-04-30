@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from f.internal.ai_agent._constants import INTENT
-from f.internal.ai_agent.main import main
+from f.internal.ai_agent.main import _main_async as main
 
 
 @pytest.mark.asyncio
@@ -24,25 +24,29 @@ async def test_ai_agent_llm_success() -> None:
             "user_profile": {"is_first_time": False, "booking_count": 5},
         }
 
-        res = main(str(args["chat_id"]), str(args["text"]))
+        res = await main({"chat_id": str(args["chat_id"]), "text": str(args["text"])})
 
         assert res is not None
 
         assert res["success"] is True
-        assert cast(dict[str, Any], res["data"])["intent"] == INTENT["CREAR_CITA"]
-        assert cast(dict[str, Any], res["data"])["confidence"] == 0.9
+        assert cast("dict[str, Any]", res["data"])["intent"] == INTENT["CREAR_CITA"]
+        assert cast("dict[str, Any]", res["data"])["confidence"] == 0.9
 
 
 @pytest.mark.asyncio
 async def test_ai_agent_social_fast_path() -> None:
-    args: dict[str, Any] = {"chat_id": "c1", "text": "hola", "user_profile": {"is_first_time": True, "booking_count": 0}}
+    args: dict[str, Any] = {
+        "chat_id": "c1",
+        "text": "hola",
+        "user_profile": {"is_first_time": True, "booking_count": 0},
+    }
 
-    res = main(str(args["chat_id"]), str(args["text"]))
+    res = await main({"chat_id": str(args["chat_id"]), "text": str(args["text"])})
 
     assert res is not None
 
     assert res["success"] is True
-    assert cast(dict[str, Any], res["data"])["intent"] == INTENT["SALUDO"]
-    assert cast(dict[str, Any], res["data"])["confidence"] > 0.8
+    assert cast("dict[str, Any]", res["data"])["intent"] == INTENT["SALUDO"]
+    assert cast("dict[str, Any]", res["data"])["confidence"] > 0.8
     # Simplified logic in Python version currently doesn't add "bienvenido"
-    assert "ayudarte" in cast(dict[str, Any], res["data"])["ai_response"].lower()
+    assert "ayudarte" in cast("dict[str, Any]", res["data"])["ai_response"].lower()

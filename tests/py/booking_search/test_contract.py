@@ -1,4 +1,5 @@
 from typing import Any
+
 import pytest
 
 from f.booking_search._search_logic import execute_search
@@ -15,7 +16,7 @@ class MockDBClient:
     async def execute(self, query: str, *args: object) -> str:
         return "OK"
 
-    async def fetchval(self, query: str, *args: object) -> Any | None:
+    async def fetchval(self, query: str, *args: object) -> object | None:
         return 0
 
     async def close(self) -> None:

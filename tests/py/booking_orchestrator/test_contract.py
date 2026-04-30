@@ -1,9 +1,9 @@
-from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from f.booking_orchestrator.main import HANDLER_MAP, main
+from f.booking_orchestrator.main import HANDLER_MAP
+from f.booking_orchestrator.main import _main_async as main
 
 
 @pytest.mark.asyncio
@@ -32,12 +32,18 @@ async def test_orchestrator_create_booking_wizard_handoff() -> None:
             patch("f.booking_orchestrator.main.create_db_client", return_value=mock_db),
             patch("f.booking_orchestrator.main.resolve_context", AsyncMock(return_value=(None, ctx))),
         ):
-            result = await main("123456", "crear_cita", {"date": "2026-05-01", "time": "10:00"})
+            err, result = await main(
+                {
+                    "telegram_chat_id": "123456",
+                    "intent": "crear_cita",
+                    "entities": {"date": "2026-05-01", "time": "10:00"},
+                }
+            )
+            assert err is None
             assert result is not None
 
-            assert result is not None
-            assert result["data"]["action"] == "crear_cita"
-            assert result["data"]["success"] is False
+            assert result["action"] == "crear_cita"
+            assert result["success"] is False
     finally:
         HANDLER_MAP["crear_cita"] = original_handler
 
@@ -53,5 +59,6 @@ async def test_orchestrator_cancel_booking_no_id_routes_to_list() -> None:
         patch("f.booking_orchestrator.main.resolve_context", AsyncMock(return_value=(None, ctx))),
     ):
         # main raises RuntimeError on error now
-        with pytest.raises(RuntimeError):
-            await main("123456", "cancelar_cita", {})
+        # But _main_async returns (err, None)
+        err, _result = await main({"telegram_chat_id": "123456", "intent": "cancelar_cita", "entities": {}})
+        assert err is not None

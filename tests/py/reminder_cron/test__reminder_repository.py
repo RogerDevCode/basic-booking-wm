@@ -1,4 +1,3 @@
-from typing import Any
 import pytest
 
 import f.reminder_cron._reminder_repository

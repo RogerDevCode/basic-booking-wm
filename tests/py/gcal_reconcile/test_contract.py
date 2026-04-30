@@ -1,10 +1,14 @@
-from typing import Any
-from typing import cast, Any
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from f.gcal_reconcile.main import main
+from f.gcal_reconcile.main import _main_async as main
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Coroutine
 
 VALID_TENANT_ID = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
 
@@ -35,7 +39,7 @@ async def test_gcal_reconcile_success() -> None:
     ]
 
     # Mock with_tenant_context
-    async def mock_with_tenant(db: object, tid: str, op: Any) -> object:
+    async def mock_with_tenant(db: object, tid: str, op: Callable[[], Coroutine[Any, Any, object]]) -> object:
         return await op()
 
     # Mock sync_booking_to_gcal logic (the internal call in main)

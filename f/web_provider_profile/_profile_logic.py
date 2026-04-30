@@ -1,5 +1,4 @@
 from datetime import datetime
-from typing import cast
 
 from ..internal._result import DBClient, Result, fail, ok
 from ._profile_models import InputSchema, ProfileRow

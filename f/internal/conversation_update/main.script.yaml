@@ -1,3 +1,18 @@
 summary: Actualizar estado conversacional en Redis
-description: Actualiza o limpia el estado conversacional para un chat_id dado (soporta hand-off de AI a wizard).
-lock: f/internal/conversation_update/main.script.lock
+description: Actualiza o limpia el estado conversacional para un chat_id dado
+  (soporta hand-off de AI a wizard).
+lock: '!inline f/internal/conversation_update/main.script.lock'
+schema:
+  properties:
+    args:
+      type: object
+      description: ''
+      default: null
+      format: resource-object
+    redis_url:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+  required:
+    - args

@@ -1,10 +1,14 @@
-from typing import Any
-from typing import cast, Any
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from f.admin_honorifics.main import main
+from f.admin_honorifics.main import _main_async as main
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Coroutine
 
 
 @pytest.mark.asyncio
@@ -22,7 +26,7 @@ async def test_admin_honorifics_list() -> None:
         }
     ]
 
-    async def mock_with_admin(db: object, op: Any) -> object:
+    async def mock_with_admin(db: object, op: Callable[[], Coroutine[Any, Any, object]]) -> object:
         return await op()
 
     with (
@@ -35,4 +39,4 @@ async def test_admin_honorifics_list() -> None:
         assert err is None
         assert len(result or []) == 1
         assert result is not None
-        assert cast(list[dict[str, object]], result)[0]["code"] == "Dr."
+        assert cast("list[dict[str, object]]", result)[0]["code"] == "Dr."

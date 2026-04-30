@@ -1,9 +1,7 @@
-from typing import Any
 from __future__ import annotations
 
-import pytest
-from f.internal.booking_fsm._fsm_machine import apply_transition, parse_action, parse_callback_data
-from f.internal.booking_fsm._fsm_models import IdleState, SelectAction, CancelAction, DraftBooking
+from f.internal.booking_fsm._fsm_machine import apply_transition, parse_callback_data
+from f.internal.booking_fsm._fsm_models import CancelAction, DraftBooking, IdleState, SelectAction
 
 
 class TestBookingFSM:

@@ -1,4 +1,3 @@
-from typing import Any
 import pytest
 
 import f.telegram_gateway._gateway_logic

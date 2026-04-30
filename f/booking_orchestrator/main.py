@@ -1,3 +1,17 @@
+# /// script
+# requires-python = ">=3.12"
+# dependencies = [
+#   "httpx>=0.28.1",
+#   "pydantic>=2.10.0",
+#   "email-validator>=2.2.0",
+#   "asyncpg>=0.30.0",
+#   "cryptography>=44.0.0",
+#   "beartype>=0.19.0",
+#   "returns>=0.24.0",
+#   "redis>=7.4.0",
+#   "typing-extensions>=4.12.0"
+# ]
+# ///
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
@@ -40,14 +54,20 @@ HANDLER_MAP: dict[str, OrchestratorHandler] = {
 
 
 async def _main_async(args: dict[str, object]) -> Result[OrchestratorResult]:
+    raw_intent = args.get("intent")
+    if not isinstance(raw_intent, str):
+        return Exception("Invalid input: intent must be a string"), None
+
+    intent = normalize_intent(raw_intent)
+    if not intent:
+        # Gracefully ignore non-booking intents so the flow falls back to AI agent response
+        return None, None
+
     try:
-        input_data = OrchestratorInput.model_validate(args)
+        normalized_args = {**args, "intent": intent}
+        input_data = OrchestratorInput.model_validate(normalized_args)
     except Exception as e:
         return Exception(f"Invalid input: {e}"), None
-
-    intent = normalize_intent(input_data.intent)
-    if not intent:
-        return Exception(f"Unknown intent: {input_data.intent}"), None
 
     conn = await create_db_client()
     try:
@@ -90,13 +110,15 @@ async def _main_async(args: dict[str, object]) -> Result[OrchestratorResult]:
         await conn.close()
 
 
-async def main(telegram_chat_id: str, intent: str, entities: dict[str, object] | None = None) -> dict[str, Any]:
+def main(telegram_chat_id: str, intent: str, entities: dict[str, object] | None = None) -> dict[str, Any]:
+    import asyncio
+
     """
     Entrypoint asincrónico para la ejecución en Windmill.
     """
     try:
         args: dict[str, object] = {"telegram_chat_id": telegram_chat_id, "intent": intent, "entities": entities or {}}
-        err, result = await _main_async(args)
+        err, result = asyncio.run(_main_async(args))
         if err:
             raise err
         # Windmill expects a JSON-serializable dict, we wrap it in 'data'

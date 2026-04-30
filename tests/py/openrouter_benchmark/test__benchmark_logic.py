@@ -1,4 +1,3 @@
-from typing import Any
 import pytest
 
 import f.openrouter_benchmark._benchmark_logic

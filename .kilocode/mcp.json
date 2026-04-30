@@ -4,6 +4,25 @@
       "command": "uv",
       "args": ["run", "python", "-m", "mcp_codebase_index.server"],
       "env": { "PROJECT_ROOT": "${workspaceFolder}" }
+    },
+    "postgres": {
+      "command": "npx",
+      "args": ["-y", "@sarmadparvez/postgresql-mcp", "postgresql://windmill:windmill@localhost:5432/windmill?sslmode=disable"]
+    },
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/home/manager/Sync/wildmill-proyects/booking-titanium-wm"]
+    },
+    "sequential-thinking": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"]
+    },
+    "gemini-docs": {
+      "url": "https://developerknowledge.googleapis.com/mcp",
+      "type": "sse",
+      "headers": {
+        "X-Goog-Api-Key": "$GOOGLE_API_KEY"
+      }
     }
   }
 }

@@ -1,3 +1,17 @@
+# /// script
+# requires-python = ">=3.12"
+# dependencies = [
+#   "httpx>=0.28.1",
+#   "pydantic>=2.10.0",
+#   "email-validator>=2.2.0",
+#   "asyncpg>=0.30.0",
+#   "cryptography>=44.0.0",
+#   "beartype>=0.19.0",
+#   "returns>=0.24.0",
+#   "redis>=7.4.0",
+#   "typing-extensions>=4.12.0"
+# ]
+# ///
 from __future__ import annotations
 
 import json
@@ -15,8 +29,8 @@ MODULE: Final[str] = "conversation_update"
 
 
 @beartype
-async def _update_conversation(input_data: ConversationUpdateInput) -> Result[ConversationUpdateResult, str]:
-    redis = await create_redis_client()
+async def _update_conversation(input_data: ConversationUpdateInput, redis_url: str | None = None) -> Result[ConversationUpdateResult, str]:
+    redis = await create_redis_client(redis_url)
     try:
         key = f"conv:{input_data.chat_id}"
 
@@ -57,14 +71,19 @@ async def _update_conversation(input_data: ConversationUpdateInput) -> Result[Co
         await redis.aclose()
 
 
-async def main(args: dict[str, object]) -> dict[str, object]:
+async def _main_async(args: object, redis_url: str | None = None) -> dict[str, object]:
     """Windmill entrypoint."""
+    if not isinstance(args, dict):
+        log("conversation_update skipped: args is not a dict", module=MODULE)
+        return {"data": {"success": False, "chat_id": "", "skipped": True, "reason": "invalid_args_type"}}
+
     try:
         input_data = ConversationUpdateInput.model_validate(args)
     except Exception as e:
-        raise RuntimeError(f"validation_error: {e}")  # noqa: B904
+        log("conversation_update validation error", error=str(e), module=MODULE)
+        return {"data": {"success": False, "chat_id": "", "skipped": True, "reason": "validation_error"}}
 
-    res = await _update_conversation(input_data)
+    res = await _update_conversation(input_data, redis_url)
     match res:
         case Success(val):
             return {"data": cast("dict[str, object]", val.model_dump())}
@@ -72,3 +91,9 @@ async def main(args: dict[str, object]) -> dict[str, object]:
             raise RuntimeError(f"update_failed: {err}")
 
     return {"data": {"success": False}}
+
+
+def main(args: object, redis_url: str | None = None) -> dict[str, object]:
+    import asyncio
+
+    return asyncio.run(_main_async(args, redis_url))

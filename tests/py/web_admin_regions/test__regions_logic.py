@@ -1,4 +1,3 @@
-from typing import Any
 import pytest
 
 import f.web_admin_regions._regions_logic

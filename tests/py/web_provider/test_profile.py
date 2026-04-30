@@ -1,10 +1,14 @@
-from typing import Any
-from typing import cast, Any
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from f.web_provider_profile.main import main
+from f.web_provider_profile.main import _main_async as main
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Coroutine
 
 VALID_ID = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
 
@@ -39,7 +43,7 @@ async def test_provider_profile_get_success() -> None:
         }
     ]
 
-    async def mock_with_tenant(db: object, tid: str, op: Any) -> object:
+    async def mock_with_tenant(db: object, tid: str, op: Callable[[], Coroutine[Any, Any, object]]) -> object:
         return await op()
 
     with (
@@ -47,7 +51,7 @@ async def test_provider_profile_get_success() -> None:
         patch("f.web_provider_profile.main.with_tenant_context", side_effect=mock_with_tenant),
     ):
         args: dict[str, Any] = {"action": "get_profile", "provider_id": VALID_ID}
-        err, result = main(args)
+        err, result = await main(args)
 
         assert err is None
         assert result is not None

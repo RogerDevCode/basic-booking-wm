@@ -1,4 +1,3 @@
-from typing import Any
 import f.availability_check._availability_models
 
 

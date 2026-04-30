@@ -1,4 +1,3 @@
-from typing import Any
 import f.internal.gcal_utils._gcal_models
 
 

@@ -1,4 +1,3 @@
-from typing import Any
 import f.openrouter_benchmark._benchmark_models
 
 

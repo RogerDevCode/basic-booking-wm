@@ -1,11 +1,11 @@
-from typing import Any
-from typing import cast
 from __future__ import annotations
 
-import pytest
+from typing import Any, cast
 from unittest.mock import AsyncMock, patch
-from f.internal.telegram_router.main import main
-from f.internal.telegram_router._router_models import RouterInput
+
+import pytest
+
+from f.internal.telegram_router.main import _main_async as main
 
 
 class TestTelegramRouter:
@@ -19,7 +19,7 @@ class TestTelegramRouter:
         res = await main(args)
         assert res is not None
         # Assert
-        assert cast(dict[str, Any], res["data"])["handled"] is False
+        assert cast("dict[str, Any]", res["data"])["handled"] is False
 
     @pytest.mark.asyncio
     @patch("f.internal.telegram_router.main.apply_transition")
@@ -50,5 +50,5 @@ class TestTelegramRouter:
         assert res is not None
 
         # Assert
-        assert cast(dict[str, Any], res["data"])["handled"] is True
-        assert cast(dict[str, Any], res["data"])["response_text"] == "Selecciona doctor:"
+        assert cast("dict[str, Any]", res["data"])["handled"] is True
+        assert cast("dict[str, Any]", res["data"])["response_text"] == "Selecciona doctor:"

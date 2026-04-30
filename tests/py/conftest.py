@@ -1,9 +1,15 @@
+from __future__ import annotations
+
 import asyncio
 import sys
+from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import MagicMock
 
 import pytest
 import wmill
+
+if TYPE_CHECKING:
+    from collections.abc import Coroutine
 
 # Inject a dummy wmill module before any tests are collected
 mock_wmill_module = MagicMock()
@@ -21,20 +27,20 @@ sys.modules["wmill"] = mock_wmill_module
 orig_run = asyncio.run
 
 
-from typing import Any, cast
-
-def mock_run(coro: Any, *, debug: Any = None, loop_factory: Any = None) -> Any:
+def mock_run(coro: Coroutine[Any, Any, Any], *, debug: bool | None = None, loop_factory: object = None) -> object:
     try:
         asyncio.get_running_loop()
         return coro
     except RuntimeError:
         kwargs: dict[str, Any] = {}
-        if debug is not None: kwargs["debug"] = debug
-        if loop_factory is not None: kwargs["loop_factory"] = loop_factory
+        if debug is not None:
+            kwargs["debug"] = debug
+        if loop_factory is not None:
+            kwargs["loop_factory"] = loop_factory
         return orig_run(coro, **kwargs)
 
 
-asyncio.run = cast(Any, mock_run)
+asyncio.run = cast("Any", mock_run)
 
 
 @pytest.fixture(autouse=True)
@@ -46,4 +52,4 @@ def windmill_env(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.fixture
 def mock_wmill() -> MagicMock:
-    return cast(MagicMock, wmill)
+    return cast("MagicMock", wmill)

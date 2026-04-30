@@ -1,33 +1,11 @@
 {
   "mcpServers": {
-    "codebase-index": {
-      "command": "uv",
-      "args": [
-        "run",
-        "python",
-        "-m",
-        "mcp_codebase_index.server"
-      ],
-      "env": {
-        "PROJECT_ROOT": "${workspaceFolder}"
-      }
-    },
-    "windmill-booking": {
+    "filesystem": {
       "command": "npx",
       "args": [
         "-y",
-        "mcp-remote",
-        "https://titanium.stax.ink/api/mcp/w/booking-titanium/mcp",
-        "--header",
-        "Authorization:Bearer wKQ2y16Zmiu1zUgRiYlRU6UekJz1F2jY"
-      ]
-    },
-    "postgres-local": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-postgres",
-        "postgresql://windmill:windmill@localhost:5432/windmill"
+        "@modelcontextprotocol/server-filesystem",
+        "/home/manager/Sync/wildmill-proyects/booking-titanium-wm"
       ]
     },
     "github": {
@@ -35,13 +13,29 @@
       "args": [
         "-y",
         "@modelcontextprotocol/server-github"
+      ]
+    },
+    "gemini-docs": {
+      "url": "https://developerknowledge.googleapis.com/mcp",
+      "type": "sse",
+      "headers": {
+        "X-Goog-Api-Key": "$GOOGLE_API_KEY"
+      }
+    },
+    "token-savior": {
+      "command": "uv",
+      "args": [
+        "run",
+        "python",
+        "-m",
+        "token_savior.server"
       ],
       "env": {
-        "GITHUB_PERSONAL_ACCESS_TOKEN": ""
+        "WORKSPACE_ROOTS": "/home/manager/Sync/wildmill-proyects/booking-titanium-wm",
+        "TOKEN_SAVIOR_PROFILE": "tiny_plus",
+        "TS_AUTO_EXTRACT": "1",
+        "TS_VIEWER_PORT": "3000"
       }
     }
-  },
-  "context": {
-    "fileName": "AGENTS.md"
   }
 }

@@ -1,10 +1,9 @@
 from typing import Any
-from typing import cast
 from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from f.web_auth_register.main import main
+from f.web_auth_register.main import _main_async as main
 
 
 @pytest.mark.asyncio
@@ -26,7 +25,7 @@ async def test_register_success() -> None:
             "password_confirm": "Password123!",
         }
 
-        err, result = main(args)
+        err, result = await main(args)
 
         assert err is None
         assert result is not None
@@ -44,6 +43,6 @@ async def test_register_invalid_rut() -> None:
         "password": "Password123!",
         "password_confirm": "Password123!",
     }
-    err, _result = main(args)
+    err, _result = await main(args)
     assert err is not None
     assert "Invalid Chilean RUT" in str(err)

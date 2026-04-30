@@ -1,4 +1,3 @@
-from typing import Any
 import pytest
 
 import f.patient_register._patient_logic

@@ -1,4 +1,3 @@
-from typing import Any
 import pytest
 
 import f.availability_check._availability_logic

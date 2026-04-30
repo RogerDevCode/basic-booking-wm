@@ -1,4 +1,3 @@
-from typing import Any
 import pytest
 
 import f.internal.scheduling_engine._scheduling_logic

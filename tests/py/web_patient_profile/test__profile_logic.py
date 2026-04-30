@@ -1,4 +1,3 @@
-from typing import Any
 import pytest
 
 import f.web_patient_profile._profile_logic

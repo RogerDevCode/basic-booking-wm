@@ -1,3 +1,17 @@
+# /// script
+# requires-python = ">=3.12"
+# dependencies = [
+#   "httpx>=0.28.1",
+#   "pydantic>=2.10.0",
+#   "email-validator>=2.2.0",
+#   "asyncpg>=0.30.0",
+#   "cryptography>=44.0.0",
+#   "beartype>=0.19.0",
+#   "returns>=0.24.0",
+#   "redis>=7.4.0",
+#   "typing-extensions>=4.12.0"
+# ]
+# ///
 from __future__ import annotations
 
 import os
@@ -14,8 +28,34 @@ if TYPE_CHECKING:
 MODULE = "telegram_send"
 
 
+def _normalize_text(value: object) -> str:
+    if isinstance(value, str):
+        return value
+    if isinstance(value, tuple):
+        return " ".join(str(part) for part in value)
+    if value is None:
+        return ""
+    return str(value)
+
+
 async def _main_async(args: dict[str, object]) -> Result[TelegramSendData]:
     from ..internal._wmill_adapter import get_variable
+
+    mode_value = args.get("mode")
+    if mode_value == "send_message":
+        raw_chat_id = args.get("chat_id")
+        raw_text = args.get("text")
+        chat_id = raw_chat_id if isinstance(raw_chat_id, str) else ""
+        text = raw_text if isinstance(raw_text, str) else ""
+        if not chat_id.strip() or not text.strip():
+            log(
+                "Skipping telegram_send due to empty chat_id/text",
+                mode="send_message",
+                has_chat_id=bool(chat_id.strip()),
+                has_text=bool(text.strip()),
+                module=MODULE,
+            )
+            return None, TelegramSendData(sent=False, message_id=None, chat_id=chat_id or None, mode="send_message")
 
     # Extract bot_token if present
     token_arg = args.get("bot_token")
@@ -44,16 +84,16 @@ async def _main_async(args: dict[str, object]) -> Result[TelegramSendData]:
     return await service.execute(input_data)
 
 
-async def main(
+def main(
     mode: str,
     chat_id: str,
-    text: str,
+    text: object,
     bot_token: str | None = None,
     parse_mode: str | None = None,
     inline_buttons_json: str | None = None,
     message_id: int | None = None,
 ) -> TelegramSendData | None:
-
+    import asyncio
     import json
 
     inline_buttons: list[object] = []
@@ -67,10 +107,12 @@ async def main(
 
             log("JSON parse error for inline_buttons", error=str(e), data=inline_buttons_json)
 
+    normalized_text = _normalize_text(text)
+
     args: dict[str, object] = {
         "mode": mode,
         "chat_id": str(chat_id),
-        "text": text,
+        "text": normalized_text,
         "bot_token": bot_token,
         "parse_mode": parse_mode or "Markdown",
         "inline_buttons": inline_buttons,
@@ -78,7 +120,7 @@ async def main(
     }
 
     try:
-        err, result = await _main_async(args)
+        err, result = asyncio.run(_main_async(args))
         if err:
             raise err
         # Ensure it returns the data model

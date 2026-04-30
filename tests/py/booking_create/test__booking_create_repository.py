@@ -1,4 +1,3 @@
-from typing import Any
 import pytest
 
 import f.booking_create._booking_create_repository

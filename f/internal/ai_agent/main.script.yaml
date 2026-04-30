@@ -11,6 +11,10 @@ schema:
       description: ''
       default: null
       originalType: string
+    conversation_state:
+      type: ''
+      description: ''
+      default: null
     provider_id:
       type: string
       description: ''

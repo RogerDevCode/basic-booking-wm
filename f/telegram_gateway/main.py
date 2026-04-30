@@ -1,3 +1,17 @@
+# /// script
+# requires-python = ">=3.12"
+# dependencies = [
+#   "httpx>=0.28.1",
+#   "pydantic>=2.10.0",
+#   "email-validator>=2.2.0",
+#   "asyncpg>=0.30.0",
+#   "cryptography>=44.0.0",
+#   "beartype>=0.19.0",
+#   "returns>=0.24.0",
+#   "redis>=7.4.0",
+#   "typing-extensions>=4.12.0"
+# ]
+# ///
 from __future__ import annotations
 
 from ..internal._db_client import _resolve_db_url
@@ -94,5 +108,7 @@ async def _main_async(args: dict[str, object]) -> dict[str, object]:
     }
 
 
-async def main(webhook_payload: dict[str, object]) -> dict[str, object]:
-    return await _main_async(webhook_payload)
+def main(webhook_payload: dict[str, object]) -> dict[str, object]:
+    import asyncio
+
+    return asyncio.run(_main_async(webhook_payload))

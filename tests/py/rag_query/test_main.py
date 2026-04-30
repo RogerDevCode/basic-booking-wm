@@ -1,4 +1,3 @@
-from typing import Any
 import pytest
 
 import f.rag_query.main

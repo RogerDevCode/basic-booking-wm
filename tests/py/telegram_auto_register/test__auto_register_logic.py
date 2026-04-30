@@ -1,4 +1,3 @@
-from typing import Any
 import pytest
 
 import f.telegram_auto_register._auto_register_logic

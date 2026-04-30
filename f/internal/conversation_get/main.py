@@ -1,3 +1,17 @@
+# /// script
+# requires-python = ">=3.12"
+# dependencies = [
+#   "httpx>=0.28.1",
+#   "pydantic>=2.10.0",
+#   "email-validator>=2.2.0",
+#   "asyncpg>=0.30.0",
+#   "cryptography>=44.0.0",
+#   "beartype>=0.19.0",
+#   "returns>=0.24.0",
+#   "redis>=7.4.0",
+#   "typing-extensions>=4.12.0"
+# ]
+# ///
 from __future__ import annotations
 
 import json
@@ -15,8 +29,8 @@ MODULE: Final[str] = "conversation_get"
 
 
 @beartype
-async def _get_conversation(chat_id: str) -> Result[ConversationGetResult, str]:
-    redis = await create_redis_client()
+async def _get_conversation(chat_id: str, redis_url: str | None = None) -> Result[ConversationGetResult, str]:
+    redis = await create_redis_client(redis_url)
     try:
         key = f"conv:{chat_id}"
         raw = await redis.get(key)
@@ -49,9 +63,9 @@ async def _get_conversation(chat_id: str) -> Result[ConversationGetResult, str]:
         await redis.aclose()
 
 
-async def main(chat_id: str) -> dict[str, object]:
+async def _main_async(chat_id: str, redis_url: str | None = None) -> dict[str, object]:
     """Windmill entrypoint."""
-    res = await _get_conversation(chat_id)
+    res = await _get_conversation(chat_id, redis_url)
     match res:
         case Success(val):
             return cast("dict[str, object]", val.model_dump())
@@ -60,3 +74,9 @@ async def main(chat_id: str) -> dict[str, object]:
             return {"data": None, "error": str(err)}
 
     return {"data": None}
+
+
+def main(chat_id: str, redis_url: str | None = None) -> dict[str, object]:
+    import asyncio
+
+    return asyncio.run(_main_async(chat_id, redis_url))

@@ -1,10 +1,9 @@
-from typing import Any
-from typing import cast
+from typing import Any, cast
 from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from f.circuit_breaker.main import main
+from f.circuit_breaker.main import _main_async as main
 
 
 @pytest.mark.asyncio
@@ -34,7 +33,7 @@ async def test_circuit_breaker_check_closed() -> None:
         err, result = await main(args)
         assert err is None
         assert result is not None
-        result_dict = cast(dict[str, object], result)
+        result_dict = cast("dict[str, object]", result)
         assert result_dict["allowed"] is True
         assert result_dict["state"] == "closed"
 
@@ -65,7 +64,7 @@ async def test_circuit_breaker_record_failure_opens() -> None:
         err, result = await main(args)
         assert err is None
         assert result is not None
-        result_dict = cast(dict[str, object], result)
+        result_dict = cast("dict[str, object]", result)
         assert result_dict["state"] == "opened"
         # Verify update to 'open' state was called
         calls = [c[0][0] for c in mock_db.execute.call_args_list]

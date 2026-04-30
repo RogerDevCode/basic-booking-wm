@@ -1,4 +1,3 @@
-from typing import Any
 import f.reminder_config._config_models
 
 

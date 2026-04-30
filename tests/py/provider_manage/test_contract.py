@@ -1,10 +1,14 @@
-from typing import Any
-from typing import cast, Any
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from f.provider_manage.main import main
+from f.provider_manage.main import _main_async as main
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Coroutine
 
 VALID_ID = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
 
@@ -13,7 +17,7 @@ VALID_ID = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
 async def test_provider_manage_update_success() -> None:
     mock_db = AsyncMock()
 
-    async def mock_with_tenant(db: object, tid: str, op: Any) -> object:
+    async def mock_with_tenant(db: object, tid: str, op: Callable[[], Coroutine[Any, Any, object]]) -> object:
         return await op()
 
     with (

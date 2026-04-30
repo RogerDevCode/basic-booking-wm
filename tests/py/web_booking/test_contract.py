@@ -1,10 +1,14 @@
-from typing import Any
-from typing import cast, Any
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from f.web_booking_api.main import main
+from f.web_booking_api.main import _main_async as main
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Coroutine
 
 VALID_ID = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
 
@@ -25,7 +29,7 @@ async def test_web_booking_crear_success() -> None:
         [{"booking_id": "b1", "status": "pending"}],  # insert result
     ]
 
-    async def mock_with_tenant(db: object, tid: str, op: Any) -> object:
+    async def mock_with_tenant(db: object, tid: str, op: Callable[[], Coroutine[Any, Any, object]]) -> object:
         return await op()
 
     with (
@@ -40,7 +44,7 @@ async def test_web_booking_crear_success() -> None:
             "start_time": "2026-05-01T10:00:00Z",
         }
 
-        err, result = main(args)
+        err, result = await main(args)
 
         assert err is None
         assert result is not None

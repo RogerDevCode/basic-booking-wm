@@ -1,12 +1,13 @@
-from typing import Any
-from typing import cast
 from __future__ import annotations
 
-import pytest
 from datetime import datetime
-from unittest.mock import MagicMock, AsyncMock, patch
-from f.booking_create.main import main_async as create_main
+from typing import Any
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+
 from f.booking_cancel.main import main_async as cancel_main
+from f.booking_create.main import main_async as create_main
 from f.booking_reschedule.main import main_async as reschedule_main
 
 # UUIDs
@@ -68,7 +69,7 @@ class TestBookingOperations:
         mock_repo_class.return_value = repo_mock
 
         # Act
-        err, result = await cancel_main(args)
+        err, _result = await cancel_main(args)
 
         # Assert
         assert err is not None
@@ -110,7 +111,7 @@ class TestBookingOperations:
         mock_with_tenant.return_value = (Exception("overlap"), None)
 
         # Act
-        err, result = await reschedule_main(args)
+        err, _result = await reschedule_main(args)
 
         # Assert
         assert err is not None

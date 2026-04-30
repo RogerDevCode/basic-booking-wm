@@ -1,4 +1,3 @@
-from typing import Any
 import pytest
 
 from f.booking_cancel._booking_cancel_models import BookingLookup, CancelBookingInput, UpdatedBooking

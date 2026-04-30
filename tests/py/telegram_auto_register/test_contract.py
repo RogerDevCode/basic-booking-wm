@@ -1,10 +1,14 @@
-from typing import Any
-from typing import cast, Any
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from f.telegram_auto_register.main import main
+from f.telegram_auto_register.main import _main_async as main
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Coroutine
 
 
 @pytest.mark.asyncio
@@ -17,7 +21,7 @@ async def test_telegram_auto_register_success() -> None:
         [{"user_id": "u123"}],  # insert result
     ]
 
-    async def mock_with_admin(db: object, op: Any) -> object:
+    async def mock_with_admin(db: object, op: Callable[[], Coroutine[Any, Any, object]]) -> object:
         return await op()
 
     with (

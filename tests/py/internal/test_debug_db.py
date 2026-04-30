@@ -1,4 +1,3 @@
-from typing import Any
 import pytest
 
 import f.internal.debug_db

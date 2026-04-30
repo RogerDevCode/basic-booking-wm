@@ -1,4 +1,3 @@
-from typing import Any
 import pytest
 
 import f.provider_agenda._agenda_logic
