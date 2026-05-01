@@ -4,9 +4,6 @@ import os
 from typing import Final
 
 from redis.asyncio import Redis
-from returns.result import Success
-
-from ._wmill_adapter import get_variable_safe
 
 # ============================================================================
 # REDIS CLIENT — Single Source of Truth for Redis connections

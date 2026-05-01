@@ -65,7 +65,7 @@ async def _get_conversation(chat_id: str, redis_url: str | None = None) -> Resul
 
 async def _main_async(chat_id: str, redis_url: str | None = None) -> dict[str, object]:
     """Windmill entrypoint."""
-    res = await _get_conversation(chat_id, redis_url)
+    res = await _get_conversation(chat_id, redis_url)  # type: ignore[call-arg]
     match res:
         case Success(val):
             return cast("dict[str, object]", val.model_dump())
@@ -78,5 +78,16 @@ async def _main_async(chat_id: str, redis_url: str | None = None) -> dict[str, o
 
 def main(chat_id: str, redis_url: str | None = None) -> dict[str, object]:
     import asyncio
+    import traceback
 
-    return asyncio.run(_main_async(chat_id, redis_url))
+    try:
+        return asyncio.run(_main_async(chat_id, redis_url))
+    except Exception as e:
+        tb = traceback.format_exc()
+        try:
+            from .._wmill_adapter import log
+
+            log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=MODULE)
+        except Exception:
+            pass
+        raise RuntimeError(f"Execution failed: {e}") from e

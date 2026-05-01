@@ -55,8 +55,38 @@ async def _main_async(args: dict[str, object]) -> Result[LogResult]:
         await conn.close()
 
 
-def main(args: dict[str, object]) -> Result[LogResult]:
+def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
     import asyncio
+    import traceback
+    from typing import cast
 
-    """Windmill entrypoint."""
-    return asyncio.run(_main_async(args))
+    from pydantic import BaseModel
+
+    try:
+        if isinstance(args, InputSchema):
+            validated = args
+        else:
+            validated = InputSchema.model_validate(args)
+            
+        err, result = asyncio.run(_main_async(validated.model_dump()))
+        if err:
+            raise err
+            
+        if result is None:
+            return {}
+        
+        if isinstance(result, BaseModel):
+            return cast("dict[str, object]", result.model_dump())
+        elif isinstance(result, dict):
+            return cast("dict[str, object]", result)
+        else:
+            return {"data": result}
+            
+    except Exception as e:
+        tb = traceback.format_exc()
+        try:
+            from ..internal._wmill_adapter import log
+            log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=MODULE)
+        except Exception:
+            pass
+        raise RuntimeError(f"Execution failed: {e}") from e

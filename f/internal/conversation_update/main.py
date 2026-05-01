@@ -29,7 +29,9 @@ MODULE: Final[str] = "conversation_update"
 
 
 @beartype
-async def _update_conversation(input_data: ConversationUpdateInput, redis_url: str | None = None) -> Result[ConversationUpdateResult, str]:
+async def _update_conversation(
+    input_data: ConversationUpdateInput, redis_url: str | None = None
+) -> Result[ConversationUpdateResult, str]:
     redis = await create_redis_client(redis_url)
     try:
         key = f"conv:{input_data.chat_id}"
@@ -83,7 +85,7 @@ async def _main_async(args: object, redis_url: str | None = None) -> dict[str, o
         log("conversation_update validation error", error=str(e), module=MODULE)
         return {"data": {"success": False, "chat_id": "", "skipped": True, "reason": "validation_error"}}
 
-    res = await _update_conversation(input_data, redis_url)
+    res = await _update_conversation(input_data, redis_url)  # type: ignore[call-arg]
     match res:
         case Success(val):
             return {"data": cast("dict[str, object]", val.model_dump())}
@@ -95,5 +97,16 @@ async def _main_async(args: object, redis_url: str | None = None) -> dict[str, o
 
 def main(args: object, redis_url: str | None = None) -> dict[str, object]:
     import asyncio
+    import traceback
 
-    return asyncio.run(_main_async(args, redis_url))
+    try:
+        return asyncio.run(_main_async(args, redis_url))
+    except Exception as e:
+        tb = traceback.format_exc()
+        try:
+            from .._wmill_adapter import log
+
+            log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=MODULE)
+        except Exception:
+            pass
+        raise RuntimeError(f"Execution failed: {e}") from e

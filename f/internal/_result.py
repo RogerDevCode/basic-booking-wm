@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import re
+
 try:
     from typing import TypeIs
 except ImportError:
-    from typing_extensions import TypeIs
+    from typing import TypeIs
 
 from typing import (
     TYPE_CHECKING,

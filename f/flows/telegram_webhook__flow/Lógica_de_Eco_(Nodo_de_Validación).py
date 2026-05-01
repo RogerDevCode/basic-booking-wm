@@ -1,5 +1,7 @@
 from __future__ import annotations
+
 from typing import Any
+
 
 async def _main_async(args: dict[str, Any]) -> dict[str, Any]:
     chat_id = args.get("chat_id")

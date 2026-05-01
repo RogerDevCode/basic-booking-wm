@@ -14,7 +14,7 @@
 # ///
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from ..internal._db_client import create_db_client
 from ..internal._wmill_adapter import log
@@ -110,23 +110,36 @@ async def _main_async(args: dict[str, object]) -> Result[OrchestratorResult]:
         await conn.close()
 
 
-def main(telegram_chat_id: str, intent: str, entities: dict[str, object] | None = None) -> dict[str, Any]:
+def main(telegram_chat_id: str, intent: str, entities: dict[str, object] | None = None) -> dict[str, object]:
     import asyncio
+    import traceback
+    from typing import cast
 
-    """
-    Entrypoint asincrónico para la ejecución en Windmill.
-    """
+    from pydantic import BaseModel
+
     try:
         args: dict[str, object] = {"telegram_chat_id": telegram_chat_id, "intent": intent, "entities": entities or {}}
         err, result = asyncio.run(_main_async(args))
         if err:
             raise err
-        # Windmill expects a JSON-serializable dict, we wrap it in 'data'
-        return {"data": dict(result) if result else {}}
-    except Exception as e:
-        import traceback
 
+        if result is None:
+            return {}
+
+        if isinstance(result, BaseModel):
+            return cast("dict[str, object]", result.model_dump())
+        elif isinstance(result, dict):
+            return cast("dict[str, object]", result)
+        else:
+            return {"data": result}
+
+    except Exception as e:
         tb = traceback.format_exc()
-        log("CRITICAL_ORCHESTRATOR_ERROR", error=str(e), traceback=tb, module=MODULE)
-        # Raise to let Windmill know it failed
-        raise RuntimeError(f"Orchestrator failed: {e}") from e
+        try:
+            from ..internal._wmill_adapter import log
+
+            log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=MODULE)
+        except Exception:
+            print(f"CRITICAL ERROR in {__file__}: {e}\n{tb}")
+
+        raise RuntimeError(f"Execution failed: {e}") from e

@@ -61,12 +61,25 @@ async def _main_async(args: dict[str, object]) -> ExtractedIntent:
     }
 
 
-def main(args: dict[str, object]) -> ExtractedIntent | None:
+def main(args: dict[str, object]) -> dict[str, object]:
     import asyncio
     import traceback
+    from typing import cast
+
+    from pydantic import BaseModel
 
     try:
-        return asyncio.run(_main_async(args))
+        result = asyncio.run(_main_async(args))
+        if result is None:
+            return {}
+
+        if isinstance(result, BaseModel):
+            return cast("dict[str, object]", result.model_dump())
+        elif isinstance(result, dict):
+            return cast("dict[str, object]", result)
+        else:
+            return {"data": result}
+
     except Exception as e:
         tb = traceback.format_exc()
         try:
@@ -76,5 +89,4 @@ def main(args: dict[str, object]) -> ExtractedIntent | None:
         except Exception:
             print(f"CRITICAL ERROR in nlu: {e}\n{tb}")
 
-        # Elevamos para que Windmill marque como FAILED
         raise RuntimeError(f"Execution failed: {e}") from e

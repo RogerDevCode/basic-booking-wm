@@ -145,11 +145,37 @@ async def _main_async(args: dict[str, Any]) -> dict[str, Any]:
 
 def main(
     chat_id: str, text: str, provider_id: str | None = None, conversation_state: dict[str, Any] | None = None
-) -> dict[str, Any]:
+) -> dict[str, object]:
+    import traceback
+
+    from pydantic import BaseModel
+
     args: dict[str, Any] = {
         "chat_id": chat_id,
         "text": text,
         "provider_id": provider_id,
         "conversation_state": conversation_state,
     }
-    return asyncio.run(_main_async(args))
+
+    try:
+        result = asyncio.run(_main_async(args))
+        if result is None:
+            return {}
+
+        if isinstance(result, BaseModel):
+            return cast("dict[str, object]", result.model_dump())
+        elif isinstance(result, dict):
+            return cast("dict[str, object]", result)
+        else:
+            return {"data": result}
+
+    except Exception as e:
+        tb = traceback.format_exc()
+        try:
+            from .._wmill_adapter import log
+
+            log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=MODULE)
+        except Exception:
+            print(f"CRITICAL ERROR in {__file__}: {e}\n{tb}")
+
+        raise RuntimeError(f"Execution failed: {e}") from e

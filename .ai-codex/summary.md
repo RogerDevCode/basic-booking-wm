@@ -283,7 +283,10 @@
 - 🔧 `fn` `main` (L6)
 
 ### `f/flows/telegram_webhook__flow/Lógica_de_Eco_(Nodo_de_Validación).py`
-- 🔧 `fn` `main` (L12)
+- 🔧 `fn` `main` (L14)
+
+### `f/flows/telegram_webhook__flow/Lógica_de_Eco_con_Contador_(Nodo_de_Validación).py`
+- 🔧 `fn` `main` (L6)
 
 ### `f/flows/telegram_webhook__flow/gates/check_parser_error.py`
 - 🔧 `fn` `main` (L10)
@@ -403,22 +406,22 @@
 - 🔧 `fn` `shared_file_lock` (L94)
 
 ### `f/internal/_redis_client.py`
-- ⚡ `async_fn` `create_redis_client` (L31)
+- ⚡ `async_fn` `create_redis_client` (L28)
 
 ### `f/internal/_result.py`
-- 🔧 `fn` `ok` (L21)
-- 🔧 `fn` `fail` (L26)
-- 🔧 `fn` `is_ok_outcome` (L37)
-- 🔧 `fn` `is_fail_outcome` (L42)
-- ⚡ `async_fn` `wrap` (L47)
-- 📦 `class` `DBClient` (L56)
-- ⚡ `async_fn` `fetch` (L59)
-- ⚡ `async_fn` `fetchrow` (L61)
-- ⚡ `async_fn` `fetchval` (L63)
-- ⚡ `async_fn` `execute` (L65)
-- ⚡ `async_fn` `close` (L67)
-- ⚡ `async_fn` `with_tenant_context` (L70)
-- ⚡ `async_fn` `with_admin_context` (L106)
+- 🔧 `fn` `ok` (L22)
+- 🔧 `fn` `fail` (L27)
+- 🔧 `fn` `is_ok_outcome` (L38)
+- 🔧 `fn` `is_fail_outcome` (L43)
+- ⚡ `async_fn` `wrap` (L48)
+- 📦 `class` `DBClient` (L57)
+- ⚡ `async_fn` `fetch` (L60)
+- ⚡ `async_fn` `fetchrow` (L62)
+- ⚡ `async_fn` `fetchval` (L64)
+- ⚡ `async_fn` `execute` (L66)
+- ⚡ `async_fn` `close` (L68)
+- ⚡ `async_fn` `with_tenant_context` (L71)
+- ⚡ `async_fn` `with_admin_context` (L107)
 
 ### `f/internal/_state_machine.py`
 - 🔧 `fn` `validate_transition` (L32)
@@ -499,10 +502,10 @@
 - 🔧 `fn` `main` (L24)
 
 ### `f/internal/booking_fsm/_fsm_machine.py`
-- 🔧 `fn` `parse_action` (L56)
-- 🔧 `fn` `parse_callback_data` (L78)
-- 🔧 `fn` `apply_transition` (L95)
-- 🔧 `fn` `flow_step_from_state` (L350)
+- 🔧 `fn` `parse_action` (L57)
+- 🔧 `fn` `parse_callback_data` (L79)
+- 🔧 `fn` `apply_transition` (L96)
+- 🔧 `fn` `flow_step_from_state` (L351)
 
 ### `f/internal/booking_fsm/_fsm_models.py`
 - 📦 `class` `NamedItem` (L20)
@@ -552,7 +555,15 @@
 - 📦 `class` `ConversationUpdateResult` (L21)
 
 ### `f/internal/conversation_update/main.py`
-- 🔧 `fn` `main` (L96)
+- 🔧 `fn` `main` (L98)
+
+### `f/internal/conversation_verify/_verify_models.py`
+- 📦 `class` `PersistedConversationState` (L6)
+- 📦 `class` `ConversationVerifyInput` (L19)
+- 📦 `class` `ConversationVerifyResult` (L27)
+
+### `f/internal/conversation_verify/main.py`
+- 🔧 `fn` `main` (L58)
 
 ### `f/internal/debug_db.py`
 - 🔧 `fn` `main` (L22)
@@ -599,6 +610,20 @@
 - 📦 `class` `ServiceRow` (L50)
 - 📦 `class` `AffectedBooking` (L56)
 - 📦 `class` `OverrideValidation` (L62)
+
+### `f/internal/telegram_classify/_classify_models.py`
+- 📦 `class` `TelegramClassifyInput` (L8)
+- 📦 `class` `TelegramClassifyResult` (L21)
+
+### `f/internal/telegram_classify/main.py`
+- 🔧 `fn` `main` (L68)
+
+### `f/internal/telegram_normalize/_normalize_models.py`
+- 📦 `class` `TelegramNormalizeInput` (L8)
+- 📦 `class` `TelegramNormalizeResult` (L19)
+
+### `f/internal/telegram_normalize/main.py`
+- 🔧 `fn` `main` (L60)
 
 ### `f/internal/telegram_router/_router_models.py`
 - 📦 `class` `RouterInput` (L8)
@@ -1191,8 +1216,11 @@
 - `f/internal/booking_fsm/_fsm_machine.script.yaml`
 - `f/internal/booking_fsm/_fsm_models.script.yaml`
 - `f/internal/booking_fsm/_fsm_responses.script.yaml`
+- `f/internal/conversation_get/_conversation_models.script.yaml`
 - `f/internal/conversation_get/main.script.yaml`
 - `f/internal/conversation_update/main.script.yaml`
+- `f/internal/conversation_verify/_verify_models.script.yaml`
+- `f/internal/conversation_verify/main.script.yaml`
 - `f/internal/debug_db.script.yaml`
 - `f/internal/debug_db_final.script.yaml`
 - `f/internal/gcal_utils/__init__.script.yaml`
@@ -1203,6 +1231,10 @@
 - `f/internal/scheduling_engine/__init__.script.yaml`
 - `f/internal/scheduling_engine/_scheduling_logic.script.yaml`
 - `f/internal/scheduling_engine/_scheduling_models.script.yaml`
+- `f/internal/telegram_classify/_classify_models.script.yaml`
+- `f/internal/telegram_classify/main.script.yaml`
+- `f/internal/telegram_normalize/_normalize_models.script.yaml`
+- `f/internal/telegram_normalize/main.script.yaml`
 - `f/internal/telegram_router/main.script.yaml`
 - `f/internal/test_var.script.yaml`
 - `f/nlu/__init__.script.yaml`
