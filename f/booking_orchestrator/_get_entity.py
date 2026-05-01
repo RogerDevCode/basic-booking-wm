@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 PRE-FLIGHT
 Mission          : Simple entity extractor helper.

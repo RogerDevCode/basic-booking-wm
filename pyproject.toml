@@ -2,7 +2,7 @@
 name = "booking-titanium-wm"
 version = "0.1.0"
 description = "Medical Appointment Booking System"
-requires-python = ">=3.11"
+requires-python = ">=3.13"
 dependencies = [
     "httpx>=0.28.1",
     "pydantic>=2.10.0",
@@ -50,7 +50,6 @@ target-version = "py313"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "ANN", "B", "RUF", "TCH"]
-ignore  = ["ANN101", "ANN102"]
 
 [tool.ruff.format]
 quote-style = "double"

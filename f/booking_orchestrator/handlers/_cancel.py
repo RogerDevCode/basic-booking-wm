@@ -1,7 +1,13 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from f.booking_cancel.main import main_async as cancel_booking
 from f.booking_orchestrator._get_entity import get_entity
-from f.booking_orchestrator._orchestrator_models import OrchestratorInput, OrchestratorResult
 from f.internal._result import DBClient, Result, ok
+
+if TYPE_CHECKING:
+    from f.booking_orchestrator._orchestrator_models import OrchestratorInput, OrchestratorResult
 
 from ._get_my_bookings import handle_get_my_bookings
 

@@ -1,5 +1,5 @@
 # /// script
-# requires-python = ">=3.12"
+# requires-python = ">=3.13"
 # dependencies = [
 #   "httpx>=0.28.1",
 #   "pydantic>=2.10.0",

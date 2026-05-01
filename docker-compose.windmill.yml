@@ -66,7 +66,7 @@ services:
     logging: *default-logging
 
   windmill_server:
-    image: ${WM_IMAGE}
+    image: ${WM_IMAGE:-ghcr.io/windmill-labs/windmill:latest-python313}
     pull_policy: always
     deploy:
       replicas: 1
@@ -124,7 +124,7 @@ services:
     logging: *default-logging
 
   windmill_worker:
-    image: ${WM_IMAGE}
+    image: ${WM_IMAGE:-ghcr.io/windmill-labs/windmill:latest-python313}
     pull_policy: always
     deploy:
       replicas: 2
@@ -161,7 +161,7 @@ services:
     logging: *default-logging
 
   windmill_worker_native:
-    image: ${WM_IMAGE}
+    image: ${WM_IMAGE:-ghcr.io/windmill-labs/windmill:latest-python313}
     pull_policy: always
     deploy:
       replicas: 1
@@ -191,7 +191,7 @@ services:
     logging: *default-logging
 
   windmill_indexer:
-    image: ${WM_IMAGE}
+    image: ${WM_IMAGE:-ghcr.io/windmill-labs/windmill:latest-python313}
     pull_policy: always
     deploy:
       replicas: 0

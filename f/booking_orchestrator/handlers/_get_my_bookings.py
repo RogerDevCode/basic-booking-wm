@@ -1,10 +1,13 @@
+from __future__ import annotations
+
 import zoneinfo
 from datetime import datetime
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
-from f.booking_orchestrator._orchestrator_models import OrchestratorInput, OrchestratorResult
-from f.internal._db_client import create_db_client
 from f.internal._result import DBClient, Result, fail, ok, with_tenant_context
+
+if TYPE_CHECKING:
+    from f.booking_orchestrator._orchestrator_models import OrchestratorInput, OrchestratorResult
 
 """
 PRE-FLIGHT
@@ -25,57 +28,49 @@ async def handle_get_my_bookings(conn: DBClient, input_data: OrchestratorInput) 
     if not client_id or not tenant_id:
         return fail("Falta identificación de paciente o establecimiento.")
 
-    conn = await create_db_client()
-    try:
+    async def operation() -> Result[list[dict[str, object]]]:
+        rows = await conn.fetch(
+            """
+            SELECT b.booking_id, b.status, b.start_time,
+                   p.name as provider_name, p.specialty, s.name as service_name
+            FROM bookings b
+            JOIN providers p ON p.provider_id = b.provider_id
+            JOIN services s ON s.service_id = b.service_id
+            WHERE b.client_id = $1::uuid
+              AND b.status NOT IN ('cancelled', 'no_show', 'rescheduled')
+              AND b.start_time >= NOW()
+            ORDER BY b.start_time ASC LIMIT 10
+            """,
+            client_id,
+        )
+        return None, rows
 
-        async def operation() -> Result[list[dict[str, object]]]:
-            rows = await conn.fetch(
-                """
-                SELECT b.booking_id, b.status, b.start_time, p.name as provider_name, p.specialty, s.name as service_name  # noqa: E501
-                FROM bookings b
-                JOIN providers p ON p.provider_id = b.provider_id
-                JOIN services s ON s.service_id = b.service_id
-                WHERE b.client_id = $1::uuid
-                  AND b.status NOT IN ('cancelled', 'no_show', 'rescheduled')
-                  AND b.start_time >= NOW()
-                ORDER BY b.start_time ASC LIMIT 10
-                """,  # noqa: E501
-                client_id,
-            )
-            return None, rows
+    err, rows = await with_tenant_context(conn, tenant_id, operation)
+    if err or rows is None:
+        return err or Exception("Failed to fetch bookings"), None
 
-        err, rows = await with_tenant_context(conn, tenant_id, operation)
-        if err or rows is None:
-            return err or Exception("Failed to fetch bookings"), None
+    tz = zoneinfo.ZoneInfo("America/Mexico_City")
+    lines: list[str] = []
+    for r in rows:
+        st = r["start_time"]
+        if isinstance(st, str):
+            dt = datetime.fromisoformat(st.replace("Z", "+00:00")).astimezone(tz)
+        elif isinstance(st, datetime):
+            dt = st.astimezone(tz)
+        else:
+            continue
 
-        # Formatting
-        tz = zoneinfo.ZoneInfo("America/Mexico_City")
-        lines: list[str] = []
-        for r in rows:
-            st = r["start_time"]
-            # Handle both datetime objects and ISO strings
-            if isinstance(st, str):
-                # asyncpg usually returns datetime objects for TIMESTAMPTZ,
-                # but if it was somehow a string, parse it.
-                dt = datetime.fromisoformat(st.replace("Z", "+00:00")).astimezone(tz)
-            elif isinstance(st, datetime):
-                dt = st.astimezone(tz)
-            else:
-                continue
+        provider_name = cast("str", r.get("provider_name", "Desconocido"))
+        service_name = cast("str", r.get("service_name", "Servicio"))
+        fmt_str = dt.strftime("%d/%m %H:%M")
+        lines.append(f"• {fmt_str}hs - {provider_name}: {service_name}")
 
-            provider_name = cast("str", r.get("provider_name", "Desconocido"))
-            service_name = cast("str", r.get("service_name", "Servicio"))
-            fmt_str = dt.strftime("%d/%m %H:%M")
-            lines.append(f"• {fmt_str}hs - {provider_name}: {service_name}")
-
-        msg_body = "\n".join(lines)
-        res_data: OrchestratorResult = {
-            "action": "mis_citas",
-            "success": True,
-            "data": rows,
-            "message": f"📋 Tus próximas citas:\n{msg_body}" if lines else "📋 No tienes próximas citas.",
-            "follow_up": input_data.notes,
-        }
-        return ok(res_data)
-    finally:
-        await conn.close()
+    msg_body = "\n".join(lines)
+    res_data: OrchestratorResult = {
+        "action": "mis_citas",
+        "success": True,
+        "data": rows,
+        "message": f"📋 Tus próximas citas:\n{msg_body}" if lines else "📋 No tienes próximas citas.",
+        "follow_up": input_data.notes,
+    }
+    return ok(res_data)

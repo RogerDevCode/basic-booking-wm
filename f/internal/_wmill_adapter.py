@@ -1,11 +1,6 @@
 from __future__ import annotations
 
-try:
-    from typing import TypeIs
-except ImportError:
-    from typing import TypeIs
-
-from typing import TypeVar, cast
+from typing import TypeIs, TypeVar, cast
 
 try:
     import wmill

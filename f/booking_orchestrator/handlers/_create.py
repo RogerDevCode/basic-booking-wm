@@ -1,9 +1,13 @@
-from typing import cast
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, cast
 
 from f.booking_create.main import main_async as create_booking
 from f.booking_orchestrator._get_entity import get_entity
-from f.booking_orchestrator._orchestrator_models import OrchestratorInput, OrchestratorResult
 from f.internal._result import DBClient, Result, ok
+
+if TYPE_CHECKING:
+    from f.booking_orchestrator._orchestrator_models import OrchestratorInput, OrchestratorResult
 
 """
 PRE-FLIGHT
@@ -27,14 +31,15 @@ async def handle_create_booking(conn: DBClient, input_data: OrchestratorInput) -
     # 1. SMART HANDOFF: Detect missing required fields for a direct booking
     if not all([client_id, provider_id, service_id, date, time]):
         query = """
-        SELECT 
+        SELECT
             s.specialty_id as id,
             s.name,
-            (SELECT COUNT(*) FROM providers p WHERE p.specialty_id = s.specialty_id AND p.is_active = true) as provider_count  # noqa: E501
+            (SELECT COUNT(*) FROM providers p
+             WHERE p.specialty_id = s.specialty_id AND p.is_active = true) as provider_count
         FROM specialties s
         WHERE s.is_active = true
         ORDER BY s.sort_order ASC, s.name ASC
-        """  # noqa: E501
+        """
         rows = await conn.fetch(query)
 
         inline_buttons: list[list[dict[str, str]]] = []

@@ -118,37 +118,37 @@
 - 🔧 `fn` `main` (L95)
 
 ### `f/booking_orchestrator/_context_resolver.py`
-- ⚡ `async_fn` `resolve_context` (L17)
+- ⚡ `async_fn` `resolve_context` (L23)
 
 ### `f/booking_orchestrator/_get_entity.py`
-- 🔧 `fn` `get_entity` (L13)
+- 🔧 `fn` `get_entity` (L15)
 
 ### `f/booking_orchestrator/_intent_router.py`
-- 🔧 `fn` `normalize_intent` (L35)
+- 🔧 `fn` `normalize_intent` (L37)
 
 ### `f/booking_orchestrator/_orchestrator_models.py`
-- 📦 `class` `OrchestratorInput` (L37)
-- 📦 `class` `OrchestratorResult` (L55)
-- 📦 `class` `ResolvedContext` (L66)
-- 📦 `class` `AvailabilitySlot` (L75)
-- 📦 `class` `AvailabilityData` (L80)
-- 📦 `class` `BookingRow` (L87)
+- 📦 `class` `OrchestratorInput` (L39)
+- 📦 `class` `OrchestratorResult` (L57)
+- 📦 `class` `ResolvedContext` (L68)
+- 📦 `class` `AvailabilitySlot` (L77)
+- 📦 `class` `AvailabilityData` (L82)
+- 📦 `class` `BookingRow` (L89)
 
 ### `f/booking_orchestrator/handlers/_cancel.py`
-- ⚡ `async_fn` `handle_cancel_booking` (L20)
+- ⚡ `async_fn` `handle_cancel_booking` (L26)
 
 ### `f/booking_orchestrator/handlers/_create.py`
-- ⚡ `async_fn` `handle_create_booking` (L20)
+- ⚡ `async_fn` `handle_create_booking` (L24)
 
 ### `f/booking_orchestrator/handlers/_get_my_bookings.py`
-- ⚡ `async_fn` `handle_get_my_bookings` (L21)
+- ⚡ `async_fn` `handle_get_my_bookings` (L24)
 - ⚡ `async_fn` `operation` (L31)
 
 ### `f/booking_orchestrator/handlers/_list_available.py`
 - ⚡ `async_fn` `handle_list_available` (L20)
 
 ### `f/booking_orchestrator/handlers/_reschedule.py`
-- ⚡ `async_fn` `handle_reschedule` (L20)
+- ⚡ `async_fn` `handle_reschedule` (L26)
 
 ### `f/booking_orchestrator/main.py`
 - 🔧 `fn` `main` (L113)
@@ -409,30 +409,30 @@
 - ⚡ `async_fn` `create_redis_client` (L28)
 
 ### `f/internal/_result.py`
-- 🔧 `fn` `ok` (L22)
-- 🔧 `fn` `fail` (L27)
-- 🔧 `fn` `is_ok_outcome` (L38)
-- 🔧 `fn` `is_fail_outcome` (L43)
-- ⚡ `async_fn` `wrap` (L48)
-- 📦 `class` `DBClient` (L57)
-- ⚡ `async_fn` `fetch` (L60)
-- ⚡ `async_fn` `fetchrow` (L62)
-- ⚡ `async_fn` `fetchval` (L64)
-- ⚡ `async_fn` `execute` (L66)
-- ⚡ `async_fn` `close` (L68)
-- ⚡ `async_fn` `with_tenant_context` (L71)
-- ⚡ `async_fn` `with_admin_context` (L107)
+- 🔧 `fn` `ok` (L17)
+- 🔧 `fn` `fail` (L22)
+- 🔧 `fn` `is_ok_outcome` (L33)
+- 🔧 `fn` `is_fail_outcome` (L38)
+- ⚡ `async_fn` `wrap` (L43)
+- 📦 `class` `DBClient` (L52)
+- ⚡ `async_fn` `fetch` (L55)
+- ⚡ `async_fn` `fetchrow` (L57)
+- ⚡ `async_fn` `fetchval` (L59)
+- ⚡ `async_fn` `execute` (L61)
+- ⚡ `async_fn` `close` (L63)
+- ⚡ `async_fn` `with_tenant_context` (L66)
+- ⚡ `async_fn` `with_admin_context` (L102)
 
 ### `f/internal/_state_machine.py`
 - 🔧 `fn` `validate_transition` (L32)
 
 ### `f/internal/_wmill_adapter.py`
-- 🔧 `fn` `is_dict_str_obj` (L25)
-- 🔧 `fn` `get_variable_safe` (L29)
-- 🔧 `fn` `get_variable` (L37)
-- 🔧 `fn` `get_resource_safe` (L48)
-- 🔧 `fn` `run_script` (L59)
-- 🔧 `fn` `log` (L71)
+- 🔧 `fn` `is_dict_str_obj` (L20)
+- 🔧 `fn` `get_variable_safe` (L24)
+- 🔧 `fn` `get_variable` (L32)
+- 🔧 `fn` `get_resource_safe` (L43)
+- 🔧 `fn` `run_script` (L54)
+- 🔧 `fn` `log` (L66)
 
 ### `f/internal/ai_agent/_ai_agent_logic.py`
 - 🔧 `fn` `adjust_intent_with_context` (L28)
@@ -502,10 +502,10 @@
 - 🔧 `fn` `main` (L24)
 
 ### `f/internal/booking_fsm/_fsm_machine.py`
-- 🔧 `fn` `parse_action` (L57)
-- 🔧 `fn` `parse_callback_data` (L79)
-- 🔧 `fn` `apply_transition` (L96)
-- 🔧 `fn` `flow_step_from_state` (L351)
+- 🔧 `fn` `parse_action` (L51)
+- 🔧 `fn` `parse_callback_data` (L73)
+- 🔧 `fn` `apply_transition` (L90)
+- 🔧 `fn` `flow_step_from_state` (L345)
 
 ### `f/internal/booking_fsm/_fsm_models.py`
 - 📦 `class` `NamedItem` (L20)

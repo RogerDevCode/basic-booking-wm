@@ -1,8 +1,14 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from f.internal._date_resolver import resolve_date, resolve_time
 from f.internal._result import DBClient, Result, fail, ok
 
 from ._get_entity import get_entity
-from ._orchestrator_models import OrchestratorInput, ResolvedContext
+
+if TYPE_CHECKING:
+    from ._orchestrator_models import OrchestratorInput, ResolvedContext
 
 """
 PRE-FLIGHT
