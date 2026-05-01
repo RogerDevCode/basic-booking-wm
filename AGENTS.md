@@ -25,7 +25,7 @@ LAW-10  NO SIDE-EFFECTS @ TOP LEVEL
 
 ## STACK
 
-PYTHON: 3.13  
+PYTHON: 3.13 (MANDATORY)
 PKG   : uv  
 LINT  : ruff  
 TYPE  : mypy + pyright  
