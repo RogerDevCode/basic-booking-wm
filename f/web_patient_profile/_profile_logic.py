@@ -11,7 +11,7 @@ def map_to_profile(r: dict[str, Any]) -> ProfileResult:
         "email": str(r["email"]) if r.get("email") else None,
         "phone": str(r["phone"]) if r.get("phone") else None,
         "telegram_chat_id": str(r["telegram_chat_id"]) if r.get("telegram_chat_id") else None,
-        "timezone": str(r["timezone"]),
+        "timezone_id": r.get("timezone_id"),
         "gcal_calendar_id": str(r["gcal_calendar_id"]) if r.get("gcal_calendar_id") else None,
     }
 
@@ -33,18 +33,17 @@ async def find_or_create_client(db: DBClient, user_id: str, user: dict[str, Any]
         if rows:
             return ok(dict(rows[0]))
 
-        # Auto-create
+        # Auto-create (no default timezone_id provided since it's an int and we don't know America/Mexico_City id)
         insert_rows = await db.fetch(
             """
-            INSERT INTO clients (name, email, phone, telegram_chat_id, timezone)
-            VALUES ($1, $2, $3, $4, $5)
+            INSERT INTO clients (name, email, phone, telegram_chat_id)
+            VALUES ($1, $2, $3, $4)
             RETURNING *
             """,
             user.get("full_name"),
             email,
             user.get("phone"),
             user.get("telegram_chat_id"),
-            user.get("timezone") or "America/Mexico_City",
         )
         if not insert_rows:
             return fail("Failed to create client record")
@@ -58,7 +57,7 @@ async def update_profile(db: DBClient, client_id: str, data: InputSchema) -> Res
         fields = []
         params = []
         idx = 1
-        for field in ["name", "email", "phone", "timezone"]:
+        for field in ["name", "email", "phone", "timezone_id"]:
             val = getattr(data, field)
             if val is not None:
                 fields.append(f"{field} = ${idx}")

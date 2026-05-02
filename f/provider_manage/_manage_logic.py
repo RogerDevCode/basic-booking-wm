@@ -15,15 +15,15 @@ async def handle_provider_actions(db: DBClient, input_data: InputSchema) -> Resu
             return fail("MISSING_FIELDS: name and email are required")
         rows = await db.fetch(
             """
-            INSERT INTO providers (name, email, phone, specialty, timezone)
-            VALUES ($1, $2, $3, $4, $5)
+            INSERT INTO providers (name, email, phone, specialty_id, timezone_id)
+            VALUES ($1, $2, $3, $4::uuid, $5)
             RETURNING provider_id, name
             """,
             input_data.name,
             input_data.email,
             input_data.phone,
-            input_data.specialty or "Medicina General",
-            input_data.timezone,
+            input_data.specialty_id,
+            input_data.timezone_id,
         )
         if not rows:
             return fail("DATABASE_ERROR: Failed to create provider")

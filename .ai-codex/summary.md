@@ -688,7 +688,7 @@
 - 🔧 `fn` `main` (L84)
 
 ### `f/patient_register/_patient_logic.py`
-- ⚡ `async_fn` `upsert_client` (L5)
+- ⚡ `async_fn` `upsert_client` (L7)
 
 ### `f/patient_register/_patient_models.py`
 - 📦 `class` `ClientResult` (L8)
@@ -1064,7 +1064,7 @@
 - 🔧 `fn` `map_to_profile` (L7)
 - ⚡ `async_fn` `find_user` (L19)
 - ⚡ `async_fn` `find_or_create_client` (L29)
-- ⚡ `async_fn` `update_profile` (L56)
+- ⚡ `async_fn` `update_profile` (L55)
 
 ### `f/web_patient_profile/_profile_models.py`
 - 📦 `class` `ProfileResult` (L6)

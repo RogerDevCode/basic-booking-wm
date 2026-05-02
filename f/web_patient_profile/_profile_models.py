@@ -9,7 +9,7 @@ class ProfileResult(TypedDict):
     email: str | None
     phone: str | None
     telegram_chat_id: str | None
-    timezone: str
+    timezone_id: int | None
     gcal_calendar_id: str | None
 
 
@@ -21,4 +21,4 @@ class InputSchema(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=200)
     email: EmailStr | None = None
     phone: str | None = Field(None, max_length=50)
-    timezone: str | None = None
+    timezone_id: int | None = None

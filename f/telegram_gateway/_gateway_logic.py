@@ -59,8 +59,8 @@ class ClientRepository:
             # Global context (no RLS for discovery/registration per §6)
             await conn.execute(
                 """
-                INSERT INTO clients (client_id, name, email, phone, timezone)
-                VALUES (gen_random_uuid(), $1, NULL, NULL, 'America/Mexico_City')
+                INSERT INTO clients (client_id, name, email, phone)
+                VALUES (gen_random_uuid(), $1, NULL, NULL)
                 ON CONFLICT (email) DO NOTHING
                 """,
                 full_name,

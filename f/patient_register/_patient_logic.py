@@ -1,3 +1,5 @@
+from typing import cast
+
 from ..internal._result import DBClient, Result, fail, ok
 from ._patient_models import ClientResult, InputSchema
 
@@ -29,16 +31,16 @@ async def upsert_client(db: DBClient, input_data: InputSchema) -> Result[ClientR
                   email = COALESCE($2, email),
                   phone = COALESCE($3, phone),
                   telegram_chat_id = COALESCE($4, telegram_chat_id),
-                  timezone = $5,
+                  timezone_id = COALESCE($5, timezone_id),
                   updated_at = NOW()
                 WHERE client_id = $6::uuid
-                RETURNING client_id, name, email, phone, telegram_chat_id, timezone
+                RETURNING client_id, name, email, phone, telegram_chat_id, timezone_id
                 """,
                 input_data.name,
                 input_data.email,
                 input_data.phone,
                 input_data.telegram_chat_id,
-                input_data.timezone,
+                input_data.timezone_id,
                 existing_id,
             )
             created = False
@@ -46,15 +48,15 @@ async def upsert_client(db: DBClient, input_data: InputSchema) -> Result[ClientR
         else:
             insert_rows = await db.fetch(
                 """
-                INSERT INTO clients (name, email, phone, telegram_chat_id, timezone)
+                INSERT INTO clients (name, email, phone, telegram_chat_id, timezone_id)
                 VALUES ($1, $2, $3, $4, $5)
-                RETURNING client_id, name, email, phone, telegram_chat_id, timezone
+                RETURNING client_id, name, email, phone, telegram_chat_id, timezone_id
                 """,
                 input_data.name,
                 input_data.email,
                 input_data.phone,
                 input_data.telegram_chat_id,
-                input_data.timezone,
+                input_data.timezone_id,
             )
             created = True
             r = insert_rows[0]
@@ -66,7 +68,7 @@ async def upsert_client(db: DBClient, input_data: InputSchema) -> Result[ClientR
                 "email": str(r["email"]) if r.get("email") else None,
                 "phone": str(r["phone"]) if r.get("phone") else None,
                 "telegram_chat_id": str(r["telegram_chat_id"]) if r.get("telegram_chat_id") else None,
-                "timezone": str(r["timezone"]),
+                "timezone_id": cast("int | None", r.get("timezone_id")),
                 "created": created,
             }
         )

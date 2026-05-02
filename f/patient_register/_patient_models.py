@@ -11,7 +11,7 @@ class ClientResult(TypedDict):
     email: str | None
     phone: str | None
     telegram_chat_id: str | None
-    timezone: str
+    timezone_id: int | None
     created: bool
 
 
@@ -22,7 +22,7 @@ class InputSchema(BaseModel):
     email: EmailStr | None = None
     phone: str | None = Field(None, max_length=50)
     telegram_chat_id: str | None = None
-    timezone: str = DEFAULT_TIMEZONE
+    timezone_id: int | None = None
     idempotency_key: str | None = None
     provider_id: str | None = None
     client_id: str | None = None
