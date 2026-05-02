@@ -1236,7 +1236,6 @@
 - `f/internal/conversation_verify/main.script.yaml`
 - `f/internal/debug_db.script.yaml`
 - `f/internal/debug_db_final.script.yaml`
-- `f/internal/fix_provider_specialty_fk.script.yaml`
 - `f/internal/gcal_utils/__init__.script.yaml`
 - `f/internal/gcal_utils/_gcal_logic.script.yaml`
 - `f/internal/gcal_utils/_gcal_models.script.yaml`
