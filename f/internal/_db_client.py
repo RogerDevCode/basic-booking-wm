@@ -46,9 +46,9 @@ def _extract_dsn_kwargs(db_url: str) -> tuple[str, dict[str, object]]:
     """Strip asyncpg-specific params from DSN query string and return them separately."""
     from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
-    _ASYNCPG_PARAMS = frozenset({
-        "statement_cache_size", "max_cached_statement_lifetime", "max_cacheable_statement_size"
-    })
+    _ASYNCPG_PARAMS = frozenset(
+        {"statement_cache_size", "max_cached_statement_lifetime", "max_cacheable_statement_size"}
+    )
 
     parsed = urlparse(db_url)
     kwargs: dict[str, object] = {}

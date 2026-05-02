@@ -80,7 +80,7 @@ async def test_booking_cycle_cancel(mock_context: tuple[None, dict[str, Any]]) -
         args: dict[str, object] = {
             "telegram_chat_id": "123",
             "intent": "cancelar_cita",
-            "entities": {"booking_id": "550e8400-e29b-41d4-a716-446655440000"}
+            "entities": {"booking_id": "550e8400-e29b-41d4-a716-446655440000"},
         }
         err, result = await _main_async(args)
         assert err is None
@@ -113,7 +113,7 @@ async def test_booking_cycle_reschedule(mock_context: tuple[None, dict[str, Any]
         args: dict[str, object] = {
             "telegram_chat_id": "123",
             "intent": "reagendar_cita",
-            "entities": {"booking_id": "550e8400-e29b-41d4-a716-446655440000"}
+            "entities": {"booking_id": "550e8400-e29b-41d4-a716-446655440000"},
         }
         err, result = await _main_async(args)
         assert err is None

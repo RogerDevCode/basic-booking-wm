@@ -16,7 +16,7 @@ def _resolve_redis_url(injected_url: str | None = None) -> str | None:
     # 1. Injected parameter (highest priority)
     if injected_url:
         return injected_url
-        
+
     # 2. Local environment
     local_url = os.getenv("REDIS_URL")
     if local_url:

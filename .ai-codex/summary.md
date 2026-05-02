@@ -283,7 +283,7 @@
 - 🔧 `fn` `main` (L6)
 
 ### `f/flows/telegram_webhook__flow/Lógica_de_Eco_(Nodo_de_Validación).py`
-- 🔧 `fn` `main` (L14)
+- 🔧 `fn` `main` (L12)
 
 ### `f/flows/telegram_webhook__flow/Lógica_de_Eco_con_Contador_(Nodo_de_Validación).py`
 - 🔧 `fn` `main` (L6)
@@ -298,7 +298,7 @@
 - 🔧 `fn` `main` (L13)
 
 ### `f/flows/telegram_webhook__flow/lógica_de_eco_con_contador_(nodo_de_validación).py`
-- 🔧 `fn` `main` (L25)
+- 🔧 `fn` `main` (L22)
 
 ### `f/flows/telegram_webhook__flow/telegram_webhook_trigger.py`
 - 📦 `class` `TriggerOutput` (L8)
@@ -547,7 +547,7 @@
 - 🔧 `fn` `build_confirmation_keyboard` (L88)
 
 ### `f/internal/booking_prefetch/main.py`
-- 🔧 `fn` `main` (L128)
+- 🔧 `fn` `main` (L129)
 
 ### `f/internal/conversation_get/_conversation_models.py`
 - 📦 `class` `ConversationState` (L8)
@@ -618,7 +618,7 @@
 - 📦 `class` `OverrideValidation` (L62)
 
 ### `f/internal/seed_test_provider.py`
-- 🔧 `fn` `main` (L99)
+- 🔧 `fn` `main` (L97)
 
 ### `f/internal/telegram_classify/_classify_models.py`
 - 📦 `class` `TelegramClassifyInput` (L8)

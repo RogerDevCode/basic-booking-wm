@@ -119,23 +119,24 @@ def main(args: TelegramUpdate | dict[str, object]) -> dict[str, object]:
             validated = args
         else:
             validated = TelegramUpdate.model_validate(args)
-            
+
         result = asyncio.run(_main_async(validated.model_dump()))
-            
+
         if result is None:
             return {}
-        
+
         if isinstance(result, BaseModel):
             return result.model_dump()
         elif isinstance(result, dict):
             return result
         else:
             return {"data": result}
-            
+
     except Exception as e:
         tb = traceback.format_exc()
         try:
             from ..internal._wmill_adapter import log
+
             log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=MODULE)
         except Exception:
             pass

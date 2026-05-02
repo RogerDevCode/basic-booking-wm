@@ -77,6 +77,7 @@ def main(input_data: TelegramClassifyInput | dict[str, object]) -> dict[str, obj
         tb = traceback.format_exc()
         try:
             from .._wmill_adapter import log
+
             log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module="telegram_classify")
         except Exception:
             pass

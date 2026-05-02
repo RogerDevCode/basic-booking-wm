@@ -16,12 +16,10 @@ async def _main_async(args: dict[str, Any]) -> dict[str, Any]:
     pending_data = state.get("pending_data") or {}
     count = pending_data.get("echo_count", 0) + 1
 
-    return {
-        "text": f"ECO #{count}: {text}",
-        "chat_id": chat_id,
-        "new_count": count
-    }
+    return {"text": f"ECO #{count}: {text}", "chat_id": chat_id, "new_count": count}
+
 
 def main(args: dict[str, Any]) -> dict[str, Any]:
     import asyncio
+
     return asyncio.run(_main_async(args))

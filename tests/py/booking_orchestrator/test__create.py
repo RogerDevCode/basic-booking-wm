@@ -66,9 +66,7 @@ async def test_handle_create_booking_specialty_with_no_providers_excluded_from_b
 @pytest.mark.asyncio
 async def test_handle_create_booking_all_fields_present_calls_create_module() -> None:
     conn = AsyncMock()
-    input_data = _make_input(
-        provider_id="prov-1", service_id="svc-1", date="2026-05-10", time="09:00"
-    )
+    input_data = _make_input(provider_id="prov-1", service_id="svc-1", date="2026-05-10", time="09:00")
 
     with patch(
         "f.booking_orchestrator.handlers._create.create_booking",
@@ -86,9 +84,7 @@ async def test_handle_create_booking_all_fields_present_calls_create_module() ->
 @pytest.mark.asyncio
 async def test_handle_create_booking_create_failure_sets_success_false() -> None:
     conn = AsyncMock()
-    input_data = _make_input(
-        provider_id="prov-1", service_id="svc-1", date="2026-05-10", time="09:00"
-    )
+    input_data = _make_input(provider_id="prov-1", service_id="svc-1", date="2026-05-10", time="09:00")
 
     with patch(
         "f.booking_orchestrator.handlers._create.create_booking",

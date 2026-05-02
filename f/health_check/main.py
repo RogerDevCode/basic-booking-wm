@@ -91,25 +91,26 @@ def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
             validated = args
         else:
             validated = InputSchema.model_validate(args)
-            
+
         err, result = asyncio.run(_main_async(validated.model_dump()))
         if err:
             raise err
-            
+
         if result is None:
             return {}
-        
+
         if isinstance(result, BaseModel):
             return cast("dict[str, object]", result.model_dump())
         elif isinstance(result, dict):
             return cast("dict[str, object]", result)
         else:
             return {"data": result}
-            
+
     except Exception as e:
         tb = traceback.format_exc()
         try:
             from ..internal._wmill_adapter import log
+
             log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=MODULE)
         except Exception:
             pass

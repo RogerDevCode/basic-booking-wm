@@ -69,6 +69,7 @@ def main(input_data: TelegramNormalizeInput | dict[str, object]) -> dict[str, ob
         tb = traceback.format_exc()
         try:
             from .._wmill_adapter import log
+
             log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module="telegram_normalize")
         except Exception:
             pass
