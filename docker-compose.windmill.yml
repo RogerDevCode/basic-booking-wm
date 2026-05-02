@@ -27,6 +27,7 @@ services:
   db:
     image: postgres:17-alpine
     restart: unless-stopped
+    
     command: postgres -c fsync=off -c synchronous_commit=off -c full_page_writes=off -c random_page_cost=1.1
     deploy:
       resources:
@@ -66,8 +67,7 @@ services:
     logging: *default-logging
 
   windmill_server:
-    image: ${WM_IMAGE:-ghcr.io/windmill-labs/windmill:latest-python313}
-    pull_policy: always
+    image: ${WM_IMAGE:-ghcr.io/windmill-labs/windmill:1.693.3}
     deploy:
       replicas: 1
       resources:
@@ -99,6 +99,7 @@ services:
   # can run containers without accessing the host Docker socket.
   dind:
     image: docker:dind
+    command: ["--tls=false"]
     privileged: true
     restart: unless-stopped
     deploy:
@@ -124,8 +125,8 @@ services:
     logging: *default-logging
 
   windmill_worker:
-    image: ${WM_IMAGE:-ghcr.io/windmill-labs/windmill:latest-python313}
-    pull_policy: always
+    image: ${WM_IMAGE:-ghcr.io/windmill-labs/windmill:1.693.3}
+    
     deploy:
       replicas: 2
       resources:
@@ -161,8 +162,8 @@ services:
     logging: *default-logging
 
   windmill_worker_native:
-    image: ${WM_IMAGE:-ghcr.io/windmill-labs/windmill:latest-python313}
-    pull_policy: always
+    image: ${WM_IMAGE:-ghcr.io/windmill-labs/windmill:1.693.3}
+    
     deploy:
       replicas: 1
       resources:
@@ -178,6 +179,7 @@ services:
       - MODE=worker
       - WORKER_GROUP=native
       - NATIVE_MODE=true
+      - FAVOR_UNSHARE_PID=false
       - SLEEP_QUEUE=200
       - NUM_WORKERS=${NUM_WORKERS:-2}
     healthcheck:
@@ -191,8 +193,8 @@ services:
     logging: *default-logging
 
   windmill_indexer:
-    image: ${WM_IMAGE:-ghcr.io/windmill-labs/windmill:latest-python313}
-    pull_policy: always
+    image: ${WM_IMAGE:-ghcr.io/windmill-labs/windmill:1.693.3}
+    
     deploy:
       replicas: 0
     restart: unless-stopped
@@ -209,7 +211,7 @@ services:
 
   windmill_extra:
     image: ghcr.io/windmill-labs/windmill-extra:latest
-    pull_policy: always
+    
     restart: unless-stopped
     deploy:
       resources:
