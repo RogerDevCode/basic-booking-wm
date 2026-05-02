@@ -22,7 +22,10 @@ def _make_input(**kwargs: object) -> OrchestratorInput:
 @pytest.mark.asyncio
 async def test_handle_cancel_booking_no_id_delegates_to_get_my_bookings() -> None:
     conn = AsyncMock()
-    mock_result = (None, {"action": "mis_citas", "success": True, "data": [], "message": "📋 No tienes próximas citas."})
+    mock_result = (
+        None,
+        {"action": "mis_citas", "success": True, "data": [], "message": "📋 No tienes próximas citas."},
+    )
 
     with patch(
         "f.booking_orchestrator.handlers._cancel.handle_get_my_bookings",

@@ -1,9 +1,9 @@
-summary: Telegram Webhook - ECO MODE + REDIS (Phase 2 Reconstruction)
+summary: Telegram Webhook - Phase 3 (Normalize + Classify)
 description: >
-  Fase 2 de la reconstrucción incremental. 
+  Fase 3 de la reconstrucción incremental.
 
-  Añade nodos para obtener y actualizar el estado en Redis, implementando un
-  contador simple.
+  normalize → classify como pipeline de procesamiento de entrada.
+  classify expone should_process, text_kind y canonical_text para el router.
 value:
   modules:
     - id: webhook_trigger
@@ -31,36 +31,53 @@ value:
         path: f/internal/conversation_get/main
       skip_if:
         expr: '!results.webhook_trigger.chat_id'
-    - id: echo_logic
-      summary: Lógica de Eco con Contador (Nodo de Validación)
+    - id: normalize
+      summary: Normalizar input Telegram
       value:
-        type: rawscript
-        content: '!inline lógica_de_eco_con_contador_(nodo_de_validación).py'
+        type: script
         input_transforms:
-          args:
+          input_data:
             type: javascript
-            expr: '{ "chat_id": results.webhook_trigger.chat_id, "text":
-              results.webhook_trigger.text, "state":
-              results.get_conversation_state.data }'
-        lock: '!inline lógica_de_eco_con_contador_(nodo_de_validación).lock'
-        language: python3
+            expr: >-
+              { "chat_id": results.webhook_trigger.chat_id, "text":
+              results.webhook_trigger.text, "username":
+              results.webhook_trigger.username, "callback_data":
+              results.webhook_trigger.callback_data, "callback_query_id":
+              results.webhook_trigger.callback_query_id, "callback_message_id":
+              results.webhook_trigger.callback_message_id }
+        path: f/internal/telegram_normalize/main
+      skip_if:
+        expr: '!results.webhook_trigger.chat_id'
+    - id: classify
+      summary: Clasificar input normalizado
+      value:
+        type: script
+        input_transforms:
+          input_data:
+            type: javascript
+            expr: results.normalize
+        path: f/internal/telegram_classify/main
+      skip_if:
+        expr: '!results.normalize.chat_id'
     - id: update_conversation_state
-      summary: Guardar nuevo contador en Redis
+      summary: Guardar clasificación en Redis
       value:
         type: script
         input_transforms:
           args:
             type: javascript
-            expr: '{ "chat_id": results.echo_logic.chat_id, "pending_data": { "echo_count":
-              results.echo_logic.new_count } }'
+            expr: >-
+              { "chat_id": results.classify.chat_id, "pending_data":
+              { "should_process": results.classify.should_process,
+              "text_kind": results.classify.text_kind } }
           redis_url:
             type: javascript
             expr: variable("u/admin/REDIS_URL")
         path: f/internal/conversation_update/main
       skip_if:
-        expr: '!results.echo_logic.chat_id'
+        expr: '!results.classify.chat_id'
     - id: send_telegram_response
-      summary: Enviar Eco a Telegram
+      summary: Enviar respuesta a Telegram
       value:
         type: script
         input_transforms:
@@ -69,13 +86,17 @@ value:
             expr: variable("u/admin/TELEGRAM_BOT_TOKEN")
           chat_id:
             type: javascript
-            expr: results.echo_logic.chat_id
+            expr: results.classify.chat_id
           mode:
             type: static
             value: send_message
           text:
             type: javascript
-            expr: results.echo_logic.text
+            expr: >-
+              results.classify.should_process
+              ? ("[" + results.classify.text_kind + "] " +
+              results.classify.canonical_text)
+              : ("No procesable [" + results.classify.text_kind + "]")
         path: f/telegram_send/main
       skip_if:
-        expr: '!results.echo_logic.chat_id'
+        expr: '!results.classify.chat_id'
