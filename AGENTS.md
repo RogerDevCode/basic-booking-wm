@@ -25,7 +25,9 @@ LAW-10  NO SIDE-EFFECTS @ TOP LEVEL
 
 ## STACK
 
-PYTHON: 3.13 (MANDATORY)
+PYTHON: 3.13 (MANDATORY EXCLUSIVITY)  
+- Absolutely NO Python 3.12 references allowed.
+- All libraries, packages, scripts, locks, and environment logic MUST assume and require Python 3.13.
 PKG   : uv  
 LINT  : ruff  
 TYPE  : mypy + pyright  

@@ -92,7 +92,7 @@ def main(
     parse_mode: str | None = None,
     inline_buttons_json: str | None = None,
     message_id: int | None = None,
-) -> TelegramSendData | None:
+) -> dict[str, object]:
     import asyncio
     import json
 
@@ -123,8 +123,9 @@ def main(
         err, result = asyncio.run(_main_async(args))
         if err:
             raise err
-        # Ensure it returns the data model
-        return result
+        if result is None:
+            return {"sent": False, "mode": mode, "message_id": None, "chat_id": None}
+        return cast("dict[str, object]", result.model_dump())
     except Exception as e:
         tb = traceback.format_exc()
         try:

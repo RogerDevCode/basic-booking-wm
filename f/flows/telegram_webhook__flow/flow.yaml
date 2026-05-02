@@ -1,7 +1,9 @@
 summary: Telegram Webhook - ECO MODE + REDIS (Phase 2 Reconstruction)
-description: |
+description: >
   Fase 2 de la reconstrucción incremental. 
-  Añade nodos para obtener y actualizar el estado en Redis, implementando un contador simple.
+
+  Añade nodos para obtener y actualizar el estado en Redis, implementando un
+  contador simple.
 value:
   modules:
     - id: webhook_trigger
@@ -12,7 +14,7 @@ value:
         input_transforms:
           webhook_payload:
             type: javascript
-            expr: 'flow_input'
+            expr: flow_input
         lock: '!inline telegram_webhook_trigger.lock'
         language: python3
     - id: get_conversation_state
@@ -33,32 +35,14 @@ value:
       summary: Lógica de Eco con Contador (Nodo de Validación)
       value:
         type: rawscript
-        content: |
-          from __future__ import annotations
-          from typing import Any
-
-          async def _main_async(args: dict[str, Any]) -> dict[str, Any]:
-              chat_id = args.get("chat_id")
-              text = args.get("text") or "Sin texto"
-              state = args.get("state") or {}
-              
-              # Extract counter from state or initialize to 0
-              pending_data = state.get("pending_data") or {}
-              count = pending_data.get("echo_count", 0) + 1
-              
-              return {
-                  "text": f"ECO #{count}: {text}",
-                  "chat_id": chat_id,
-                  "new_count": count
-              }
-
-          def main(args: dict[str, Any]) -> dict[str, Any]:
-              import asyncio
-              return asyncio.run(_main_async(args))
+        content: '!inline lógica_de_eco_con_contador_(nodo_de_validación).py'
         input_transforms:
           args:
             type: javascript
-            expr: '{ "chat_id": results.webhook_trigger.chat_id, "text": results.webhook_trigger.text, "state": results.get_conversation_state.data }'
+            expr: '{ "chat_id": results.webhook_trigger.chat_id, "text":
+              results.webhook_trigger.text, "state":
+              results.get_conversation_state.data }'
+        lock: '!inline lógica_de_eco_con_contador_(nodo_de_validación).lock'
         language: python3
     - id: update_conversation_state
       summary: Guardar nuevo contador en Redis
@@ -67,7 +51,8 @@ value:
         input_transforms:
           args:
             type: javascript
-            expr: '{ "chat_id": results.echo_logic.chat_id, "pending_data": { "echo_count": results.echo_logic.new_count } }'
+            expr: '{ "chat_id": results.echo_logic.chat_id, "pending_data": { "echo_count":
+              results.echo_logic.new_count } }'
           redis_url:
             type: javascript
             expr: variable("u/admin/REDIS_URL")
