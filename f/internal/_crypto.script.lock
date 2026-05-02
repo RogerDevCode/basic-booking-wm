@@ -1,4 +1,0 @@
-# py: 3.13
-cffi==2.0.0
-cryptography==47.0.0
-pycparser==3.0

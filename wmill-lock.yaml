@@ -221,6 +221,7 @@ locks:
   f/internal/booking_fsm/machine: a3145ad8ca815d948483bd48d67df6004c8cde245142d881a0861c8c470d90bf
   f/internal/booking_fsm/responses: b6a83ac4315782995921010ec0905043310611df48020f28403a490dd4801069
   f/internal/booking_fsm/types: 9e714b61dd0c9a5eb3078328cdc37ed88f092aa0b513d7c94de5727f3d7468f1
+  f/internal/booking_prefetch/main: eba73dc1ab55856cb47f17cae2c6d5cb8cc75bb70664c7ef7a1e32e5ac0946a0
   f/internal/cache/index: 13a3060860dfe8ae33e29ee19d1c825f14e3aaf38422094ad0f397f17ced9993
   f/internal/config/index: 641378f929c9896d042634242d5275148e458eeff7b9ee7130ce3b8c2bf837b6
   f/internal/conversation_get/main: a2ce81f59f34ff4b70dfd1a70a6e6c4606ca1aa5b367e791f7a42ca39fc30e29
@@ -255,6 +256,7 @@ locks:
   f/internal/scheduling_engine/_scheduling_logic: 635ec2e681e70ee2497046cac59d57ca8f89cb0b6fcb11fe6b0ca9c6d7934466
   f/internal/scheduling_engine/_scheduling_models: ba17dc0e46b022c7e5cfc6c76064135785430187b0da26cba8a71c1fee53ef88
   f/internal/scheduling-engine/index: 0258265d9d6383312334ea2bb74cd9e666519ceb36a3cafa6d9ace888dd38498
+  f/internal/seed_test_provider: 74355e2ec9727b1ad45903d8b1d9508c9d6b95d2d1bbc5568103b6083d08333d
   f/internal/state-machine/index: 1136ac6a039a22282cab2a744f186e9422a8073a247d0ad3f8bd292e44f54ca3
   f/internal/telegram_bubble/formatResponse: 4b4cd3a01c26ab73023626555d1e62507f298e674dd6483257b21b32ceb6fff3
   f/internal/telegram_bubble/main: 57764c4ac311e9ea04cdfd2ea62d8318316b2cb7ee57f4c623f3b33a02d2feba
@@ -263,6 +265,7 @@ locks:
   f/internal/telegram_bubble/wizard-bubble: 6e52716cc42bd8b85b912bbf2eaa132f9f1d47852cf9e284b3ff04f5070421db
   f/internal/telegram_classify/_classify_models: 99f599481d90dca46493128682a785d2aefb75053b718b7289a121cef3e53f7c
   f/internal/telegram_classify/main: 4f7c3b6ce9e6f8dd2ecff0ca7bab2bf286a500b71989a638c0f53b4df7f564f6
+  f/internal/telegram_deduplicate/main: d11fce9607b4cb5015b0179d8c4f4356f901559df81da5f7f15390d50db82b41
   f/internal/telegram_normalize/_normalize_models: e96581d198c0dcbb0a17b895e2edceee9fc2875c58b05a1ff83d177478e0414f
   f/internal/telegram_normalize/main: a1a4b5d71af9c0543aa4a9ae83e2f04ff3628e68bc4844944bd49d5d6c014e3c
   f/internal/telegram_router/booking-wizard: ec32a888c93dbf6cfa20c2d088120febe0d72a356cfe0094d1376b2ee410a88a
