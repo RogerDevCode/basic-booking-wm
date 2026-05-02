@@ -8,3 +8,28 @@ repos:
         always_run: true
         pass_filenames: false
         stages: [pre-commit]
+
+  # Ruff linter
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.9.0
+    hooks:
+      - id: ruff
+        name: "Ruff Check"
+        args: [ --fix, --exit-non-zero-on-fix ]
+
+  # Ruff formatter
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.9.0
+    hooks:
+      - id: ruff-format
+        name: "Ruff Format"
+
+  # Mypy strict type checking via local uv environment
+  - repo: local
+    hooks:
+      - id: mypy-strict
+        name: "Mypy Strict"
+        entry: uv run mypy --strict .
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]
