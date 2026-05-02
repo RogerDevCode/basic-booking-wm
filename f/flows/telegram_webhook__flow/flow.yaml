@@ -90,6 +90,9 @@ value:
           booking_draft:
             type: javascript
             expr: results.get_conversation_state.data?.booking_draft || null
+          user_input:
+            type: javascript
+            expr: results.classify.canonical_text || null
         path: f/internal/booking_prefetch/main
       skip_if:
         expr: '!results.classify.chat_id || results.telegram_deduplicate.duplicate'

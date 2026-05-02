@@ -4,8 +4,6 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
-from ..internal._config import DEFAULT_TIMEZONE
-
 
 class InputSchema(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")

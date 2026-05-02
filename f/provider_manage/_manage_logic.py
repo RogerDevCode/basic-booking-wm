@@ -60,7 +60,8 @@ async def handle_provider_actions(db: DBClient, input_data: InputSchema) -> Resu
 
     elif action == "list_providers":
         rows = await db.fetch(
-            "SELECT provider_id, name, email, phone, specialty_id, timezone_id, is_active FROM providers ORDER BY name ASC"
+            "SELECT provider_id, name, email, phone, specialty_id, timezone_id, is_active "
+            "FROM providers ORDER BY name ASC"
         )
         res_list: dict[str, object] = {"providers": [dict(r) for r in rows]}
         return ok(res_list)

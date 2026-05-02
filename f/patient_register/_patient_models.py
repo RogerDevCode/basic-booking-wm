@@ -2,8 +2,6 @@ from typing import TypedDict
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
-from f.internal._config import DEFAULT_TIMEZONE
-
 
 class ClientResult(TypedDict):
     client_id: str

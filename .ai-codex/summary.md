@@ -547,7 +547,7 @@
 - 🔧 `fn` `build_confirmation_keyboard` (L88)
 
 ### `f/internal/booking_prefetch/main.py`
-- 🔧 `fn` `main` (L99)
+- 🔧 `fn` `main` (L128)
 
 ### `f/internal/conversation_get/_conversation_models.py`
 - 📦 `class` `ConversationState` (L8)
@@ -618,7 +618,7 @@
 - 📦 `class` `OverrideValidation` (L62)
 
 ### `f/internal/seed_test_provider.py`
-- 🔧 `fn` `main` (L98)
+- 🔧 `fn` `main` (L99)
 
 ### `f/internal/telegram_classify/_classify_models.py`
 - 📦 `class` `TelegramClassifyInput` (L8)
@@ -691,8 +691,8 @@
 - ⚡ `async_fn` `upsert_client` (L7)
 
 ### `f/patient_register/_patient_models.py`
-- 📦 `class` `ClientResult` (L8)
-- 📦 `class` `InputSchema` (L18)
+- 📦 `class` `ClientResult` (L6)
+- 📦 `class` `InputSchema` (L16)
 
 ### `f/patient_register/main.py`
 - ⚡ `async_fn` `operation` (L54)
@@ -715,12 +715,12 @@
 
 ### `f/provider_manage/_manage_logic.py`
 - ⚡ `async_fn` `handle_provider_actions` (L11)
-- ⚡ `async_fn` `handle_service_actions` (L71)
-- ⚡ `async_fn` `handle_schedule_actions` (L141)
-- ⚡ `async_fn` `handle_override_actions` (L180)
+- ⚡ `async_fn` `handle_service_actions` (L72)
+- ⚡ `async_fn` `handle_schedule_actions` (L142)
+- ⚡ `async_fn` `handle_override_actions` (L181)
 
 ### `f/provider_manage/_manage_models.py`
-- 📦 `class` `InputSchema` (L10)
+- 📦 `class` `InputSchema` (L8)
 
 ### `f/provider_manage/main.py`
 - ⚡ `async_fn` `operation` (L55)
