@@ -1,4 +1,4 @@
-# py: 3.12
+# py: 3.13
 annotated-types==0.7.0
 asyncpg==0.31.0
 pydantic==2.13.3
