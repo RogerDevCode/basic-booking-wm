@@ -153,6 +153,7 @@ services:
       - DATABASE_URL=postgresql://windmill:windmill@db:5432/windmill?sslmode=disable&application_name=windmill&statement_cache_size=0
       - MODE=worker
       - WORKER_GROUP=default
+      - NATIVE_MODE=true
       - FAVOR_UNSHARE_PID=false
       - DOCKER_HOST=tcp://dind:2375
       - WORKER_TAGS=bun,python3,bash
