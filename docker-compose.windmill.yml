@@ -64,6 +64,12 @@ services:
           memory: 256M
         reservations:
           memory: 128M
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     logging: *default-logging
 
   windmill_server:
@@ -76,6 +82,8 @@ services:
         reservations:
           memory: 1024M
     restart: unless-stopped
+    env_file:
+      - .env
     expose:
       - 8000
       - 2525
@@ -83,8 +91,11 @@ services:
       - DATABASE_URL=postgresql://windmill:windmill@db:5432/windmill?sslmode=disable&application_name=windmill&statement_cache_size=0
       - MODE=server
       - SERVER_TIMEOUT_SECS=600
-      - WINDMILL_BASE_URL=https://titanium.stax.ink
+      - WINDMILL_BASE_URL=${WM_BASE_URL:-https://titanium.stax.ink}
       - DENO_AUTH_TOKENS=${DENO_AUTH_TOKENS:-}
+      - WM_GIT_REPO=${WM_GIT_REPO:-}
+      - WM_GIT_BRANCH=${WM_GIT_BRANCH:-main}
+      - WM_GIT_SYNC_INTERVAL=${WM_GIT_SYNC_INTERVAL:-60}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/version"]
       interval: 30s
@@ -148,7 +159,13 @@ services:
       - NUM_WORKERS=${NUM_WORKERS:-50}
       - SLEEP_QUEUE=2000
     depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
       dind:
+        condition: service_healthy
+      windmill_server:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://windmill_server:8000/api/version"]
@@ -163,7 +180,7 @@ services:
 
   windmill_worker_native:
     image: ${WM_IMAGE:-ghcr.io/windmill-labs/windmill:1.693.3}
-    
+
     deploy:
       replicas: 1
       resources:
@@ -172,6 +189,7 @@ services:
         reservations:
           memory: 1024M
     restart: unless-stopped
+    privileged: true
     env_file:
       - .env
     environment:
@@ -182,6 +200,13 @@ services:
       - FAVOR_UNSHARE_PID=false
       - SLEEP_QUEUE=200
       - NUM_WORKERS=${NUM_WORKERS:-2}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      windmill_server:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://windmill_server:8000/api/version"]
       interval: 60s
@@ -220,6 +245,7 @@ services:
         reservations:
           memory: 512M
     expose:
+      - 3000
       - 3001
       - 3002
       - 3003
@@ -273,7 +299,6 @@ volumes:
   db_data: null
   worker_dependency_cache: null
   worker_logs: null
-  worker_memory: null
   windmill_index: null
   lsp_cache: null
   caddy_data: null

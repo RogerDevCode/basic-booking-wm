@@ -1,0 +1,12 @@
+summary: Clasificar mensaje normalizado de Telegram
+description: Aplica una clasificación semántica mínima al mensaje normalizado
+  para preparar el reingreso futuro de router, FSM e IA.
+lock: '!inline f/internal/telegram_classify/main.script.lock'
+schema:
+  properties:
+    input_data:
+      type: object
+      description: ''
+      default: null
+  required:
+    - input_data

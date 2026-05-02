@@ -1,0 +1,12 @@
+summary: Normalizar mensaje entrante de Telegram
+description: Convierte la salida del trigger en un contrato canónico y decide si
+  el flujo debe procesar el evento.
+lock: '!inline f/internal/telegram_normalize/main.script.lock'
+schema:
+  properties:
+    input_data:
+      type: object
+      description: ''
+      default: null
+  required:
+    - input_data

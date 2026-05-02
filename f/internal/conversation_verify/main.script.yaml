@@ -1,0 +1,12 @@
+summary: Verificar estado persistido en Redis
+description: Relee el estado persistido y valida que el contador de eco coincida
+  con el valor esperado antes de continuar el flujo.
+lock: '!inline f/internal/conversation_verify/main.script.lock'
+schema:
+  properties:
+    input_data:
+      type: object
+      description: ''
+      default: null
+  required:
+    - input_data
