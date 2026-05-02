@@ -10,6 +10,7 @@ class TriggerOutput(BaseModel):
     chat_id: str
     text: str
     username: str
+    update_id: int | None = None
     callback_data: str | None = None
     callback_query_id: str | None = None
     callback_message_id: int | None = None
@@ -27,6 +28,9 @@ async def _main_async(webhook_payload: dict[str, Any]) -> dict[str, Any]:
             if key in webhook_payload and isinstance(webhook_payload[key], dict):
                 payload = webhook_payload[key]
                 break
+
+    update_id_raw = payload.get("update_id")
+    update_id = int(update_id_raw) if isinstance(update_id_raw, int) else None
 
     message = payload.get("message", {})
     callback_query = payload.get("callback_query", {})
@@ -54,6 +58,7 @@ async def _main_async(webhook_payload: dict[str, Any]) -> dict[str, Any]:
         "chat_id": chat_id,
         "text": text,
         "username": username,
+        "update_id": update_id,
         "callback_data": callback_data,
         "callback_query_id": callback_query_id,
         "callback_message_id": callback_message_id,

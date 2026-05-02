@@ -26,8 +26,8 @@ class InputSchema(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=200)
     email: EmailStr | None = None
     phone: str | None = Field(None, max_length=50)
-    specialty: str | None = Field(None, max_length=100)
-    timezone: str | None = DEFAULT_TIMEZONE
+    specialty_id: str | None = None
+    timezone_id: int | None = None
     is_active: bool | None = None
     service_id: str | None = None
     service_name: str | None = Field(None, max_length=200)

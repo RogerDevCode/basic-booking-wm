@@ -32,7 +32,7 @@ async def handle_get_my_bookings(conn: DBClient, input_data: OrchestratorInput) 
         rows = await conn.fetch(
             """
             SELECT b.booking_id, b.status, b.start_time,
-                   p.name as provider_name, p.specialty, s.name as service_name
+                   p.name as provider_name, s.name as service_name
             FROM bookings b
             JOIN providers p ON p.provider_id = b.provider_id
             JOIN services s ON s.service_id = b.service_id

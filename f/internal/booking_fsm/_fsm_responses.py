@@ -21,19 +21,26 @@ def build_header(error: str | None = None) -> str:
 
 def build_specialty_prompt(items: list[NamedItem], error: str | None = None) -> str:
     header = build_header(error)
-    return f"{header}Selecciona la especialidad que necesitas:"
+    if not items:
+        return f"{header}Lo sentimos, el sistema está temporalmente en mantenimiento. Intenta más tarde. 🛠️"
+    lines = "\n".join(f"{i + 1}. {it['name']}" for i, it in enumerate(items))
+    return f"{header}Selecciona la especialidad que necesitas:\n\n{lines}"
 
 
 def build_doctors_prompt(specialty_name: str, items: list[NamedItem], error: str | None = None) -> str:
-    # specialty_name unused but kept for signature consistency
     header = build_header(error)
-    return f"{header}¿Con qué doctor deseas tu cita?"
+    if not items:
+        return f"{header}No hay doctores disponibles en este momento para esa especialidad. 🛠️"
+    lines = "\n".join(f"{i + 1}. {it['name']}" for i, it in enumerate(items))
+    return f"{header}¿Con qué doctor deseas tu cita?\n\n{lines}"
 
 
 def build_slots_prompt(doctor_name: str, items: list[TimeSlotItem], error: str | None = None) -> str:
-    # doctor_name unused but kept for signature consistency
     header = build_header(error)
-    return f"{header}¿Qué horario prefieres?"
+    if not items:
+        return f"{header}No hay horarios disponibles en este momento. 🛠️"
+    lines = "\n".join(f"{i + 1}. {it['label']}" for i, it in enumerate(items))
+    return f"{header}¿Qué horario prefieres?\n\n{lines}"
 
 
 def build_confirmation_prompt(time_label: str, doctor_name: str, extra: str | None = None) -> str:

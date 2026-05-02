@@ -11,6 +11,7 @@ class RouterInput(BaseModel):
     chat_id: str
     user_input: str
     state: dict[str, Any] | None = None
+    items: list[dict[str, Any]] | None = None
 
 
 class RouterResult(BaseModel):
@@ -20,3 +21,4 @@ class RouterResult(BaseModel):
     nextState: dict[str, Any] | None = None
     nextDraft: dict[str, Any] | None = None
     inline_buttons: list[dict[str, Any]] | None = None
+    active_flow: str | None = None

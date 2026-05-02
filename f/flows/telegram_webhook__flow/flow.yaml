@@ -1,9 +1,9 @@
-summary: Telegram Webhook - Phase 3 (Normalize + Classify)
+summary: Telegram Webhook - Phase 3 (Deduplicate + Normalize + Classify + Prefetch + Router)
 description: >
-  Fase 3 de la reconstrucción incremental.
-
-  normalize → classify como pipeline de procesamiento de entrada.
-  classify expone should_process, text_kind y canonical_text para el router.
+  Fase 3 completa: deduplicate → normalize → classify → prefetch → router FSM.
+  booking_prefetch carga especialidades/doctores de DB antes del router.
+  El router aplica transiciones FSM con datos reales.
+  Si no maneja (handled=false), responde con fallback informativo.
 value:
   modules:
     - id: webhook_trigger
@@ -17,6 +17,23 @@ value:
             expr: flow_input
         lock: '!inline telegram_webhook_trigger.lock'
         language: python3
+    - id: telegram_deduplicate
+      summary: Deduplicar webhook por update_id
+      value:
+        type: script
+        input_transforms:
+          update_id:
+            type: javascript
+            expr: results.webhook_trigger.update_id
+          chat_id:
+            type: javascript
+            expr: results.webhook_trigger.chat_id
+          redis_url:
+            type: javascript
+            expr: variable("u/admin/REDIS_URL")
+        path: f/internal/telegram_deduplicate/main
+      skip_if:
+        expr: '!results.webhook_trigger.chat_id'
     - id: get_conversation_state
       summary: Obtener estado conversacional de Redis
       value:
@@ -30,7 +47,7 @@ value:
             expr: variable("u/admin/REDIS_URL")
         path: f/internal/conversation_get/main
       skip_if:
-        expr: '!results.webhook_trigger.chat_id'
+        expr: '!results.webhook_trigger.chat_id || results.telegram_deduplicate.duplicate'
     - id: normalize
       summary: Normalizar input Telegram
       value:
@@ -47,7 +64,7 @@ value:
               results.webhook_trigger.callback_message_id }
         path: f/internal/telegram_normalize/main
       skip_if:
-        expr: '!results.webhook_trigger.chat_id'
+        expr: '!results.webhook_trigger.chat_id || results.telegram_deduplicate.duplicate'
     - id: classify
       summary: Clasificar input normalizado
       value:
@@ -58,24 +75,58 @@ value:
             expr: results.normalize
         path: f/internal/telegram_classify/main
       skip_if:
-        expr: '!results.normalize.chat_id'
-    - id: update_conversation_state
-      summary: Guardar clasificación en Redis
+        expr: '!results.normalize.chat_id || results.telegram_deduplicate.duplicate'
+    - id: booking_prefetch
+      summary: Pre-fetch especialidades/doctores segun estado FSM actual
+      value:
+        type: script
+        input_transforms:
+          pg_url:
+            type: javascript
+            expr: variable("u/admin/DATABASE_URL")
+          booking_state:
+            type: javascript
+            expr: results.get_conversation_state.data?.booking_state || null
+          booking_draft:
+            type: javascript
+            expr: results.get_conversation_state.data?.booking_draft || null
+        path: f/internal/booking_prefetch/main
+      skip_if:
+        expr: '!results.classify.chat_id || results.telegram_deduplicate.duplicate'
+    - id: router
+      summary: Enrutar via FSM de booking
       value:
         type: script
         input_transforms:
           args:
             type: javascript
             expr: >-
-              { "chat_id": results.classify.chat_id, "pending_data":
-              { "should_process": results.classify.should_process,
+              { "chat_id": results.classify.chat_id, "user_input":
+              results.classify.canonical_text, "state":
+              results.get_conversation_state.data || {}, "items":
+              results.booking_prefetch.items || [] }
+        path: f/internal/telegram_router/main
+      skip_if:
+        expr: '!results.classify.chat_id || results.telegram_deduplicate.duplicate'
+    - id: update_conversation_state
+      summary: Persistir nuevo estado en Redis
+      value:
+        type: script
+        input_transforms:
+          args:
+            type: javascript
+            expr: >-
+              { "chat_id": results.classify.chat_id, "booking_state":
+              results.router.data.nextState, "active_flow":
+              results.router.data.active_flow || null, "pending_data":
+              { "router_handled": results.router.data.handled,
               "text_kind": results.classify.text_kind } }
           redis_url:
             type: javascript
             expr: variable("u/admin/REDIS_URL")
         path: f/internal/conversation_update/main
       skip_if:
-        expr: '!results.classify.chat_id'
+        expr: '!results.classify.chat_id || results.telegram_deduplicate.duplicate'
     - id: send_telegram_response
       summary: Enviar respuesta a Telegram
       value:
@@ -93,10 +144,10 @@ value:
           text:
             type: javascript
             expr: >-
-              results.classify.should_process
-              ? ("[" + results.classify.text_kind + "] " +
+              (results.router.data.handled && results.router.data.response_text)
+              ? results.router.data.response_text
+              : ("[no_manejado:" + results.classify.text_kind + "] " +
               results.classify.canonical_text)
-              : ("No procesable [" + results.classify.text_kind + "]")
         path: f/telegram_send/main
       skip_if:
-        expr: '!results.classify.chat_id'
+        expr: '!results.classify.chat_id || results.telegram_deduplicate.duplicate'

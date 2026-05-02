@@ -42,16 +42,16 @@ async def handle_provider_actions(db: DBClient, input_data: InputSchema) -> Resu
             UPDATE providers
             SET name = COALESCE($1, name),
                 phone = COALESCE($2, phone),
-                specialty = COALESCE($3, specialty),
-                timezone = COALESCE($4, timezone),
+                specialty_id = COALESCE($3::uuid, specialty_id),
+                timezone_id = COALESCE($4, timezone_id),
                 is_active = COALESCE($5, is_active),
                 updated_at = NOW()
             WHERE provider_id = $6::uuid
             """,
             input_data.name,
             input_data.phone,
-            input_data.specialty,
-            input_data.timezone,
+            input_data.specialty_id,
+            input_data.timezone_id,
             input_data.is_active,
             input_data.provider_id,
         )
@@ -60,7 +60,7 @@ async def handle_provider_actions(db: DBClient, input_data: InputSchema) -> Resu
 
     elif action == "list_providers":
         rows = await db.fetch(
-            "SELECT provider_id, name, email, phone, specialty, timezone, is_active FROM providers ORDER BY name ASC"
+            "SELECT provider_id, name, email, phone, specialty_id, timezone_id, is_active FROM providers ORDER BY name ASC"
         )
         res_list: dict[str, object] = {"providers": [dict(r) for r in rows]}
         return ok(res_list)

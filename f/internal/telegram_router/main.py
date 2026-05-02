@@ -33,10 +33,23 @@ async def _route(input_data: RouterInput) -> Result[RouterResult, str]:
     state_dict = input_data.state or {}
     active_flow = cast("str | None", state_dict.get("active_flow"))
 
-    # If no active flow and user input is not a command/callback that starts one,
-    # then we don't handle it (AI Agent will)
     user_input = input_data.user_input
     is_callback = ":" in user_input or user_input in ["back", "cancel", "cfm:yes", "cfm:no"]
+
+    # Handle /start — initialize booking flow regardless of current state
+    if user_input.strip() == "/start":
+        return Success(
+            RouterResult(
+                handled=True,
+                active_flow="booking",
+                nextState={"name": "idle"},
+                response_text=(
+                    "¡Hola! Soy tu asistente de reservas.\n\n"
+                    "Puedo ayudarte a *agendar*, *consultar* o *cancelar* una cita.\n\n"
+                    "¿Qué deseas hacer hoy?"
+                ),
+            )
+        )
 
     if not active_flow and not is_callback:
         return Success(RouterResult(handled=False))
@@ -61,8 +74,9 @@ async def _route(input_data: RouterInput) -> Result[RouterResult, str]:
         if not action:
             return Success(RouterResult(handled=False))
 
-        # 4. Apply transition
-        err, outcome = apply_transition(current_state, action, draft)
+        # 4. Apply transition — pass pre-fetched items if available
+        prefetched_items = list(input_data.items) if input_data.items is not None else None
+        err, outcome = apply_transition(current_state, action, draft, items=prefetched_items)
 
         if err:
             log("FSM_TRANSITION_ERROR", error=str(err), chat_id=input_data.chat_id)

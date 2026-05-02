@@ -24,7 +24,7 @@ async def test_provider_manage_update_success() -> None:
         patch("f.provider_manage.main.create_db_client", return_value=mock_db),
         patch("f.provider_manage.main.with_tenant_context", side_effect=mock_with_tenant),
     ):
-        args: dict[str, Any] = {"action": "update_provider", "provider_id": VALID_ID, "name": "Updated Name"}
+        args: dict[str, Any] = {"action": "update_provider", "provider_id": VALID_ID, "name": "Updated Name", "specialty_id": VALID_ID}
 
         err, result = await main(args)
 
