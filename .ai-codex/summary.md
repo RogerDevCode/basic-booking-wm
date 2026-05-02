@@ -297,6 +297,9 @@
 ### `f/flows/telegram_webhook__flow/gates/skip_if_router_handled.py`
 - 🔧 `fn` `main` (L13)
 
+### `f/flows/telegram_webhook__flow/lógica_de_eco_con_contador_(nodo_de_validación).py`
+- 🔧 `fn` `main` (L23)
+
 ### `f/flows/telegram_webhook__flow/telegram_webhook_trigger.py`
 - 📦 `class` `TriggerOutput` (L8)
 - 🔧 `fn` `main` (L63)
