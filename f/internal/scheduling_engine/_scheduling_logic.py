@@ -88,19 +88,20 @@ async def get_availability(db: DBClient, query: AvailabilityQuery) -> Result[Ava
     try:
         # Determine day of week (0=Sun, ..., 6=Sat) to match Postgres
         dt = datetime.fromisoformat(target_date)
+        dt_date = dt.date()  # asyncpg requires date objects, not strings, for ::date params
         day_of_week = dt.isoweekday() % 7
 
         # 1. Layer 2: Overrides
         override_rows = await db.fetch(
             """
-            SELECT override_id, provider_id, override_date, is_blocked, 
+            SELECT override_id, provider_id, override_date, is_blocked,
                    start_time::text, end_time::text, reason
             FROM schedule_overrides
             WHERE provider_id = $1::uuid
-              AND override_date = $2::date
+              AND override_date = $2
             """,
             query["provider_id"],
-            target_date,
+            dt_date,
         )
 
         overrides = cast("list[ScheduleOverrideRow]", override_rows)
@@ -139,12 +140,11 @@ async def get_availability(db: DBClient, query: AvailabilityQuery) -> Result[Ava
         else:
             rule_rows = await db.fetch(
                 """
-                SELECT schedule_id as id, provider_id, day_of_week, 
+                SELECT id, provider_id, day_of_week,
                        start_time::text, end_time::text
                 FROM provider_schedules
                 WHERE provider_id = $1::uuid
                   AND day_of_week = $2
-                  AND is_active = True
                 """,
                 query["provider_id"],
                 day_of_week,
@@ -170,12 +170,12 @@ async def get_availability(db: DBClient, query: AvailabilityQuery) -> Result[Ava
             """
             SELECT start_time, end_time FROM bookings
             WHERE provider_id = $1::uuid
-              AND start_time >= $2::date
-              AND start_time < ($2::date + INTERVAL '1 day')
+              AND start_time >= $2
+              AND start_time < ($2 + INTERVAL '1 day')
               AND status NOT IN ('cancelled', 'no_show', 'rescheduled')
             """,
             query["provider_id"],
-            target_date,
+            dt_date,
         )
         bookings = cast("list[BookingTimeRow]", booking_rows)
 

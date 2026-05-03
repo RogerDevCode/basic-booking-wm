@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date, time
 from typing import TYPE_CHECKING
 
 from ..internal._result import DBClient, Result, fail, ok
@@ -149,6 +150,13 @@ async def handle_schedule_actions(db: DBClient, input_data: InputSchema) -> Resu
             or not input_data.end_time
         ):
             return fail("MISSING_FIELDS: provider_id, day_of_week, start_time, end_time are required")
+
+        try:
+            t_start = time.fromisoformat(input_data.start_time)
+            t_end = time.fromisoformat(input_data.end_time)
+        except ValueError:
+            return fail("INVALID_TIME_FORMAT")
+
         await db.execute(
             """
             INSERT INTO provider_schedules (provider_id, day_of_week, start_time, end_time, is_active)
@@ -158,8 +166,8 @@ async def handle_schedule_actions(db: DBClient, input_data: InputSchema) -> Resu
             """,
             input_data.provider_id,
             input_data.day_of_week,
-            input_data.start_time,
-            input_data.end_time,
+            t_start,
+            t_end,
         )
         res_upd: dict[str, object] = {"updated": True}
         return ok(res_upd)
@@ -183,6 +191,14 @@ async def handle_override_actions(db: DBClient, input_data: InputSchema) -> Resu
     if action == "set_override":
         if not input_data.provider_id or not input_data.override_date:
             return fail("MISSING_FIELDS: provider_id and override_date are required")
+
+        try:
+            d_override = date.fromisoformat(input_data.override_date)
+            t_start = time.fromisoformat(input_data.start_time) if input_data.start_time else None
+            t_end = time.fromisoformat(input_data.end_time) if input_data.end_time else None
+        except ValueError:
+            return fail("INVALID_DATE_OR_TIME_FORMAT")
+
         await db.execute(
             """
             INSERT INTO schedule_overrides (provider_id, override_date, is_blocked, start_time, end_time, reason)
@@ -194,10 +210,10 @@ async def handle_override_actions(db: DBClient, input_data: InputSchema) -> Resu
                           reason = EXCLUDED.reason
             """,
             input_data.provider_id,
-            input_data.override_date,
+            d_override,
             input_data.is_blocked or False,
-            input_data.start_time,
-            input_data.end_time,
+            t_start,
+            t_end,
             input_data.override_reason,
         )
         res_upd: dict[str, object] = {"updated": True}
@@ -206,10 +222,16 @@ async def handle_override_actions(db: DBClient, input_data: InputSchema) -> Resu
     elif action == "remove_override":
         if not input_data.provider_id or not input_data.override_date:
             return fail("MISSING_FIELDS: provider_id and override_date are required")
+
+        try:
+            d_override = date.fromisoformat(input_data.override_date)
+        except ValueError:
+            return fail("INVALID_DATE_FORMAT")
+
         await db.execute(
             "DELETE FROM schedule_overrides WHERE provider_id = $1::uuid AND override_date = $2::date",
             input_data.provider_id,
-            input_data.override_date,
+            d_override,
         )
         res_del: dict[str, object] = {"deleted": True}
         return ok(res_del)

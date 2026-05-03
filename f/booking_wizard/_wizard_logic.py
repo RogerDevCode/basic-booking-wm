@@ -121,6 +121,11 @@ class WizardRepository:
         return ok(int(cast("Any", rows[0]["duration_minutes"])))
 
     async def get_available_slots(self, provider_id: str, date_str: str, duration_min: int) -> Result[list[str]]:
+        try:
+            target_date = date.fromisoformat(date_str)
+        except ValueError:
+            return fail("invalid_date_format")
+
         rows = await self.db.fetch(
             """
             SELECT start_time FROM bookings
@@ -129,7 +134,7 @@ class WizardRepository:
               AND status NOT IN ('cancelled', 'no_show', 'rescheduled')
             """,
             provider_id,
-            date_str,
+            target_date,
         )
         booked_times = set()
         for r in rows:
@@ -161,7 +166,14 @@ class WizardRepository:
         tz: str,
         duration_min: int,
     ) -> Result[str]:
-        local_ts = f"{date_str}T{time_str}:00"
+        local_ts_str = f"{date_str}T{time_str}:00"
+        try:
+            # We don't attach TZ here because SQL uses AT TIME ZONE $5
+            # So we pass a naive timestamp and the TZ name separately
+            local_dt = datetime.fromisoformat(local_ts_str)
+        except ValueError:
+            return fail("invalid_timestamp_format")
+
         ik = f"wizard-{client_id}-{provider_id}-{service_id}-{date_str}-{time_str}"
         try:
             rows = await self.db.fetch(
@@ -181,7 +193,7 @@ class WizardRepository:
                 client_id,
                 provider_id,
                 service_id,
-                local_ts,
+                local_dt,
                 tz,
                 duration_min,
                 ik,

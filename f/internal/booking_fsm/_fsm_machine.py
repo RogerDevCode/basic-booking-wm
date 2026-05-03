@@ -141,6 +141,19 @@ def apply_transition(
                     )
                 )
 
+            doctor_items = items if items is not None else []
+            if _is_named_item_list(doctor_items) and doctor_items:
+                return ok(
+                    TransitionOutcome(
+                        nextState=SelectingDoctorState(
+                            specialtyId=specialty["id"],
+                            specialtyName=specialty["name"],
+                            items=doctor_items,
+                        ),
+                        responseText=build_doctors_prompt(specialty["name"], doctor_items),
+                        advance=True,
+                    )
+                )
             return ok(
                 TransitionOutcome(
                     nextState=SelectingDoctorState(
@@ -192,6 +205,20 @@ def apply_transition(
                     )
                 )
 
+            time_items = items if items is not None else []
+            if _is_time_slot_list(time_items) and time_items:
+                return ok(
+                    TransitionOutcome(
+                        nextState=SelectingTimeState(
+                            specialtyId=current_state.specialtyId,
+                            doctorId=doctor["id"],
+                            doctorName=doctor["name"],
+                            items=time_items,
+                        ),
+                        responseText=build_slots_prompt(doctor["name"], time_items),
+                        advance=True,
+                    )
+                )
             return ok(
                 TransitionOutcome(
                     nextState=SelectingTimeState(
@@ -308,7 +335,7 @@ def apply_transition(
                 )
             )
 
-        if isinstance(action, (ConfirmNoAction, BackAction)):
+        if isinstance(action, ConfirmNoAction | BackAction):
             raw_items = items if items is not None else []
             if _is_time_slot_list(raw_items):
                 return ok(

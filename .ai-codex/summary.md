@@ -205,8 +205,8 @@
 - 📦 `class` `WizardRepository` (L111)
 - ⚡ `async_fn` `get_service_duration` (L115)
 - ⚡ `async_fn` `get_available_slots` (L123)
-- ⚡ `async_fn` `get_names` (L147)
-- ⚡ `async_fn` `create_booking` (L154)
+- ⚡ `async_fn` `get_names` (L152)
+- ⚡ `async_fn` `create_booking` (L159)
 
 ### `f/booking_wizard/_wizard_models.py`
 - 📦 `class` `WizardState` (L10)
@@ -508,7 +508,7 @@
 - 🔧 `fn` `parse_action` (L51)
 - 🔧 `fn` `parse_callback_data` (L73)
 - 🔧 `fn` `apply_transition` (L90)
-- 🔧 `fn` `flow_step_from_state` (L345)
+- 🔧 `fn` `flow_step_from_state` (L372)
 
 ### `f/internal/booking_fsm/_fsm_models.py`
 - 📦 `class` `NamedItem` (L20)
@@ -547,7 +547,7 @@
 - 🔧 `fn` `build_confirmation_keyboard` (L88)
 
 ### `f/internal/booking_prefetch/main.py`
-- 🔧 `fn` `main` (L129)
+- 🔧 `fn` `main` (L199)
 
 ### `f/internal/conversation_get/_conversation_models.py`
 - 📦 `class` `ConversationState` (L8)
@@ -714,10 +714,10 @@
 - 🔧 `fn` `main` (L67)
 
 ### `f/provider_manage/_manage_logic.py`
-- ⚡ `async_fn` `handle_provider_actions` (L11)
-- ⚡ `async_fn` `handle_service_actions` (L72)
-- ⚡ `async_fn` `handle_schedule_actions` (L142)
-- ⚡ `async_fn` `handle_override_actions` (L181)
+- ⚡ `async_fn` `handle_provider_actions` (L12)
+- ⚡ `async_fn` `handle_service_actions` (L73)
+- ⚡ `async_fn` `handle_schedule_actions` (L143)
+- ⚡ `async_fn` `handle_override_actions` (L189)
 
 ### `f/provider_manage/_manage_models.py`
 - 📦 `class` `InputSchema` (L8)
@@ -1204,6 +1204,16 @@
 - `f/health_check/_health_logic.script.yaml`
 - `f/health_check/_health_models.script.yaml`
 - `f/health_check/main.script.yaml`
+- `f/internal/_db_client.script.yaml`
+- `f/internal/_redis_client.script.yaml`
+- `f/internal/booking_fsm/_fsm_machine.script.yaml`
+- `f/internal/booking_prefetch/main.script.yaml`
+- `f/internal/conversation_verify/main.script.yaml`
+- `f/internal/debug_schedules.script.yaml`
+- `f/internal/scheduling_engine/_scheduling_logic.script.yaml`
+- `f/internal/seed_test_schedules.script.yaml`
+- `f/internal/telegram_classify/main.script.yaml`
+- `f/internal/telegram_normalize/main.script.yaml`
 - `f/nlu/__init__.script.yaml`
 - `f/nlu/_constants.script.yaml`
 - `f/nlu/_tfidf_classifier.script.yaml`
