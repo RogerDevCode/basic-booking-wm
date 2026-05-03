@@ -40,7 +40,13 @@ async def _main_async(
     provider_id: str,
     start_time: str,
     chat_id: str,
+    pg_url: str | None = None,
 ) -> dict[str, object]:
+    import os
+
+    if pg_url:
+        os.environ["DATABASE_URL"] = pg_url
+
     from f.booking_create.main import main_async as booking_create_async
 
     # 1. Resolve service_id from provider — booking_create requires it
@@ -87,7 +93,8 @@ def main(
     provider_id: str,
     start_time: str,
     chat_id: str,
+    pg_url: str | None = None,
 ) -> dict[str, object]:
     import asyncio
 
-    return asyncio.run(_main_async(client_id, provider_id, start_time, chat_id))
+    return asyncio.run(_main_async(client_id, provider_id, start_time, chat_id, pg_url))

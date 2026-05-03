@@ -34,6 +34,12 @@ MODULE = "telegram_auto_register"
 
 
 async def _main_async(args: dict[str, object]) -> Result[RegisterResult]:
+    import os
+
+    # Inject DATABASE_URL from flow args if provided (same pattern as booking_prefetch)
+    if pg_url := args.get("pg_url"):
+        os.environ["DATABASE_URL"] = str(pg_url)
+
     # 1. Validate Input
     try:
         input_data = InputSchema.model_validate(args)

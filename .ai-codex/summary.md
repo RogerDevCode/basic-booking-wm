@@ -505,7 +505,7 @@
 - 🔧 `fn` `main` (L24)
 
 ### `f/internal/booking_confirm/main.py`
-- 🔧 `fn` `main` (L85)
+- 🔧 `fn` `main` (L91)
 
 ### `f/internal/booking_fsm/_fsm_machine.py`
 - 🔧 `fn` `parse_action` (L51)
@@ -790,8 +790,8 @@
 - 📦 `class` `InputSchema` (L12)
 
 ### `f/telegram_auto_register/main.py`
-- ⚡ `async_fn` `operation` (L46)
-- 🔧 `fn` `main` (L58)
+- ⚡ `async_fn` `operation` (L52)
+- 🔧 `fn` `main` (L64)
 
 ### `f/telegram_callback/_callback_logic.py`
 - 🔧 `fn` `parse_callback_data` (L18)

@@ -86,7 +86,8 @@ value:
               { "chat_id": results.webhook_trigger.chat_id,
                 "first_name": results.webhook_trigger.first_name,
                 "last_name": results.webhook_trigger.last_name || null,
-                "username": results.webhook_trigger.username || null }
+                "username": results.webhook_trigger.username || null,
+                "pg_url": variable("u/admin/DATABASE_URL") }
         path: f/telegram_auto_register/main
       skip_if:
         expr: '!results.classify.chat_id || results.telegram_deduplicate.duplicate'
@@ -163,6 +164,9 @@ value:
           chat_id:
             type: javascript
             expr: results.classify.chat_id
+          pg_url:
+            type: javascript
+            expr: variable("u/admin/DATABASE_URL")
         path: f/internal/booking_confirm/main
       skip_if:
         expr: >-
