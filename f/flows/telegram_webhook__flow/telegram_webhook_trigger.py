@@ -10,6 +10,8 @@ class TriggerOutput(BaseModel):
     chat_id: str
     text: str
     username: str
+    first_name: str
+    last_name: str | None = None
     update_id: int | None = None
     callback_data: str | None = None
     callback_query_id: str | None = None
@@ -42,22 +44,33 @@ async def _main_async(webhook_payload: dict[str, Any]) -> dict[str, Any]:
     callback_query_id = None
     callback_message_id = None
 
+    first_name = "Usuario"
+    last_name: str | None = None
+
     if message:
+        from_data = message.get("from", {})
         chat_id = str(message.get("chat", {}).get("id", ""))
         text = message.get("text", "")
-        username = message.get("from", {}).get("username", "unknown")
+        username = from_data.get("username", "unknown")
+        first_name = from_data.get("first_name", "Usuario") or "Usuario"
+        last_name = from_data.get("last_name") or None
     elif callback_query:
+        from_data = callback_query.get("from", {})
         msg = callback_query.get("message", {})
         chat_id = str(msg.get("chat", {}).get("id", ""))
         callback_data = callback_query.get("data")
         callback_query_id = callback_query.get("id")
         callback_message_id = msg.get("message_id")
-        username = callback_query.get("from", {}).get("username", "unknown")
+        username = from_data.get("username", "unknown")
+        first_name = from_data.get("first_name", "Usuario") or "Usuario"
+        last_name = from_data.get("last_name") or None
 
     return {
         "chat_id": chat_id,
         "text": text,
         "username": username,
+        "first_name": first_name,
+        "last_name": last_name,
         "update_id": update_id,
         "callback_data": callback_data,
         "callback_query_id": callback_query_id,

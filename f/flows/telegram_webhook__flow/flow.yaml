@@ -1,9 +1,8 @@
-summary: Telegram Webhook - Phase 3 (Deduplicate + Normalize + Classify + Prefetch + Router)
+summary: Telegram Webhook - Phase 4 (+ AutoRegister user_id)
 description: >
-  Fase 3 completa: deduplicate → normalize → classify → prefetch → router FSM.
-  booking_prefetch carga especialidades/doctores de DB antes del router.
-  El router aplica transiciones FSM con datos reales.
-  Si no maneja (handled=false), responde con fallback informativo.
+  Fase 4: deduplicate → normalize → classify → auto_register → prefetch → router FSM.
+  telegram_auto_register resuelve chat_id → user_id (UPSERT en users).
+  user_id queda disponible para booking_create en la siguiente fase.
 value:
   modules:
     - id: webhook_trigger
@@ -76,6 +75,21 @@ value:
         path: f/internal/telegram_classify/main
       skip_if:
         expr: '!results.normalize.chat_id || results.telegram_deduplicate.duplicate'
+    - id: telegram_auto_register
+      summary: Registrar/resolver usuario Telegram → user_id en DB
+      value:
+        type: script
+        input_transforms:
+          args:
+            type: javascript
+            expr: >-
+              { "chat_id": results.webhook_trigger.chat_id,
+                "first_name": results.webhook_trigger.first_name,
+                "last_name": results.webhook_trigger.last_name || null,
+                "username": results.webhook_trigger.username || null }
+        path: f/telegram_auto_register/main
+      skip_if:
+        expr: '!results.classify.chat_id || results.telegram_deduplicate.duplicate'
     - id: booking_prefetch
       summary: Pre-fetch especialidades/doctores segun estado FSM actual
       value:
@@ -123,13 +137,37 @@ value:
               results.router.data.nextState, "active_flow":
               results.router.data.active_flow || null, "pending_data":
               { "router_handled": results.router.data.handled,
-              "text_kind": results.classify.text_kind } }
+              "text_kind": results.classify.text_kind,
+              "user_id": results.telegram_auto_register?.user_id || null,
+              "client_id": results.telegram_auto_register?.client_id || null } }
           redis_url:
             type: javascript
             expr: variable("u/admin/REDIS_URL")
         path: f/internal/conversation_update/main
       skip_if:
         expr: '!results.classify.chat_id || results.telegram_deduplicate.duplicate'
+    - id: booking_commit
+      summary: Crear cita real en DB cuando FSM alcanza estado completed
+      value:
+        type: script
+        input_transforms:
+          client_id:
+            type: javascript
+            expr: results.telegram_auto_register.client_id
+          provider_id:
+            type: javascript
+            expr: results.get_conversation_state.data?.booking_state?.doctorId
+          start_time:
+            type: javascript
+            expr: results.get_conversation_state.data?.booking_state?.draft?.start_time
+          chat_id:
+            type: javascript
+            expr: results.classify.chat_id
+        path: f/internal/booking_confirm/main
+      skip_if:
+        expr: >-
+          results.router.data.nextState?.name !== "completed" ||
+          results.telegram_deduplicate.duplicate
     - id: send_telegram_response
       summary: Enviar respuesta a Telegram
       value:
@@ -147,10 +185,17 @@ value:
           text:
             type: javascript
             expr: >-
-              (results.router.data.handled && results.router.data.response_text)
+              (results.booking_commit?.success)
+              ? ("✅ *Reserva Confirmada*\n\n" +
+                 "📋 " + results.booking_commit.service_name + " con " + results.booking_commit.provider_name + "\n" +
+                 "🆔 ID: `" + results.booking_commit.booking_id + "`\n\n" +
+                 "Recibirás un recordatorio antes de tu cita.")
+              : (results.booking_commit?.error)
+              ? ("❌ No se pudo confirmar la cita.\n\n" + results.booking_commit.error + "\n\nIntenta seleccionar otro horario.")
+              : (results.router.data.handled && results.router.data.response_text)
               ? results.router.data.response_text
               : ("[no_manejado:" + results.classify.text_kind + "] " +
-              results.classify.canonical_text)
+                 results.classify.canonical_text)
         path: f/telegram_send/main
       skip_if:
         expr: '!results.classify.chat_id || results.telegram_deduplicate.duplicate'

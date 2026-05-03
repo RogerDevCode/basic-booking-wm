@@ -20,11 +20,22 @@ from beartype import beartype
 from returns.result import Failure, Result, Success
 
 from .._wmill_adapter import log
-from ..booking_fsm._fsm_machine import apply_transition, parse_action, parse_callback_data
+from ..booking_fsm._fsm_machine import MAIN_MENU_TEXT, apply_transition, parse_action, parse_callback_data
 from ..booking_fsm._fsm_models import BookingStateRoot, DraftBooking
 from ._router_models import RouterInput, RouterResult
 
 MODULE: Final[str] = "telegram_router"
+
+_START_TEXT: Final[str] = (
+    "¡Hola! Soy tu asistente de reservas. 👋\n\n"
+    "Puedo ayudarte a agendar, consultar o cancelar una cita médica.\n\n" + MAIN_MENU_TEXT
+)
+
+# Main menu keyword sets — used to disambiguate idle-state inputs before FSM
+_AGENDAR_KEYWORDS: Final[frozenset[str]] = frozenset(["1", "agendar", "agendar cita", "nueva cita", "cita"])
+_MIS_CITAS_KEYWORDS: Final[frozenset[str]] = frozenset(["2", "mis citas", "consultar", "consultar citas", "ver citas"])
+_RECORDATORIOS_KEYWORDS: Final[frozenset[str]] = frozenset(["3", "recordatorios", "recordatorio"])
+_INFO_KEYWORDS: Final[frozenset[str]] = frozenset(["4", "información", "informacion", "info", "información"])
 
 
 @beartype
@@ -43,11 +54,7 @@ async def _route(input_data: RouterInput) -> Result[RouterResult, str]:
                 handled=True,
                 active_flow="booking",
                 nextState={"name": "idle"},
-                response_text=(
-                    "¡Hola! Soy tu asistente de reservas.\n\n"
-                    "Puedo ayudarte a *agendar*, *consultar* o *cancelar* una cita.\n\n"
-                    "¿Qué deseas hacer hoy?"
-                ),
+                response_text=_START_TEXT,
             )
         )
 
@@ -68,7 +75,55 @@ async def _route(input_data: RouterInput) -> Result[RouterResult, str]:
         draft_raw = cast("dict[str, object]", state_dict.get("booking_draft") or {})
         draft = DraftBooking.model_validate(draft_raw)
 
-        # 3. Parse action
+        # 3a. Main menu disambiguation — intercept non-booking options at idle state
+        #     so "2/3/4" never reach the booking FSM as specialty selections.
+        if current_state.name == "idle" and not is_callback:
+            lower = user_input.strip().lower()
+            if lower in _MIS_CITAS_KEYWORDS:
+                return Success(
+                    RouterResult(
+                        handled=True,
+                        nextState=current_state_raw,
+                        response_text=(
+                            "📋 *Mis Citas*\n\n"
+                            "La consulta de citas estará disponible muy pronto.\n\n"
+                            "Por ahora puedes agendar una nueva cita.\n\n" + MAIN_MENU_TEXT
+                        ),
+                    )
+                )
+            if lower in _RECORDATORIOS_KEYWORDS:
+                return Success(
+                    RouterResult(
+                        handled=True,
+                        nextState=current_state_raw,
+                        response_text=(
+                            "🔔 *Recordatorios*\n\n"
+                            "Los recordatorios se envían automáticamente al confirmar tu cita.\n\n" + MAIN_MENU_TEXT
+                        ),
+                    )
+                )
+            if lower in _INFO_KEYWORDS:
+                return Success(
+                    RouterResult(
+                        handled=True,
+                        nextState=current_state_raw,
+                        response_text=(
+                            "\U00002139️ *Información*\n\n"
+                            "Este es tu asistente de reservas médicas.\n"
+                            "Puedes agendar, consultar o cancelar citas en cualquier momento.\n\n" + MAIN_MENU_TEXT
+                        ),
+                    )
+                )
+            if lower not in _AGENDAR_KEYWORDS:
+                return Success(
+                    RouterResult(
+                        handled=True,
+                        nextState=current_state_raw,
+                        response_text=("Lo siento, no entendí esa opción. 😊\n\n" + MAIN_MENU_TEXT),
+                    )
+                )
+
+        # 3b. Parse action for FSM
         action = parse_callback_data(user_input) if is_callback else parse_action(user_input)
 
         if not action:

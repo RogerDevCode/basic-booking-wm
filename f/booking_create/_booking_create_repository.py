@@ -100,10 +100,9 @@ class PostgresBookingCreateRepository:
     async def is_provider_scheduled(self, provider_id: str, day_of_week: int) -> bool:
         row = await self._client.fetchrow(
             """
-            SELECT schedule_id FROM provider_schedules
+            SELECT id FROM provider_schedules
             WHERE provider_id = $1::uuid
               AND day_of_week = $2
-              AND is_active = true
             LIMIT 1
             """,
             provider_id,

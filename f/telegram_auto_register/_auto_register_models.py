@@ -5,6 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 class RegisterResult(TypedDict):
     user_id: str
+    client_id: str
     is_new: bool
 
 

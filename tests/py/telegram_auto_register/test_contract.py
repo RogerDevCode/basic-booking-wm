@@ -14,11 +14,15 @@ if TYPE_CHECKING:
 @pytest.mark.asyncio
 async def test_telegram_auto_register_success() -> None:
     mock_db = AsyncMock()
-    # 1. SELECT user by chat_id -> []
-    # 2. INSERT user -> returning row
+    # 1. SELECT users → []      (no existing user)
+    # 2. INSERT users → row      (new user created)
+    # 3. SELECT clients → []     (no existing client)
+    # 4. INSERT clients → row    (new client created)
     mock_db.fetch.side_effect = [
-        [],  # no existing user
-        [{"user_id": "u123"}],  # insert result
+        [],
+        [{"user_id": "u123"}],
+        [],
+        [{"client_id": "c456"}],
     ]
 
     async def mock_with_admin(db: object, op: Callable[[], Coroutine[Any, Any, object]]) -> object:
@@ -35,6 +39,7 @@ async def test_telegram_auto_register_success() -> None:
         assert err is None
         assert result is not None
         assert result["user_id"] == "u123"
+        assert result["client_id"] == "c456"
         assert result["is_new"] is True
-        # Verify fetch was called twice (lookup + insert)
-        assert mock_db.fetch.call_count == 2
+        # 4 calls: SELECT users, INSERT users, SELECT clients, INSERT clients
+        assert mock_db.fetch.call_count == 4

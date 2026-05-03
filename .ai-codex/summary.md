@@ -103,8 +103,8 @@
 - ⚡ `async_fn` `get_service_context` (L63)
 - ⚡ `async_fn` `is_provider_blocked` (L86)
 - ⚡ `async_fn` `is_provider_scheduled` (L100)
-- ⚡ `async_fn` `has_overlapping_booking` (L114)
-- ⚡ `async_fn` `insert_booking` (L130)
+- ⚡ `async_fn` `has_overlapping_booking` (L113)
+- ⚡ `async_fn` `insert_booking` (L129)
 
 ### `f/booking_create/_create_booking_logic.py`
 - ⚡ `async_fn` `fetch_booking_context` (L10)
@@ -302,7 +302,7 @@
 
 ### `f/flows/telegram_webhook__flow/telegram_webhook_trigger.py`
 - 📦 `class` `TriggerOutput` (L8)
-- 🔧 `fn` `main` (L68)
+- 🔧 `fn` `main` (L81)
 
 ### `f/gcal_reconcile/_reconcile_logic.py`
 - ⚡ `async_fn` `retry_with_backoff` (L21)
@@ -504,6 +504,9 @@
 ### `f/internal/apply_fix_migration.py`
 - 🔧 `fn` `main` (L24)
 
+### `f/internal/booking_confirm/main.py`
+- 🔧 `fn` `main` (L85)
+
 ### `f/internal/booking_fsm/_fsm_machine.py`
 - 🔧 `fn` `parse_action` (L51)
 - 🔧 `fn` `parse_callback_data` (L73)
@@ -642,7 +645,7 @@
 - 📦 `class` `RouterResult` (L17)
 
 ### `f/internal/telegram_router/main.py`
-- 🔧 `fn` `main` (L125)
+- 🔧 `fn` `main` (L180)
 
 ### `f/nlu/_tfidf_classifier.py`
 - 📦 `class` `ModelData` (L234)
@@ -780,11 +783,11 @@
 - 🔧 `fn` `main` (L136)
 
 ### `f/telegram_auto_register/_auto_register_logic.py`
-- ⚡ `async_fn` `register_telegram_user` (L8)
+- ⚡ `async_fn` `register_telegram_user` (L31)
 
 ### `f/telegram_auto_register/_auto_register_models.py`
 - 📦 `class` `RegisterResult` (L6)
-- 📦 `class` `InputSchema` (L11)
+- 📦 `class` `InputSchema` (L12)
 
 ### `f/telegram_auto_register/main.py`
 - ⚡ `async_fn` `operation` (L46)
@@ -1206,6 +1209,7 @@
 - `f/health_check/main.script.yaml`
 - `f/internal/_db_client.script.yaml`
 - `f/internal/_redis_client.script.yaml`
+- `f/internal/booking_confirm/main.script.yaml`
 - `f/internal/booking_fsm/_fsm_machine.script.yaml`
 - `f/internal/booking_prefetch/main.script.yaml`
 - `f/internal/conversation_verify/main.script.yaml`
@@ -1214,6 +1218,7 @@
 - `f/internal/seed_test_schedules.script.yaml`
 - `f/internal/telegram_classify/main.script.yaml`
 - `f/internal/telegram_normalize/main.script.yaml`
+- `f/internal/telegram_router/main.script.yaml`
 - `f/nlu/__init__.script.yaml`
 - `f/nlu/_constants.script.yaml`
 - `f/nlu/_tfidf_classifier.script.yaml`
