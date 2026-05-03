@@ -10,38 +10,24 @@ if TYPE_CHECKING:
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
-
-_NEW_USER_ID = "new-uuid-1234"
 _NEW_CLIENT_ID = "new-client-uuid-5678"
-_EXISTING_USER_ID = "existing-uuid-5678"
 _EXISTING_CLIENT_ID = "existing-client-uuid-9999"
 
 
-def _make_db(*, existing_user_id: str | None = None) -> MagicMock:
+def _make_db(*, existing_client_id: str | None = None) -> MagicMock:
     """Return a mock DB client.
 
-    Sequence of fetch calls for the new auto_register logic:
-      New user:      SELECT users → [] | INSERT users → [user_id] | SELECT clients → [] | INSERT clients → [client_id]
-      Existing user: SELECT users → [user_id]                     | SELECT clients → [] | INSERT clients → [client_id]
+    New client:      SELECT clients → [] | INSERT clients → [client_id]  (2 calls)
+    Existing client: SELECT clients → [client_id]                        (1 call)
     """
     db = MagicMock()
-    if existing_user_id:
-        # Existing user: SELECT users → row; SELECT clients → []; INSERT clients → row
-        db.fetch = AsyncMock(
-            side_effect=[
-                [{"user_id": existing_user_id}],  # SELECT users
-                [],  # SELECT clients
-                [{"client_id": _NEW_CLIENT_ID}],  # INSERT clients
-            ]
-        )
+    if existing_client_id:
+        db.fetch = AsyncMock(side_effect=[[{"client_id": existing_client_id}]])
     else:
-        # New user: SELECT users → []; INSERT users → row; SELECT clients → []; INSERT clients → row
         db.fetch = AsyncMock(
             side_effect=[
-                [],  # SELECT users (not found)
-                [{"user_id": _NEW_USER_ID}],  # INSERT users
-                [],  # SELECT clients (not found)
-                [{"client_id": _NEW_CLIENT_ID}],  # INSERT clients
+                [],
+                [{"client_id": _NEW_CLIENT_ID}],
             ]
         )
     db.close = AsyncMock()
@@ -70,8 +56,8 @@ def _patch_admin_ctx() -> AbstractContextManager[MagicMock]:
 class TestAutoRegisterNewUser:
     @pytest.mark.asyncio
     async def test_new_user_registered_successfully(self) -> None:
-        """New chat_id creates user + client rows, returns is_new=True."""
-        db = _make_db(existing_user_id=None)
+        """New chat_id creates client row, returns is_new=True."""
+        db = _make_db(existing_client_id=None)
         with _patch_db(db), _patch_admin_ctx():
             from f.telegram_auto_register.main import _main_async
 
@@ -81,31 +67,31 @@ class TestAutoRegisterNewUser:
 
         assert err is None
         assert result is not None
-        assert result["user_id"] == _NEW_USER_ID
         assert result["client_id"] == _NEW_CLIENT_ID
+        assert result["user_id"] == _NEW_CLIENT_ID  # user_id aliases client_id
         assert result["is_new"] is True
 
     @pytest.mark.asyncio
-    async def test_new_user_db_called_four_times(self) -> None:
-        """New user: SELECT users → INSERT users → SELECT clients → INSERT clients = 4 calls."""
-        db = _make_db(existing_user_id=None)
+    async def test_new_user_db_called_twice(self) -> None:
+        """New client: SELECT clients → INSERT clients = 2 calls."""
+        db = _make_db(existing_client_id=None)
         with _patch_db(db), _patch_admin_ctx():
             from f.telegram_auto_register.main import _main_async
 
             await _main_async({"chat_id": "222", "first_name": "Luis", "last_name": "Gómez", "username": None})
 
-        assert db.fetch.call_count == 4
+        assert db.fetch.call_count == 2
 
     @pytest.mark.asyncio
     async def test_new_user_full_name_with_last_name(self) -> None:
         """Full name must be 'first_name last_name' when last_name is provided."""
-        db = _make_db(existing_user_id=None)
+        db = _make_db(existing_client_id=None)
         with _patch_db(db), _patch_admin_ctx():
             from f.telegram_auto_register.main import _main_async
 
             await _main_async({"chat_id": "333", "first_name": "María", "last_name": "López", "username": None})
 
-        # Second call is INSERT users — check the full_name argument
+        # Second call is INSERT clients — check full_name argument
         insert_call = db.fetch.call_args_list[1]
         assert "María López" in insert_call.args
 
@@ -113,8 +99,8 @@ class TestAutoRegisterNewUser:
 class TestAutoRegisterExistingUser:
     @pytest.mark.asyncio
     async def test_existing_user_returns_is_new_false(self) -> None:
-        """Known chat_id returns existing user_id + fresh client_id with is_new=False."""
-        db = _make_db(existing_user_id=_EXISTING_USER_ID)
+        """Known chat_id returns existing client_id with is_new=False."""
+        db = _make_db(existing_client_id=_EXISTING_CLIENT_ID)
         with _patch_db(db), _patch_admin_ctx():
             from f.telegram_auto_register.main import _main_async
 
@@ -124,20 +110,20 @@ class TestAutoRegisterExistingUser:
 
         assert err is None
         assert result is not None
-        assert result["user_id"] == _EXISTING_USER_ID
-        assert result["client_id"] == _NEW_CLIENT_ID
+        assert result["client_id"] == _EXISTING_CLIENT_ID
+        assert result["user_id"] == _EXISTING_CLIENT_ID
         assert result["is_new"] is False
 
     @pytest.mark.asyncio
-    async def test_existing_user_db_called_three_times(self) -> None:
-        """Existing user: SELECT users → SELECT clients → INSERT clients = 3 calls."""
-        db = _make_db(existing_user_id=_EXISTING_USER_ID)
+    async def test_existing_user_db_called_once(self) -> None:
+        """Existing client: SELECT clients only = 1 call."""
+        db = _make_db(existing_client_id=_EXISTING_CLIENT_ID)
         with _patch_db(db), _patch_admin_ctx():
             from f.telegram_auto_register.main import _main_async
 
             await _main_async({"chat_id": "555", "first_name": "Pedro", "last_name": None, "username": None})
 
-        assert db.fetch.call_count == 3
+        assert db.fetch.call_count == 1
 
 
 class TestAutoRegisterValidation:
@@ -182,7 +168,7 @@ class TestAutoRegisterDBFailure:
     async def test_insert_failure_returns_error(self) -> None:
         """Failed INSERT returns error tuple, does not raise."""
         db = MagicMock()
-        # SELECT returns empty (new user), INSERT returns empty (failure)
+        # SELECT clients → [] (new), INSERT clients → [] (failure)
         db.fetch = AsyncMock(side_effect=[[], []])
         db.close = AsyncMock()
         with _patch_db(db), _patch_admin_ctx():

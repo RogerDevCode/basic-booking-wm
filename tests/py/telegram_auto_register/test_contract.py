@@ -14,13 +14,9 @@ if TYPE_CHECKING:
 @pytest.mark.asyncio
 async def test_telegram_auto_register_success() -> None:
     mock_db = AsyncMock()
-    # 1. SELECT users → []      (no existing user)
-    # 2. INSERT users → row      (new user created)
-    # 3. SELECT clients → []     (no existing client)
-    # 4. INSERT clients → row    (new client created)
+    # 1. SELECT clients → []      (no existing client)
+    # 2. INSERT clients → row     (new client created)
     mock_db.fetch.side_effect = [
-        [],
-        [{"user_id": "u123"}],
         [],
         [{"client_id": "c456"}],
     ]
@@ -38,8 +34,8 @@ async def test_telegram_auto_register_success() -> None:
 
         assert err is None
         assert result is not None
-        assert result["user_id"] == "u123"
         assert result["client_id"] == "c456"
+        assert result["user_id"] == "c456"  # user_id aliases client_id
         assert result["is_new"] is True
-        # 4 calls: SELECT users, INSERT users, SELECT clients, INSERT clients
-        assert mock_db.fetch.call_count == 4
+        # 2 calls: SELECT clients, INSERT clients
+        assert mock_db.fetch.call_count == 2

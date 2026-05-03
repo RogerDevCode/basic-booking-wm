@@ -783,7 +783,7 @@
 - 🔧 `fn` `main` (L136)
 
 ### `f/telegram_auto_register/_auto_register_logic.py`
-- ⚡ `async_fn` `register_telegram_user` (L31)
+- ⚡ `async_fn` `register_telegram_user` (L11)
 
 ### `f/telegram_auto_register/_auto_register_models.py`
 - 📦 `class` `RegisterResult` (L6)
