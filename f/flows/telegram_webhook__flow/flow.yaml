@@ -134,9 +134,9 @@ value:
             type: javascript
             expr: >-
               { "chat_id": results.classify.chat_id, "booking_state":
-              results.router.data.nextState, "active_flow":
-              results.router.data.active_flow || null, "pending_data":
-              { "router_handled": results.router.data.handled,
+              results.router?.data?.nextState, "active_flow":
+              results.router?.data?.active_flow || null, "pending_data":
+              { "router_handled": results.router?.data?.handled,
               "text_kind": results.classify.text_kind,
               "user_id": results.telegram_auto_register?.user_id || null,
               "client_id": results.telegram_auto_register?.client_id || null } }
@@ -166,7 +166,7 @@ value:
         path: f/internal/booking_confirm/main
       skip_if:
         expr: >-
-          results.router.data.nextState?.name !== "completed" ||
+          results.router?.data?.nextState?.name !== "completed" ||
           results.telegram_deduplicate.duplicate
     - id: send_telegram_response
       summary: Enviar respuesta a Telegram
@@ -192,8 +192,8 @@ value:
                  "Recibirás un recordatorio antes de tu cita.")
               : (results.booking_commit?.error)
               ? ("❌ No se pudo confirmar la cita.\n\n" + results.booking_commit.error + "\n\nIntenta seleccionar otro horario.")
-              : (results.router.data.handled && results.router.data.response_text)
-              ? results.router.data.response_text
+              : (results.router?.data?.handled && results.router?.data?.response_text)
+              ? results.router?.data?.response_text
               : ("[no_manejado:" + results.classify.text_kind + "] " +
                  results.classify.canonical_text)
         path: f/telegram_send/main
