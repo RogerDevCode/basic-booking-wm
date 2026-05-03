@@ -37,12 +37,14 @@ async def _main_async(args: dict[str, object]) -> Result[RegisterResult]:
     import os
 
     # Inject DATABASE_URL from flow args if provided (same pattern as booking_prefetch)
+    # Pop pg_url before validation — InputSchema has extra="forbid"
+    clean_args = {k: v for k, v in args.items() if k != "pg_url"}
     if pg_url := args.get("pg_url"):
         os.environ["DATABASE_URL"] = str(pg_url)
 
     # 1. Validate Input
     try:
-        input_data = InputSchema.model_validate(args)
+        input_data = InputSchema.model_validate(clean_args)
     except Exception as e:
         return fail(f"Validation error: {e}")
 

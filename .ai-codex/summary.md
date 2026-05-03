@@ -790,8 +790,8 @@
 - 📦 `class` `InputSchema` (L12)
 
 ### `f/telegram_auto_register/main.py`
-- ⚡ `async_fn` `operation` (L52)
-- 🔧 `fn` `main` (L64)
+- ⚡ `async_fn` `operation` (L54)
+- 🔧 `fn` `main` (L66)
 
 ### `f/telegram_callback/_callback_logic.py`
 - 🔧 `fn` `parse_callback_data` (L18)
