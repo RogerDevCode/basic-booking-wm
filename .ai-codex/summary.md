@@ -790,8 +790,8 @@
 - 📦 `class` `InputSchema` (L12)
 
 ### `f/telegram_auto_register/main.py`
-- ⚡ `async_fn` `operation` (L54)
-- 🔧 `fn` `main` (L66)
+- ⚡ `async_fn` `operation` (L46)
+- 🔧 `fn` `main` (L58)
 
 ### `f/telegram_callback/_callback_logic.py`
 - 🔧 `fn` `parse_callback_data` (L18)
@@ -1209,6 +1209,7 @@
 - `f/health_check/main.script.yaml`
 - `f/internal/_db_client.script.yaml`
 - `f/internal/_redis_client.script.yaml`
+- `f/internal/_wmill_adapter.script.yaml`
 - `f/internal/booking_confirm/main.script.yaml`
 - `f/internal/booking_fsm/_fsm_machine.script.yaml`
 - `f/internal/booking_prefetch/main.script.yaml`

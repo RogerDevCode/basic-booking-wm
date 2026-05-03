@@ -34,17 +34,9 @@ MODULE = "telegram_auto_register"
 
 
 async def _main_async(args: dict[str, object]) -> Result[RegisterResult]:
-    import os
-
-    # Inject DATABASE_URL from flow args if provided (same pattern as booking_prefetch)
-    # Pop pg_url before validation — InputSchema has extra="forbid"
-    clean_args = {k: v for k, v in args.items() if k != "pg_url"}
-    if pg_url := args.get("pg_url"):
-        os.environ["DATABASE_URL"] = str(pg_url)
-
-    # 1. Validate Input
+    # 1. Validate Input (pg_url already stripped by main() before calling here)
     try:
-        input_data = InputSchema.model_validate(clean_args)
+        input_data = InputSchema.model_validate(args)
     except Exception as e:
         return fail(f"Validation error: {e}")
 
@@ -65,6 +57,7 @@ async def _main_async(args: dict[str, object]) -> Result[RegisterResult]:
 
 def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
     import asyncio
+    import os
     import traceback
     from typing import cast
 
@@ -73,8 +66,13 @@ def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
     try:
         if isinstance(args, InputSchema):
             validated = args
+            clean: dict[str, object] = validated.model_dump()
         else:
-            validated = InputSchema.model_validate(args)
+            # Strip pg_url before validation — InputSchema has extra="forbid"
+            if pg_url := args.get("pg_url"):
+                os.environ["DATABASE_URL"] = str(pg_url)
+            clean = {k: v for k, v in args.items() if k != "pg_url"}
+            validated = InputSchema.model_validate(clean)
 
         err, result = asyncio.run(_main_async(validated.model_dump()))
         if err:
