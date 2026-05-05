@@ -2,7 +2,8 @@ import re
 from typing import Literal, TypedDict
 
 from ._ai_agent_models import IntentResult
-from ._constants import INTENT, URGENCY_WORDS
+from ._constants import INTENT
+from ._rules_service import get_nlu_rule
 
 
 class GuardrailPass(TypedDict):
@@ -92,7 +93,8 @@ def verify_urgency(result: IntentResult, text: str) -> IntentResult:
     for k, v in accents.items():
         lower = lower.replace(k, v)
 
-    has_urgency = any(w in lower for w in URGENCY_WORDS)
+    urgency_words = get_nlu_rule("urgency_words", [])
+    has_urgency = any(w in lower for w in urgency_words)
     has_typos = any(x in lower for x in ["urjente", "urgnete", "urjencia", "nececito atencion", "duele"])
 
     if result.intent == INTENT["URGENCIA"]:

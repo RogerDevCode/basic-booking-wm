@@ -29,12 +29,15 @@ from ._ai_agent_logic import (
     generate_ai_response,
 )
 from ._ai_agent_models import AIAgentInput, IntentResult, LLMOutput
-from ._constants import ESCALATION_THRESHOLDS, INTENT
+from ._constants import INTENT
+from ._rules_service import get_nlu_rule
 from ._guardrails import sanitize_json_response, validate_input, verify_urgency
 from ._llm_client import call_llm
 from ._prompt_builder import build_system_prompt, build_user_message
 from ._rag_context import build_rag_context
 from ._tfidf_classifier import classify_intent
+
+from ._rules_service import ensure_nlu_cache
 
 MODULE: Final[str] = "ai_agent"
 
@@ -42,7 +45,10 @@ MODULE: Final[str] = "ai_agent"
 async def _main_async(args: dict[str, Any]) -> dict[str, Any]:
     start_ms = int(time.time() * 1000)
 
-    # 0. Validate Input
+    # 0. Load rules into memory cache
+    await ensure_nlu_cache()
+
+    # 1. Validate Input
     try:
         input_data = AIAgentInput.model_validate(args)
     except Exception as e:
@@ -71,7 +77,7 @@ async def _main_async(args: dict[str, Any]) -> dict[str, Any]:
         # 2.2 TF-IDF
         tfidf = classify_intent(text)
         has_enough = len(text.split()) >= 2
-        if tfidf["confidence"] >= ESCALATION_THRESHOLDS["tfidf_minimum"] and has_enough:
+        if tfidf["confidence"] >= float(get_nlu_rule("escalation_tfidf_minimum", 0.4)) and has_enough:
             intent = str(tfidf["intent"])
             confidence = float(tfidf["confidence"])
             cot_reasoning = f"TF-IDF semantic match ({intent})"

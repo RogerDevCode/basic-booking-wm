@@ -4,21 +4,8 @@ import re
 from typing import Literal, cast
 
 from ._ai_agent_models import AvailabilityContext, ConversationState, EntityMap, EscalationLevel
-from ._constants import (
-    CONFIDENCE_BOUNDARIES,
-    DAY_NAMES,
-    ESCALATION_THRESHOLDS,
-    FAREWELL_PHRASES,
-    FAREWELLS,
-    FLEXIBILITY_KEYWORDS,
-    GREETING_PHRASES,
-    GREETINGS,
-    INTENT,
-    RELATIVE_DATES,
-    SERVICE_TYPES,
-    SOCIAL_CONFIDENCE_VALUES,
-    URGENCY_WORDS,
-)
+from ._constants import INTENT
+from ._rules_service import get_nlu_rule
 
 # ============================================================================
 # CONTEXT-AWARE INTENT ADJUSTMENT
@@ -50,10 +37,11 @@ def adjust_intent_with_context(
         }
 
     if state.active_flow != "none" and lower in ["no", "volver", "menu", "menú", "inicio"]:
+        high_min = get_nlu_rule("confidence_bound_high_min", 0.85)
         return {
             "adjusted": True,
             "intent": INTENT["PREGUNTA_GENERAL"],
-            "confidence": CONFIDENCE_BOUNDARIES["HIGH_MIN"],
+            "confidence": float(high_min),
             "reason": f"Context: user wants to exit current flow ({state.active_flow})",
         }
 
@@ -87,7 +75,8 @@ def extract_entities(text: str) -> EntityMap:
         "reminder_window": None,
     }
 
-    for rel in RELATIVE_DATES:
+    relative_dates = get_nlu_rule("relative_dates", [])
+    for rel in relative_dates:
         if rel in lower_text:
             data["date"] = rel
             break
@@ -105,7 +94,8 @@ def extract_entities(text: str) -> EntityMap:
                 break
 
     if not data["date"]:
-        for day in DAY_NAMES:
+        day_names = get_nlu_rule("day_names", {})
+        for day in day_names:
             if day in lower_text:
                 data["date"] = day
                 break
@@ -131,7 +121,8 @@ def extract_entities(text: str) -> EntityMap:
             data["provider_name"] = f"Dr. {m.group(1)}"
             break
 
-    for service in SERVICE_TYPES:
+    service_types = get_nlu_rule("service_types", [])
+    for service in service_types:
         if service in lower_text:
             data["service_type"] = service
             break
@@ -150,8 +141,12 @@ def detect_context(text: str, entities: EntityMap) -> AvailabilityContext:
     lower = text.lower()
     is_today = "hoy" in lower or entities.date == "hoy"
     is_tomorrow = any(x in lower for x in ["mañana", "manana"]) or entities.date == "mañana"
-    is_urgent = any(w in lower for w in URGENCY_WORDS)
-    is_flexible = any(w in lower for w in FLEXIBILITY_KEYWORDS)
+    
+    urgency_words = get_nlu_rule("urgency_words", [])
+    is_urgent = any(w in lower for w in urgency_words)
+    
+    flex_keywords = get_nlu_rule("flexibility_keywords", [])
+    is_flexible = any(w in lower for w in flex_keywords)
 
     time_pref: Literal["morning", "afternoon", "evening", "any"] = "any"
     if any(x in lower for x in ["mañana", "manana"]):
@@ -162,7 +157,8 @@ def detect_context(text: str, entities: EntityMap) -> AvailabilityContext:
         time_pref = "evening"
 
     day_pref = None
-    for day, full in DAY_NAMES.items():
+    day_names = get_nlu_rule("day_names", {})
+    for day, full in day_names.items():
         if day in lower:
             day_pref = full
             break
@@ -180,17 +176,20 @@ def detect_context(text: str, entities: EntityMap) -> AvailabilityContext:
 
 def determine_escalation_level(intent: str, text: str, confidence: float) -> EscalationLevel:
     lower = text.lower()
-    if intent == INTENT["URGENCIA"] and confidence >= ESCALATION_THRESHOLDS["medical_emergency_min"]:
+    med_min = float(get_nlu_rule("escalation_medical_emergency_min", 0.8))
+    if intent == INTENT["URGENCIA"] and confidence >= med_min:
         patterns = (
             r"muerte|morir|no respiro|infarto|desmay|sangr|convul|paro|dolor.*pecho|dificultad.*respir|no puedo.*respir"
         )
         if re.search(patterns, lower):
             return "medical_emergency"
 
-    if intent == INTENT["URGENCIA"] and confidence < ESCALATION_THRESHOLDS["priority_queue_max"]:
+    pri_max = float(get_nlu_rule("escalation_priority_queue_max", 0.6))
+    if intent == INTENT["URGENCIA"] and confidence < pri_max:
         return "priority_queue"
 
-    if confidence < ESCALATION_THRESHOLDS["human_handoff_max"] and intent not in [
+    hum_max = float(get_nlu_rule("escalation_human_handoff_max", 0.4))
+    if confidence < hum_max and intent not in [
         INTENT["SALUDO"],
         INTENT["DESPEDIDA"],
         INTENT["AGRADECIMIENTO"],
@@ -219,12 +218,18 @@ def generate_ai_response(
 
 def detect_social(text: str) -> tuple[str, float] | None:
     lower = text.lower().strip()
-    if lower in GREETINGS:
-        return cast("tuple[str, float]", (INTENT["SALUDO"], SOCIAL_CONFIDENCE_VALUES["greeting_exact"]))
-    if any(p in lower for p in GREETING_PHRASES):
-        return cast("tuple[str, float]", (INTENT["SALUDO"], SOCIAL_CONFIDENCE_VALUES["greeting_phrase"]))
-    if lower in FAREWELLS:
-        return cast("tuple[str, float]", (INTENT["DESPEDIDA"], SOCIAL_CONFIDENCE_VALUES["farewell_exact"]))
-    if any(p in lower for p in FAREWELL_PHRASES):
-        return cast("tuple[str, float]", (INTENT["DESPEDIDA"], SOCIAL_CONFIDENCE_VALUES["farewell_phrase"]))
+    
+    greetings = get_nlu_rule("greetings", [])
+    greeting_phrases = get_nlu_rule("greeting_phrases", [])
+    farewells = get_nlu_rule("farewells", [])
+    farewell_phrases = get_nlu_rule("farewell_phrases", [])
+
+    if lower in greetings:
+        return cast("tuple[str, float]", (INTENT["SALUDO"], 0.95))
+    if any(p in lower for p in greeting_phrases):
+        return cast("tuple[str, float]", (INTENT["SALUDO"], 0.9))
+    if lower in farewells:
+        return cast("tuple[str, float]", (INTENT["DESPEDIDA"], 0.95))
+    if any(p in lower for p in farewell_phrases):
+        return cast("tuple[str, float]", (INTENT["DESPEDIDA"], 0.9))
     return None

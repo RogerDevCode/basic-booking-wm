@@ -3,6 +3,7 @@ import re
 from typing import TypedDict
 
 from ._constants import INTENT
+from ._rules_service import get_nlu_rule
 
 # ============================================================================
 # REFERENCE CORPUS — Real-world examples per intent
@@ -168,9 +169,10 @@ def normalize(text: str) -> list[str]:
     text = re.sub(r"[?¿!¡.,;:()]", " ", text)
     tokens = text.split()
 
+    typo_map = get_nlu_rule("normalization_map", {})
     result = []
     for t in tokens:
-        t = TYPO_MAP.get(t, t)
+        t = typo_map.get(t, t)
         if len(t) > 1 and t not in STOP_WORDS:
             result.append(t)
     return result
@@ -211,23 +213,14 @@ def cosine_similarity(a: dict[str, float], b: dict[str, float], idf: dict[str, f
 
 
 class TfIdfModel:
-    def __init__(self) -> None:
-        self.intents = list(CORPUS.keys())
+    def __init__(self, corpus: dict[str, list[str]]) -> None:
+        self.intents = list(corpus.keys())
         intent_docs = []
         for intent in self.intents:
-            for doc in CORPUS[intent]:
+            for doc in corpus[intent]:
                 intent_docs.append(normalize(doc))
         self.idf = compute_idf(intent_docs)
-
-
-_model: TfIdfModel | None = None
-
-
-def get_model() -> TfIdfModel:
-    global _model
-    if _model is None:
-        _model = TfIdfModel()
-    return _model
+        self.corpus = corpus
 
 
 class Score(TypedDict):
@@ -242,7 +235,18 @@ class TfIdfResult(TypedDict):
 
 
 def classify_intent(text: str) -> TfIdfResult:
-    m = get_model()
+    # Build model on the fly from rules
+    # In a real scenario, this model itself should be cached, but for now we build it from the cached rules
+    intents_struct = INTENT
+    intent_keys = list(intents_struct.values())
+    
+    corpus = {}
+    for intent in intent_keys:
+        rule_key = f"intent_keywords_{intent}"
+        data = get_nlu_rule(rule_key, {"keywords": []})
+        corpus[intent] = data.get("keywords", [])
+        
+    m = TfIdfModel(corpus)
     query_tokens = normalize(text)
     if not query_tokens:
         return {"intent": INTENT["DESCONOCIDO"], "confidence": 0.0, "scores": []}
@@ -252,7 +256,7 @@ def classify_intent(text: str) -> TfIdfResult:
 
     for intent in m.intents:
         max_sim = 0.0
-        for doc in CORPUS[intent]:
+        for doc in m.corpus[intent]:
             doc_tf = compute_tf(normalize(doc))
             sim = cosine_similarity(query_tf, doc_tf, m.idf)
             if sim > max_sim:
