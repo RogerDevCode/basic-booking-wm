@@ -33,7 +33,7 @@ async def find_or_create_client(db: DBClient, user_id: str, user: dict[str, Any]
         if rows:
             return ok(dict(rows[0]))
 
-        # Auto-create (no default timezone_id provided since it's an int and we don't know America/Mexico_City id)
+        # Auto-create (no default timezone_id provided since it's an int and we don't know America/Santiago id)
         insert_rows = await db.fetch(
             """
             INSERT INTO clients (name, email, phone, telegram_chat_id)

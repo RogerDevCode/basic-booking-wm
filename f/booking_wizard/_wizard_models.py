@@ -4,8 +4,6 @@ from typing import Literal, TypedDict
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from ..internal._config import DEFAULT_TIMEZONE
-
 
 class WizardState(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
@@ -33,7 +31,7 @@ class InputSchema(BaseModel):
     user_input: str | None = None
     provider_id: str | None = None
     service_id: str | None = None
-    timezone: str = DEFAULT_TIMEZONE
+    timezone: str = "America/Santiago"
 
 
 class WizardResult(TypedDict):

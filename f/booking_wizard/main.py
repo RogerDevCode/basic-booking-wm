@@ -16,6 +16,8 @@ from __future__ import annotations
 
 import re
 
+from ..internal._booking_utils import get_active_booking_for_provider
+
 # ============================================================================
 # PRE-FLIGHT CHECKLIST
 # Mission         : Multi-step appointment booking flow (availability → confirmation → creation)
@@ -105,6 +107,40 @@ async def _main_async(args: dict[str, object]) -> Result[dict[str, object]]:
             elif action == "confirm":
                 if not input_data.provider_id or not input_data.service_id:
                     return fail("missing_data_for_confirm")
+
+                # Check for duplicate active booking (Rule BE-02)
+                err_dup, active_booking = await get_active_booking_for_provider(
+                    conn, state.client_id, input_data.provider_id
+                )
+                if not err_dup and active_booking:
+                    st = active_booking["start_time"]
+                    fmt_time = st.strftime("%d/%m %H:%M") if hasattr(st, "strftime") else str(st)
+
+                    target_date = state.selected_date
+                    target_time = state.selected_time
+
+                    ars_callback = f"ars:{active_booking['booking_id']}:{target_date}:{target_time}"
+
+                    message = (
+                        f"\u2139\ufe0f *Ya tienes una cita activa*\n\n"
+                        f"Tienes una cita con *{active_booking['provider_name']}* para el *{fmt_time}*.\n\n"
+                        f"\u00bfDeseas reagendar esa cita para el nuevo horario "
+                        f"(*{target_date}* a las *{target_time}*) o prefieres volver al men\u00fa?"
+                    )
+
+                    reply_kb = [
+                        [{"text": "\ud83d\udd04 S\u00ed, reagendar cita", "callback_data": ars_callback}],
+                        ["\u00ab Volver al men\u00fa"],
+                    ]
+
+                    return None, {
+                        "message": message,
+                        "reply_keyboard": reply_kb,
+                        "new_state": state,
+                        "force_reply": False,
+                        "reply_placeholder": "",
+                        "is_complete": False,
+                    }
 
                 err_create, _bid = await repo.create_booking(
                     state.client_id,

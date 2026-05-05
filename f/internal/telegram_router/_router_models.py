@@ -12,6 +12,8 @@ class RouterInput(BaseModel):
     user_input: str
     state: dict[str, Any] | None = None
     items: list[dict[str, Any]] | None = None
+    phone: str | None = None
+    client_name: str | None = None
 
 
 class RouterResult(BaseModel):
@@ -22,3 +24,4 @@ class RouterResult(BaseModel):
     nextDraft: dict[str, Any] | None = None
     inline_buttons: list[dict[str, Any]] | None = None
     active_flow: str | None = None
+    registration_data: dict[str, str | None] | None = None

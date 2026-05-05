@@ -1,8 +1,11 @@
-from typing import TypedDict
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, TypedDict
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from f.internal.scheduling_engine import TimeSlot
+if TYPE_CHECKING:
+    from f.internal.scheduling_engine import TimeSlot
 
 
 class InputSchema(BaseModel):

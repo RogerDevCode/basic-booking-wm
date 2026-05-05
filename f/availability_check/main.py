@@ -14,8 +14,10 @@
 # ///
 from __future__ import annotations
 
+from typing import Any, cast
+
 from ..internal._db_client import create_db_client
-from ..internal._result import Result, with_tenant_context
+from ..internal._result import Result, ok, with_tenant_context
 from ..internal._wmill_adapter import log
 from ..internal.scheduling_engine import get_availability
 from ._availability_logic import get_provider, get_provider_service_id
@@ -35,7 +37,10 @@ from ._availability_models import AvailabilityResult, InputSchema
 MODULE = "availability_check"
 
 
-async def main_async(args: dict[str, object]) -> Result[AvailabilityResult]:
+async def main_async(args: dict[str, Any]) -> Result[AvailabilityResult]:
+    """
+    Business logic entrypoint.
+    """
     try:
         input_data = InputSchema.model_validate(args)
     except Exception as e:
@@ -45,14 +50,17 @@ async def main_async(args: dict[str, object]) -> Result[AvailabilityResult]:
     try:
 
         async def operation() -> Result[AvailabilityResult]:
+            # 1. Resolve Provider
             provider = await get_provider(conn, input_data.provider_id)
             if not provider:
                 return Exception(f"Provider {input_data.provider_id} not found or inactive"), None
 
+            # 2. Resolve Service
             effective_service_id = input_data.service_id or await get_provider_service_id(conn, input_data.provider_id)
             if not effective_service_id:
                 return Exception("No services available for this provider"), None
 
+            # 3. Fetch Availability from engine
             sched_err, sched_result = await get_availability(
                 conn,
                 {
@@ -66,8 +74,9 @@ async def main_async(args: dict[str, object]) -> Result[AvailabilityResult]:
                 return sched_err, None
 
             if not sched_result:
-                return Exception("No availability data returned"), None
+                return Exception("No availability data returned from engine"), None
 
+            # 4. Map Result
             res: AvailabilityResult = {
                 "provider_id": input_data.provider_id,
                 "provider_name": str(provider["name"]),
@@ -79,7 +88,7 @@ async def main_async(args: dict[str, object]) -> Result[AvailabilityResult]:
                 "is_blocked": bool(sched_result["is_blocked"]),
                 "block_reason": str(sched_result["block_reason"]) if sched_result["block_reason"] else None,
             }
-            return None, res
+            return ok(res)
 
         return await with_tenant_context(conn, input_data.tenant_id, operation)
 
@@ -90,17 +99,12 @@ async def main_async(args: dict[str, object]) -> Result[AvailabilityResult]:
         await conn.close()
 
 
-async def _main_async(args: dict[str, object]) -> Result[AvailabilityResult]:
-    """Windmill entrypoint."""
-    return await main_async(args)
-
-
-def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
+def main(args: InputSchema | dict[str, Any]) -> dict[str, Any]:
+    """
+    Windmill sync wrapper.
+    """
     import asyncio
     import traceback
-    from typing import cast
-
-    from pydantic import BaseModel
 
     try:
         if isinstance(args, InputSchema):
@@ -108,19 +112,14 @@ def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
         else:
             validated = InputSchema.model_validate(args)
 
-        err, result = asyncio.run(_main_async(validated.model_dump()))
+        err, result = asyncio.run(main_async(validated.model_dump()))
         if err:
             raise err
 
         if result is None:
             return {}
 
-        if isinstance(result, BaseModel):
-            return cast("dict[str, object]", result.model_dump())
-        elif isinstance(result, dict):
-            return cast("dict[str, object]", result)
-        else:
-            return {"data": result}
+        return cast("dict[str, Any]", result)
 
     except Exception as e:
         tb = traceback.format_exc()

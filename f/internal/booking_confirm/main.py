@@ -21,6 +21,22 @@ from .._wmill_adapter import log
 
 MODULE: Final[str] = "booking_confirm"
 
+_MSG_SLOT_TAKEN: Final[str] = "Ese horario ya fue reservado por otra persona. Por favor elige un horario diferente."
+_MSG_NO_SERVICE: Final[str] = (
+    "El profesional seleccionado no tiene servicios disponibles en este momento. Intenta con otro profesional."
+)
+_MSG_GENERIC: Final[str] = "No pudimos confirmar tu cita en este momento. Por favor intenta de nuevo en unos minutos."
+
+
+def _user_message(err: Exception | str) -> str:
+    """Map a technical error to a safe, user-friendly Spanish message."""
+    msg = str(err).lower()
+    if "duplicate" in msg or "unique" in msg or "already" in msg:
+        return _MSG_SLOT_TAKEN
+    if "no_service_for_provider" in msg:
+        return _MSG_NO_SERVICE
+    return _MSG_GENERIC
+
 
 async def _resolve_service_id(provider_id: str) -> str | None:
     """Look up the active service_id for a given provider."""
@@ -53,7 +69,7 @@ async def _main_async(
     service_id = await _resolve_service_id(provider_id)
     if not service_id:
         log("BOOKING_CONFIRM_NO_SERVICE", provider_id=provider_id, module=MODULE)
-        return {"success": False, "error": "no_service_for_provider"}
+        return {"success": False, "error": "no_service_for_provider", "user_message": _MSG_NO_SERVICE}
 
     # 2. Idempotency key scoped to Telegram chat + slot
     idempotency_key = f"tg:{chat_id}:{start_time}"
@@ -73,15 +89,17 @@ async def _main_async(
 
     if err:
         log("BOOKING_CONFIRM_FAILED", error=str(err), chat_id=chat_id, module=MODULE)
-        return {"success": False, "error": str(err)}
+        return {"success": False, "error": str(err), "user_message": _user_message(err)}
 
     if not result:
-        return {"success": False, "error": "no_result_from_booking_create"}
+        return {"success": False, "error": "no_result_from_booking_create", "user_message": _MSG_GENERIC}
 
-    log("BOOKING_CONFIRM_OK", booking_id=str(result["booking_id"]), chat_id=chat_id, module=MODULE)
+    booking_id = str(result["booking_id"])
+    log("BOOKING_CONFIRM_OK", booking_id=booking_id, chat_id=chat_id, module=MODULE)
     return {
         "success": True,
-        "booking_id": str(result["booking_id"]),
+        "booking_id": booking_id,
+        "booking_short_id": booking_id[:8].upper(),
         "provider_name": str(result["provider_name"]),
         "service_name": str(result["service_name"]),
         "start_time": str(result["start_time"]),

@@ -14,7 +14,7 @@ class InputSchema(BaseModel):
     service_id: str
     start_time: datetime
     idempotency_key: str = Field(min_length=1)
-    notes: str | None = None
+    notes: str | None = Field(default=None, max_length=500)
     actor: Literal["client", "provider", "system"] = "client"
     channel: Literal["telegram", "web", "api"] = "api"
 
@@ -47,7 +47,6 @@ class ClientContext(TypedDict):
 class ProviderContext(TypedDict):
     id: str
     name: str
-    timezone: str
 
 
 class ServiceContext(TypedDict):

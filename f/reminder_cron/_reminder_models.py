@@ -4,8 +4,6 @@ from typing import Literal, TypedDict
 
 from pydantic import BaseModel, ConfigDict
 
-from ..internal._config import DEFAULT_TIMEZONE
-
 
 class ReminderPrefs(TypedDict, total=False):
     telegram_24h: bool
@@ -47,7 +45,7 @@ class InputSchema(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
 
     dry_run: bool = False
-    timezone: str = DEFAULT_TIMEZONE
+    timezone: str = "America/Santiago"
 
 
 ReminderWindow = Literal["24h", "2h", "30min"]

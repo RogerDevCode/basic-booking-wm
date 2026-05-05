@@ -49,7 +49,7 @@ async def handle_get_my_bookings(conn: DBClient, input_data: OrchestratorInput) 
     if err or rows is None:
         return err or Exception("Failed to fetch bookings"), None
 
-    tz = zoneinfo.ZoneInfo("America/Mexico_City")
+    tz = zoneinfo.ZoneInfo("America/Santiago")
     lines: list[str] = []
     for r in rows:
         st = r["start_time"]

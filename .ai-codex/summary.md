@@ -37,18 +37,18 @@
 - 🔧 `fn` `main` (L67)
 
 ### `f/availability_check/_availability_logic.py`
-- ⚡ `async_fn` `get_provider_service_id` (L5)
-- ⚡ `async_fn` `get_provider` (L20)
+- ⚡ `async_fn` `get_provider_service_id` (L10)
+- ⚡ `async_fn` `get_provider` (L28)
 
 ### `f/availability_check/_availability_models.py`
-- 📦 `class` `InputSchema` (L8)
-- 📦 `class` `AvailabilityResult` (L19)
-- 📦 `class` `ProviderRow` (L31)
+- 📦 `class` `InputSchema` (L11)
+- 📦 `class` `AvailabilityResult` (L22)
+- 📦 `class` `ProviderRow` (L34)
 
 ### `f/availability_check/main.py`
-- ⚡ `async_fn` `main_async` (L38)
-- ⚡ `async_fn` `operation` (L47)
-- 🔧 `fn` `main` (L98)
+- ⚡ `async_fn` `main_async` (L40)
+- ⚡ `async_fn` `operation` (L52)
+- 🔧 `fn` `main` (L102)
 
 ### `f/booking_cancel/_booking_cancel_models.py`
 - 📦 `class` `CancelBookingInput` (L8)
@@ -71,13 +71,13 @@
 - ⚡ `async_fn` `trigger_gcal_sync` (L109)
 
 ### `f/booking_cancel/_cancel_booking_logic.py`
-- 🔧 `fn` `authorize_actor` (L7)
-- ⚡ `async_fn` `execute_cancel_booking` (L17)
+- 🔧 `fn` `authorize_actor` (L13)
+- ⚡ `async_fn` `execute_cancel_booking` (L33)
 
 ### `f/booking_cancel/main.py`
 - ⚡ `async_fn` `main_async` (L42)
-- ⚡ `async_fn` `operation` (L77)
-- 🔧 `fn` `main` (L118)
+- ⚡ `async_fn` `operation` (L75)
+- 🔧 `fn` `main` (L107)
 
 ### `f/booking_create/_booking_create_models.py`
 - 📦 `class` `InputSchema` (L9)
@@ -85,8 +85,8 @@
 - 📦 `class` `BookingCreated` (L32)
 - 📦 `class` `ClientContext` (L42)
 - 📦 `class` `ProviderContext` (L47)
-- 📦 `class` `ServiceContext` (L53)
-- 📦 `class` `BookingContext` (L59)
+- 📦 `class` `ServiceContext` (L52)
+- 📦 `class` `BookingContext` (L58)
 
 ### `f/booking_create/_booking_create_repository.py`
 - 📦 `class` `BookingCreateRepository` (L19)
@@ -138,7 +138,7 @@
 - ⚡ `async_fn` `handle_cancel_booking` (L26)
 
 ### `f/booking_orchestrator/handlers/_create.py`
-- ⚡ `async_fn` `handle_create_booking` (L24)
+- ⚡ `async_fn` `handle_create_booking` (L25)
 
 ### `f/booking_orchestrator/handlers/_get_my_bookings.py`
 - ⚡ `async_fn` `handle_get_my_bookings` (L24)
@@ -154,8 +154,8 @@
 - 🔧 `fn` `main` (L113)
 
 ### `f/booking_reschedule/_reschedule_logic.py`
-- 🔧 `fn` `authorize` (L9)
-- ⚡ `async_fn` `execute_reschedule_logic` (L19)
+- 🔧 `fn` `authorize` (L14)
+- ⚡ `async_fn` `execute_reschedule_logic` (L33)
 
 ### `f/booking_reschedule/_reschedule_models.py`
 - 📦 `class` `RescheduleInput` (L12)
@@ -178,9 +178,9 @@
 - ⚡ `async_fn` `execute_reschedule` (L89)
 
 ### `f/booking_reschedule/main.py`
-- ⚡ `async_fn` `main_async` (L40)
-- ⚡ `async_fn` `operation` (L83)
-- 🔧 `fn` `main` (L127)
+- ⚡ `async_fn` `main_async` (L43)
+- ⚡ `async_fn` `operation` (L91)
+- 🔧 `fn` `main` (L131)
 
 ### `f/booking_search/_search_logic.py`
 - ⚡ `async_fn` `execute_search` (L11)
@@ -215,8 +215,8 @@
 - 📦 `class` `WizardResult` (L39)
 
 ### `f/booking_wizard/main.py`
-- ⚡ `async_fn` `operation` (L56)
-- 🔧 `fn` `main` (L167)
+- ⚡ `async_fn` `operation` (L58)
+- 🔧 `fn` `main` (L203)
 
 ### `f/circuit_breaker/_circuit_logic.py`
 - ⚡ `async_fn` `get_state` (L11)
@@ -369,10 +369,14 @@
 ### `f/health_check/main.py`
 - 🔧 `fn` `main` (L82)
 
+### `f/internal/_booking_utils.py`
+- 📦 `class` `ActiveBookingInfo` (L8)
+- ⚡ `async_fn` `get_active_booking_for_provider` (L14)
+
 ### `f/internal/_config.py`
-- 🔧 `fn` `get_env` (L59)
-- 🔧 `fn` `require_env` (L63)
-- 🔧 `fn` `require_database_url` (L70)
+- 🔧 `fn` `get_env` (L54)
+- 🔧 `fn` `require_env` (L58)
+- 🔧 `fn` `require_database_url` (L65)
 
 ### `f/internal/_crypto.py`
 - 🔧 `fn` `hash_password` (L19)
@@ -385,9 +389,9 @@
 
 ### `f/internal/_date_resolver.py`
 - 📦 `class` `ResolveDateOpts` (L21)
-- 🔧 `fn` `resolve_date` (L84)
-- 🔧 `fn` `resolve_time` (L143)
-- 🔧 `fn` `today_ymd` (L170)
+- 🔧 `fn` `resolve_date` (L82)
+- 🔧 `fn` `resolve_time` (L141)
+- 🔧 `fn` `today_ymd` (L168)
 
 ### `f/internal/_db_client.py`
 - ⚡ `async_fn` `fetch` (L17)
@@ -432,10 +436,10 @@
 ### `f/internal/_wmill_adapter.py`
 - 🔧 `fn` `is_dict_str_obj` (L20)
 - 🔧 `fn` `get_variable_safe` (L24)
-- 🔧 `fn` `get_variable` (L32)
-- 🔧 `fn` `get_resource_safe` (L43)
-- 🔧 `fn` `run_script` (L54)
-- 🔧 `fn` `log` (L66)
+- 🔧 `fn` `get_variable` (L34)
+- 🔧 `fn` `get_resource_safe` (L45)
+- 🔧 `fn` `run_script` (L56)
+- 🔧 `fn` `log` (L68)
 
 ### `f/internal/ai_agent/_ai_agent_logic.py`
 - 🔧 `fn` `adjust_intent_with_context` (L28)
@@ -505,13 +509,13 @@
 - 🔧 `fn` `main` (L24)
 
 ### `f/internal/booking_confirm/main.py`
-- 🔧 `fn` `main` (L91)
+- 🔧 `fn` `main` (L107)
 
 ### `f/internal/booking_fsm/_fsm_machine.py`
 - 🔧 `fn` `parse_action` (L51)
-- 🔧 `fn` `parse_callback_data` (L73)
-- 🔧 `fn` `apply_transition` (L90)
-- 🔧 `fn` `flow_step_from_state` (L372)
+- 🔧 `fn` `parse_callback_data` (L78)
+- 🔧 `fn` `apply_transition` (L95)
+- 🔧 `fn` `flow_step_from_state` (L377)
 
 ### `f/internal/booking_fsm/_fsm_models.py`
 - 📦 `class` `NamedItem` (L20)
@@ -551,6 +555,9 @@
 
 ### `f/internal/booking_prefetch/main.py`
 - 🔧 `fn` `main` (L199)
+
+### `f/internal/client_register/main.py`
+- 🔧 `fn` `main` (L71)
 
 ### `f/internal/conversation_get/_conversation_models.py`
 - 📦 `class` `ConversationState` (L8)
@@ -597,6 +604,12 @@
 - ⚡ `async_fn` `refresh_access_token` (L52)
 - ⚡ `async_fn` `persist_new_token` (L79)
 
+### `f/internal/intercept_debug/main.py`
+- 🔧 `fn` `main` (L14)
+
+### `f/internal/intercept_outbound/main.py`
+- 🔧 `fn` `main` (L15)
+
 ### `f/internal/message_parser/main.py`
 - 📦 `class` `ParserInput` (L20)
 - 📦 `class` `ParserResult` (L26)
@@ -642,10 +655,10 @@
 
 ### `f/internal/telegram_router/_router_models.py`
 - 📦 `class` `RouterInput` (L8)
-- 📦 `class` `RouterResult` (L17)
+- 📦 `class` `RouterResult` (L19)
 
 ### `f/internal/telegram_router/main.py`
-- 🔧 `fn` `main` (L180)
+- 🔧 `fn` `main` (L373)
 
 ### `f/nlu/_tfidf_classifier.py`
 - 📦 `class` `ModelData` (L234)
@@ -691,15 +704,16 @@
 - 🔧 `fn` `main` (L84)
 
 ### `f/patient_register/_patient_logic.py`
-- ⚡ `async_fn` `upsert_client` (L7)
+- ⚡ `async_fn` `upsert_client` (L12)
 
 ### `f/patient_register/_patient_models.py`
-- 📦 `class` `ClientResult` (L6)
-- 📦 `class` `InputSchema` (L16)
+- 📦 `class` `ClientResult` (L8)
+- 📦 `class` `InputSchema` (L18)
 
 ### `f/patient_register/main.py`
-- ⚡ `async_fn` `operation` (L54)
-- 🔧 `fn` `main` (L66)
+- ⚡ `async_fn` `main_async` (L39)
+- ⚡ `async_fn` `operation` (L62)
+- 🔧 `fn` `main` (L77)
 
 ### `f/provider_agenda/_agenda_logic.py`
 - ⚡ `async_fn` `get_provider_agenda` (L12)
@@ -787,41 +801,43 @@
 
 ### `f/telegram_auto_register/_auto_register_models.py`
 - 📦 `class` `RegisterResult` (L6)
-- 📦 `class` `InputSchema` (L12)
+- 📦 `class` `InputSchema` (L14)
 
 ### `f/telegram_auto_register/main.py`
 - ⚡ `async_fn` `operation` (L46)
 - 🔧 `fn` `main` (L58)
 
 ### `f/telegram_callback/_callback_logic.py`
-- 🔧 `fn` `parse_callback_data` (L18)
-- ⚡ `async_fn` `confirm_booking` (L32)
-- ⚡ `async_fn` `update_booking_status` (L65)
-- ⚡ `async_fn` `answer_callback_query` (L115)
-- ⚡ `async_fn` `send_followup_message` (L131)
+- 🔧 `fn` `parse_callback_data` (L19)
+- ⚡ `async_fn` `confirm_booking` (L39)
+- ⚡ `async_fn` `update_booking_status` (L72)
+- ⚡ `async_fn` `answer_callback_query` (L122)
+- ⚡ `async_fn` `send_followup_message` (L138)
 
 ### `f/telegram_callback/_callback_models.py`
 - 📦 `class` `InputSchema` (L8)
 - 📦 `class` `ActionContext` (L19)
-- 📦 `class` `ActionResult` (L28)
-- 📦 `class` `ActionHandler` (L33)
-- ⚡ `async_fn` `handle` (L34)
+- 📦 `class` `ActionResult` (L30)
+- 📦 `class` `ActionHandler` (L35)
+- ⚡ `async_fn` `handle` (L36)
 
 ### `f/telegram_callback/_callback_router.py`
-- 📦 `class` `ConfirmHandler` (L7)
-- ⚡ `async_fn` `handle` (L8)
-- ⚡ `async_fn` `operation` (L12)
-- 📦 `class` `CancelHandler` (L39)
-- ⚡ `async_fn` `handle` (L40)
-- ⚡ `async_fn` `operation` (L44)
-- 📦 `class` `AcknowledgeHandler` (L76)
-- ⚡ `async_fn` `handle` (L77)
-- 📦 `class` `TelegramRouter` (L81)
-- 🔧 `fn` `register` (L85)
-- ⚡ `async_fn` `route` (L88)
+- 📦 `class` `ConfirmHandler` (L9)
+- ⚡ `async_fn` `handle` (L10)
+- ⚡ `async_fn` `operation` (L14)
+- 📦 `class` `CancelHandler` (L41)
+- ⚡ `async_fn` `handle` (L42)
+- ⚡ `async_fn` `operation` (L46)
+- 📦 `class` `AcknowledgeHandler` (L78)
+- ⚡ `async_fn` `handle` (L79)
+- 📦 `class` `AutoRescheduleHandler` (L83)
+- ⚡ `async_fn` `handle` (L84)
+- 📦 `class` `TelegramRouter` (L124)
+- 🔧 `fn` `register` (L128)
+- ⚡ `async_fn` `route` (L131)
 
 ### `f/telegram_callback/main.py`
-- 🔧 `fn` `main` (L101)
+- 🔧 `fn` `main` (L105)
 
 ### `f/telegram_gateway/_gateway_logic.py`
 - 📦 `class` `TelegramClient` (L14)
@@ -1207,18 +1223,26 @@
 - `f/health_check/_health_logic.script.yaml`
 - `f/health_check/_health_models.script.yaml`
 - `f/health_check/main.script.yaml`
+- `f/internal/_booking_utils.script.yaml`
+- `f/internal/_config.script.yaml`
+- `f/internal/_date_resolver.script.yaml`
 - `f/internal/_db_client.script.yaml`
 - `f/internal/_redis_client.script.yaml`
 - `f/internal/_wmill_adapter.script.yaml`
+- `f/internal/apply_fix_migration.script.yaml`
 - `f/internal/booking_confirm/main.script.yaml`
 - `f/internal/booking_fsm/_fsm_machine.script.yaml`
 - `f/internal/booking_prefetch/main.script.yaml`
+- `f/internal/client_register/main.script.yaml`
 - `f/internal/conversation_verify/main.script.yaml`
 - `f/internal/debug_schedules.script.yaml`
+- `f/internal/intercept_debug/main.script.yaml`
+- `f/internal/intercept_outbound/main.script.yaml`
 - `f/internal/scheduling_engine/_scheduling_logic.script.yaml`
 - `f/internal/seed_test_schedules.script.yaml`
 - `f/internal/telegram_classify/main.script.yaml`
 - `f/internal/telegram_normalize/main.script.yaml`
+- `f/internal/telegram_router/_router_models.script.yaml`
 - `f/internal/telegram_router/main.script.yaml`
 - `f/nlu/__init__.script.yaml`
 - `f/nlu/_constants.script.yaml`

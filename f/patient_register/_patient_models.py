@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import TypedDict
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
@@ -9,7 +11,7 @@ class ClientResult(TypedDict):
     email: str | None
     phone: str | None
     telegram_chat_id: str | None
-    timezone_id: int | None
+    timezone: str
     created: bool
 
 
@@ -18,9 +20,9 @@ class InputSchema(BaseModel):
 
     name: str = Field(min_length=1, max_length=200)
     email: EmailStr | None = None
-    phone: str | None = Field(None, max_length=50)
+    phone: str | None = None
     telegram_chat_id: str | None = None
-    timezone_id: int | None = None
+    timezone: str | None = None
     idempotency_key: str | None = None
     provider_id: str | None = None
     client_id: str | None = None

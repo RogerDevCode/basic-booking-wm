@@ -69,6 +69,9 @@ async def _main_async(args: dict[str, object]) -> Result[dict[str, object]]:
     router.register("confirm", ConfirmHandler())
     router.register("cancel", CancelHandler())
     router.register("acknowledge", AcknowledgeHandler())
+    from ._callback_router import AutoRescheduleHandler
+
+    router.register("auto_reschedule", AutoRescheduleHandler())
 
     context: ActionContext = {
         "botToken": bot_token,
@@ -77,6 +80,8 @@ async def _main_async(args: dict[str, object]) -> Result[dict[str, object]]:
         "client_id": input_data.client_id,
         "chat_id": input_data.chat_id,
         "callback_query_id": input_data.callback_query_id,
+        "date": parsed_cb.get("date"),
+        "time": parsed_cb.get("time"),
     }
 
     err_route, result = await router.route(action, context)

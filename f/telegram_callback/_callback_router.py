@@ -1,3 +1,5 @@
+from f.booking_reschedule.main import main_async as reschedule_booking
+
 from ..internal._db_client import create_db_client
 from ..internal._result import Result, ok, with_tenant_context
 from ._callback_logic import confirm_booking, update_booking_status
@@ -76,6 +78,47 @@ class CancelHandler:
 class AcknowledgeHandler:
     async def handle(self, context: ActionContext) -> Result[ActionResult]:
         return ok({"responseText": "Entendido", "followUpText": None})
+
+
+class AutoRescheduleHandler:
+    async def handle(self, context: ActionContext) -> Result[ActionResult]:
+        booking_id = context["booking_id"]
+        date = context.get("date")
+        time = context.get("time")
+
+        if not date or not time:
+            return ok(
+                {
+                    "responseText": "\u26a0\ufe0f Error de datos",
+                    "followUpText": "No se pudo obtener la nueva fecha/hora para reagendar. Intenta manualmente.",
+                }
+            )
+
+        args: dict[str, object] = {
+            "booking_id": booking_id,
+            "new_start_time": f"{date}T{time}:00",
+            "actor": "client",
+            "actor_id": context["client_id"],
+            "reason": "Auto-reschedule via duplicate booking detection",
+            "idempotency_key": f"cb-ars-{booking_id}-{date}-{time}",
+        }
+
+        err, _data = await reschedule_booking(args)
+
+        if err:
+            return ok(
+                {
+                    "responseText": "\u274c No se pudo reagendar",
+                    "followUpText": f"Hubo un problema al reagendar: {err}",
+                }
+            )
+
+        return ok(
+            {
+                "responseText": "\u2705 Reagendada con \u00e9xito",
+                "followUpText": f"Tu cita ha sido movida al {date} a las {time}.",
+            }
+        )
 
 
 class TelegramRouter:

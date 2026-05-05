@@ -14,6 +14,14 @@
 # ///
 from __future__ import annotations
 
+from typing import Any, cast
+
+from ..internal._db_client import create_db_client
+from ..internal._result import Result, fail, with_tenant_context
+from ..internal._wmill_adapter import log
+from ._patient_logic import upsert_client
+from ._patient_models import ClientResult, InputSchema
+
 # ============================================================================
 # PRE-FLIGHT CHECKLIST
 # Mission         : Create or update client records
@@ -24,49 +32,54 @@ from __future__ import annotations
 # RLS Tenant ID   : YES — with_tenant_context wraps DB ops
 # Pydantic Schemas: YES — InputSchema validates name, email, phone
 # ============================================================================
-from ..internal._db_client import create_db_client
-from ..internal._result import Result, fail, with_tenant_context
-from ..internal._wmill_adapter import log
-from ._patient_logic import upsert_client
-from ._patient_models import ClientResult, InputSchema
 
 MODULE = "patient_register"
 
 
-async def _main_async(args: dict[str, object]) -> Result[ClientResult]:
+async def main_async(args: dict[str, Any]) -> Result[ClientResult]:
+    """
+    Main business logic execution.
+    """
     # 1. Validate Input
     try:
         input_data = InputSchema.model_validate(args)
     except Exception as e:
         return fail(f"Validation error: {e}")
 
-    # 2. Resolve Tenant
+    # 2. Resolve Tenant Identifier
+    # We require a tenant ID (provider_id or client_id) to activate RLS
     tenant_id = input_data.provider_id or input_data.client_id
     if not tenant_id:
         return fail("tenant_id required for isolation (provider_id or client_id)")
 
-    if not input_data.email and not input_data.phone and not input_data.telegram_chat_id:
+    # 3. Minimum Identification Requirement
+    if not any([input_data.email, input_data.phone, input_data.telegram_chat_id]):
         return fail("At least one identifier required (email, phone, or telegram_chat_id)")
 
     conn = await create_db_client()
     try:
-        # 3. Execute with Tenant Context
+        # 4. Execute operation within tenant context
         async def operation() -> Result[ClientResult]:
-            return await upsert_client(conn, input_data)
+            try:
+                return await upsert_client(conn, input_data)
+            except Exception as e_logic:
+                return fail(f"logic_execution_error: {e_logic}")
 
         return await with_tenant_context(conn, tenant_id, operation)
 
     except Exception as e:
-        log("Internal error in patient_register", error=str(e), module=MODULE)
-        return fail(f"internal_error: {e}")
+        log("Unexpected error in patient_register", error=str(e), module=MODULE)
+        return fail(f"internal_database_error: {e}")
     finally:
         await conn.close()
 
 
-def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
+def main(args: InputSchema | dict[str, Any]) -> dict[str, Any]:
+    """
+    Windmill sync wrapper.
+    """
     import asyncio
     import traceback
-    from typing import cast
 
     from pydantic import BaseModel
 
@@ -76,7 +89,7 @@ def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
         else:
             validated = InputSchema.model_validate(args)
 
-        err, result = asyncio.run(_main_async(validated.model_dump()))
+        err, result = asyncio.run(main_async(validated.model_dump()))
         if err:
             raise err
 
@@ -84,11 +97,9 @@ def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
             return {}
 
         if isinstance(result, BaseModel):
-            return cast("dict[str, object]", result.model_dump())
-        elif isinstance(result, dict):
-            return cast("dict[str, object]", result)
-        else:
-            return {"data": result}
+            return cast("dict[str, Any]", result.model_dump())
+
+        return cast("dict[str, Any]", result)
 
     except Exception as e:
         tb = traceback.format_exc()

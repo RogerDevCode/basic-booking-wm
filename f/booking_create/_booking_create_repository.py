@@ -49,7 +49,7 @@ class PostgresBookingCreateRepository:
     async def get_provider_context(self, provider_id: str) -> ProviderContext | None:
         row = await self._client.fetchrow(
             """
-            SELECT provider_id, name, timezone FROM providers
+            SELECT provider_id, name FROM providers
             WHERE provider_id = $1::uuid AND is_active = true
             LIMIT 1
             FOR UPDATE
@@ -58,7 +58,7 @@ class PostgresBookingCreateRepository:
         )
         if not row:
             return None
-        return {"id": str(row["provider_id"]), "name": str(row["name"]), "timezone": str(row["timezone"])}
+        return {"id": str(row["provider_id"]), "name": str(row["name"])}
 
     async def get_service_context(self, service_id: str, provider_id: str) -> ServiceContext | None:
         row = await self._client.fetchrow(

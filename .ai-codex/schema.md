@@ -12,7 +12,7 @@ name         TEXT NOT NULL
 email        TEXT UNIQUE NOT NULL
 phone        TEXT
 specialty    TEXT NOT NULL
-timezone     TEXT DEFAULT 'America/Mexico_City'
+timezone     TEXT DEFAULT 'America/Santiago'
 is_active    BOOLEAN DEFAULT true
 -- Extended fields (from web_provider_profile queries):
 password_hash          TEXT
@@ -63,7 +63,7 @@ client_id  UUID PK
 name       TEXT NOT NULL
 email      TEXT UNIQUE
 phone      TEXT
-timezone   TEXT DEFAULT 'America/Mexico_City'
+timezone   TEXT DEFAULT 'America/Santiago'
 -- user_id  UUID (links to auth users table)
 ```
 

@@ -20,10 +20,7 @@ Zod Schemas      : NO
 
 class ResolveDateOpts(TypedDict, total=False):
     referenceDate: str | None
-    timezone: str | None
-
-
-DEFAULT_TIMEZONE: Final[str] = "America/Mexico_City"
+    timezone: str
 
 
 def _normalise(s: str) -> str:
@@ -86,10 +83,10 @@ def resolve_date(input_str: str, opts: ResolveDateOpts | None = None) -> str | N
     Resolves a user-supplied date string to an absolute YYYY-MM-DD date.
     Returns None if unrecognised.
     """
-    if opts is None:
-        opts = {}
+    if opts is None or not opts.get("timezone"):
+        raise ValueError("Timezone is required but was not provided.")
 
-    tz = opts.get("timezone") or DEFAULT_TIMEZONE
+    tz = opts["timezone"]
     ref = opts.get("referenceDate") or _today_in_timezone(tz)
     src = _normalise(input_str)
 

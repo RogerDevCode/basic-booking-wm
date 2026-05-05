@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS patients (
     phone             TEXT,
     telegram_chat_id  TEXT,
     gcal_calendar_id  TEXT,
-    timezone          TEXT DEFAULT 'America/Mexico_City',
+    timezone          TEXT DEFAULT 'America/Santiago',
     metadata          JSONB DEFAULT '{}',
     created_at        TIMESTAMPTZ DEFAULT NOW(),
     updated_at        TIMESTAMPTZ DEFAULT NOW()
@@ -181,7 +181,7 @@ UPDATE providers
 ALTER TABLE providers 
     ADD COLUMN IF NOT EXISTS specialty TEXT,
     ADD COLUMN IF NOT EXISTS phone TEXT,
-    ADD COLUMN IF NOT EXISTS timezone TEXT DEFAULT 'America/Mexico_City';
+    ADD COLUMN IF NOT EXISTS timezone TEXT DEFAULT 'America/Santiago';
 
 -- Make provider_id NOT NULL and set as primary key
 ALTER TABLE providers 

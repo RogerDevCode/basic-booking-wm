@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS providers_new (
     specialty         TEXT NOT NULL DEFAULT 'Medicina General',
     telegram_chat_id  TEXT,
     gcal_calendar_id  TEXT,
-    timezone          TEXT NOT NULL DEFAULT 'America/Mexico_City',
+    timezone          TEXT NOT NULL DEFAULT 'America/Santiago',
     is_active         BOOLEAN DEFAULT true,
     created_at        TIMESTAMPTZ DEFAULT NOW(),
     updated_at        TIMESTAMPTZ DEFAULT NOW()
@@ -193,7 +193,7 @@ CREATE TABLE IF NOT EXISTS clients (
     phone             TEXT,
     telegram_chat_id  TEXT,
     gcal_calendar_id  TEXT,
-    timezone          TEXT DEFAULT 'America/Mexico_City',
+    timezone          TEXT DEFAULT 'America/Santiago',
     metadata          JSONB DEFAULT '{}',
     created_at        TIMESTAMPTZ DEFAULT NOW(),
     updated_at        TIMESTAMPTZ DEFAULT NOW()
@@ -490,7 +490,7 @@ BEGIN
     -- Get provider timezone
     SELECT timezone INTO v_timezone FROM providers WHERE provider_id = p_provider_id;
     IF v_timezone IS NULL THEN
-        v_timezone := 'America/Mexico_City';
+        v_timezone := 'America/Santiago';
     END IF;
     
     -- Check if date is blocked by override

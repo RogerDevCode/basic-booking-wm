@@ -1,0 +1,36 @@
+{
+  "$schema": "https://app.kilo.ai/config.json",
+  "mcp": {
+    "codebase-index": {
+      "type": "local",
+      "command": ["uv", "run", "python", "-m", "mcp_codebase_index.server"],
+      "environment": {
+        "PROJECT_ROOT": "${workspaceFolder}"
+      },
+      "enabled": true
+    },
+    "postgres": {
+      "type": "local",
+      "command": ["npx", "-y", "@sarmadparvez/postgresql-mcp", "postgresql://windmill:windmill@localhost:5432/windmill?sslmode=disable"],
+      "enabled": true
+    },
+    "filesystem": {
+      "type": "local",
+      "command": ["npx", "-y", "@modelcontextprotocol/server-filesystem", "/home/manager/Sync/wildmill-proyects/booking-titanium-wm"],
+      "enabled": true
+    },
+    "sequential-thinking": {
+      "type": "local",
+      "command": ["npx", "-y", "@modelcontextprotocol/server-sequential-thinking"],
+      "enabled": true
+    },
+    "gemini-docs": {
+      "type": "remote",
+      "url": "https://developerknowledge.googleapis.com/mcp",
+      "headers": {
+        "X-Goog-Api-Key": "$GOOGLE_API_KEY"
+      },
+      "enabled": true
+    }
+  }
+}

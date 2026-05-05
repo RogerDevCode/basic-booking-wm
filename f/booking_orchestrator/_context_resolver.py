@@ -59,9 +59,48 @@ async def resolve_context(db: DBClient, input_data: OrchestratorInput) -> Result
             if rows:
                 service_id = str(rows[0]["service_id"])
 
-        # 3. Date/Time Parsing
+        # 3. Resolve Timezone (Fail-Fast if not found)
+        timezone: str | None = None
+        if provider_id:
+            rows = await db.fetch("SELECT timezone FROM providers WHERE provider_id = $1::uuid LIMIT 1", provider_id)
+            if rows and rows[0]["timezone"]:
+                timezone = str(rows[0]["timezone"])
+
+        # 4. Client Resolution by Telegram Chat ID
+        if not client_id and input_data.telegram_chat_id:
+            rows = await db.fetch(
+                "SELECT client_id, timezone FROM clients WHERE telegram_chat_id = $1 LIMIT 1",
+                input_data.telegram_chat_id,
+            )
+            if rows:
+                client_id = str(rows[0]["client_id"])
+                if not timezone and rows[0]["timezone"]:
+                    timezone = str(rows[0]["timezone"])
+            else:
+                # Auto-register client if chat_id known but not in DB
+                name = input_data.telegram_name or "Usuario Telegram"
+                # Use provider timezone as default for new client if available, else it will fail later
+                client_tz = timezone or "UTC"
+                rows = await db.fetch(
+                    "INSERT INTO clients (name, telegram_chat_id, timezone) VALUES ($1, $2, $3) RETURNING client_id",
+                    name,
+                    input_data.telegram_chat_id,
+                    client_tz,
+                )
+                if rows:
+                    client_id = str(rows[0]["client_id"])
+
+        if not timezone and client_id:
+            rows = await db.fetch("SELECT timezone FROM clients WHERE client_id = $1::uuid LIMIT 1", client_id)
+            if rows and rows[0]["timezone"]:
+                timezone = str(rows[0]["timezone"])
+
+        if not timezone:
+            return fail("Timezone resolution failed. A provider or client with a valid timezone is required.")
+
+        # 5. Date/Time Parsing
         if res_date:
-            abs_date = resolve_date(res_date)
+            abs_date = resolve_date(res_date, {"timezone": timezone})
             if abs_date:
                 res_date = abs_date
 
@@ -70,7 +109,7 @@ async def resolve_context(db: DBClient, input_data: OrchestratorInput) -> Result
             if abs_time:
                 res_time = abs_time
 
-        # 4. Tenant Fallback
+        # 6. Tenant Fallback
         # If no tenant is provided, we pick the first one as default or from the resolved provider
         if not tenant_id:
             if provider_id:
@@ -84,25 +123,7 @@ async def resolve_context(db: DBClient, input_data: OrchestratorInput) -> Result
         if not tenant_id:
             return fail("Could not resolve tenant_id")
 
-        # 5. Client Resolution by Telegram Chat ID
-        if not client_id and input_data.telegram_chat_id:
-            rows = await db.fetch(
-                "SELECT client_id FROM clients WHERE telegram_chat_id = $1 LIMIT 1", input_data.telegram_chat_id
-            )
-            if rows:
-                client_id = str(rows[0]["client_id"])
-            else:
-                # Auto-register client if chat_id known but not in DB
-                name = input_data.telegram_name or "Usuario Telegram"
-                rows = await db.fetch(
-                    "INSERT INTO clients (name, telegram_chat_id) VALUES ($1, $2) RETURNING client_id",
-                    name,
-                    input_data.telegram_chat_id,
-                )
-                if rows:
-                    client_id = str(rows[0]["client_id"])
-
-        # 6. Service Fallback (Pick first service of the provider)
+        # 7. Service Fallback (Pick first service of the provider)
         if not service_id and provider_id:
             rows = await db.fetch("SELECT service_id FROM services WHERE provider_id = $1::uuid LIMIT 1", provider_id)
             if rows:

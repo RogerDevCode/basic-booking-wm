@@ -9,6 +9,7 @@ ACTION_MAP: dict[str, str] = {
     "cnf": "confirm",
     "cxl": "cancel",
     "res": "reagendar_cita",
+    "ars": "auto_reschedule",
     "act": "activate_reminders",
     "dea": "deactivate_reminders",
     "ack": "acknowledge",
@@ -17,16 +18,22 @@ ACTION_MAP: dict[str, str] = {
 
 def parse_callback_data(data: str) -> dict[str, str] | None:
     parts = data.split(":")
-    if len(parts) != 2:
+    if len(parts) < 2:
         return None
     action_code = parts[0]
     booking_id = parts[1]
-    if not action_code or not booking_id:
-        return None
+
     action = ACTION_MAP.get(action_code)
     if not action:
         return None
-    return {"action": action, "booking_id": booking_id}
+
+    res = {"action": action, "booking_id": booking_id}
+
+    if action == "auto_reschedule" and len(parts) == 4:
+        res["date"] = parts[2]
+        res["time"] = parts[3]
+
+    return res
 
 
 async def confirm_booking(db: DBClient, booking_id: str, client_id: str | None) -> Result[bool]:

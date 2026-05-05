@@ -10,7 +10,7 @@ async def _main() -> None:
         sql = """
             ALTER TABLE clients ADD COLUMN IF NOT EXISTS telegram_chat_id TEXT;
             ALTER TABLE clients ADD COLUMN IF NOT EXISTS gcal_calendar_id TEXT;
-            ALTER TABLE clients ADD COLUMN IF NOT EXISTS timezone TEXT DEFAULT 'America/Mexico_City';
+            ALTER TABLE clients ADD COLUMN IF NOT EXISTS timezone TEXT DEFAULT 'America/Santiago';
             CREATE INDEX IF NOT EXISTS idx_clients_telegram ON clients(telegram_chat_id);
             ALTER TABLE users ADD COLUMN IF NOT EXISTS telegram_chat_id TEXT;
             CREATE INDEX IF NOT EXISTS idx_users_telegram ON users(telegram_chat_id);

@@ -14,12 +14,12 @@
 # ///
 from __future__ import annotations
 
-from typing import cast
+from typing import Any, cast
 
 from pydantic import ValidationError
 
 from ..internal._db_client import create_db_client
-from ..internal._result import Result, with_tenant_context
+from ..internal._result import Result, fail, ok, with_tenant_context
 from ..internal._wmill_adapter import log
 from ._booking_cancel_models import CancelBookingInput, CancelResult, UpdatedBooking
 from ._booking_cancel_repository import PostgresBookingCancelRepository
@@ -39,88 +39,77 @@ from ._cancel_booking_logic import authorize_actor, execute_cancel_booking
 MODULE = "booking_cancel"
 
 
-async def main_async(args: dict[str, object]) -> Result[CancelResult]:
-    raw_input: object
-    if "rawInput" in args:
-        raw_input = args["rawInput"]
-    else:
-        raw_input = args
-
+async def main_async(args: dict[str, Any]) -> Result[CancelResult]:
+    """
+    Main business logic orchestrator for cancellations.
+    """
+    # 1. Input Sanitization
     try:
+        raw_input = args.get("rawInput", args)
         if not isinstance(raw_input, dict):
-            raise ValueError("Input must be a JSON object")
+            return fail("invalid_input: expected_dictionary")
         input_data = CancelBookingInput.model_validate(raw_input)
     except ValidationError as e:
-        log("validation_failed", error=str(e), module=MODULE)
-        return Exception(f"validation_error: {e}"), None
+        return fail(f"validation_failed: {e}")
     except Exception as e:
-        log("validation_failed", error=str(e), module=MODULE)
-        return Exception(f"validation_error: {e}"), None
+        return fail(f"unexpected_input_error: {e}")
 
-    try:
-        conn = await create_db_client()
-    except Exception as e:
-        return Exception(f"configuration_error: {e}"), None
-
+    conn = await create_db_client()
     try:
         repo = PostgresBookingCancelRepository(conn)
 
-        # Initial Lookup
-        booking = await repo.fetch_booking(input_data.booking_id)
-        if not booking:
-            return Exception(f"booking_not_found: {input_data.booking_id}"), None
+        # 2. Initial Lookup & Authorization (Outside tenant context for lookup)
+        try:
+            booking = await repo.fetch_booking(input_data.booking_id)
+            if not booking:
+                return fail(f"booking_not_found: {input_data.booking_id}")
+        except Exception as e:
+            return fail(f"db_lookup_failed: {e}")
 
+        # 3. Authorization check
         err_auth, _ = authorize_actor(input_data, booking)
-        if err_auth is not None:
-            return err_auth, None
+        if err_auth:
+            return fail(err_auth)
 
+        # 4. Transactional Execution with Tenant Isolation
         async def operation() -> Result[UpdatedBooking]:
-            return await execute_cancel_booking(repo, input_data, booking)
+            try:
+                return await execute_cancel_booking(repo, input_data, booking)
+            except Exception as e_op:
+                return fail(f"cancellation_op_failed: {e_op}")
 
-        # Cast booking to dict[str, object] to avoid Any contamination
-        b_dict = cast("dict[str, object]", booking)
-        tenant_id = str(b_dict["provider_id"])
-
+        tenant_id = str(booking["provider_id"])
         err, updated = await with_tenant_context(conn, tenant_id, operation)
 
-        if err is not None:
-            log("transaction_failed", error=str(err), module=MODULE)
-            return err, None
+        if err or not updated:
+            return fail(err or "cancellation_result_empty")
 
-        if not updated:
-            return Exception("cancel_failed: no result returned"), None
-
-        # Cast updated to dict[str, object] as well
-        u_dict = cast("dict[str, object]", updated)
-
-        result: CancelResult = {
-            "booking_id": str(u_dict["booking_id"]),
-            "previous_status": str(b_dict["status"]),
-            "new_status": str(u_dict["status"]),
-            "cancelled_by": str(u_dict["cancelled_by"]),
-            "cancellation_reason": str(u_dict["cancellation_reason"]) if u_dict.get("cancellation_reason") else None,
-        }
-
-        return None, result
+        # 5. Result Mapping
+        try:
+            result: CancelResult = {
+                "booking_id": str(updated["booking_id"]),
+                "previous_status": str(booking["status"]),
+                "new_status": str(updated["status"]),
+                "cancelled_by": str(updated["cancelled_by"]),
+                "cancellation_reason": updated.get("cancellation_reason"),
+            }
+            return ok(result)
+        except KeyError as e_key:
+            return fail(f"result_mapping_failed: missing_{e_key}")
 
     except Exception as e:
-        log("unexpected_exception", error=str(e), module=MODULE)
-        return Exception(str(e)), None
+        log("CRITICAL_CANCEL_ERROR", error=str(e), module=MODULE)
+        return fail(f"unhandled_cancellation_error: {e}")
     finally:
         await conn.close()
 
 
-async def _main_async(args: dict[str, object]) -> Result[CancelResult]:
-    """Windmill entrypoint."""
-    return await main_async(args)
-
-
-def main(args: CancelBookingInput | dict[str, object]) -> dict[str, object]:
+def main(args: CancelBookingInput | dict[str, Any]) -> dict[str, Any]:
+    """
+    Windmill sync wrapper.
+    """
     import asyncio
     import traceback
-    from typing import cast
-
-    from pydantic import BaseModel
 
     try:
         if isinstance(args, CancelBookingInput):
@@ -128,26 +117,21 @@ def main(args: CancelBookingInput | dict[str, object]) -> dict[str, object]:
         else:
             validated = CancelBookingInput.model_validate(args)
 
-        err, result = asyncio.run(_main_async(validated.model_dump()))
+        err, result = asyncio.run(main_async(validated.model_dump()))
         if err:
             raise err
 
         if result is None:
             return {}
 
-        if isinstance(result, BaseModel):
-            return cast("dict[str, object]", result.model_dump())
-        elif isinstance(result, dict):
-            return cast("dict[str, object]", result)
-        else:
-            return {"data": result}
+        return cast("dict[str, Any]", result)
 
     except Exception as e:
         tb = traceback.format_exc()
         try:
             from ..internal._wmill_adapter import log
 
-            log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=MODULE)
+            log("ENTRYPOINT_CATASTROPHE", error=str(e), traceback=tb, module=MODULE)
         except Exception:
             pass
         raise RuntimeError(f"Execution failed: {e}") from e

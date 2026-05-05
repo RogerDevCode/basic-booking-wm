@@ -32,8 +32,6 @@ MAX_CANCELLATION_REASON_LENGTH: Final[int] = 500
 # ─── Booking Limits
 MAX_BOOKINGS_PER_QUERY: Final[int] = 20
 MAX_SLOTS_DISPLAYED: Final[int] = 10
-DEFAULT_SERVICE_DURATION_MIN: Final[int] = 30
-DEFAULT_BUFFER_TIME_MIN: Final[int] = 10
 
 # ─── GCal Configuration
 GCAL_BASE_URL: Final[str] = "https://www.googleapis.com/calendar/v3"
@@ -51,9 +49,6 @@ BOOKING_STATUS: Final[dict[str, str]] = {
     "NO_SHOW": "no_show",
     "RESCHEDULED": "rescheduled",
 }
-
-# ─── Default Values
-DEFAULT_TIMEZONE: Final[str] = "America/Mexico_City"
 
 
 def get_env(name: str, default: str | None = None) -> str | None:

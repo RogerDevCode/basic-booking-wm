@@ -18,7 +18,7 @@ async def test_telegram_auto_register_success() -> None:
     # 2. INSERT clients → row     (new client created)
     mock_db.fetch.side_effect = [
         [],
-        [{"client_id": "c456"}],
+        [{"client_id": "c456", "name": "Test User"}],
     ]
 
     async def mock_with_admin(db: object, op: Callable[[], Coroutine[Any, Any, object]]) -> object:

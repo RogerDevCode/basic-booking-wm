@@ -1,7 +1,7 @@
 summary: Telegram Webhook - Phase 4 (+ AutoRegister user_id)
 description: >
-  Fase 4: deduplicate → normalize → classify → auto_register → prefetch → router FSM.
-  telegram_auto_register resuelve chat_id → user_id (UPSERT en users).
+  Fase 4: deduplicate → normalize → classify → auto_register → prefetch → router
+  FSM. telegram_auto_register resuelve chat_id → user_id (UPSERT en users).
   user_id queda disponible para booking_create en la siguiente fase.
 value:
   modules:
@@ -21,15 +21,15 @@ value:
       value:
         type: script
         input_transforms:
-          update_id:
-            type: javascript
-            expr: results.webhook_trigger.update_id
           chat_id:
             type: javascript
             expr: results.webhook_trigger.chat_id
           redis_url:
             type: javascript
             expr: variable("u/admin/REDIS_URL")
+          update_id:
+            type: javascript
+            expr: results.webhook_trigger.update_id
         path: f/internal/telegram_deduplicate/main
       skip_if:
         expr: '!results.webhook_trigger.chat_id'
@@ -46,7 +46,8 @@ value:
             expr: variable("u/admin/REDIS_URL")
         path: f/internal/conversation_get/main
       skip_if:
-        expr: '!results.webhook_trigger.chat_id || results.telegram_deduplicate.duplicate'
+        expr: '!results.webhook_trigger.chat_id ||
+          results.telegram_deduplicate.duplicate'
     - id: normalize
       summary: Normalizar input Telegram
       value:
@@ -54,16 +55,16 @@ value:
         input_transforms:
           input_data:
             type: javascript
-            expr: >-
-              { "chat_id": results.webhook_trigger.chat_id, "text":
+            expr: '{ "chat_id": results.webhook_trigger.chat_id, "text":
               results.webhook_trigger.text, "username":
               results.webhook_trigger.username, "callback_data":
               results.webhook_trigger.callback_data, "callback_query_id":
               results.webhook_trigger.callback_query_id, "callback_message_id":
-              results.webhook_trigger.callback_message_id }
+              results.webhook_trigger.callback_message_id }'
         path: f/internal/telegram_normalize/main
       skip_if:
-        expr: '!results.webhook_trigger.chat_id || results.telegram_deduplicate.duplicate'
+        expr: '!results.webhook_trigger.chat_id ||
+          results.telegram_deduplicate.duplicate'
     - id: classify
       summary: Clasificar input normalizado
       value:
@@ -82,7 +83,7 @@ value:
         input_transforms:
           args:
             type: javascript
-            expr: >-
+            expr: |-
               { "chat_id": results.webhook_trigger.chat_id,
                 "first_name": results.webhook_trigger.first_name,
                 "last_name": results.webhook_trigger.last_name || null,
@@ -96,15 +97,15 @@ value:
       value:
         type: script
         input_transforms:
-          pg_url:
-            type: javascript
-            expr: variable("u/admin/DATABASE_URL")
-          booking_state:
-            type: javascript
-            expr: results.get_conversation_state.data?.booking_state || null
           booking_draft:
             type: javascript
             expr: results.get_conversation_state.data?.booking_draft || null
+          booking_state:
+            type: javascript
+            expr: results.get_conversation_state.data?.booking_state || null
+          pg_url:
+            type: javascript
+            expr: variable("u/admin/DATABASE_URL")
           user_input:
             type: javascript
             expr: results.classify.canonical_text || null
@@ -118,14 +119,38 @@ value:
         input_transforms:
           args:
             type: javascript
-            expr: >-
-              { "chat_id": results.classify.chat_id, "user_input":
+            expr: '{ "chat_id": results.classify.chat_id, "user_input":
               results.classify.canonical_text, "state":
               results.get_conversation_state.data || {}, "items":
-              results.booking_prefetch.items || [] }
+              results.booking_prefetch.items || [], "phone":
+              results.telegram_auto_register?.phone ?? null, "client_name":
+              results.telegram_auto_register?.name ?? null }'
         path: f/internal/telegram_router/main
       skip_if:
         expr: '!results.classify.chat_id || results.telegram_deduplicate.duplicate'
+    - id: client_register
+      summary: Actualizar datos del cliente tras registro
+      value:
+        type: script
+        input_transforms:
+          name:
+            type: javascript
+            expr: results.router?.data?.registration_data?.name ?? null
+          client_id:
+            type: javascript
+            expr: results.telegram_auto_register.client_id
+          email:
+            type: javascript
+            expr: results.router?.data?.registration_data?.email ?? null
+          pg_url:
+            type: javascript
+            expr: variable("u/admin/DATABASE_URL")
+          phone:
+            type: javascript
+            expr: results.router?.data?.registration_data?.phone ?? null
+        path: f/internal/client_register/main
+      skip_if:
+        expr: '!results.router?.data?.registration_data'
     - id: update_conversation_state
       summary: Persistir nuevo estado en Redis
       value:
@@ -133,14 +158,14 @@ value:
         input_transforms:
           args:
             type: javascript
-            expr: >-
-              { "chat_id": results.classify.chat_id, "booking_state":
+            expr: '{ "chat_id": results.classify.chat_id, "booking_state":
               results.router?.data?.nextState, "active_flow":
-              results.router?.data?.active_flow || null, "pending_data":
-              { "router_handled": results.router?.data?.handled,
-              "text_kind": results.classify.text_kind,
-              "user_id": results.telegram_auto_register?.user_id || null,
-              "client_id": results.telegram_auto_register?.client_id || null } }
+              results.router?.data?.active_flow || null, "booking_draft":
+              results.router?.data?.nextDraft ?? null, "pending_data": {
+              "router_handled": results.router?.data?.handled, "text_kind":
+              results.classify.text_kind, "user_id":
+              results.telegram_auto_register?.user_id || null, "client_id":
+              results.telegram_auto_register?.client_id || null } }'
           redis_url:
             type: javascript
             expr: variable("u/admin/REDIS_URL")
@@ -152,26 +177,54 @@ value:
       value:
         type: script
         input_transforms:
+          chat_id:
+            type: javascript
+            expr: results.classify.chat_id
           client_id:
             type: javascript
             expr: results.telegram_auto_register.client_id
+          pg_url:
+            type: javascript
+            expr: variable("u/admin/DATABASE_URL")
           provider_id:
             type: javascript
             expr: results.get_conversation_state.data?.booking_state?.doctorId
           start_time:
             type: javascript
             expr: results.get_conversation_state.data?.booking_state?.draft?.start_time
+        path: f/internal/booking_confirm/main
+      skip_if:
+        expr: results.router?.data?.nextState?.name !== "completed" ||
+          results.telegram_deduplicate.duplicate
+    - id: intercept_outbound
+      summary: "[DEBUG] Interceptar mensaje saliente a Telegram"
+      value:
+        type: script
+        input_transforms:
           chat_id:
             type: javascript
             expr: results.classify.chat_id
-          pg_url:
+          text:
             type: javascript
-            expr: variable("u/admin/DATABASE_URL")
-        path: f/internal/booking_confirm/main
+            expr: >-
+              (results.booking_commit?.success) ? ("✅ *Reserva Confirmada*\n\n"
+              +
+                 "📋 " + results.booking_commit.service_name + " con " + results.booking_commit.provider_name + "\n" +
+                 "🆔 Ref: `" + results.booking_commit.booking_short_id + "`\n\n" +
+                 "Recibirás un recordatorio antes de tu cita.")
+              : (results.booking_commit?.error) ? ("❌ No se pudo confirmar la
+              cita.\n\n" +
+                 (results.booking_commit.user_message || "Por favor intenta de nuevo en unos minutos."))
+              : (results.router?.data?.handled &&
+              results.router?.data?.response_text) ?
+              results.router?.data?.response_text : "Lo siento, no entendí tu
+              mensaje. 😊\n\nEscribe /start para ver el menú principal."
+          redis_url:
+            type: javascript
+            expr: variable("u/admin/REDIS_URL")
+        path: f/internal/intercept_outbound/main
       skip_if:
-        expr: >-
-          results.router?.data?.nextState?.name !== "completed" ||
-          results.telegram_deduplicate.duplicate
+        expr: '!results.classify.chat_id || results.telegram_deduplicate.duplicate'
     - id: send_telegram_response
       summary: Enviar respuesta a Telegram
       value:
@@ -189,17 +242,18 @@ value:
           text:
             type: javascript
             expr: >-
-              (results.booking_commit?.success)
-              ? ("✅ *Reserva Confirmada*\n\n" +
+              (results.booking_commit?.success) ? ("✅ *Reserva Confirmada*\n\n"
+              +
                  "📋 " + results.booking_commit.service_name + " con " + results.booking_commit.provider_name + "\n" +
-                 "🆔 ID: `" + results.booking_commit.booking_id + "`\n\n" +
+                 "🆔 Ref: `" + results.booking_commit.booking_short_id + "`\n\n" +
                  "Recibirás un recordatorio antes de tu cita.")
-              : (results.booking_commit?.error)
-              ? ("❌ No se pudo confirmar la cita.\n\n" + results.booking_commit.error + "\n\nIntenta seleccionar otro horario.")
-              : (results.router?.data?.handled && results.router?.data?.response_text)
-              ? results.router?.data?.response_text
-              : ("[no_manejado:" + results.classify.text_kind + "] " +
-                 results.classify.canonical_text)
+              : (results.booking_commit?.error) ? ("❌ No se pudo confirmar la
+              cita.\n\n" +
+                 (results.booking_commit.user_message || "Por favor intenta de nuevo en unos minutos."))
+              : (results.router?.data?.handled &&
+              results.router?.data?.response_text) ?
+              results.router?.data?.response_text : "Lo siento, no entendí tu
+              mensaje. 😊\n\nEscribe /start para ver el menú principal."
         path: f/telegram_send/main
       skip_if:
         expr: '!results.classify.chat_id || results.telegram_deduplicate.duplicate'

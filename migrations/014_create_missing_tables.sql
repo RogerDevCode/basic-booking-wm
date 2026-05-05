@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash    TEXT,
     role             TEXT NOT NULL DEFAULT 'client' CHECK (role IN ('client', 'provider', 'admin')),
     is_active        BOOLEAN DEFAULT true,
-    timezone         TEXT DEFAULT 'America/Mexico_City',
+    timezone         TEXT DEFAULT 'America/Santiago',
     telegram_chat_id TEXT,
     created_at       TIMESTAMPTZ DEFAULT NOW(),
     updated_at       TIMESTAMPTZ DEFAULT NOW()

@@ -213,13 +213,19 @@ class TestTelegramRouterMainMenu:
         assert cast("dict[str, Any]", data["nextState"])["name"] == "idle"
 
     @pytest.mark.asyncio
-    async def test_numeric_5_is_invalid_at_idle(self) -> None:
-        """'5' is not a valid menu option — must return invalid message, not FSM."""
-        args: dict[str, Any] = {"chat_id": "1", "user_input": "5", "state": self._IDLE_STATE}
+    async def test_numeric_5_routes_to_mis_datos(self) -> None:
+        """'5' now maps to Mis datos — returns handled=True with a response."""
+        args: dict[str, Any] = {
+            "chat_id": "1",
+            "user_input": "5",
+            "state": self._IDLE_STATE,
+            "phone": "+34600000001",
+            "client_name": "Test User",
+        }
         res = await main(args)
         data = cast("dict[str, Any]", res["data"])
         assert data["handled"] is True
-        assert cast("dict[str, Any]", data["nextState"])["name"] == "idle"
+        assert "Mis Datos" in (data.get("response_text") or "")
 
     @pytest.mark.asyncio
     async def test_menu_intercept_only_at_idle_not_in_subflow(self) -> None:

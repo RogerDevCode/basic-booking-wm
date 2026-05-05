@@ -37,7 +37,9 @@ from ._fsm_responses import (
     build_specialty_prompt,
 )
 
-MAIN_MENU_TEXT: Final[str] = "📱 *Menú Principal*\n\n1️⃣ Agendar cita\n2️⃣ Mis citas\n3️⃣ Recordatorios\n4️⃣ Información"
+MAIN_MENU_TEXT: Final[str] = (
+    "📱 *Menú Principal*\n\n1️⃣ Agendar cita\n2️⃣ Mis citas\n3️⃣ Recordatorios\n4️⃣ Información\n5️⃣ Mis datos"
+)
 
 
 def _is_named_item_list(val: list[NamedItem]) -> TypeIs[list[NamedItem]]:
@@ -48,7 +50,7 @@ def _is_time_slot_list(val: list[TimeSlotItem]) -> TypeIs[list[TimeSlotItem]]:
     return all(isinstance(x, dict) and "id" in x and "label" in x and "start_time" in x for x in val)
 
 
-def parse_action(text: str) -> BookingAction:
+def parse_action(text: str, timezone: str | None = None) -> BookingAction:
     trimmed = text.strip().lower()
 
     if trimmed in ["volver", "back", "atras", "menu", "menú", "inicio"]:
@@ -63,9 +65,14 @@ def parse_action(text: str) -> BookingAction:
     if re.match(r"^\d+$", trimmed):
         return SelectAction(value=trimmed)
 
-    parsed_date = resolve_date(trimmed)
-    if parsed_date:
-        return SelectDateAction(value=parsed_date)
+    # Only attempt date parsing if timezone is provided
+    if timezone:
+        try:
+            parsed_date = resolve_date(trimmed, {"timezone": timezone})
+            if parsed_date:
+                return SelectDateAction(value=parsed_date)
+        except ValueError:
+            pass
 
     return SelectAction(value=trimmed)
 

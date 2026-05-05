@@ -1,13 +1,21 @@
-from ..internal._result import DBClient
-from ._availability_models import ProviderRow
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..internal._result import DBClient
+    from ._availability_models import ProviderRow
 
 
 async def get_provider_service_id(db: DBClient, provider_id: str) -> str | None:
+    """
+    Fetches the first active service ID for a provider.
+    """
     rows = await db.fetch(
         """
         SELECT service_id FROM services
         WHERE provider_id = $1::uuid AND is_active = true
-        ORDER BY service_id
+        ORDER BY created_at ASC
         LIMIT 1
         """,
         provider_id,
@@ -18,6 +26,9 @@ async def get_provider_service_id(db: DBClient, provider_id: str) -> str | None:
 
 
 async def get_provider(db: DBClient, provider_id: str) -> ProviderRow | None:
+    """
+    Fetches provider details including name and timezone.
+    """
     rows = await db.fetch(
         """
         SELECT provider_id, name, timezone FROM providers

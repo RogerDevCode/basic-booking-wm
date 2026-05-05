@@ -22,12 +22,14 @@ def _make_db(*, existing_client_id: str | None = None) -> MagicMock:
     """
     db = MagicMock()
     if existing_client_id:
-        db.fetch = AsyncMock(side_effect=[[{"client_id": existing_client_id}]])
+        db.fetch = AsyncMock(
+            side_effect=[[{"client_id": existing_client_id, "name": "Carlos", "phone": "+34600000001"}]]
+        )
     else:
         db.fetch = AsyncMock(
             side_effect=[
                 [],
-                [{"client_id": _NEW_CLIENT_ID}],
+                [{"client_id": _NEW_CLIENT_ID, "name": "Ana"}],
             ]
         )
     db.close = AsyncMock()

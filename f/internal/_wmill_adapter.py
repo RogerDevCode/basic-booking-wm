@@ -24,6 +24,8 @@ def is_dict_str_obj(val: object) -> TypeIs[dict[str, object]]:
 def get_variable_safe(path: str) -> Result[str, Exception]:
     try:
         val = wmill.get_variable(path)
+        if val is None:
+            return Failure(KeyError(f"Variable {path} not found or inaccessible"))
         return Success(str(val))
     except Exception as e:
         return Failure(e)

@@ -31,23 +31,209 @@ _START_TEXT: Final[str] = (
     "Puedo ayudarte a agendar, consultar o cancelar una cita médica.\n\n" + MAIN_MENU_TEXT
 )
 
-# Main menu keyword sets — used to disambiguate idle-state inputs before FSM
 _AGENDAR_KEYWORDS: Final[frozenset[str]] = frozenset(["1", "agendar", "agendar cita", "nueva cita", "cita"])
 _MIS_CITAS_KEYWORDS: Final[frozenset[str]] = frozenset(["2", "mis citas", "consultar", "consultar citas", "ver citas"])
 _RECORDATORIOS_KEYWORDS: Final[frozenset[str]] = frozenset(["3", "recordatorios", "recordatorio"])
 _INFO_KEYWORDS: Final[frozenset[str]] = frozenset(["4", "información", "informacion", "info", "información"])
+_MIS_DATOS_KEYWORDS: Final[frozenset[str]] = frozenset(["5", "mis datos", "datos", "mi perfil", "perfil"])
+
+_SI_WORDS: Final[frozenset[str]] = frozenset({"si", "sí", "yes", "ok", "dale", "claro", "correcto", "exacto"})
+_NO_WORDS: Final[frozenset[str]] = frozenset({"no", "nope", "nel", "negativo"})
+
+_REG_STATES: Final[frozenset[str]] = frozenset(
+    {
+        "needs_registration",
+        "reg_confirming_name",
+        "reg_entering_name",
+        "reg_collecting_phone",
+        "reg_collecting_email",
+    }
+)
+
+_SKIP_WORDS: Final[frozenset[str]] = frozenset({"saltar", "skip", "omitir"})
+
+
+def _start_registration(
+    input_data: RouterInput,
+    source: str,
+    draft_raw: dict[str, object],
+) -> Result[RouterResult, str]:
+    new_draft: dict[str, object] = {**draft_raw, "reg_source": source}
+    return Success(
+        RouterResult(
+            handled=True,
+            nextState={"name": "needs_registration"},
+            nextDraft=new_draft,
+            active_flow="booking",
+            response_text=(
+                "Para agendar una cita necesito registrarte primero.\n\n"
+                "Solo necesito tu número de teléfono. Es rápido. 😊\n\n"
+                "¿Empezamos? Responde *sí* para continuar o *no* para volver al menú."
+            ),
+        )
+    )
+
+
+def _handle_mis_datos(
+    input_data: RouterInput,
+    current_state_raw: dict[str, object],
+) -> Result[RouterResult, str]:
+    if not input_data.phone:
+        return _start_registration(input_data, source="mis_datos", draft_raw={})
+    return Success(
+        RouterResult(
+            handled=True,
+            nextState=current_state_raw,
+            response_text=(
+                "👤 *Mis Datos*\n\n"
+                f"📛 Nombre: {input_data.client_name or 'No registrado'}\n"
+                "📱 Teléfono: ✅ Registrado\n\n"
+                "Para actualizar tu información, contáctanos.\n\n" + MAIN_MENU_TEXT
+            ),
+        )
+    )
+
+
+def _handle_registration_state(
+    input_data: RouterInput,
+    current_state_name: str,
+    draft_raw: dict[str, object],
+) -> Result[RouterResult, str]:
+    lower = input_data.user_input.strip().lower()
+    user_text = input_data.user_input.strip()
+    client_name = input_data.client_name or "amigo"
+
+    if current_state_name == "needs_registration":
+        if lower in _SI_WORDS:
+            return Success(
+                RouterResult(
+                    handled=True,
+                    nextState={"name": "reg_confirming_name"},
+                    nextDraft=dict(draft_raw),
+                    response_text=(
+                        f"¡Perfecto! 😊\n\n"
+                        f"Tu nombre registrado es *{client_name}*.\n"
+                        "¿Es correcto? Responde *sí* o *no*."
+                    ),
+                )
+            )
+        if lower in _NO_WORDS:
+            return Success(
+                RouterResult(
+                    handled=True,
+                    nextState={"name": "idle"},
+                    nextDraft={},
+                    response_text=(
+                        "Entendido. 👍\n\nPuedes registrarte cuando quieras para agendar citas.\n\n" + MAIN_MENU_TEXT
+                    ),
+                )
+            )
+        return Success(
+            RouterResult(
+                handled=True,
+                nextState={"name": "needs_registration"},
+                nextDraft=dict(draft_raw),
+                response_text="¿Empezamos con el registro? Responde *sí* o *no*. 😊",
+            )
+        )
+
+    if current_state_name == "reg_confirming_name":
+        if lower in _SI_WORDS:
+            new_draft: dict[str, object] = {**dict(draft_raw), "reg_name": client_name}
+            return Success(
+                RouterResult(
+                    handled=True,
+                    nextState={"name": "reg_collecting_phone"},
+                    nextDraft=new_draft,
+                    response_text="📱 ¿Cuál es tu número de teléfono?\n\nEjemplo: +34600000000",
+                )
+            )
+        if lower in _NO_WORDS:
+            return Success(
+                RouterResult(
+                    handled=True,
+                    nextState={"name": "reg_entering_name"},
+                    nextDraft=dict(draft_raw),
+                    response_text="¿Cómo te llamas? Escribe tu nombre completo.",
+                )
+            )
+        return Success(
+            RouterResult(
+                handled=True,
+                nextState={"name": "reg_confirming_name"},
+                nextDraft=dict(draft_raw),
+                response_text=(f"Tu nombre registrado es *{client_name}*.\n¿Es correcto? Responde *sí* o *no*."),
+            )
+        )
+
+    if current_state_name == "reg_entering_name":
+        if not user_text:
+            return Success(
+                RouterResult(
+                    handled=True,
+                    nextState={"name": "reg_entering_name"},
+                    nextDraft=dict(draft_raw),
+                    response_text="Por favor escribe tu nombre completo.",
+                )
+            )
+        new_draft2: dict[str, object] = {**dict(draft_raw), "reg_name": user_text}
+        return Success(
+            RouterResult(
+                handled=True,
+                nextState={"name": "reg_collecting_phone"},
+                nextDraft=new_draft2,
+                response_text="📱 ¿Cuál es tu número de teléfono?\n\nEjemplo: +34600000000",
+            )
+        )
+
+    if current_state_name == "reg_collecting_phone":
+        if not user_text:
+            return Success(
+                RouterResult(
+                    handled=True,
+                    nextState={"name": "reg_collecting_phone"},
+                    nextDraft=dict(draft_raw),
+                    response_text="Por favor escribe tu número de teléfono.",
+                )
+            )
+        new_draft3: dict[str, object] = {**dict(draft_raw), "reg_phone": user_text}
+        return Success(
+            RouterResult(
+                handled=True,
+                nextState={"name": "reg_collecting_email"},
+                nextDraft=new_draft3,
+                response_text=(
+                    "📧 ¿Tienes correo electrónico? (opcional)\n\nEscríbelo o envía *saltar* para omitirlo."
+                ),
+            )
+        )
+
+    if current_state_name == "reg_collecting_email":
+        reg_name = str(draft_raw.get("reg_name") or client_name)
+        reg_phone = str(draft_raw.get("reg_phone") or "")
+        reg_email: str | None = None if lower in _SKIP_WORDS or lower in _NO_WORDS else user_text
+
+        return Success(
+            RouterResult(
+                handled=True,
+                nextState={"name": "idle"},
+                nextDraft={},
+                registration_data={"name": reg_name, "phone": reg_phone, "email": reg_email},
+                response_text=("✅ ¡Registro completado!\n\nYa puedes agendar tu cita. 🗓️\n\n" + MAIN_MENU_TEXT),
+            )
+        )
+
+    return Success(RouterResult(handled=False))
 
 
 @beartype
 async def _route(input_data: RouterInput) -> Result[RouterResult, str]:
-    # 1. Check if we have an active flow
     state_dict = input_data.state or {}
     active_flow = cast("str | None", state_dict.get("active_flow"))
 
     user_input = input_data.user_input
     is_callback = ":" in user_input or user_input in ["back", "cancel", "cfm:yes", "cfm:no"]
 
-    # Handle /start — initialize booking flow regardless of current state
     if user_input.strip() == "/start":
         return Success(
             RouterResult(
@@ -61,24 +247,27 @@ async def _route(input_data: RouterInput) -> Result[RouterResult, str]:
     if not active_flow and not is_callback:
         return Success(RouterResult(handled=False))
 
-    # 2. Parse current state and draft
+    if active_flow and active_flow != "booking":
+        return Success(RouterResult(handled=False))
+
+    current_state_raw = cast("dict[str, object]", state_dict.get("booking_state") or {"name": "idle"})
+    current_state_name = str(current_state_raw.get("name", "idle"))
+    draft_raw = cast("dict[str, object]", state_dict.get("booking_draft") or {})
+
+    # Registration states must be checked before BookingStateRoot.model_validate
+    if current_state_name in _REG_STATES:
+        return _handle_registration_state(input_data, current_state_name, draft_raw)
+
     try:
-        # Simplified: for now we only support 'booking' flow
-        if active_flow and active_flow != "booking":
-            return Success(RouterResult(handled=False))
-
-        # Reconstruct state model from dict
-        current_state_raw = cast("dict[str, object]", state_dict.get("booking_state") or {"name": "idle"})
-        state_root = BookingStateRoot.model_validate(current_state_raw)
-        current_state = state_root.root
-
-        draft_raw = cast("dict[str, object]", state_dict.get("booking_draft") or {})
-        draft = DraftBooking.model_validate(draft_raw)
-
-        # 3a. Main menu disambiguation — intercept non-booking options at idle state
-        #     so "2/3/4" never reach the booking FSM as specialty selections.
-        if current_state.name == "idle" and not is_callback:
+        if current_state_name == "idle" and not is_callback:
             lower = user_input.strip().lower()
+
+            if lower in _AGENDAR_KEYWORDS and not input_data.phone:
+                return _start_registration(input_data, source="agendar", draft_raw=draft_raw)
+
+            if lower in _MIS_DATOS_KEYWORDS:
+                return _handle_mis_datos(input_data, current_state_raw)
+
             if lower in _MIS_CITAS_KEYWORDS:
                 return Success(
                     RouterResult(
@@ -123,13 +312,18 @@ async def _route(input_data: RouterInput) -> Result[RouterResult, str]:
                     )
                 )
 
-        # 3b. Parse action for FSM
+        state_root = BookingStateRoot.model_validate(current_state_raw)
+        current_state = state_root.root
+
+        # Strip registration keys so DraftBooking(extra="forbid") doesn't reject them
+        booking_draft_raw = {k: v for k, v in draft_raw.items() if not k.startswith("reg_")}
+        draft = DraftBooking.model_validate(booking_draft_raw)
+
         action = parse_callback_data(user_input) if is_callback else parse_action(user_input)
 
         if not action:
             return Success(RouterResult(handled=False))
 
-        # 4. Apply transition — pass pre-fetched items if available
         prefetched_items = list(input_data.items) if input_data.items is not None else None
         err, outcome = apply_transition(current_state, action, draft, items=prefetched_items)
 
@@ -142,7 +336,6 @@ async def _route(input_data: RouterInput) -> Result[RouterResult, str]:
         if not outcome:
             return Success(RouterResult(handled=False))
 
-        # 5. Return result
         return Success(
             RouterResult(
                 handled=True,
@@ -150,7 +343,7 @@ async def _route(input_data: RouterInput) -> Result[RouterResult, str]:
                 nextState=cast("dict[str, object]", outcome["nextState"].model_dump())
                 if outcome["nextState"]
                 else None,
-                nextDraft=None,  # Should be handled by FSM
+                nextDraft=None,
                 inline_buttons=[],
             )
         )

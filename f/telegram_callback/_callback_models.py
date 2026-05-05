@@ -16,13 +16,15 @@ class InputSchema(BaseModel):
     client_id: str | None = None
 
 
-class ActionContext(TypedDict):
+class ActionContext(TypedDict, total=False):
     botToken: str
     tenantId: str
     booking_id: str
     client_id: str | None
     chat_id: str
     callback_query_id: str
+    date: str | None
+    time: str | None
 
 
 class ActionResult(TypedDict):

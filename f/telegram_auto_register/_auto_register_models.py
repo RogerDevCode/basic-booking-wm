@@ -7,6 +7,8 @@ class RegisterResult(TypedDict):
     user_id: str
     client_id: str
     is_new: bool
+    name: str
+    phone: str | None
 
 
 class InputSchema(BaseModel):

@@ -5,30 +5,31 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from f.patient_register.main import _main_async as main
+from f.patient_register.main import main_async
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Coroutine
 
-VALID_ID = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+VALID_ID = "00000000-0000-0000-0000-000000000001"
 
 
 @pytest.mark.asyncio
-async def test_patient_register_success() -> None:
+async def test_patient_register_e2e_mocked() -> None:
     mock_db = AsyncMock()
-    # 1. Search for existing -> []
-    # 2. Insert -> returning row
+
+    # Logic Mock: Search -> Empty, Insert -> Success
+    # Skipping telegram lookup because not in args
+    # It will try Email, skip Phone (not in input_data), then Insert
     mock_db.fetch.side_effect = [
-        [],  # telegram lookup
-        [],  # email lookup
+        [],  # Email lookup
         [
-            {  # insert result
+            {  # Insert Result
                 "client_id": VALID_ID,
-                "name": "Test Client",
-                "email": "t@t.com",
-                "phone": None,
-                "telegram_chat_id": "123",
-                "timezone": "UTC",
+                "name": "Jane Doe",
+                "email": "jane@example.com",
+                "phone": "5551234",
+                "telegram_chat_id": None,
+                "timezone": "America/Santiago",
             }
         ],
     ]
@@ -41,15 +42,28 @@ async def test_patient_register_success() -> None:
         patch("f.patient_register.main.with_tenant_context", side_effect=mock_with_tenant),
     ):
         args: dict[str, Any] = {
-            "name": "Test Client",
-            "email": "t@t.com",
-            "telegram_chat_id": "123",
+            "name": "Jane Doe",
+            "email": "jane@example.com",
             "provider_id": VALID_ID,
         }
 
-        err, result = await main(args)
+        err, result = await main_async(args)
 
         assert err is None
         assert result is not None
         assert result["client_id"] == VALID_ID
         assert result["created"] is True
+
+
+@pytest.mark.asyncio
+async def test_patient_register_missing_tenant() -> None:
+    args: dict[str, Any] = {
+        "name": "Jane Doe",
+        "email": "jane@example.com",
+    }
+
+    err, result = await main_async(args)
+
+    assert err is not None
+    assert "tenant_id required" in str(err)
+    assert result is None
