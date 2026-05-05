@@ -17,25 +17,19 @@ from __future__ import annotations
 from typing import Final
 
 from .._db_client import create_db_client
+from .._nlu_cache import ensure_nlu_cache, get_nlu_rule
 from .._wmill_adapter import log
 
 MODULE: Final[str] = "booking_confirm"
-
-_MSG_SLOT_TAKEN: Final[str] = "Ese horario ya fue reservado por otra persona. Por favor elige un horario diferente."
-_MSG_NO_SERVICE: Final[str] = (
-    "El profesional seleccionado no tiene servicios disponibles en este momento. Intenta con otro profesional."
-)
-_MSG_GENERIC: Final[str] = "No pudimos confirmar tu cita en este momento. Por favor intenta de nuevo en unos minutos."
-
 
 def _user_message(err: Exception | str) -> str:
     """Map a technical error to a safe, user-friendly Spanish message."""
     msg = str(err).lower()
     if "duplicate" in msg or "unique" in msg or "already" in msg:
-        return _MSG_SLOT_TAKEN
+        return str(get_nlu_rule("msg_slot_taken", "Ese horario ya fue reservado por otra persona. Por favor elige un horario diferente."))
     if "no_service_for_provider" in msg:
-        return _MSG_NO_SERVICE
-    return _MSG_GENERIC
+        return str(get_nlu_rule("msg_no_service", "El profesional seleccionado no tiene servicios disponibles en este momento. Intenta con otro profesional."))
+    return str(get_nlu_rule("msg_generic", "No pudimos confirmar tu cita en este momento. Por favor intenta de nuevo en unos minutos."))
 
 
 async def _resolve_service_id(provider_id: str) -> str | None:
@@ -63,13 +57,15 @@ async def _main_async(
     if pg_url:
         os.environ["DATABASE_URL"] = pg_url
 
+    await ensure_nlu_cache()
+
     from f.booking_create.main import main_async as booking_create_async
 
     # 1. Resolve service_id from provider — booking_create requires it
     service_id = await _resolve_service_id(provider_id)
     if not service_id:
         log("BOOKING_CONFIRM_NO_SERVICE", provider_id=provider_id, module=MODULE)
-        return {"success": False, "error": "no_service_for_provider", "user_message": _MSG_NO_SERVICE}
+        return {"success": False, "error": "no_service_for_provider", "user_message": _user_message("no_service_for_provider")}
 
     # 2. Idempotency key scoped to Telegram chat + slot
     idempotency_key = f"tg:{chat_id}:{start_time}"
@@ -92,7 +88,7 @@ async def _main_async(
         return {"success": False, "error": str(err), "user_message": _user_message(err)}
 
     if not result:
-        return {"success": False, "error": "no_result_from_booking_create", "user_message": _MSG_GENERIC}
+        return {"success": False, "error": "no_result_from_booking_create", "user_message": _user_message("generic")}
 
     booking_id = str(result["booking_id"])
     log("BOOKING_CONFIRM_OK", booking_id=booking_id, chat_id=chat_id, module=MODULE)

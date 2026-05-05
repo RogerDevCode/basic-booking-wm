@@ -74,9 +74,25 @@ async def handle_list_available(conn: DBClient, input_data: OrchestratorInput) -
             )
         )
 
+    # Resolve UI limits
+    limit = 10
+    try:
+        # data["provider_id"] should be available from availability check
+        provider_id = avail.get("provider_id")
+        if provider_id:
+            # We already have a DB client in conn, let's fetch the UI preference
+            prefs_row = await conn.fetchrow(
+                "SELECT ui_preferences->>'max_slots_displayed' as max_s FROM providers WHERE provider_id = $1::uuid LIMIT 1",
+                provider_id
+            )
+            if prefs_row and prefs_row["max_s"]:
+                limit = int(prefs_row["max_s"])
+    except Exception:
+        pass
+
     all_slots = avail.get("slots", [])
     slots = [s for s in all_slots if s.get("available")]
-    slots = slots[:10]
+    slots = slots[:limit]
 
     if not slots:
         return ok(

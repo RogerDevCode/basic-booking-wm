@@ -19,6 +19,7 @@ import json
 import time
 from typing import Any, Final, Literal, cast
 
+from .._nlu_cache import ensure_nlu_cache, get_nlu_rule
 from .._wmill_adapter import log
 from ._ai_agent_logic import (
     adjust_intent_with_context,
@@ -30,14 +31,11 @@ from ._ai_agent_logic import (
 )
 from ._ai_agent_models import AIAgentInput, IntentResult, LLMOutput
 from ._constants import INTENT
-from ._rules_service import get_nlu_rule
 from ._guardrails import sanitize_json_response, validate_input, verify_urgency
 from ._llm_client import call_llm
 from ._prompt_builder import build_system_prompt, build_user_message
 from ._rag_context import build_rag_context
 from ._tfidf_classifier import classify_intent
-
-from ._rules_service import ensure_nlu_cache
 
 MODULE: Final[str] = "ai_agent"
 

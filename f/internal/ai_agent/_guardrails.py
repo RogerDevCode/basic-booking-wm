@@ -1,9 +1,9 @@
 import re
 from typing import Literal, TypedDict
 
+from .._nlu_cache import get_nlu_rule
 from ._ai_agent_models import IntentResult
 from ._constants import INTENT
-from ._rules_service import get_nlu_rule
 
 
 class GuardrailPass(TypedDict):

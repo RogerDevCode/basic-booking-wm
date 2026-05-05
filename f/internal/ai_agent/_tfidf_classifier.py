@@ -2,8 +2,8 @@ import math
 import re
 from typing import TypedDict
 
+from .._nlu_cache import get_nlu_rule
 from ._constants import INTENT
-from ._rules_service import get_nlu_rule
 
 # ============================================================================
 # REFERENCE CORPUS — Real-world examples per intent

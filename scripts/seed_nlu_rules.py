@@ -60,7 +60,13 @@ async def seed_nlu_rules():
             "flexibility_keywords": FLEXIBILITY_KEYWORDS,
             "day_names": DAY_NAMES,
             "relative_dates": RELATIVE_DATES,
-            "service_types": SERVICE_TYPES
+            "service_types": SERVICE_TYPES,
+            
+            # UI Messages
+            "msg_slot_taken": "Ese horario ya fue reservado por otra persona. Por favor elige un horario diferente.",
+            "msg_no_service": "El profesional seleccionado no tiene servicios disponibles en este momento. Intenta con otro profesional.",
+            "msg_generic": "No pudimos confirmar tu cita en este momento. Por favor intenta de nuevo en unos minutos.",
+            "msg_main_menu": "📱 *Menú Principal*\n\n1️⃣ Agendar cita\n2️⃣ Mis citas\n3️⃣ Recordatorios\n4️⃣ Información\n5️⃣ Mis datos"
         }
         
         for key, value in other_rules.items():

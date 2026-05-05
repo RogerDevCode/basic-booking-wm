@@ -6,6 +6,7 @@ from typing import Any, Final, TypeIs
 from pydantic import TypeAdapter
 
 from .._date_resolver import resolve_date
+from .._nlu_cache import get_nlu_rule
 from .._result import Result, fail, ok
 from ._fsm_models import (
     BackAction,
@@ -37,10 +38,9 @@ from ._fsm_responses import (
     build_specialty_prompt,
 )
 
-MAIN_MENU_TEXT: Final[str] = (
-    "📱 *Menú Principal*\n\n1️⃣ Agendar cita\n2️⃣ Mis citas\n3️⃣ Recordatorios\n4️⃣ Información\n5️⃣ Mis datos"
-)
-
+def get_main_menu_text() -> str:
+    default_text = "📱 *Menú Principal*\n\n1️⃣ Agendar cita\n2️⃣ Mis citas\n3️⃣ Recordatorios\n4️⃣ Información\n5️⃣ Mis datos"
+    return str(get_nlu_rule("msg_main_menu", default_text))
 
 def _is_named_item_list(val: list[NamedItem]) -> TypeIs[list[NamedItem]]:
     return all(isinstance(x, dict) and "id" in x and "name" in x for x in val)
@@ -109,7 +109,7 @@ def apply_transition(
 
     # 1. Global Actions
     if action.type == "cancel":
-        return ok(TransitionOutcome(nextState=IdleState(), responseText=MAIN_MENU_TEXT, advance=False))
+        return ok(TransitionOutcome(nextState=IdleState(), responseText=get_main_menu_text(), advance=False))
 
     # 2. Step Handlers
     if isinstance(current_state, IdleState):
@@ -128,7 +128,7 @@ def apply_transition(
 
     elif isinstance(current_state, SelectingSpecialtyState):
         if isinstance(action, BackAction):
-            return ok(TransitionOutcome(nextState=IdleState(), responseText=MAIN_MENU_TEXT, advance=False))
+            return ok(TransitionOutcome(nextState=IdleState(), responseText=get_main_menu_text(), advance=False))
 
         if isinstance(action, SelectAction):
             specialty_items = current_state.items
@@ -361,7 +361,7 @@ def apply_transition(
             return fail("invalid_state_transition_no_items")
 
     elif isinstance(current_state, CompletedState):
-        return ok(TransitionOutcome(nextState=IdleState(), responseText=MAIN_MENU_TEXT, advance=False))
+        return ok(TransitionOutcome(nextState=IdleState(), responseText=get_main_menu_text(), advance=False))
 
     return fail(f"unknown_state_or_action: {current_state.name}")
 

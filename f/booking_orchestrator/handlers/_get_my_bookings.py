@@ -29,6 +29,18 @@ async def handle_get_my_bookings(conn: DBClient, input_data: OrchestratorInput) 
         return fail("Falta identificación de paciente o establecimiento.")
 
     async def operation() -> Result[list[dict[str, object]]]:
+        # Get UI preference for limits
+        prefs_row = await conn.fetchrow(
+            "SELECT ui_preferences->>'max_bookings_per_query' as max_b FROM providers WHERE provider_id = $1::uuid LIMIT 1",
+            tenant_id
+        )
+        limit = 20
+        if prefs_row and prefs_row["max_b"]:
+            try:
+                limit = int(prefs_row["max_b"])
+            except ValueError:
+                pass
+
         rows = await conn.fetch(
             """
             SELECT b.booking_id, b.status, b.start_time,
@@ -39,9 +51,10 @@ async def handle_get_my_bookings(conn: DBClient, input_data: OrchestratorInput) 
             WHERE b.client_id = $1::uuid
               AND b.status NOT IN ('cancelled', 'no_show', 'rescheduled')
               AND b.start_time >= NOW()
-            ORDER BY b.start_time ASC LIMIT 10
+            ORDER BY b.start_time ASC LIMIT $2
             """,
             client_id,
+            limit
         )
         return None, rows
 

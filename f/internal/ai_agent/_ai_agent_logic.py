@@ -3,9 +3,9 @@ from __future__ import annotations
 import re
 from typing import Literal, cast
 
+from .._nlu_cache import get_nlu_rule
 from ._ai_agent_models import AvailabilityContext, ConversationState, EntityMap, EscalationLevel
 from ._constants import INTENT
-from ._rules_service import get_nlu_rule
 
 # ============================================================================
 # CONTEXT-AWARE INTENT ADJUSTMENT

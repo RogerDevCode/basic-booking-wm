@@ -20,16 +20,17 @@ from beartype import beartype
 from returns.result import Failure, Result, Success
 
 from .._wmill_adapter import log
-from ..booking_fsm._fsm_machine import MAIN_MENU_TEXT, apply_transition, parse_action, parse_callback_data
+from ..booking_fsm._fsm_machine import apply_transition, get_main_menu_text, parse_action, parse_callback_data
 from ..booking_fsm._fsm_models import BookingStateRoot, DraftBooking
 from ._router_models import RouterInput, RouterResult
 
 MODULE: Final[str] = "telegram_router"
 
-_START_TEXT: Final[str] = (
-    "¡Hola! Soy tu asistente de reservas. 👋\n\n"
-    "Puedo ayudarte a agendar, consultar o cancelar una cita médica.\n\n" + MAIN_MENU_TEXT
-)
+def _get_start_text() -> str:
+    return (
+        "¡Hola! Soy tu asistente de reservas. 👋\n\n"
+        "Puedo ayudarte a agendar, consultar o cancelar una cita médica.\n\n" + get_main_menu_text()
+    )
 
 _AGENDAR_KEYWORDS: Final[frozenset[str]] = frozenset(["1", "agendar", "agendar cita", "nueva cita", "cita"])
 _MIS_CITAS_KEYWORDS: Final[frozenset[str]] = frozenset(["2", "mis citas", "consultar", "consultar citas", "ver citas"])
@@ -88,7 +89,7 @@ def _handle_mis_datos(
                 "👤 *Mis Datos*\n\n"
                 f"📛 Nombre: {input_data.client_name or 'No registrado'}\n"
                 "📱 Teléfono: ✅ Registrado\n\n"
-                "Para actualizar tu información, contáctanos.\n\n" + MAIN_MENU_TEXT
+                "Para actualizar tu información, contáctanos.\n\n" + get_main_menu_text()
             ),
         )
     )
@@ -124,7 +125,7 @@ def _handle_registration_state(
                     nextState={"name": "idle"},
                     nextDraft={},
                     response_text=(
-                        "Entendido. 👍\n\nPuedes registrarte cuando quieras para agendar citas.\n\n" + MAIN_MENU_TEXT
+                        "Entendido. 👍\n\nPuedes registrarte cuando quieras para agendar citas.\n\n" + get_main_menu_text()
                     ),
                 )
             )
@@ -219,7 +220,7 @@ def _handle_registration_state(
                 nextState={"name": "idle"},
                 nextDraft={},
                 registration_data={"name": reg_name, "phone": reg_phone, "email": reg_email},
-                response_text=("✅ ¡Registro completado!\n\nYa puedes agendar tu cita. 🗓️\n\n" + MAIN_MENU_TEXT),
+                response_text=("✅ ¡Registro completado!\n\nYa puedes agendar tu cita. 🗓️\n\n" + get_main_menu_text()),
             )
         )
 
@@ -240,7 +241,7 @@ async def _route(input_data: RouterInput) -> Result[RouterResult, str]:
                 handled=True,
                 active_flow="booking",
                 nextState={"name": "idle"},
-                response_text=_START_TEXT,
+                response_text=_get_start_text(),
             )
         )
 
@@ -258,6 +259,9 @@ async def _route(input_data: RouterInput) -> Result[RouterResult, str]:
     if current_state_name in _REG_STATES:
         return _handle_registration_state(input_data, current_state_name, draft_raw)
 
+    from .._nlu_cache import ensure_nlu_cache
+    await ensure_nlu_cache()
+    
     try:
         if current_state_name == "idle" and not is_callback:
             lower = user_input.strip().lower()
@@ -276,7 +280,7 @@ async def _route(input_data: RouterInput) -> Result[RouterResult, str]:
                         response_text=(
                             "📋 *Mis Citas*\n\n"
                             "La consulta de citas estará disponible muy pronto.\n\n"
-                            "Por ahora puedes agendar una nueva cita.\n\n" + MAIN_MENU_TEXT
+                            "Por ahora puedes agendar una nueva cita.\n\n" + get_main_menu_text()
                         ),
                     )
                 )
@@ -287,7 +291,7 @@ async def _route(input_data: RouterInput) -> Result[RouterResult, str]:
                         nextState=current_state_raw,
                         response_text=(
                             "🔔 *Recordatorios*\n\n"
-                            "Los recordatorios se envían automáticamente al confirmar tu cita.\n\n" + MAIN_MENU_TEXT
+                            "Los recordatorios se envían automáticamente al confirmar tu cita.\n\n" + get_main_menu_text()
                         ),
                     )
                 )
@@ -299,7 +303,7 @@ async def _route(input_data: RouterInput) -> Result[RouterResult, str]:
                         response_text=(
                             "\U00002139️ *Información*\n\n"
                             "Este es tu asistente de reservas médicas.\n"
-                            "Puedes agendar, consultar o cancelar citas en cualquier momento.\n\n" + MAIN_MENU_TEXT
+                            "Puedes agendar, consultar o cancelar citas en cualquier momento.\n\n" + get_main_menu_text()
                         ),
                     )
                 )
@@ -308,7 +312,7 @@ async def _route(input_data: RouterInput) -> Result[RouterResult, str]:
                     RouterResult(
                         handled=True,
                         nextState=current_state_raw,
-                        response_text=("Lo siento, no entendí esa opción. 😊\n\n" + MAIN_MENU_TEXT),
+                        response_text=("Lo siento, no entendí esa opción. 😊\n\n" + get_main_menu_text()),
                     )
                 )
 
