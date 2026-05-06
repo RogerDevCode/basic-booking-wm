@@ -1,31 +1,29 @@
 from __future__ import annotations
 
-from typing import Any
+import json
+import urllib.request
+from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict
+type EventKind = Literal["message", "callback", "empty"]
+type TextKind = Literal["plain_text", "command_start", "command_other", "callback", "empty"]
 
 
-class TriggerOutput(BaseModel):
-    model_config = ConfigDict(strict=True)
-    chat_id: str
-    text: str
-    username: str
-    first_name: str
-    last_name: str | None = None
-    update_id: int | None = None
-    callback_data: str | None = None
-    callback_query_id: str | None = None
-    callback_message_id: int | None = None
+def _answer_callback_query(callback_query_id: str, bot_token: str) -> None:
+    url = f"https://api.telegram.org/bot{bot_token}/answerCallbackQuery"
+    data = json.dumps({"callback_query_id": callback_query_id}).encode()
+    req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
+    try:
+        urllib.request.urlopen(req, timeout=2)
+    except Exception:
+        pass  # Non-fatal — best-effort answer
 
 
 async def _main_async(webhook_payload: dict[str, Any]) -> dict[str, Any]:
-    # Extract the actual Telegram payload from Windmill's wrapper if present
-    # Windmill raw webhooks often place the payload in 'body' or 'data'
+    # Extract actual Telegram payload from Windmill's wrapper if present
     payload = webhook_payload
     if "body" in webhook_payload and isinstance(webhook_payload["body"], dict):
         payload = webhook_payload["body"]
     elif "message" not in webhook_payload and "callback_query" not in webhook_payload:
-        # Fallback: maybe it's under another key?
         for key in ["webhook_payload", "data", "event"]:
             if key in webhook_payload and isinstance(webhook_payload[key], dict):
                 payload = webhook_payload[key]
@@ -40,10 +38,9 @@ async def _main_async(webhook_payload: dict[str, Any]) -> dict[str, Any]:
     chat_id = ""
     text = ""
     username = "unknown"
-    callback_data = None
-    callback_query_id = None
-    callback_message_id = None
-
+    callback_data: str | None = None
+    callback_query_id: str | None = None
+    callback_message_id: int | None = None
     first_name = "Usuario"
     last_name: str | None = None
 
@@ -65,6 +62,45 @@ async def _main_async(webhook_payload: dict[str, Any]) -> dict[str, Any]:
         first_name = from_data.get("first_name", "Usuario") or "Usuario"
         last_name = from_data.get("last_name") or None
 
+    # Answer callback query immediately to dismiss Telegram inline button spinner
+    if callback_query_id:
+        try:
+            import wmill
+
+            bot_token = wmill.get_variable("u/admin/TELEGRAM_BOT_TOKEN")
+            if bot_token:
+                _answer_callback_query(callback_query_id, str(bot_token))
+        except Exception:
+            pass  # Non-fatal
+
+    # Inline normalize + classify
+    normalized_text = text.strip()
+    event_kind: EventKind = "empty"
+
+    if normalized_text:
+        event_kind = "message"
+    elif callback_data is not None:
+        event_kind = "callback"
+
+    text_kind: TextKind = "empty"
+    canonical_text = ""
+    should_process = False
+
+    if event_kind == "callback":
+        # Use callback_data as canonical_text so downstream router receives it
+        text_kind = "callback"
+        canonical_text = callback_data or ""
+        should_process = True
+    elif event_kind == "message":
+        should_process = True
+        canonical_text = normalized_text
+        if canonical_text == "/start":
+            text_kind = "command_start"
+        elif canonical_text.startswith("/"):
+            text_kind = "command_other"
+        else:
+            text_kind = "plain_text"
+
     return {
         "chat_id": chat_id,
         "text": text,
@@ -75,6 +111,10 @@ async def _main_async(webhook_payload: dict[str, Any]) -> dict[str, Any]:
         "callback_data": callback_data,
         "callback_query_id": callback_query_id,
         "callback_message_id": callback_message_id,
+        "event_kind": event_kind,
+        "canonical_text": canonical_text,
+        "text_kind": text_kind,
+        "should_process": should_process,
     }
 
 
