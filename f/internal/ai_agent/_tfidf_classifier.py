@@ -1,6 +1,6 @@
 import math
 import re
-from typing import TypedDict
+from typing import TypedDict, cast
 
 from .._nlu_cache import get_nlu_rule
 from ._constants import INTENT
@@ -239,14 +239,14 @@ def classify_intent(text: str) -> TfIdfResult:
     # In a real scenario, this model itself should be cached, but for now we build it from the cached rules
     intents_struct = INTENT
     intent_keys = list(intents_struct.values())
-    
+
     corpus = {}
     for intent in intent_keys:
         rule_key = f"intent_keywords_{intent}"
         data = get_nlu_rule(rule_key, {"keywords": []})
         corpus[intent] = data.get("keywords", [])
-        
-    m = TfIdfModel(corpus)
+
+    m = TfIdfModel(cast("dict[str, list[str]]", corpus))
     query_tokens = normalize(text)
     if not query_tokens:
         return {"intent": INTENT["DESCONOCIDO"], "confidence": 0.0, "scores": []}

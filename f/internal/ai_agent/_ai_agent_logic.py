@@ -141,10 +141,10 @@ def detect_context(text: str, entities: EntityMap) -> AvailabilityContext:
     lower = text.lower()
     is_today = "hoy" in lower or entities.date == "hoy"
     is_tomorrow = any(x in lower for x in ["mañana", "manana"]) or entities.date == "mañana"
-    
+
     urgency_words = get_nlu_rule("urgency_words", [])
     is_urgent = any(w in lower for w in urgency_words)
-    
+
     flex_keywords = get_nlu_rule("flexibility_keywords", [])
     is_flexible = any(w in lower for w in flex_keywords)
 
@@ -218,7 +218,7 @@ def generate_ai_response(
 
 def detect_social(text: str) -> tuple[str, float] | None:
     lower = text.lower().strip()
-    
+
     greetings = get_nlu_rule("greetings", [])
     greeting_phrases = get_nlu_rule("greeting_phrases", [])
     farewells = get_nlu_rule("farewells", [])

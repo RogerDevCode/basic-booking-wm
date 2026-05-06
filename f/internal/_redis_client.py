@@ -4,6 +4,9 @@ import os
 from typing import Final
 
 from redis.asyncio import Redis
+from returns.result import Success
+
+from ._wmill_adapter import get_variable_safe
 
 # ============================================================================
 # REDIS CLIENT — Single Source of Truth for Redis connections
@@ -12,27 +15,31 @@ from redis.asyncio import Redis
 REDIS_TTL: Final[int] = 1800  # 30 minutes
 
 
-def _resolve_redis_url(injected_url: str | None = None) -> str | None:
-    # 1. Injected parameter (highest priority)
-    if injected_url:
-        return injected_url
-
-    # 2. Local environment
+def _resolve_redis_url() -> str | None:
+    # 1. Local environment
     local_url = os.getenv("REDIS_URL")
     if local_url:
         return local_url
 
+    # 2. Windmill variables (Priority order)
+    paths = ["g/all/REDIS_URL", "u/admin/REDIS_URL", "REDIS_URL"]
+    for path in paths:
+        res = get_variable_safe(path)
+        if isinstance(res, Success):
+            return str(res.unwrap())
+
     return None
 
 
-async def create_redis_client(redis_url: str | None = None) -> Redis:
+async def create_redis_client() -> Redis:
     """
     Factory for Redis client.
     """
-    resolved_url = _resolve_redis_url(redis_url)
-    if not resolved_url:
-        resolved_url = "redis://redis:6379"
-    elif not resolved_url.startswith(("redis://", "rediss://", "unix://")):
-        resolved_url = f"redis://{resolved_url}"
+    redis_url = _resolve_redis_url()
+    if not redis_url:
+        # Default for local docker-compose
+        redis_url = "redis://redis:6379"
 
-    return Redis.from_url(resolved_url, decode_responses=True)
+    # Use Redis.from_url. We suppress type-arg because redis-py async types
+    # are problematic in some environments/stubs.
+    return Redis.from_url(redis_url, decode_responses=True)

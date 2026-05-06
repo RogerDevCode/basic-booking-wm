@@ -23,6 +23,7 @@ IntentType = Literal[
     "desconocido",
 ]
 
+
 class IntentsStruct(TypedDict):
     CREAR_CITA: Literal["crear_cita"]
     CANCELAR_CITA: Literal["cancelar_cita"]
@@ -40,6 +41,7 @@ class IntentsStruct(TypedDict):
     PASO_WIZARD: Literal["paso_wizard"]
     VER_MIS_CITAS: Literal["ver_mis_citas"]
     DESCONOCIDO: Literal["desconocido"]
+
 
 INTENT: Final[IntentsStruct] = {
     "CREAR_CITA": "crear_cita",
@@ -59,3 +61,67 @@ INTENT: Final[IntentsStruct] = {
     "VER_MIS_CITAS": "ver_mis_citas",
     "DESCONOCIDO": "desconocido",
 }
+
+ESCALATION_THRESHOLDS: Final[dict[str, float]] = {
+    "medical_emergency_min": 0.8,
+    "priority_queue_max": 0.6,
+    "human_handoff_max": 0.4,
+    "tfidf_minimum": 0.4,
+}
+
+CONFIDENCE_BOUNDARIES: Final[dict[str, float]] = {
+    "HIGH_MIN": 0.85,
+    "MODERATE_MIN": 0.60,
+    "MODERATE_MAX": 0.85,
+    "LOW_MAX": 0.60,
+}
+
+CONFIDENCE_THRESHOLDS: Final[dict[str, float]] = {
+    "medical_emergency_min": 0.8,
+    "priority_queue_max": 0.6,
+    "human_handoff_max": 0.4,
+    "tfidf_minimum": 0.4,
+}
+
+FAREWELLS: Final[list[str]] = ["adios", "chao"]
+FAREWELL_PHRASES: Final[list[str]] = ["hasta luego", "nos vemos"]
+GREETINGS: Final[list[str]] = ["hola", "buenas", "saludos"]
+GREETING_PHRASES: Final[list[str]] = ["buenos dias", "buen dia"]
+THANK_YOU_WORDS: Final[list[str]] = ["gracias", "muchas gracias"]
+URGENCY_WORDS: Final[list[str]] = ["urgencia", "emergencia", "rapido"]
+FLEXIBILITY_KEYWORDS: Final[list[str]] = ["cambio", "otra", "reagendar"]
+DAY_NAMES: Final[dict[str, str]] = {
+    "lunes": "Lunes",
+    "martes": "Martes",
+    "miercoles": "Miércoles",
+    "jueves": "Jueves",
+    "viernes": "Viernes",
+    "sabado": "Sábado",
+    "domingo": "Domingo",
+}
+RELATIVE_DATES: Final[list[str]] = ["hoy", "mañana", "manana"]
+SERVICE_TYPES: Final[list[str]] = ["medicina general", "cardiologia", "dermatologia"]
+RULE_CONFIDENCE_VALUES: Final[dict[str, float]] = {
+    "greeting_exact": 0.95,
+    "greeting_phrase": 0.9,
+    "farewell_exact": 0.95,
+    "farewell_phrase": 0.9,
+}
+SOCIAL_CONFIDENCE_VALUES: Final[dict[str, float]] = {
+    "greeting_exact": 0.95,
+    "greeting_phrase": 0.9,
+    "farewell_exact": 0.95,
+    "farewell_phrase": 0.9,
+}
+INTENT_KEYWORDS: Final[dict[str, list[str]]] = {
+    "saludo": ["hola", "buenas", "buenos dias", "buen dia", "saludos"],
+    "urgencia": ["urgencia", "emergencia", "ayuda", "socorro", "rapido"],
+    "crear_cita": ["agendar", "cita", "reservar", "programar"],
+    "despedida": ["adios", "bye", "hasta luego", "chao"],
+    "agradecimiento": ["gracias", "muchas gracias"],
+    "ver_mis_citas": ["mis citas", "ver citas", "mis reservas"],
+    "mostrar_menu_principal": ["menu", "inicio", "volver"],
+}
+NORMALIZATION_MAP: Final[dict[str, str]] = {}
+PROFANITY_TO_IGNORE: Final[list[str]] = []
+OFF_TOPIC_PATTERNS: Final[list[str]] = []

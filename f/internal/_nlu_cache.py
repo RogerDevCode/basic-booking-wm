@@ -1,6 +1,6 @@
 import json
 import os
-from typing import Any
+from typing import Any, cast
 
 import asyncpg
 import redis
@@ -8,9 +8,11 @@ import redis
 # Global memory cache (fallback for fast sync access if needed)
 _NLU_CACHE: dict[str, Any] = {}
 
+
 def get_redis_client() -> redis.Redis:
     redis_url = os.getenv("REDIS_URL") or "redis://redis:6379"
     return redis.from_url(redis_url, decode_responses=True)
+
 
 async def load_nlu_rules_to_redis() -> None:
     """Loads NLU rules from Postgres to Redis."""
@@ -22,17 +24,18 @@ async def load_nlu_rules_to_redis() -> None:
         pipeline = r.pipeline()
         for row in rows:
             key = f"nlu_rule:{row['rule_key']}"
-            if row['keywords'] is not None:
-                val = row['keywords']
+            if row["keywords"] is not None:
+                val = row["keywords"]
                 if isinstance(val, str):
                     pipeline.set(key, val)
                 else:
                     pipeline.set(key, json.dumps(val))
-            elif row['threshold_value'] is not None:
-                pipeline.set(key, str(row['threshold_value']))
+            elif row["threshold_value"] is not None:
+                pipeline.set(key, str(row["threshold_value"]))
         pipeline.execute()
     finally:
         await conn.close()
+
 
 async def ensure_nlu_cache() -> None:
     """Ensures the global memory cache is populated."""
@@ -43,7 +46,7 @@ async def ensure_nlu_cache() -> None:
     # Try loading from Redis first
     r = get_redis_client()
     keys = r.keys("nlu_rule:*")
-    
+
     if not keys:
         # Load from DB to Redis
         await load_nlu_rules_to_redis()
@@ -53,8 +56,9 @@ async def ensure_nlu_cache() -> None:
         return
 
     # Fetch all from Redis
-    values = r.mget(keys)
-    for k, v in zip(keys, values):
+    str_keys = cast("list[str]", keys)
+    values = cast("list[bytes | None]", r.mget(str_keys))
+    for k, v in zip(str_keys, values, strict=False):
         if not v:
             continue
         key_name = k.replace("nlu_rule:", "")
@@ -66,6 +70,7 @@ async def ensure_nlu_cache() -> None:
             except ValueError:
                 _NLU_CACHE[key_name] = v
 
-def get_nlu_rule(rule_key: str, default: Any = None) -> Any:
+
+def get_nlu_rule(rule_key: str, default: Any = None) -> Any:  # noqa: ANN401
     """Gets an NLU rule from the memory cache synchronously."""
     return _NLU_CACHE.get(rule_key, default)

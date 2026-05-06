@@ -1,15 +1,18 @@
 from __future__ import annotations
 
 import sys
+from typing import TYPE_CHECKING, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+
+if TYPE_CHECKING:
+    from f.booking_create._booking_create_models import BookingCreated
 
 # Ensure wmill is mocked before imports
 if "wmill" not in sys.modules:
     sys.modules["wmill"] = MagicMock()
 
-from f.booking_create._booking_create_models import BookingCreated
 from f.booking_orchestrator.main import _main_async as orchestrator_main
 
 # Constants for testing
@@ -70,7 +73,8 @@ async def test_e2e_booking_happy_path(
     mock_db = AsyncMock()
     mock_db.close.return_value = None
 
-    async def mock_with_tenant_context(conn, pid, op):
+    async def mock_with_tenant_context(conn: object, pid: object, op: object) -> object:
+        assert callable(op)
         return await op()
 
     with (
@@ -113,9 +117,10 @@ async def test_e2e_booking_happy_path(
         # Check that it successfully created the booking
         data = result.get("data")
         assert data is not None
-        assert data["booking_id"] == VALID_BOOKING_ID
-        assert data["status"] == "confirmed"
-        assert data["provider_name"] == "Dr. Test"
+        data_dict = cast("dict[str, object]", data)
+        assert data_dict["booking_id"] == VALID_BOOKING_ID
+        assert data_dict["status"] == "confirmed"
+        assert data_dict["provider_name"] == "Dr. Test"
 
         # Verify that booking repository was called correctly
         mock_booking_repo.get_client_context.assert_awaited_once_with(VALID_CLIENT_ID)

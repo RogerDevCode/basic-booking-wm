@@ -18,7 +18,7 @@ def main(chat_id: str | None = None) -> dict[str, Any]:
     redis_url = os.getenv("REDIS_URL") or "redis://redis:6379"
     r = redis.from_url(redis_url)
     key = f"telegram:outbound:{chat_id}"
-    data = cast(bytes, r.get(key))
+    data = cast("bytes", r.get(key))
 
     if data:
         payload = json.loads(data)

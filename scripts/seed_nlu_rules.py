@@ -1,34 +1,38 @@
+from __future__ import annotations
+
 import asyncio
 import json
 import os
+
 import asyncpg
 
 from f.internal.ai_agent._constants import (
+    DAY_NAMES,
+    FAREWELL_PHRASES,
+    FAREWELLS,
+    FLEXIBILITY_KEYWORDS,
+    GREETING_PHRASES,
+    GREETINGS,
     INTENT_KEYWORDS,
     NORMALIZATION_MAP,
-    PROFANITY_TO_IGNORE,
     OFF_TOPIC_PATTERNS,
-    GREETINGS,
-    GREETING_PHRASES,
-    FAREWELLS,
-    FAREWELL_PHRASES,
-    THANK_YOU_WORDS,
-    URGENCY_WORDS,
-    FLEXIBILITY_KEYWORDS,
-    DAY_NAMES,
+    PROFANITY_TO_IGNORE,
     RELATIVE_DATES,
     SERVICE_TYPES,
+    THANK_YOU_WORDS,
+    URGENCY_WORDS,
 )
 
-async def seed_nlu_rules():
+
+async def seed_nlu_rules() -> None:
     db_url = os.getenv("DATABASE_URL") or "postgresql://postgres:postgres@localhost:5432/booking_db"
     conn = await asyncpg.connect(db_url)
-    
+
     try:
         # Read and execute migration file
-        with open("migrations/017_create_nlu_rules.sql", "r") as f:
+        with open("migrations/017_create_nlu_rules.sql") as f:
             await conn.execute(f.read())
-            
+
         print("Migration 017 executed.")
 
         # Seed intent keywords
@@ -43,9 +47,9 @@ async def seed_nlu_rules():
                 """,
                 rule_key,
                 keywords_json,
-                f"Keywords and weight for {intent}"
+                f"Keywords and weight for {intent}",
             )
-            
+
         # Seed lists and dictionaries
         other_rules = {
             "normalization_map": NORMALIZATION_MAP,
@@ -61,14 +65,17 @@ async def seed_nlu_rules():
             "day_names": DAY_NAMES,
             "relative_dates": RELATIVE_DATES,
             "service_types": SERVICE_TYPES,
-            
             # UI Messages
-            "msg_slot_taken": "Ese horario ya fue reservado por otra persona. Por favor elige un horario diferente.",
-            "msg_no_service": "El profesional seleccionado no tiene servicios disponibles en este momento. Intenta con otro profesional.",
-            "msg_generic": "No pudimos confirmar tu cita en este momento. Por favor intenta de nuevo en unos minutos.",
-            "msg_main_menu": "📱 *Menú Principal*\n\n1️⃣ Agendar cita\n2️⃣ Mis citas\n3️⃣ Recordatorios\n4️⃣ Información\n5️⃣ Mis datos"
+            "msg_slot_taken": "Ese horario ya fue reservado. Por favor elige un horario diferente.",
+            "msg_no_service": (
+                "El profesional seleccionado no tiene servicios disponibles. Intenta con otro profesional."
+            ),
+            "msg_generic": "No pudimos confirmar tu cita. Por favor intenta de nuevo en unos minutos.",
+            "msg_main_menu": (
+                "📱 *Menú Principal*\n\n1️⃣ Agendar cita\n2️⃣ Mis citas\n3️⃣ Recordatorios\n4️⃣ Información\n5️⃣ Mis datos"
+            ),
         }
-        
+
         for key, value in other_rules.items():
             await conn.execute(
                 """
@@ -78,13 +85,14 @@ async def seed_nlu_rules():
                 """,
                 key,
                 json.dumps(value),
-                f"Data for {key}"
+                f"Data for {key}",
             )
-            
+
         print("All NLU constants successfully seeded to nlu_rules table.")
 
     finally:
         await conn.close()
+
 
 if __name__ == "__main__":
     asyncio.run(seed_nlu_rules())

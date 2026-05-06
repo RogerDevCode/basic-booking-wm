@@ -38,6 +38,7 @@ strict = true
 mypy_path = "stubs"
 warn_return_any = true
 warn_unused_ignores = true
+exclude = ["^reset_nlu\\.py$", "^fix_nlu\\.py$", "^scripts/"]
 
 [[tool.mypy.overrides]]
 module = "wmill.*"

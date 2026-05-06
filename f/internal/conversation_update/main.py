@@ -32,7 +32,7 @@ MODULE: Final[str] = "conversation_update"
 async def _update_conversation(
     input_data: ConversationUpdateInput, redis_url: str | None = None
 ) -> Result[ConversationUpdateResult, str]:
-    redis = await create_redis_client(redis_url)
+    redis = await create_redis_client()
     try:
         key = f"conv:{input_data.chat_id}"
 

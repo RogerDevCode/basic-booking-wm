@@ -38,9 +38,11 @@ from ._fsm_responses import (
     build_specialty_prompt,
 )
 
+
 def get_main_menu_text() -> str:
     default_text = "📱 *Menú Principal*\n\n1️⃣ Agendar cita\n2️⃣ Mis citas\n3️⃣ Recordatorios\n4️⃣ Información\n5️⃣ Mis datos"
     return str(get_nlu_rule("msg_main_menu", default_text))
+
 
 def _is_named_item_list(val: list[NamedItem]) -> TypeIs[list[NamedItem]]:
     return all(isinstance(x, dict) and "id" in x and "name" in x for x in val)

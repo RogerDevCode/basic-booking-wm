@@ -33,7 +33,7 @@ async def _main_async(
     if not update_id:
         return {"duplicate": False, "update_id": update_id}
 
-    redis = await create_redis_client(redis_url)
+    redis = await create_redis_client()
     try:
         key = f"dedup:upd:{update_id}"
         # SET NX — atomically sets only if key doesn't exist

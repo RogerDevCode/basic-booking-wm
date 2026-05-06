@@ -1,41 +1,44 @@
 {
   "mcpServers": {
-    "filesystem": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-filesystem",
-        "/home/manager/Sync/wildmill-proyects/booking-titanium-wm"
-      ]
-    },
-    "github": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-github"
-      ]
-    },
-    "gemini-docs": {
-      "url": "https://developerknowledge.googleapis.com/mcp",
-      "type": "sse",
-      "headers": {
-        "X-Goog-Api-Key": "$GOOGLE_API_KEY"
-      }
-    },
-    "token-savior": {
+    "codebase-index": {
       "command": "uv",
       "args": [
         "run",
         "python",
         "-m",
-        "token_savior.server"
+        "mcp_codebase_index.server"
       ],
       "env": {
-        "WORKSPACE_ROOTS": "/home/manager/Sync/wildmill-proyects/booking-titanium-wm",
-        "TOKEN_SAVIOR_PROFILE": "tiny_plus",
-        "TS_AUTO_EXTRACT": "1",
-        "TS_VIEWER_PORT": "3000"
+        "PROJECT_ROOT": "${workspaceFolder}"
       }
+    },
+    "windmill-booking": {
+      "url": "http://localhost:8080/api/mcp/w/booking-titanium/mcp",
+      "headers": {
+        "Authorization": "Bearer LJipaz08ZSYDSoQtB4IGJiOxLFR86GBz"
+      }
+    },
+    "redis": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-redis",
+        "redis://localhost:6379"
+      ]
+    },
+    "postgres-local": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-postgres",
+        "postgresql://windmill:windmill@localhost:5432/windmill"
+      ]
+    },
+    "github": {
+      "command": "true"
     }
+  },
+  "context": {
+    "fileName": "AGENTS.md"
   }
 }

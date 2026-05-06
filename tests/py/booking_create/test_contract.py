@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 from datetime import UTC, datetime
+from typing import cast
 
 import pytest
 
@@ -17,7 +20,7 @@ class MockBookingRepository:
         return {"id": client_id, "name": "Test Client"}
 
     async def get_provider_context(self, provider_id: str) -> ProviderContext | None:
-        return {"id": provider_id, "name": "Dr. Test", "timezone": "UTC"}
+        return cast("ProviderContext", {"id": provider_id, "name": "Dr. Test", "timezone": "UTC"})
 
     async def get_service_context(self, service_id: str, provider_id: str) -> ServiceContext | None:
         return {"id": service_id, "name": "General Checkup", "duration": 30}

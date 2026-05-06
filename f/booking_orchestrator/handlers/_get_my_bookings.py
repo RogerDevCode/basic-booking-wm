@@ -31,13 +31,14 @@ async def handle_get_my_bookings(conn: DBClient, input_data: OrchestratorInput) 
     async def operation() -> Result[list[dict[str, object]]]:
         # Get UI preference for limits
         prefs_row = await conn.fetchrow(
-            "SELECT ui_preferences->>'max_bookings_per_query' as max_b FROM providers WHERE provider_id = $1::uuid LIMIT 1",
-            tenant_id
+            "SELECT ui_preferences->>'max_bookings_per_query' as max_b"
+            " FROM providers WHERE provider_id = $1::uuid LIMIT 1",
+            tenant_id,
         )
         limit = 20
         if prefs_row and prefs_row["max_b"]:
             try:
-                limit = int(prefs_row["max_b"])
+                limit = int(str(prefs_row["max_b"]))
             except ValueError:
                 pass
 
@@ -54,7 +55,7 @@ async def handle_get_my_bookings(conn: DBClient, input_data: OrchestratorInput) 
             ORDER BY b.start_time ASC LIMIT $2
             """,
             client_id,
-            limit
+            limit,
         )
         return None, rows
 

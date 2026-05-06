@@ -26,11 +26,13 @@ from ._router_models import RouterInput, RouterResult
 
 MODULE: Final[str] = "telegram_router"
 
+
 def _get_start_text() -> str:
     return (
         "¡Hola! Soy tu asistente de reservas. 👋\n\n"
         "Puedo ayudarte a agendar, consultar o cancelar una cita médica.\n\n" + get_main_menu_text()
     )
+
 
 _AGENDAR_KEYWORDS: Final[frozenset[str]] = frozenset(["1", "agendar", "agendar cita", "nueva cita", "cita"])
 _MIS_CITAS_KEYWORDS: Final[frozenset[str]] = frozenset(["2", "mis citas", "consultar", "consultar citas", "ver citas"])
@@ -125,7 +127,8 @@ def _handle_registration_state(
                     nextState={"name": "idle"},
                     nextDraft={},
                     response_text=(
-                        "Entendido. 👍\n\nPuedes registrarte cuando quieras para agendar citas.\n\n" + get_main_menu_text()
+                        "Entendido. 👍\n\nPuedes registrarte cuando quieras para agendar citas.\n\n"
+                        + get_main_menu_text()
                     ),
                 )
             )
@@ -260,8 +263,9 @@ async def _route(input_data: RouterInput) -> Result[RouterResult, str]:
         return _handle_registration_state(input_data, current_state_name, draft_raw)
 
     from .._nlu_cache import ensure_nlu_cache
+
     await ensure_nlu_cache()
-    
+
     try:
         if current_state_name == "idle" and not is_callback:
             lower = user_input.strip().lower()
@@ -291,7 +295,8 @@ async def _route(input_data: RouterInput) -> Result[RouterResult, str]:
                         nextState=current_state_raw,
                         response_text=(
                             "🔔 *Recordatorios*\n\n"
-                            "Los recordatorios se envían automáticamente al confirmar tu cita.\n\n" + get_main_menu_text()
+                            "Los recordatorios se envían automáticamente al confirmar tu cita.\n\n"
+                            + get_main_menu_text()
                         ),
                     )
                 )
@@ -303,7 +308,8 @@ async def _route(input_data: RouterInput) -> Result[RouterResult, str]:
                         response_text=(
                             "\U00002139️ *Información*\n\n"
                             "Este es tu asistente de reservas médicas.\n"
-                            "Puedes agendar, consultar o cancelar citas en cualquier momento.\n\n" + get_main_menu_text()
+                            "Puedes agendar, consultar o cancelar citas en cualquier momento.\n\n"
+                            + get_main_menu_text()
                         ),
                     )
                 )

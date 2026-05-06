@@ -209,10 +209,10 @@
 - ⚡ `async_fn` `create_booking` (L159)
 
 ### `f/booking_wizard/_wizard_models.py`
-- 📦 `class` `WizardState` (L10)
-- 📦 `class` `StepView` (L20)
-- 📦 `class` `InputSchema` (L28)
-- 📦 `class` `WizardResult` (L39)
+- 📦 `class` `WizardState` (L8)
+- 📦 `class` `StepView` (L18)
+- 📦 `class` `InputSchema` (L26)
+- 📦 `class` `WizardResult` (L37)
 
 ### `f/booking_wizard/main.py`
 - ⚡ `async_fn` `operation` (L58)
@@ -370,8 +370,8 @@
 - 🔧 `fn` `main` (L82)
 
 ### `f/internal/_booking_utils.py`
-- 📦 `class` `ActiveBookingInfo` (L8)
-- ⚡ `async_fn` `get_active_booking_for_provider` (L14)
+- 📦 `class` `ActiveBookingInfo` (L9)
+- ⚡ `async_fn` `get_active_booking_for_provider` (L16)
 
 ### `f/internal/_config.py`
 - 🔧 `fn` `get_env` (L54)
@@ -389,31 +389,37 @@
 
 ### `f/internal/_date_resolver.py`
 - 📦 `class` `ResolveDateOpts` (L21)
-- 🔧 `fn` `resolve_date` (L82)
-- 🔧 `fn` `resolve_time` (L141)
-- 🔧 `fn` `today_ymd` (L168)
+- 🔧 `fn` `resolve_date` (L81)
+- 🔧 `fn` `resolve_time` (L140)
+- 🔧 `fn` `today_ymd` (L167)
 
 ### `f/internal/_db_client.py`
-- ⚡ `async_fn` `fetch` (L17)
-- ⚡ `async_fn` `fetchrow` (L19)
-- ⚡ `async_fn` `fetchval` (L21)
-- ⚡ `async_fn` `execute` (L23)
-- ⚡ `async_fn` `close` (L25)
-- ⚡ `async_fn` `create_db_client` (L74)
-- 📦 `class` `AsyncpgWrapper` (L86)
-- ⚡ `async_fn` `fetch` (L90)
-- ⚡ `async_fn` `fetchrow` (L95)
-- ⚡ `async_fn` `fetchval` (L99)
-- ⚡ `async_fn` `execute` (L102)
-- ⚡ `async_fn` `close` (L106)
+- ⚡ `async_fn` `fetch` (L15)
+- ⚡ `async_fn` `fetchrow` (L17)
+- ⚡ `async_fn` `fetchval` (L19)
+- ⚡ `async_fn` `execute` (L21)
+- ⚡ `async_fn` `close` (L23)
+- ⚡ `async_fn` `create_db_client` (L48)
+- 📦 `class` `AsyncpgWrapper` (L60)
+- ⚡ `async_fn` `fetch` (L64)
+- ⚡ `async_fn` `fetchrow` (L68)
+- ⚡ `async_fn` `fetchval` (L72)
+- ⚡ `async_fn` `execute` (L76)
+- ⚡ `async_fn` `close` (L80)
 
 ### `f/internal/_file_lock.py`
 - 📦 `class` `FileLockError` (L17)
 - 🔧 `fn` `exclusive_file_lock` (L24)
 - 🔧 `fn` `shared_file_lock` (L94)
 
+### `f/internal/_nlu_cache.py`
+- 🔧 `fn` `get_redis_client` (L12)
+- ⚡ `async_fn` `load_nlu_rules_to_redis` (L17)
+- ⚡ `async_fn` `ensure_nlu_cache` (L40)
+- 🔧 `fn` `get_nlu_rule` (L74)
+
 ### `f/internal/_redis_client.py`
-- ⚡ `async_fn` `create_redis_client` (L28)
+- ⚡ `async_fn` `create_redis_client` (L34)
 
 ### `f/internal/_result.py`
 - 🔧 `fn` `ok` (L17)
@@ -442,12 +448,12 @@
 - 🔧 `fn` `log` (L68)
 
 ### `f/internal/ai_agent/_ai_agent_logic.py`
-- 🔧 `fn` `adjust_intent_with_context` (L28)
-- 🔧 `fn` `extract_entities` (L76)
-- 🔧 `fn` `detect_context` (L149)
-- 🔧 `fn` `determine_escalation_level` (L181)
-- 🔧 `fn` `generate_ai_response` (L203)
-- 🔧 `fn` `detect_social` (L220)
+- 🔧 `fn` `adjust_intent_with_context` (L15)
+- 🔧 `fn` `extract_entities` (L64)
+- 🔧 `fn` `detect_context` (L140)
+- 🔧 `fn` `determine_escalation_level` (L177)
+- 🔧 `fn` `generate_ai_response` (L202)
+- 🔧 `fn` `detect_social` (L219)
 
 ### `f/internal/ai_agent/_ai_agent_models.py`
 - 📦 `class` `ConversationState` (L11)
@@ -462,19 +468,14 @@
 
 ### `f/internal/ai_agent/_constants.py`
 - 📦 `class` `IntentsStruct` (L27)
-- 📦 `class` `KeywordDef` (L85)
-- 📦 `class` `EscalationThresholdsStruct` (L548)
-- 📦 `class` `RuleConfidenceStruct` (L563)
-- 📦 `class` `SocialConfidenceStruct` (L582)
-- 📦 `class` `ConfidenceBoundariesStruct` (L601)
 
 ### `f/internal/ai_agent/_guardrails.py`
-- 📦 `class` `GuardrailPass` (L8)
-- 📦 `class` `GuardrailBlocked` (L12)
-- 🔧 `fn` `validate_input` (L42)
-- 🔧 `fn` `validate_output` (L60)
-- 🔧 `fn` `sanitize_json_response` (L74)
-- 🔧 `fn` `verify_urgency` (L88)
+- 📦 `class` `GuardrailPass` (L9)
+- 📦 `class` `GuardrailBlocked` (L13)
+- 🔧 `fn` `validate_input` (L43)
+- 🔧 `fn` `validate_output` (L61)
+- 🔧 `fn` `sanitize_json_response` (L75)
+- 🔧 `fn` `verify_urgency` (L89)
 
 ### `f/internal/ai_agent/_llm_client.py`
 - 📦 `class` `ChatMessage` (L18)
@@ -492,30 +493,30 @@
 - ⚡ `async_fn` `get_rag_context` (L54)
 
 ### `f/internal/ai_agent/_tfidf_classifier.py`
-- 🔧 `fn` `normalize` (L159)
-- 🔧 `fn` `compute_tf` (L179)
-- 🔧 `fn` `compute_idf` (L187)
-- 🔧 `fn` `cosine_similarity` (L197)
-- 📦 `class` `TfIdfModel` (L213)
-- 🔧 `fn` `get_model` (L226)
-- 📦 `class` `Score` (L233)
-- 📦 `class` `TfIdfResult` (L238)
-- 🔧 `fn` `classify_intent` (L244)
+- 🔧 `fn` `normalize` (L160)
+- 🔧 `fn` `compute_tf` (L181)
+- 🔧 `fn` `compute_idf` (L189)
+- 🔧 `fn` `cosine_similarity` (L199)
+- 📦 `class` `TfIdfModel` (L215)
+- 📦 `class` `Score` (L226)
+- 📦 `class` `TfIdfResult` (L231)
+- 🔧 `fn` `classify_intent` (L237)
 
 ### `f/internal/ai_agent/main.py`
-- 🔧 `fn` `main` (L146)
+- 🔧 `fn` `main` (L150)
 
 ### `f/internal/apply_fix_migration.py`
 - 🔧 `fn` `main` (L24)
 
 ### `f/internal/booking_confirm/main.py`
-- 🔧 `fn` `main` (L107)
+- 🔧 `fn` `main` (L124)
 
 ### `f/internal/booking_fsm/_fsm_machine.py`
-- 🔧 `fn` `parse_action` (L51)
-- 🔧 `fn` `parse_callback_data` (L78)
-- 🔧 `fn` `apply_transition` (L95)
-- 🔧 `fn` `flow_step_from_state` (L377)
+- 🔧 `fn` `get_main_menu_text` (L42)
+- 🔧 `fn` `parse_action` (L55)
+- 🔧 `fn` `parse_callback_data` (L82)
+- 🔧 `fn` `apply_transition` (L99)
+- 🔧 `fn` `flow_step_from_state` (L381)
 
 ### `f/internal/booking_fsm/_fsm_models.py`
 - 📦 `class` `NamedItem` (L20)
@@ -588,7 +589,7 @@
 - 🔧 `fn` `main` (L17)
 
 ### `f/internal/gcal_utils/_gcal_logic.py`
-- 🔧 `fn` `build_gcal_event` (L7)
+- 🔧 `fn` `build_gcal_event` (L6)
 
 ### `f/internal/gcal_utils/_gcal_models.py`
 - 📦 `class` `BookingEventData` (L4)
@@ -658,7 +659,7 @@
 - 📦 `class` `RouterResult` (L19)
 
 ### `f/internal/telegram_router/main.py`
-- 🔧 `fn` `main` (L373)
+- 🔧 `fn` `main` (L383)
 
 ### `f/nlu/_tfidf_classifier.py`
 - 📦 `class` `ModelData` (L234)
@@ -783,10 +784,10 @@
 - 🔧 `fn` `build_inline_buttons` (L60)
 
 ### `f/reminder_cron/_reminder_models.py`
-- 📦 `class` `ReminderPrefs` (L10)
-- 📦 `class` `BookingRecord` (L19)
-- 📦 `class` `CronResult` (L37)
-- 📦 `class` `InputSchema` (L46)
+- 📦 `class` `ReminderPrefs` (L8)
+- 📦 `class` `BookingRecord` (L17)
+- 📦 `class` `CronResult` (L35)
+- 📦 `class` `InputSchema` (L44)
 
 ### `f/reminder_cron/_reminder_repository.py`
 - ⚡ `async_fn` `get_bookings_for_window` (L12)
@@ -837,7 +838,7 @@
 - ⚡ `async_fn` `route` (L131)
 
 ### `f/telegram_callback/main.py`
-- 🔧 `fn` `main` (L105)
+- 🔧 `fn` `main` (L106)
 
 ### `f/telegram_gateway/_gateway_logic.py`
 - 📦 `class` `TelegramClient` (L14)
@@ -1001,9 +1002,9 @@
 - 🔧 `fn` `main` (L108)
 
 ### `f/web_auth_complete_profile/_complete_profile_models.py`
-- 📦 `class` `CompleteProfileResult` (L8)
-- 📦 `class` `UserRow` (L16)
-- 📦 `class` `InputSchema` (L24)
+- 📦 `class` `CompleteProfileResult` (L6)
+- 📦 `class` `UserRow` (L14)
+- 📦 `class` `InputSchema` (L22)
 
 ### `f/web_auth_complete_profile/main.py`
 - ⚡ `async_fn` `operation` (L59)
@@ -1038,8 +1039,8 @@
 - 🔧 `fn` `hash_password_sync` (L44)
 
 ### `f/web_auth_register/_register_models.py`
-- 📦 `class` `RegisterResult` (L8)
-- 📦 `class` `InputSchema` (L15)
+- 📦 `class` `RegisterResult` (L6)
+- 📦 `class` `InputSchema` (L13)
 
 ### `f/web_auth_register/main.py`
 - ⚡ `async_fn` `operation` (L58)

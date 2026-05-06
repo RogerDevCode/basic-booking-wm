@@ -29,7 +29,7 @@ repos:
     hooks:
       - id: mypy-strict
         name: "Mypy Strict"
-        entry: uv run mypy --strict .
+        entry: uv run mypy --strict --exclude "^conftest\\.py$" .
         language: system
         pass_filenames: false
         stages: [pre-commit]

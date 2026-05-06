@@ -22,14 +22,29 @@ from .._wmill_adapter import log
 
 MODULE: Final[str] = "booking_confirm"
 
+
 def _user_message(err: Exception | str) -> str:
     """Map a technical error to a safe, user-friendly Spanish message."""
     msg = str(err).lower()
     if "duplicate" in msg or "unique" in msg or "already" in msg:
-        return str(get_nlu_rule("msg_slot_taken", "Ese horario ya fue reservado por otra persona. Por favor elige un horario diferente."))
+        return str(
+            get_nlu_rule(
+                "msg_slot_taken", "Ese horario ya fue reservado por otra persona. Por favor elige un horario diferente."
+            )
+        )
     if "no_service_for_provider" in msg:
-        return str(get_nlu_rule("msg_no_service", "El profesional seleccionado no tiene servicios disponibles en este momento. Intenta con otro profesional."))
-    return str(get_nlu_rule("msg_generic", "No pudimos confirmar tu cita en este momento. Por favor intenta de nuevo en unos minutos."))
+        return str(
+            get_nlu_rule(
+                "msg_no_service",
+                "El profesional seleccionado no tiene servicios"
+                " disponibles en este momento. Intenta con otro profesional.",
+            )
+        )
+    return str(
+        get_nlu_rule(
+            "msg_generic", "No pudimos confirmar tu cita en este momento. Por favor intenta de nuevo en unos minutos."
+        )
+    )
 
 
 async def _resolve_service_id(provider_id: str) -> str | None:
@@ -65,7 +80,11 @@ async def _main_async(
     service_id = await _resolve_service_id(provider_id)
     if not service_id:
         log("BOOKING_CONFIRM_NO_SERVICE", provider_id=provider_id, module=MODULE)
-        return {"success": False, "error": "no_service_for_provider", "user_message": _user_message("no_service_for_provider")}
+        return {
+            "success": False,
+            "error": "no_service_for_provider",
+            "user_message": _user_message("no_service_for_provider"),
+        }
 
     # 2. Idempotency key scoped to Telegram chat + slot
     idempotency_key = f"tg:{chat_id}:{start_time}"
