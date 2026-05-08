@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import zoneinfo
 from datetime import UTC, date, datetime, timedelta
 from typing import cast
 
 from .._result import DBClient, Result, fail, ok
+from .._wmill_adapter import log
 from ._scheduling_models import (
     AffectedBooking,
     AvailabilityQuery,
@@ -26,8 +28,19 @@ def time_to_minutes(time_str: str) -> int:
 
 
 def generate_slots_for_rule(
-    rule: ProviderScheduleRow, target_date: str, slot_duration_min: int, bookings: list[BookingTimeRow]
+    rule: ProviderScheduleRow,
+    target_date: str,
+    slot_duration_min: int,
+    bookings: list[BookingTimeRow],
+    timezone_name: str = "UTC",
+    slot_spacing_min: int | None = None,
+    cutoff_utc: datetime | None = None,
 ) -> list[TimeSlot]:
+    """
+    slot_duration_min: actual service duration (used for end_time and overlap check).
+    slot_spacing_min:  advance between slot starts = duration + buffer. Defaults to duration.
+    """
+    spacing = slot_spacing_min if slot_spacing_min is not None else slot_duration_min
     slots: list[TimeSlot] = []
     start_min = time_to_minutes(rule["start_time"])
     end_min = time_to_minutes(rule["end_time"])
@@ -41,12 +54,9 @@ def generate_slots_for_rule(
     # Prepare booking ranges as (start_ts, end_ts) for faster lookup
     booking_ranges = []
     for b in bookings:
-        # asyncpg returns datetime objects for timestamptz
-        # We ensure they are UTC and then get timestamp
         b_start = b["start_time"]
         b_end = b["end_time"]
 
-        # If they are strings (unlikely with asyncpg but possible if mocked)
         if isinstance(b_start, str):
             b_start_dt = datetime.fromisoformat(b_start.replace("Z", "+00:00"))
         else:
@@ -59,9 +69,10 @@ def generate_slots_for_rule(
 
         booking_ranges.append((b_start_dt.timestamp(), b_end_dt.timestamp()))
 
+    tz = zoneinfo.ZoneInfo(timezone_name)
     current_min = start_min
     while current_min + slot_duration_min <= end_min:
-        slot_start_dt = datetime(y, m, d, current_min // 60, current_min % 60, tzinfo=UTC)
+        slot_start_dt = datetime(y, m, d, current_min // 60, current_min % 60, tzinfo=tz)
         slot_end_dt = slot_start_dt + timedelta(minutes=slot_duration_min)
 
         slot_start_ts = slot_start_dt.timestamp()
@@ -69,15 +80,22 @@ def generate_slots_for_rule(
 
         is_booked = any(slot_start_ts < b_end and slot_end_ts > b_start for b_start, b_end in booking_ranges)
 
+        start_utc = slot_start_dt.astimezone(UTC)
+        end_utc = slot_end_dt.astimezone(UTC)
+
+        if cutoff_utc and start_utc <= cutoff_utc:
+            current_min += spacing
+            continue
+
         slots.append(
             {
-                "start": slot_start_dt.isoformat().replace("+00:00", "Z"),
-                "end": slot_end_dt.isoformat().replace("+00:00", "Z"),
+                "start": start_utc.isoformat().replace("+00:00", "Z"),
+                "end": end_utc.isoformat().replace("+00:00", "Z"),
                 "available": not is_booked,
             }
         )
 
-        current_min += slot_duration_min
+        current_min += spacing
 
     return slots
 
@@ -179,7 +197,26 @@ async def get_availability(db: DBClient, query: AvailabilityQuery) -> Result[Ava
         )
         bookings = cast("list[BookingTimeRow]", booking_rows)
 
-        # 4. Service details
+        # 4. Provider timezone and UI preferences
+        tz_rows = await db.fetch(
+            """
+            SELECT t.name as tz_name, p.ui_preferences
+            FROM providers p
+            LEFT JOIN timezones t ON t.id = p.timezone_id
+            WHERE p.provider_id = $1::uuid
+            LIMIT 1
+            """,
+            query["provider_id"],
+        )
+        provider_tz = str(tz_rows[0]["tz_name"]) if tz_rows and tz_rows[0]["tz_name"] else "UTC"
+
+        advance_notice_minutes = 0
+        if tz_rows and tz_rows[0].get("ui_preferences"):
+            prefs = tz_rows[0]["ui_preferences"]
+            if isinstance(prefs, dict):
+                advance_notice_minutes = int(prefs.get("advance_notice_minutes", 0))
+
+        # 5. Service details
         service_rows = await db.fetch(
             "SELECT service_id, duration_minutes, buffer_minutes FROM services WHERE service_id = $1::uuid LIMIT 1",
             query["service_id"],
@@ -188,12 +225,17 @@ async def get_availability(db: DBClient, query: AvailabilityQuery) -> Result[Ava
             return fail(f"Service not found: {query['service_id']}")
 
         service = cast("ServiceRow", service_rows[0])
-        slot_duration = service["duration_minutes"] + service["buffer_minutes"]
+        slot_duration = service["duration_minutes"]
+        slot_spacing = slot_duration + service["buffer_minutes"]
 
-        # 5. Generate slots
+        # 6. Generate slots using provider's local timezone
+        cutoff_utc = datetime.now(UTC) + timedelta(minutes=advance_notice_minutes)
+
         all_slots: list[TimeSlot] = []
         for rule in rules:
-            rule_slots = generate_slots_for_rule(rule, target_date, slot_duration, bookings)
+            rule_slots = generate_slots_for_rule(
+                rule, target_date, slot_duration, bookings, provider_tz, slot_spacing, cutoff_utc
+            )
             all_slots.extend(rule_slots)
 
         available_count = len([s for s in all_slots if s["available"]])
@@ -203,7 +245,7 @@ async def get_availability(db: DBClient, query: AvailabilityQuery) -> Result[Ava
             AvailabilityResult(
                 provider_id=query["provider_id"],
                 date=target_date,
-                timezone="UTC",
+                timezone=provider_tz,
                 slots=all_slots,
                 total_available=available_count,
                 total_booked=booked_count,
@@ -213,6 +255,9 @@ async def get_availability(db: DBClient, query: AvailabilityQuery) -> Result[Ava
         )
 
     except Exception as e:
+        import traceback
+
+        log("GET_AVAILABILITY_CRITICAL_ERROR", error=str(e), traceback=traceback.format_exc())
         return fail(e)
 
 
@@ -225,6 +270,7 @@ async def get_availability_range(
         curr_dt = date.fromisoformat(date_from)
         end_dt = date.fromisoformat(date_to)
     except ValueError as e:
+        log("GET_AVAILABILITY_RANGE_DATE_ERROR", error=str(e))
         return fail(f"Invalid date format: {e}")
 
     iter_date = curr_dt
@@ -279,4 +325,7 @@ async def validate_override(
             )
         )
     except Exception as e:
+        import traceback
+
+        log("VALIDATE_OVERRIDE_ERROR", error=str(e), traceback=traceback.format_exc())
         return fail(e)

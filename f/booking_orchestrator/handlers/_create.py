@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, cast
+from collections.abc import Callable, Coroutine, Mapping
+from typing import TYPE_CHECKING, Any, cast
 
-from f.booking_create.main import main_async as create_booking
 from f.booking_orchestrator._get_entity import get_entity
 from f.internal._booking_utils import get_active_booking_for_provider
 from f.internal._result import DBClient, Result, ok
@@ -22,7 +22,9 @@ Zod Schemas      : NO
 """
 
 
-async def handle_create_booking(conn: DBClient, input_data: OrchestratorInput) -> Result[OrchestratorResult]:
+async def handle_create_booking(
+    conn: DBClient, input_data: OrchestratorInput, delegates: Mapping[str, Callable[..., Coroutine[Any, Any, Any]]]
+) -> Result[OrchestratorResult]:
     client_id = input_data.client_id
     provider_id = input_data.provider_id
     service_id = input_data.service_id
@@ -131,7 +133,17 @@ async def handle_create_booking(conn: DBClient, input_data: OrchestratorInput) -
         "channel": input_data.channel,
     }
 
-    err, data = await create_booking(args)
+    try:
+        book_create_res = await delegates["book_create"](args=args)
+        if isinstance(book_create_res, dict) and "error" in book_create_res:
+            err = str(book_create_res["error"])
+            data = None
+        else:
+            err = None
+            data = book_create_res
+    except Exception as e:
+        err = str(e)
+        data = None
 
     res_final: OrchestratorResult = {
         "action": "crear_cita",

@@ -5,5 +5,29 @@ kind: script
 schema:
   $schema: https://json-schema.org/draft/2020-12/schema
   type: object
-  properties: {}
-  required: []
+  properties:
+    booking_draft:
+      type: ''
+      description: ''
+      default: null
+    booking_state:
+      type: ''
+      description: ''
+      default: null
+    client_id:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    pg_url:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    user_input:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+  required:
+    - pg_url

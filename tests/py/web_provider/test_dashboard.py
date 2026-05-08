@@ -20,7 +20,7 @@ async def test_provider_dashboard_success() -> None:
     # 2. Fetch Agenda
     # 3. Monthly Stats
     mock_db.fetch.side_effect = [
-        [{"provider_id": "p1", "name": "Dr. Smith", "specialty": "Cardio"}],  # provider
+        [{"provider_id": "p1", "name": "Dr. Smith", "specialty": "Cardio", "tz_name": "America/Santiago"}],  # provider
         [
             {
                 "booking_id": "b1",

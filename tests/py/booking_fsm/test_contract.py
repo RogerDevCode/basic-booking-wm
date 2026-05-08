@@ -1,7 +1,6 @@
 from typing import Any, cast
 
 from f.internal.booking_fsm import (
-    CompletedState,
     ConfirmingState,
     DraftBooking,
     IdleState,
@@ -76,7 +75,7 @@ def test_fsm_flow_success() -> None:
     err, result = apply_transition(state, action, updated_draft)
     assert err is None
     assert result is not None
-    assert isinstance(result["nextState"], CompletedState)
+    assert isinstance(result["nextState"], IdleState)
 
 
 def test_fsm_back_navigation() -> None:

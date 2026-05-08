@@ -14,7 +14,7 @@
 # ///
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Final, cast
 
 from .._wmill_adapter import log
@@ -51,14 +51,19 @@ _DAYS_ES: Final[list[str]] = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"]
 _MONTHS_ES: Final[list[str]] = ["", "Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
 
 
-def _slot_label(start_iso: str) -> str:
-    dt = datetime.fromisoformat(start_iso.replace("Z", "+00:00"))
+def _slot_label(start_iso: str, provider_tz: str = "UTC") -> str:
+    import zoneinfo
+
+    dt_utc = datetime.fromisoformat(start_iso.replace("Z", "+00:00"))
+    tz = zoneinfo.ZoneInfo(provider_tz)
+    dt = dt_utc.astimezone(tz)
     day = _DAYS_ES[dt.weekday() + 1 if dt.weekday() < 6 else 0]
     return f"{day} {dt.day} {_MONTHS_ES[dt.month]} · {dt.strftime('%H:%M')}"
 
 
 async def _fetch_slots_for_doctor(db: DBClient, doctor_id: str) -> list[dict[str, object]]:
-    from datetime import date, timedelta
+    import zoneinfo
+    from datetime import timedelta
 
     from ..scheduling_engine._scheduling_logic import get_availability_range
 
@@ -70,9 +75,30 @@ async def _fetch_slots_for_doctor(db: DBClient, doctor_id: str) -> list[dict[str
         return []
     service_id = str(row["service_id"])
 
-    today = date.today()
-    date_from = today.isoformat()
-    date_to = (today + timedelta(days=7)).isoformat()
+    # Get provider timezone and booking preferences
+    pref_row = await db.fetchrow(
+        """
+        SELECT p.ui_preferences, t.name as tz_name
+        FROM providers p
+        LEFT JOIN timezones t ON t.id = p.timezone_id
+        WHERE p.provider_id = $1::uuid
+        """,
+        doctor_id,
+    )
+    require_advance = False
+    provider_tz = "UTC"
+    if pref_row:
+        if pref_row["tz_name"]:
+            provider_tz = str(pref_row["tz_name"])
+        prefs = pref_row["ui_preferences"]
+        if isinstance(prefs, dict):
+            require_advance = bool(prefs.get("require_advance_booking", False))
+
+    # Use provider's local date as "today", not the server's UTC date
+    tz = zoneinfo.ZoneInfo(provider_tz)
+    provider_today = datetime.now(tz).date()
+    date_from = (provider_today + timedelta(days=1) if require_advance else provider_today).isoformat()
+    date_to = (provider_today + timedelta(days=7)).isoformat()
 
     err, results = await get_availability_range(db, doctor_id, service_id, date_from, date_to)
     if err:
@@ -81,13 +107,18 @@ async def _fetch_slots_for_doctor(db: DBClient, doctor_id: str) -> list[dict[str
     if not results:
         return []
 
+    # Filter past slots: compare UTC timestamps directly (no artificial buffer)
+    now_utc = datetime.now(UTC)
     slots: list[dict[str, object]] = []
     for day_result in results:
         for slot in day_result["slots"]:
             if not slot["available"]:
                 continue
             start_iso = str(slot["start"])
-            slots.append({"id": start_iso, "label": _slot_label(start_iso), "start_time": start_iso})
+            slot_dt = datetime.fromisoformat(start_iso.replace("Z", "+00:00"))
+            if slot_dt <= now_utc:
+                continue
+            slots.append({"id": start_iso, "label": _slot_label(start_iso, provider_tz), "start_time": start_iso})
             if len(slots) >= 8:
                 return slots
     return slots
@@ -140,11 +171,26 @@ def _resolve_specialty_from_selection(
     return None
 
 
+async def _has_active_booking(db: DBClient, client_id: str) -> bool:
+    row = await db.fetchrow(
+        """
+        SELECT booking_id FROM bookings
+        WHERE client_id = $1::uuid
+          AND status NOT IN ('cancelled', 'no_show', 'rescheduled', 'completed')
+          AND start_time > NOW()
+        LIMIT 1
+        """,
+        client_id,
+    )
+    return row is not None
+
+
 async def _main_async(
     booking_state: dict[str, object] | None,
     booking_draft: dict[str, object] | None,
     pg_url: str,
     user_input: str | None = None,
+    client_id: str | None = None,
 ) -> dict[str, object]:
     state_name = cast("str", (booking_state or {}).get("name", "idle"))
 
@@ -170,6 +216,9 @@ async def _main_async(
             # Pre-fetch slots when user is picking a doctor
             doctor_id = _resolve_doctor_from_selection(user_input, state_items)
             if doctor_id:
+                if client_id and await _has_active_booking(db, client_id):
+                    log("PREFETCH_BLOCKED_ACTIVE_BOOKING", client_id=client_id, module=MODULE)
+                    return {"items": [], "prefetch_type": "blocked", "block_reason": "already_booked"}
                 slots = await _fetch_slots_for_doctor(db, doctor_id)
                 log("PREFETCH_SLOTS_AHEAD", count=len(slots), doctor_id=doctor_id, module=MODULE)
                 return {"items": slots, "prefetch_type": "time_slots", "resolved_doctor_id": doctor_id}
@@ -183,6 +232,16 @@ async def _main_async(
                     items = await _fetch_doctors_by_specialty(db, specialty_id)
                     log("PREFETCH_DOCTORS", count=len(items), specialty_id=specialty_id, module=MODULE)
                     return {"items": items, "prefetch_type": "doctors"}
+
+        if state_name == "selecting_time":
+            # Re-fetch slots if state has none (happens when initial prefetch returned empty)
+            state_time_items = cast("list[dict[str, object]]", (booking_state or {}).get("items", []))
+            if not state_time_items:
+                doctor_id = cast("str | None", (booking_state or {}).get("doctorId"))
+                if doctor_id:
+                    slots = await _fetch_slots_for_doctor(db, str(doctor_id))
+                    log("PREFETCH_SLOTS_RETRY", count=len(slots), doctor_id=doctor_id, module=MODULE)
+                    return {"items": slots, "prefetch_type": "time_slots"}
 
         log("PREFETCH_NO_MATCH", state_name=state_name, module=MODULE)
         return {"items": [], "prefetch_type": None}
@@ -201,7 +260,8 @@ def main(
     booking_state: dict[str, object] | None = None,
     booking_draft: dict[str, object] | None = None,
     user_input: str | None = None,
+    client_id: str | None = None,
 ) -> dict[str, object]:
     import asyncio
 
-    return asyncio.run(_main_async(booking_state, booking_draft, pg_url, user_input))
+    return asyncio.run(_main_async(booking_state, booking_draft, pg_url, user_input, client_id))

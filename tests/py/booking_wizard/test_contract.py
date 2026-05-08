@@ -16,6 +16,7 @@ VALID_ID = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
 @pytest.mark.asyncio
 async def test_booking_wizard_start() -> None:
     mock_db = AsyncMock()
+    mock_db.fetchrow.return_value = {"tz_name": "America/Santiago"}
     # Mock resolve_tenant (none needed for start usually, but let's mock it)
 
     async def mock_with_tenant(db: object, tid: str, op: Callable[[], Coroutine[Any, Any, object]]) -> object:
@@ -45,18 +46,33 @@ async def test_booking_wizard_start() -> None:
 async def test_booking_wizard_select_date_success() -> None:
     mock_db = AsyncMock()
     # 1. get_service_duration
-    # 2. get_available_slots
+    # 2. get_availability is mocked below via patch
     mock_db.fetch.side_effect = [
         [{"duration_minutes": 30}],  # service duration
-        [{"start_time": "2026-05-01T09:00:00Z"}],  # already booked
+        [{"service_id": VALID_ID}],  # Fallback query in WizardRepository
     ]
 
     async def mock_with_tenant(db: object, tid: str, op: Callable[[], Coroutine[Any, Any, object]]) -> object:
         return await op()
 
+    mock_avail = (
+        None,
+        {
+            "provider_id": VALID_ID,
+            "date": "2026-05-01",
+            "timezone": "UTC",
+            "slots": [{"start": "2026-05-01T09:00:00Z", "end": "2026-05-01T09:30:00Z", "available": True}],
+            "total_available": 1,
+            "total_booked": 0,
+            "is_blocked": False,
+            "block_reason": None,
+        },
+    )
+
     with (
         patch("f.booking_wizard.main.create_db_client", return_value=mock_db),
         patch("f.booking_wizard.main.with_tenant_context", side_effect=mock_with_tenant),
+        patch("f.internal.scheduling_engine._scheduling_logic.get_availability", return_value=mock_avail),
     ):
         args: dict[str, Any] = {
             "action": "select_date",

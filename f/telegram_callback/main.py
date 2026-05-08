@@ -9,7 +9,8 @@
 #   "beartype>=0.19.0",
 #   "returns>=0.24.0",
 #   "redis>=7.4.0",
-#   "typing-extensions>=4.12.0"
+#   "typing-extensions>=4.12.0",
+#   "wmill>=1.0.0"
 # ]
 # ///
 from __future__ import annotations
@@ -37,7 +38,14 @@ if TYPE_CHECKING:
 MODULE = "telegram_callback"
 
 
-async def _main_async(args: dict[str, object]) -> Result[dict[str, object]]:
+from collections.abc import Callable, Coroutine
+from typing import Any
+
+
+async def _main_async(
+    args: dict[str, object],
+    book_reschedule_fn: Callable[[Any], Coroutine[Any, Any, Any]],
+) -> Result[dict[str, object]]:
     # 1. Validate Input
     try:
         input_data = InputSchema.model_validate(args)
@@ -71,7 +79,7 @@ async def _main_async(args: dict[str, object]) -> Result[dict[str, object]]:
     router.register("acknowledge", AcknowledgeHandler())
     from ._callback_router import AutoRescheduleHandler
 
-    router.register("auto_reschedule", AutoRescheduleHandler())
+    router.register("auto_reschedule", AutoRescheduleHandler(book_reschedule_fn))
 
     context: ActionContext = {
         "botToken": bot_token,
@@ -103,8 +111,13 @@ async def _main_async(args: dict[str, object]) -> Result[dict[str, object]]:
     return None, res
 
 
-def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
-    import asyncio
+from wmill import task_script, workflow
+
+book_reschedule = task_script("f/booking_reschedule/main", timeout=30)
+
+
+@workflow  # type: ignore
+async def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
     import traceback
     from typing import cast
 
@@ -116,7 +129,7 @@ def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
         else:
             validated = InputSchema.model_validate(args)
 
-        err, result = asyncio.run(_main_async(validated.model_dump()))
+        err, result = await _main_async(validated.model_dump(), book_reschedule)
         if err:
             raise err
 

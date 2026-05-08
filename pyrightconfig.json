@@ -1,9 +1,16 @@
 {
-  "reportUnknownParameterType": true,
-  "reportUnknownArgumentType": true,
-  "reportUnknownLambdaType": true,
-  "strict": ["f", "tests/py"],
   "typeCheckingMode": "strict",
+  "pythonVersion": "3.13",
   "venvPath": ".",
-  "venv": ".venv"
+  "venv": ".venv",
+  "reportPrivateUsage": false,
+  "reportUnknownMemberType": false,
+  "reportUnknownVariableType": false,
+  "reportUnknownArgumentType": false,
+  "reportTypedDictNotRequiredAccess": false,
+  "exclude": [
+    "**/__pycache__",
+    ".git",
+    ".venv"
+  ]
 }

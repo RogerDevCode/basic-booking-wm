@@ -204,6 +204,8 @@ async def test_da_01_race_condition_double_booking() -> None:
     repo.is_provider_blocked.return_value = False
     repo.is_provider_scheduled.return_value = True
     repo.has_overlapping_booking.return_value = False  # Check is clean, race condition happens ON insert
+    repo.has_active_booking_for_client.return_value = False
+    repo.has_client_overlap.return_value = False
 
     async def attempt_booking(user_id: str) -> object:
         # Construct isolated mock inputs
@@ -253,6 +255,8 @@ async def test_da_02_network_failure_db_timeout() -> None:
     repo.is_provider_blocked.return_value = False
     repo.is_provider_scheduled.return_value = True
     repo.has_overlapping_booking.return_value = False
+    repo.has_active_booking_for_client.return_value = False
+    repo.has_client_overlap.return_value = False
 
     input_data = AsyncMock()
     from datetime import datetime

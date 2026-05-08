@@ -1,4 +1,5 @@
-from f.booking_reschedule.main import main_async as reschedule_booking
+from collections.abc import Callable, Coroutine
+from typing import Any
 
 from ..internal._db_client import create_db_client
 from ..internal._result import Result, ok, with_tenant_context
@@ -81,6 +82,9 @@ class AcknowledgeHandler:
 
 
 class AutoRescheduleHandler:
+    def __init__(self, book_reschedule: Callable[..., Coroutine[Any, Any, Any]]) -> None:
+        self.book_reschedule = book_reschedule
+
     async def handle(self, context: ActionContext) -> Result[ActionResult]:
         booking_id = context["booking_id"]
         date = context.get("date")
@@ -103,7 +107,13 @@ class AutoRescheduleHandler:
             "idempotency_key": f"cb-ars-{booking_id}-{date}-{time}",
         }
 
-        err, _data = await reschedule_booking(args)
+        try:
+            result = await self.book_reschedule(args=args)
+            err = None
+            if isinstance(result, dict) and "error" in result:
+                err = str(result["error"])
+        except Exception as e:
+            err = str(e)
 
         if err:
             return ok(

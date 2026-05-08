@@ -7,9 +7,22 @@ import pytest
 from f.booking_orchestrator.main import _main_async as main
 
 
+def _make_delegates(**overrides: object) -> dict[str, AsyncMock]:
+    d: dict[str, AsyncMock] = {
+        "book_create": AsyncMock(return_value={}),
+        "book_cancel": AsyncMock(return_value={}),
+        "book_reschedule": AsyncMock(return_value={}),
+        "availability_check": AsyncMock(return_value={}),
+    }
+    for k, v in overrides.items():
+        d[k] = v  # type: ignore[assignment]
+    return d
+
+
 @pytest.mark.asyncio
 async def test_main_async_non_string_intent_returns_error() -> None:
-    err, result = await main({"intent": 42, "telegram_chat_id": "123"})
+    delegates = _make_delegates()
+    err, result = await main({"intent": 42, "telegram_chat_id": "123"}, delegates)
 
     assert err is not None
     assert result is None
@@ -17,7 +30,8 @@ async def test_main_async_non_string_intent_returns_error() -> None:
 
 @pytest.mark.asyncio
 async def test_main_async_unknown_intent_returns_none_gracefully() -> None:
-    err, result = await main({"intent": "duda_general", "telegram_chat_id": "123"})
+    delegates = _make_delegates()
+    err, result = await main({"intent": "duda_general", "telegram_chat_id": "123"}, delegates)
 
     assert err is None
     assert result is None
@@ -44,7 +58,10 @@ async def test_main_async_valid_intent_routes_to_handler() -> None:
             {"mis_citas": AsyncMock(return_value=(None, mock_result))},
         ),
     ):
-        err, result = await main({"intent": "mis_citas", "telegram_chat_id": "123", "entities": {}})
+        err, result = await main(
+            {"intent": "mis_citas", "telegram_chat_id": "123", "entities": {}},
+            _make_delegates(),
+        )
 
         assert err is None
         assert result is not None
@@ -62,7 +79,10 @@ async def test_main_async_context_resolution_failure_returns_error() -> None:
             AsyncMock(return_value=(Exception("no tenant"), None)),
         ),
     ):
-        err, result = await main({"intent": "mis_citas", "telegram_chat_id": "123", "entities": {}})
+        err, result = await main(
+            {"intent": "mis_citas", "telegram_chat_id": "123", "entities": {}},
+            _make_delegates(),
+        )
 
         assert err is not None
         assert result is None

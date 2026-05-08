@@ -1,7 +1,12 @@
 from __future__ import annotations
 
 import re
-from typing import Any, Final, TypeIs
+from typing import Any, Final
+
+try:
+    from typing import TypeIs
+except ImportError:
+    from typing import TypeIs
 
 from pydantic import TypeAdapter
 
@@ -59,9 +64,9 @@ def parse_action(text: str, timezone: str | None = None) -> BookingAction:
         return BackAction()
     if trimmed in ["cancelar", "cancel", "no quiero"]:
         return CancelAction()
-    if trimmed in ["si", "sí", "yes", "confirmar", "confirmo", "ok", "dale"]:
+    if trimmed in ["s", "y", "si", "sí", "yes", "confirmar", "confirmo", "ok", "dale"]:
         return ConfirmYesAction()
-    if trimmed in ["no", "nop", "nope"]:
+    if trimmed in ["n", "no", "nop", "nope"]:
         return ConfirmNoAction()
 
     if re.match(r"^\d+$", trimmed):
@@ -338,8 +343,8 @@ def apply_transition(
         if isinstance(action, ConfirmYesAction):
             return ok(
                 TransitionOutcome(
-                    nextState=CompletedState(bookingId="pending"),
-                    responseText="✅ *Reserva Confirmada*\n\nTu cita ha sido agendada correctamente.\nRecibirás un recordatorio antes de tu cita.",  # noqa: E501
+                    nextState=IdleState(),
+                    responseText="⏳ Procesando tu reserva...",
                     advance=True,
                 )
             )
@@ -361,6 +366,57 @@ def apply_transition(
                     )
                 )
             return fail("invalid_state_transition_no_items")
+
+        if isinstance(action, SelectAction):
+            if action.value == "1":
+                return ok(
+                    TransitionOutcome(
+                        nextState=IdleState(),
+                        responseText="⏳ Procesando tu reserva...",
+                        advance=True,
+                    )
+                )
+            if action.value == "2":
+                raw_items = items if items is not None else []
+                if _is_time_slot_list(raw_items):
+                    return ok(
+                        TransitionOutcome(
+                            nextState=SelectingTimeState(
+                                specialtyId=current_state.specialtyId,
+                                doctorId=current_state.doctorId,
+                                doctorName=current_state.doctorName,
+                                targetDate=draft.target_date,
+                                items=raw_items,
+                            ),
+                            responseText=build_slots_prompt(current_state.doctorName, raw_items),
+                            advance=False,
+                        )
+                    )
+            attempts = getattr(current_state, "invalid_attempts", 0) + 1
+            if attempts >= 3:
+                return ok(
+                    TransitionOutcome(
+                        nextState=IdleState(),
+                        responseText="❌ Demasiados intentos inválidos. Volviendo al menú principal.\n\n"
+                        + get_main_menu_text(),
+                        advance=False,
+                    )
+                )
+
+            return ok(
+                TransitionOutcome(
+                    nextState=ConfirmingState(
+                        specialtyId=current_state.specialtyId,
+                        doctorId=current_state.doctorId,
+                        doctorName=current_state.doctorName,
+                        timeSlot=current_state.timeSlot,
+                        draft=current_state.draft,
+                        invalid_attempts=attempts,
+                    ),
+                    responseText=build_confirmation_prompt(current_state.timeSlot, current_state.doctorName),
+                    advance=False,
+                )
+            )
 
     elif isinstance(current_state, CompletedState):
         return ok(TransitionOutcome(nextState=IdleState(), responseText=get_main_menu_text(), advance=False))

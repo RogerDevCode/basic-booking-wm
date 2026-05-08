@@ -1,0 +1,1898 @@
+{
+ "name": "AutoAgenda",
+ "type": "bot_chat",
+ "id": 8581822135,
+ "messages": [
+  {
+   "id": 5925,
+   "type": "message",
+   "date": "2026-05-06T09:54:01",
+   "date_unixtime": "1778075641",
+   "from": "Roger Gallegos",
+   "from_id": "user5391760292",
+   "text": [
+    {
+     "type": "bot_command",
+     "text": "/start"
+    }
+   ],
+   "text_entities": [
+    {
+     "type": "bot_command",
+     "text": "/start"
+    }
+   ]
+  },
+  {
+   "id": 5926,
+   "type": "message",
+   "date": "2026-05-06T09:54:17",
+   "date_unixtime": "1778075657",
+   "from": "AutoAgenda",
+   "from_id": "user8581822135",
+   "text": [
+    "¡Hola! Soy tu asistente de reservas. 👋\n\nPuedo ayudarte a agendar, consultar o cancelar una cita médica.\n\n📱 ",
+    {
+     "type": "bold",
+     "text": "Menú Principal"
+    },
+    "\n\n1️⃣ Agendar cita\n2️⃣ Mis citas\n3️⃣ Recordatorios\n4️⃣ Información\n5️⃣ Mis datos"
+   ],
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "¡Hola! Soy tu asistente de reservas. 👋\n\nPuedo ayudarte a agendar, consultar o cancelar una cita médica.\n\n📱 "
+    },
+    {
+     "type": "bold",
+     "text": "Menú Principal"
+    },
+    {
+     "type": "plain",
+     "text": "\n\n1️⃣ Agendar cita\n2️⃣ Mis citas\n3️⃣ Recordatorios\n4️⃣ Información\n5️⃣ Mis datos"
+    }
+   ]
+  },
+  {
+   "id": 5927,
+   "type": "message",
+   "date": "2026-05-06T09:54:35",
+   "date_unixtime": "1778075675",
+   "from": "Roger Gallegos",
+   "from_id": "user5391760292",
+   "text": "1",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "1"
+    }
+   ]
+  },
+  {
+   "id": 5928,
+   "type": "message",
+   "date": "2026-05-06T09:54:47",
+   "date_unixtime": "1778075687",
+   "from": "AutoAgenda",
+   "from_id": "user8581822135",
+   "text": "Selecciona la especialidad que necesitas:\n\n1. Medicina General",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "Selecciona la especialidad que necesitas:\n\n1. Medicina General"
+    }
+   ]
+  },
+  {
+   "id": 5929,
+   "type": "message",
+   "date": "2026-05-06T09:54:49",
+   "date_unixtime": "1778075689",
+   "from": "Roger Gallegos",
+   "from_id": "user5391760292",
+   "text": "1",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "1"
+    }
+   ]
+  },
+  {
+   "id": 5930,
+   "type": "message",
+   "date": "2026-05-06T09:55:02",
+   "date_unixtime": "1778075702",
+   "from": "AutoAgenda",
+   "from_id": "user8581822135",
+   "text": "¿Con qué doctor deseas tu cita?\n\n1. Dr. Test\n2. Roger Gallegos",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "¿Con qué doctor deseas tu cita?\n\n1. Dr. Test\n2. Roger Gallegos"
+    }
+   ]
+  },
+  {
+   "id": 5931,
+   "type": "message",
+   "date": "2026-05-06T09:55:04",
+   "date_unixtime": "1778075704",
+   "from": "Roger Gallegos",
+   "from_id": "user5391760292",
+   "text": "1",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "1"
+    }
+   ]
+  },
+  {
+   "id": 5932,
+   "type": "message",
+   "date": "2026-05-06T09:55:16",
+   "date_unixtime": "1778075716",
+   "from": "AutoAgenda",
+   "from_id": "user8581822135",
+   "text": [
+    "⏳ Buscando horarios disponibles con ",
+    {
+     "type": "bold",
+     "text": "Dr. Test"
+    },
+    "..."
+   ],
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "⏳ Buscando horarios disponibles con "
+    },
+    {
+     "type": "bold",
+     "text": "Dr. Test"
+    },
+    {
+     "type": "plain",
+     "text": "..."
+    }
+   ]
+  },
+  {
+   "id": 5933,
+   "type": "message",
+   "date": "2026-05-06T09:56:57",
+   "date_unixtime": "1778075817",
+   "from": "Roger Gallegos",
+   "from_id": "user5391760292",
+   "text": [
+    {
+     "type": "bot_command",
+     "text": "/start"
+    }
+   ],
+   "text_entities": [
+    {
+     "type": "bot_command",
+     "text": "/start"
+    }
+   ]
+  },
+  {
+   "id": 5934,
+   "type": "message",
+   "date": "2026-05-06T09:57:13",
+   "date_unixtime": "1778075833",
+   "from": "AutoAgenda",
+   "from_id": "user8581822135",
+   "text": [
+    "¡Hola! Soy tu asistente de reservas. 👋\n\nPuedo ayudarte a agendar, consultar o cancelar una cita médica.\n\n📱 ",
+    {
+     "type": "bold",
+     "text": "Menú Principal"
+    },
+    "\n\n1️⃣ Agendar cita\n2️⃣ Mis citas\n3️⃣ Recordatorios\n4️⃣ Información\n5️⃣ Mis datos"
+   ],
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "¡Hola! Soy tu asistente de reservas. 👋\n\nPuedo ayudarte a agendar, consultar o cancelar una cita médica.\n\n📱 "
+    },
+    {
+     "type": "bold",
+     "text": "Menú Principal"
+    },
+    {
+     "type": "plain",
+     "text": "\n\n1️⃣ Agendar cita\n2️⃣ Mis citas\n3️⃣ Recordatorios\n4️⃣ Información\n5️⃣ Mis datos"
+    }
+   ]
+  },
+  {
+   "id": 5935,
+   "type": "message",
+   "date": "2026-05-06T09:57:22",
+   "date_unixtime": "1778075842",
+   "from": "Roger Gallegos",
+   "from_id": "user5391760292",
+   "text": "1",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "1"
+    }
+   ]
+  },
+  {
+   "id": 5936,
+   "type": "message",
+   "date": "2026-05-06T09:57:40",
+   "date_unixtime": "1778075860",
+   "from": "AutoAgenda",
+   "from_id": "user8581822135",
+   "text": "Selecciona la especialidad que necesitas:\n\n1. Medicina General",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "Selecciona la especialidad que necesitas:\n\n1. Medicina General"
+    }
+   ]
+  },
+  {
+   "id": 5937,
+   "type": "message",
+   "date": "2026-05-06T09:57:42",
+   "date_unixtime": "1778075862",
+   "from": "Roger Gallegos",
+   "from_id": "user5391760292",
+   "text": "1",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "1"
+    }
+   ]
+  },
+  {
+   "id": 5938,
+   "type": "message",
+   "date": "2026-05-06T09:58:00",
+   "date_unixtime": "1778075880",
+   "from": "AutoAgenda",
+   "from_id": "user8581822135",
+   "text": "¿Con qué doctor deseas tu cita?\n\n1. Dr. Test\n2. Roger Gallegos",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "¿Con qué doctor deseas tu cita?\n\n1. Dr. Test\n2. Roger Gallegos"
+    }
+   ]
+  },
+  {
+   "id": 5939,
+   "type": "message",
+   "date": "2026-05-06T09:58:02",
+   "date_unixtime": "1778075882",
+   "from": "Roger Gallegos",
+   "from_id": "user5391760292",
+   "text": "1",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "1"
+    }
+   ]
+  },
+  {
+   "id": 5940,
+   "type": "message",
+   "date": "2026-05-06T09:58:19",
+   "date_unixtime": "1778075899",
+   "from": "AutoAgenda",
+   "from_id": "user8581822135",
+   "text": [
+    "⏳ Buscando horarios disponibles con ",
+    {
+     "type": "bold",
+     "text": "Dr. Test"
+    },
+    "..."
+   ],
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "⏳ Buscando horarios disponibles con "
+    },
+    {
+     "type": "bold",
+     "text": "Dr. Test"
+    },
+    {
+     "type": "plain",
+     "text": "..."
+    }
+   ]
+  },
+  {
+   "id": 5941,
+   "type": "message",
+   "date": "2026-05-06T13:43:37",
+   "date_unixtime": "1778089417",
+   "from": "Roger Gallegos",
+   "from_id": "user5391760292",
+   "text": [
+    {
+     "type": "bot_command",
+     "text": "/start"
+    }
+   ],
+   "text_entities": [
+    {
+     "type": "bot_command",
+     "text": "/start"
+    }
+   ]
+  },
+  {
+   "id": 5942,
+   "type": "message",
+   "date": "2026-05-06T13:44:50",
+   "date_unixtime": "1778089490",
+   "from": "Roger Gallegos",
+   "from_id": "user5391760292",
+   "text": [
+    {
+     "type": "bot_command",
+     "text": "/start"
+    }
+   ],
+   "text_entities": [
+    {
+     "type": "bot_command",
+     "text": "/start"
+    }
+   ]
+  },
+  {
+   "id": 5943,
+   "type": "message",
+   "date": "2026-05-06T13:45:02",
+   "date_unixtime": "1778089502",
+   "from": "AutoAgenda",
+   "from_id": "user8581822135",
+   "text": [
+    "¡Hola! Soy tu asistente de reservas. 👋\n\nPuedo ayudarte a agendar, consultar o cancelar una cita médica.\n\n📱 ",
+    {
+     "type": "bold",
+     "text": "Menú Principal"
+    },
+    "\n\n1️⃣ Agendar cita\n2️⃣ Mis citas\n3️⃣ Recordatorios\n4️⃣ Información\n5️⃣ Mis datos"
+   ],
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "¡Hola! Soy tu asistente de reservas. 👋\n\nPuedo ayudarte a agendar, consultar o cancelar una cita médica.\n\n📱 "
+    },
+    {
+     "type": "bold",
+     "text": "Menú Principal"
+    },
+    {
+     "type": "plain",
+     "text": "\n\n1️⃣ Agendar cita\n2️⃣ Mis citas\n3️⃣ Recordatorios\n4️⃣ Información\n5️⃣ Mis datos"
+    }
+   ]
+  },
+  {
+   "id": 5944,
+   "type": "message",
+   "date": "2026-05-06T13:45:07",
+   "date_unixtime": "1778089507",
+   "from": "Roger Gallegos",
+   "from_id": "user5391760292",
+   "text": "1",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "1"
+    }
+   ]
+  },
+  {
+   "id": 5945,
+   "type": "message",
+   "date": "2026-05-06T13:45:18",
+   "date_unixtime": "1778089518",
+   "from": "AutoAgenda",
+   "from_id": "user8581822135",
+   "text": "Selecciona la especialidad que necesitas:\n\n1. Medicina General",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "Selecciona la especialidad que necesitas:\n\n1. Medicina General"
+    }
+   ]
+  },
+  {
+   "id": 5946,
+   "type": "message",
+   "date": "2026-05-06T13:45:24",
+   "date_unixtime": "1778089524",
+   "from": "Roger Gallegos",
+   "from_id": "user5391760292",
+   "text": "1",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "1"
+    }
+   ]
+  },
+  {
+   "id": 5947,
+   "type": "message",
+   "date": "2026-05-06T13:45:41",
+   "date_unixtime": "1778089541",
+   "from": "AutoAgenda",
+   "from_id": "user8581822135",
+   "text": "¿Con qué doctor deseas tu cita?\n\n1. Dr. Test\n2. Roger Gallegos",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "¿Con qué doctor deseas tu cita?\n\n1. Dr. Test\n2. Roger Gallegos"
+    }
+   ]
+  },
+  {
+   "id": 5948,
+   "type": "message",
+   "date": "2026-05-06T13:45:44",
+   "date_unixtime": "1778089544",
+   "from": "Roger Gallegos",
+   "from_id": "user5391760292",
+   "text": "1",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "1"
+    }
+   ]
+  },
+  {
+   "id": 5949,
+   "type": "message",
+   "date": "2026-05-06T13:45:56",
+   "date_unixtime": "1778089556",
+   "from": "AutoAgenda",
+   "from_id": "user8581822135",
+   "text": "¿Qué horario prefieres?\n\n1. Jue 7 May · 09:00\n2. Jue 7 May · 09:40\n3. Jue 7 May · 10:20\n4. Jue 7 May · 11:00\n5. Jue 7 May · 11:40\n6. Jue 7 May · 12:20\n7. Jue 7 May · 13:00\n8. Jue 7 May · 13:40",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "¿Qué horario prefieres?\n\n1. Jue 7 May · 09:00\n2. Jue 7 May · 09:40\n3. Jue 7 May · 10:20\n4. Jue 7 May · 11:00\n5. Jue 7 May · 11:40\n6. Jue 7 May · 12:20\n7. Jue 7 May · 13:00\n8. Jue 7 May · 13:40"
+    }
+   ]
+  },
+  {
+   "id": 5950,
+   "type": "message",
+   "date": "2026-05-06T14:38:33",
+   "date_unixtime": "1778092713",
+   "from": "Roger Gallegos",
+   "from_id": "user5391760292",
+   "text": [
+    {
+     "type": "bot_command",
+     "text": "/start"
+    }
+   ],
+   "text_entities": [
+    {
+     "type": "bot_command",
+     "text": "/start"
+    }
+   ]
+  },
+  {
+   "id": 5951,
+   "type": "message",
+   "date": "2026-05-06T14:38:51",
+   "date_unixtime": "1778092731",
+   "from": "AutoAgenda",
+   "from_id": "user8581822135",
+   "text": [
+    "¡Hola! Soy tu asistente de reservas. 👋\n\nPuedo ayudarte a agendar, consultar o cancelar una cita médica.\n\n📱 ",
+    {
+     "type": "bold",
+     "text": "Menú Principal"
+    },
+    "\n\n1️⃣ Agendar cita\n2️⃣ Mis citas\n3️⃣ Recordatorios\n4️⃣ Información\n5️⃣ Mis datos"
+   ],
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "¡Hola! Soy tu asistente de reservas. 👋\n\nPuedo ayudarte a agendar, consultar o cancelar una cita médica.\n\n📱 "
+    },
+    {
+     "type": "bold",
+     "text": "Menú Principal"
+    },
+    {
+     "type": "plain",
+     "text": "\n\n1️⃣ Agendar cita\n2️⃣ Mis citas\n3️⃣ Recordatorios\n4️⃣ Información\n5️⃣ Mis datos"
+    }
+   ]
+  },
+  {
+   "id": 5952,
+   "type": "message",
+   "date": "2026-05-06T14:38:57",
+   "date_unixtime": "1778092737",
+   "from": "Roger Gallegos",
+   "from_id": "user5391760292",
+   "text": "1",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "1"
+    }
+   ]
+  },
+  {
+   "id": 5953,
+   "type": "message",
+   "date": "2026-05-06T14:39:14",
+   "date_unixtime": "1778092754",
+   "from": "AutoAgenda",
+   "from_id": "user8581822135",
+   "text": "Selecciona la especialidad que necesitas:\n\n1. Medicina General",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "Selecciona la especialidad que necesitas:\n\n1. Medicina General"
+    }
+   ]
+  },
+  {
+   "id": 5954,
+   "type": "message",
+   "date": "2026-05-06T14:39:17",
+   "date_unixtime": "1778092757",
+   "from": "Roger Gallegos",
+   "from_id": "user5391760292",
+   "text": "1",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "1"
+    }
+   ]
+  },
+  {
+   "id": 5955,
+   "type": "message",
+   "date": "2026-05-06T14:39:35",
+   "date_unixtime": "1778092775",
+   "from": "AutoAgenda",
+   "from_id": "user8581822135",
+   "text": "¿Con qué doctor deseas tu cita?\n\n1. Dr. Test\n2. Roger Gallegos",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "¿Con qué doctor deseas tu cita?\n\n1. Dr. Test\n2. Roger Gallegos"
+    }
+   ]
+  },
+  {
+   "id": 5956,
+   "type": "message",
+   "date": "2026-05-06T14:39:43",
+   "date_unixtime": "1778092783",
+   "from": "Roger Gallegos",
+   "from_id": "user5391760292",
+   "text": "1",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "1"
+    }
+   ]
+  },
+  {
+   "id": 5957,
+   "type": "message",
+   "date": "2026-05-06T14:40:01",
+   "date_unixtime": "1778092801",
+   "from": "AutoAgenda",
+   "from_id": "user8581822135",
+   "text": "¿Qué horario prefieres?\n\n1. Jue 7 May · 09:00\n2. Jue 7 May · 09:40\n3. Jue 7 May · 10:20\n4. Jue 7 May · 11:00\n5. Jue 7 May · 11:40\n6. Jue 7 May · 12:20\n7. Jue 7 May · 13:00\n8. Jue 7 May · 13:40",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "¿Qué horario prefieres?\n\n1. Jue 7 May · 09:00\n2. Jue 7 May · 09:40\n3. Jue 7 May · 10:20\n4. Jue 7 May · 11:00\n5. Jue 7 May · 11:40\n6. Jue 7 May · 12:20\n7. Jue 7 May · 13:00\n8. Jue 7 May · 13:40"
+    }
+   ]
+  },
+  {
+   "id": 5958,
+   "type": "message",
+   "date": "2026-05-06T14:40:12",
+   "date_unixtime": "1778092812",
+   "from": "Roger Gallegos",
+   "from_id": "user5391760292",
+   "text": "1",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "1"
+    }
+   ]
+  },
+  {
+   "id": 5959,
+   "type": "message",
+   "date": "2026-05-06T14:40:30",
+   "date_unixtime": "1778092830",
+   "from": "AutoAgenda",
+   "from_id": "user8581822135",
+   "text": [
+    "📋 ",
+    {
+     "type": "bold",
+     "text": "Confirmar Cita"
+    },
+    "\n\nDoctor: Dr. Test\nHorario: Jue 7 May · 09:00\n\n¿Confirmas esta cita? Responde \"sí\" o \"no\"."
+   ],
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "📋 "
+    },
+    {
+     "type": "bold",
+     "text": "Confirmar Cita"
+    },
+    {
+     "type": "plain",
+     "text": "\n\nDoctor: Dr. Test\nHorario: Jue 7 May · 09:00\n\n¿Confirmas esta cita? Responde \"sí\" o \"no\"."
+    }
+   ]
+  },
+  {
+   "id": 5960,
+   "type": "message",
+   "date": "2026-05-06T14:40:39",
+   "date_unixtime": "1778092839",
+   "from": "Roger Gallegos",
+   "from_id": "user5391760292",
+   "text": "si",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "si"
+    }
+   ]
+  },
+  {
+   "id": 5961,
+   "type": "message",
+   "date": "2026-05-06T14:40:57",
+   "date_unixtime": "1778092857",
+   "from": "AutoAgenda",
+   "from_id": "user8581822135",
+   "text": [
+    "✅ ",
+    {
+     "type": "bold",
+     "text": "Reserva Confirmada"
+    },
+    "\n\n📋 Consulta General con Dr. Test\n🆔 Ref: ",
+    {
+     "type": "code",
+     "text": "F13E0DEF"
+    },
+    "\n\nRecibirás un recordatorio antes de tu cita."
+   ],
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "✅ "
+    },
+    {
+     "type": "bold",
+     "text": "Reserva Confirmada"
+    },
+    {
+     "type": "plain",
+     "text": "\n\n📋 Consulta General con Dr. Test\n🆔 Ref: "
+    },
+    {
+     "type": "code",
+     "text": "F13E0DEF"
+    },
+    {
+     "type": "plain",
+     "text": "\n\nRecibirás un recordatorio antes de tu cita."
+    }
+   ]
+  },
+  {
+   "id": 5962,
+   "type": "message",
+   "date": "2026-05-06T17:36:45",
+   "date_unixtime": "1778103405",
+   "from": "Roger Gallegos",
+   "from_id": "user5391760292",
+   "text": [
+    {
+     "type": "bot_command",
+     "text": "/start"
+    }
+   ],
+   "text_entities": [
+    {
+     "type": "bot_command",
+     "text": "/start"
+    }
+   ]
+  },
+  {
+   "id": 5963,
+   "type": "message",
+   "date": "2026-05-06T17:39:26",
+   "date_unixtime": "1778103566",
+   "from": "Roger Gallegos",
+   "from_id": "user5391760292",
+   "text": [
+    {
+     "type": "bot_command",
+     "text": "/start"
+    }
+   ],
+   "text_entities": [
+    {
+     "type": "bot_command",
+     "text": "/start"
+    }
+   ]
+  },
+  {
+   "id": 5964,
+   "type": "message",
+   "date": "2026-05-06T17:39:39",
+   "date_unixtime": "1778103579",
+   "from": "AutoAgenda",
+   "from_id": "user8581822135",
+   "text": [
+    "¡Hola! Soy tu asistente de reservas. 👋\n\nPuedo ayudarte a agendar, consultar o cancelar una cita médica.\n\n📱 ",
+    {
+     "type": "bold",
+     "text": "Menú Principal"
+    },
+    "\n\n1️⃣ Agendar cita\n2️⃣ Mis citas\n3️⃣ Recordatorios\n4️⃣ Información\n5️⃣ Mis datos"
+   ],
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "¡Hola! Soy tu asistente de reservas. 👋\n\nPuedo ayudarte a agendar, consultar o cancelar una cita médica.\n\n📱 "
+    },
+    {
+     "type": "bold",
+     "text": "Menú Principal"
+    },
+    {
+     "type": "plain",
+     "text": "\n\n1️⃣ Agendar cita\n2️⃣ Mis citas\n3️⃣ Recordatorios\n4️⃣ Información\n5️⃣ Mis datos"
+    }
+   ]
+  },
+  {
+   "id": 5965,
+   "type": "message",
+   "date": "2026-05-06T17:39:42",
+   "date_unixtime": "1778103582",
+   "from": "Roger Gallegos",
+   "from_id": "user5391760292",
+   "text": "1",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "1"
+    }
+   ]
+  },
+  {
+   "id": 5966,
+   "type": "message",
+   "date": "2026-05-06T17:39:53",
+   "date_unixtime": "1778103593",
+   "from": "AutoAgenda",
+   "from_id": "user8581822135",
+   "text": "Selecciona la especialidad que necesitas:\n\n1. Medicina General",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "Selecciona la especialidad que necesitas:\n\n1. Medicina General"
+    }
+   ]
+  },
+  {
+   "id": 5967,
+   "type": "message",
+   "date": "2026-05-06T17:39:57",
+   "date_unixtime": "1778103597",
+   "from": "Roger Gallegos",
+   "from_id": "user5391760292",
+   "text": "1",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "1"
+    }
+   ]
+  },
+  {
+   "id": 5968,
+   "type": "message",
+   "date": "2026-05-06T17:40:09",
+   "date_unixtime": "1778103609",
+   "from": "AutoAgenda",
+   "from_id": "user8581822135",
+   "text": "¿Con qué doctor deseas tu cita?\n\n1. Dr. Test\n2. Roger Gallegos",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "¿Con qué doctor deseas tu cita?\n\n1. Dr. Test\n2. Roger Gallegos"
+    }
+   ]
+  },
+  {
+   "id": 5969,
+   "type": "message",
+   "date": "2026-05-06T17:40:11",
+   "date_unixtime": "1778103611",
+   "from": "Roger Gallegos",
+   "from_id": "user5391760292",
+   "text": "1",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "1"
+    }
+   ]
+  },
+  {
+   "id": 5970,
+   "type": "message",
+   "date": "2026-05-06T17:40:23",
+   "date_unixtime": "1778103623",
+   "from": "AutoAgenda",
+   "from_id": "user8581822135",
+   "text": "¿Qué horario prefieres?\n\n1. Jue 7 May · 09:40\n2. Jue 7 May · 10:20\n3. Jue 7 May · 11:00\n4. Jue 7 May · 11:40\n5. Jue 7 May · 12:20\n6. Jue 7 May · 13:00\n7. Jue 7 May · 13:40\n8. Jue 7 May · 14:20",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "¿Qué horario prefieres?\n\n1. Jue 7 May · 09:40\n2. Jue 7 May · 10:20\n3. Jue 7 May · 11:00\n4. Jue 7 May · 11:40\n5. Jue 7 May · 12:20\n6. Jue 7 May · 13:00\n7. Jue 7 May · 13:40\n8. Jue 7 May · 14:20"
+    }
+   ]
+  },
+  {
+   "id": 5971,
+   "type": "message",
+   "date": "2026-05-06T17:40:31",
+   "date_unixtime": "1778103631",
+   "from": "Roger Gallegos",
+   "from_id": "user5391760292",
+   "text": "1",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "1"
+    }
+   ]
+  },
+  {
+   "id": 5972,
+   "type": "message",
+   "date": "2026-05-06T17:40:43",
+   "date_unixtime": "1778103643",
+   "from": "AutoAgenda",
+   "from_id": "user8581822135",
+   "text": [
+    "📋 ",
+    {
+     "type": "bold",
+     "text": "Confirmar Cita"
+    },
+    "\n\nDoctor: Dr. Test\nHorario: Jue 7 May · 09:40\n\n¿Confirmas esta cita? Responde \"sí\" o \"no\"."
+   ],
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "📋 "
+    },
+    {
+     "type": "bold",
+     "text": "Confirmar Cita"
+    },
+    {
+     "type": "plain",
+     "text": "\n\nDoctor: Dr. Test\nHorario: Jue 7 May · 09:40\n\n¿Confirmas esta cita? Responde \"sí\" o \"no\"."
+    }
+   ]
+  },
+  {
+   "id": 5973,
+   "type": "message",
+   "date": "2026-05-06T17:40:48",
+   "date_unixtime": "1778103648",
+   "from": "Roger Gallegos",
+   "from_id": "user5391760292",
+   "text": "s",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "s"
+    }
+   ]
+  },
+  {
+   "id": 5974,
+   "type": "message",
+   "date": "2026-05-06T17:41:04",
+   "date_unixtime": "1778103664",
+   "from": "AutoAgenda",
+   "from_id": "user8581822135",
+   "text": [
+    "✅ ",
+    {
+     "type": "bold",
+     "text": "Reserva Confirmada"
+    },
+    "\n\nTu cita ha sido agendada correctamente.\nRecibirás un recordatorio antes de tu cita.\n\n📱 ",
+    {
+     "type": "bold",
+     "text": "Menú Principal"
+    },
+    "\n\n1️⃣ Agendar cita\n2️⃣ Mis citas\n3️⃣ Recordatorios\n4️⃣ Información\n5️⃣ Mis datos"
+   ],
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "✅ "
+    },
+    {
+     "type": "bold",
+     "text": "Reserva Confirmada"
+    },
+    {
+     "type": "plain",
+     "text": "\n\nTu cita ha sido agendada correctamente.\nRecibirás un recordatorio antes de tu cita.\n\n📱 "
+    },
+    {
+     "type": "bold",
+     "text": "Menú Principal"
+    },
+    {
+     "type": "plain",
+     "text": "\n\n1️⃣ Agendar cita\n2️⃣ Mis citas\n3️⃣ Recordatorios\n4️⃣ Información\n5️⃣ Mis datos"
+    }
+   ]
+  },
+  {
+   "id": 5975,
+   "type": "message",
+   "date": "2026-05-06T17:41:12",
+   "date_unixtime": "1778103672",
+   "from": "Roger Gallegos",
+   "from_id": "user5391760292",
+   "text": "1",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "1"
+    }
+   ]
+  },
+  {
+   "id": 5976,
+   "type": "message",
+   "date": "2026-05-06T17:41:29",
+   "date_unixtime": "1778103689",
+   "from": "AutoAgenda",
+   "from_id": "user8581822135",
+   "text": "Selecciona la especialidad que necesitas:\n\n1. Medicina General",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "Selecciona la especialidad que necesitas:\n\n1. Medicina General"
+    }
+   ]
+  },
+  {
+   "id": 5977,
+   "type": "message",
+   "date": "2026-05-06T17:41:31",
+   "date_unixtime": "1778103691",
+   "from": "Roger Gallegos",
+   "from_id": "user5391760292",
+   "text": "1",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "1"
+    }
+   ]
+  },
+  {
+   "id": 5978,
+   "type": "message",
+   "date": "2026-05-06T17:41:45",
+   "date_unixtime": "1778103705",
+   "from": "AutoAgenda",
+   "from_id": "user8581822135",
+   "text": "¿Con qué doctor deseas tu cita?\n\n1. Dr. Test\n2. Roger Gallegos",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "¿Con qué doctor deseas tu cita?\n\n1. Dr. Test\n2. Roger Gallegos"
+    }
+   ]
+  },
+  {
+   "id": 5979,
+   "type": "message",
+   "date": "2026-05-06T17:41:48",
+   "date_unixtime": "1778103708",
+   "from": "Roger Gallegos",
+   "from_id": "user5391760292",
+   "text": "1",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "1"
+    }
+   ]
+  },
+  {
+   "id": 5980,
+   "type": "message",
+   "date": "2026-05-06T17:42:04",
+   "date_unixtime": "1778103724",
+   "from": "AutoAgenda",
+   "from_id": "user8581822135",
+   "text": "¿Qué horario prefieres?\n\n1. Jue 7 May · 09:40\n2. Jue 7 May · 10:20\n3. Jue 7 May · 11:00\n4. Jue 7 May · 11:40\n5. Jue 7 May · 12:20\n6. Jue 7 May · 13:00\n7. Jue 7 May · 13:40\n8. Jue 7 May · 14:20",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "¿Qué horario prefieres?\n\n1. Jue 7 May · 09:40\n2. Jue 7 May · 10:20\n3. Jue 7 May · 11:00\n4. Jue 7 May · 11:40\n5. Jue 7 May · 12:20\n6. Jue 7 May · 13:00\n7. Jue 7 May · 13:40\n8. Jue 7 May · 14:20"
+    }
+   ]
+  },
+  {
+   "id": 5981,
+   "type": "message",
+   "date": "2026-05-06T17:42:15",
+   "date_unixtime": "1778103735",
+   "from": "Roger Gallegos",
+   "from_id": "user5391760292",
+   "text": "1",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "1"
+    }
+   ]
+  },
+  {
+   "id": 5982,
+   "type": "message",
+   "date": "2026-05-06T17:42:33",
+   "date_unixtime": "1778103753",
+   "from": "AutoAgenda",
+   "from_id": "user8581822135",
+   "text": [
+    "📋 ",
+    {
+     "type": "bold",
+     "text": "Confirmar Cita"
+    },
+    "\n\nDoctor: Dr. Test\nHorario: Jue 7 May · 09:40\n\n¿Confirmas esta cita? Responde \"sí\" o \"no\"."
+   ],
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "📋 "
+    },
+    {
+     "type": "bold",
+     "text": "Confirmar Cita"
+    },
+    {
+     "type": "plain",
+     "text": "\n\nDoctor: Dr. Test\nHorario: Jue 7 May · 09:40\n\n¿Confirmas esta cita? Responde \"sí\" o \"no\"."
+    }
+   ]
+  },
+  {
+   "id": 5983,
+   "type": "message",
+   "date": "2026-05-06T17:42:39",
+   "date_unixtime": "1778103759",
+   "from": "Roger Gallegos",
+   "from_id": "user5391760292",
+   "text": "si",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "si"
+    }
+   ]
+  },
+  {
+   "id": 5984,
+   "type": "message",
+   "date": "2026-05-06T17:42:56",
+   "date_unixtime": "1778103776",
+   "from": "AutoAgenda",
+   "from_id": "user8581822135",
+   "text": [
+    "✅ ",
+    {
+     "type": "bold",
+     "text": "Reserva Confirmada"
+    },
+    "\n\nTu cita ha sido agendada correctamente.\nRecibirás un recordatorio antes de tu cita.\n\n📱 ",
+    {
+     "type": "bold",
+     "text": "Menú Principal"
+    },
+    "\n\n1️⃣ Agendar cita\n2️⃣ Mis citas\n3️⃣ Recordatorios\n4️⃣ Información\n5️⃣ Mis datos"
+   ],
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "✅ "
+    },
+    {
+     "type": "bold",
+     "text": "Reserva Confirmada"
+    },
+    {
+     "type": "plain",
+     "text": "\n\nTu cita ha sido agendada correctamente.\nRecibirás un recordatorio antes de tu cita.\n\n📱 "
+    },
+    {
+     "type": "bold",
+     "text": "Menú Principal"
+    },
+    {
+     "type": "plain",
+     "text": "\n\n1️⃣ Agendar cita\n2️⃣ Mis citas\n3️⃣ Recordatorios\n4️⃣ Información\n5️⃣ Mis datos"
+    }
+   ]
+  },
+  {
+   "id": 5985,
+   "type": "message",
+   "date": "2026-05-06T17:49:10",
+   "date_unixtime": "1778104150",
+   "from": "Roger Gallegos",
+   "from_id": "user5391760292",
+   "text": [
+    {
+     "type": "bot_command",
+     "text": "/start"
+    }
+   ],
+   "text_entities": [
+    {
+     "type": "bot_command",
+     "text": "/start"
+    }
+   ]
+  },
+  {
+   "id": 5986,
+   "type": "message",
+   "date": "2026-05-06T17:49:23",
+   "date_unixtime": "1778104163",
+   "from": "AutoAgenda",
+   "from_id": "user8581822135",
+   "text": [
+    "¡Hola! Soy tu asistente de reservas. 👋\n\nPuedo ayudarte a agendar, consultar o cancelar una cita médica.\n\n📱 ",
+    {
+     "type": "bold",
+     "text": "Menú Principal"
+    },
+    "\n\n1️⃣ Agendar cita\n2️⃣ Mis citas\n3️⃣ Recordatorios\n4️⃣ Información\n5️⃣ Mis datos"
+   ],
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "¡Hola! Soy tu asistente de reservas. 👋\n\nPuedo ayudarte a agendar, consultar o cancelar una cita médica.\n\n📱 "
+    },
+    {
+     "type": "bold",
+     "text": "Menú Principal"
+    },
+    {
+     "type": "plain",
+     "text": "\n\n1️⃣ Agendar cita\n2️⃣ Mis citas\n3️⃣ Recordatorios\n4️⃣ Información\n5️⃣ Mis datos"
+    }
+   ]
+  },
+  {
+   "id": 5987,
+   "type": "message",
+   "date": "2026-05-06T17:49:28",
+   "date_unixtime": "1778104168",
+   "from": "Roger Gallegos",
+   "from_id": "user5391760292",
+   "text": "1",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "1"
+    }
+   ]
+  },
+  {
+   "id": 5988,
+   "type": "message",
+   "date": "2026-05-06T17:49:40",
+   "date_unixtime": "1778104180",
+   "from": "AutoAgenda",
+   "from_id": "user8581822135",
+   "text": "Selecciona la especialidad que necesitas:\n\n1. Medicina General",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "Selecciona la especialidad que necesitas:\n\n1. Medicina General"
+    }
+   ]
+  },
+  {
+   "id": 5989,
+   "type": "message",
+   "date": "2026-05-06T17:49:42",
+   "date_unixtime": "1778104182",
+   "from": "Roger Gallegos",
+   "from_id": "user5391760292",
+   "text": "1",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "1"
+    }
+   ]
+  },
+  {
+   "id": 5990,
+   "type": "message",
+   "date": "2026-05-06T17:49:55",
+   "date_unixtime": "1778104195",
+   "from": "AutoAgenda",
+   "from_id": "user8581822135",
+   "text": "¿Con qué doctor deseas tu cita?\n\n1. Dr. Test\n2. Roger Gallegos",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "¿Con qué doctor deseas tu cita?\n\n1. Dr. Test\n2. Roger Gallegos"
+    }
+   ]
+  },
+  {
+   "id": 5991,
+   "type": "message",
+   "date": "2026-05-06T17:49:57",
+   "date_unixtime": "1778104197",
+   "from": "Roger Gallegos",
+   "from_id": "user5391760292",
+   "text": "1",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "1"
+    }
+   ]
+  },
+  {
+   "id": 5992,
+   "type": "message",
+   "date": "2026-05-06T17:50:10",
+   "date_unixtime": "1778104210",
+   "from": "AutoAgenda",
+   "from_id": "user8581822135",
+   "text": "¿Qué horario prefieres?\n\n1. Jue 7 May · 09:40\n2. Jue 7 May · 10:20\n3. Jue 7 May · 11:00\n4. Jue 7 May · 11:40\n5. Jue 7 May · 12:20\n6. Jue 7 May · 13:00\n7. Jue 7 May · 13:40\n8. Jue 7 May · 14:20",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "¿Qué horario prefieres?\n\n1. Jue 7 May · 09:40\n2. Jue 7 May · 10:20\n3. Jue 7 May · 11:00\n4. Jue 7 May · 11:40\n5. Jue 7 May · 12:20\n6. Jue 7 May · 13:00\n7. Jue 7 May · 13:40\n8. Jue 7 May · 14:20"
+    }
+   ]
+  },
+  {
+   "id": 5993,
+   "type": "message",
+   "date": "2026-05-06T17:50:40",
+   "date_unixtime": "1778104240",
+   "from": "Roger Gallegos",
+   "from_id": "user5391760292",
+   "text": "1",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "1"
+    }
+   ]
+  },
+  {
+   "id": 5994,
+   "type": "message",
+   "date": "2026-05-06T17:50:52",
+   "date_unixtime": "1778104252",
+   "from": "AutoAgenda",
+   "from_id": "user8581822135",
+   "text": [
+    "📋 ",
+    {
+     "type": "bold",
+     "text": "Confirmar Cita"
+    },
+    "\n\nDoctor: Dr. Test\nHorario: Jue 7 May · 09:40\n\n¿Confirmas esta cita? Responde \"sí\" o \"no\"."
+   ],
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "📋 "
+    },
+    {
+     "type": "bold",
+     "text": "Confirmar Cita"
+    },
+    {
+     "type": "plain",
+     "text": "\n\nDoctor: Dr. Test\nHorario: Jue 7 May · 09:40\n\n¿Confirmas esta cita? Responde \"sí\" o \"no\"."
+    }
+   ]
+  },
+  {
+   "id": 5995,
+   "type": "message",
+   "date": "2026-05-06T17:50:58",
+   "date_unixtime": "1778104258",
+   "from": "Roger Gallegos",
+   "from_id": "user5391760292",
+   "text": "si",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "si"
+    }
+   ]
+  },
+  {
+   "id": 5996,
+   "type": "message",
+   "date": "2026-05-06T17:51:09",
+   "date_unixtime": "1778104269",
+   "from": "AutoAgenda",
+   "from_id": "user8581822135",
+   "text": [
+    "✅ ",
+    {
+     "type": "bold",
+     "text": "Reserva Confirmada"
+    },
+    "\n\n📋 Consulta General con Dr. Test\n🆔 Ref: ",
+    {
+     "type": "code",
+     "text": "741C5A7B"
+    },
+    "\n\nRecibirás un recordatorio antes de tu cita.\n\n📱 ",
+    {
+     "type": "bold",
+     "text": "Menú Principal"
+    },
+    "\n\n1️⃣ Agendar cita\n2️⃣ Mis citas\n3️⃣ Recordatorios\n4️⃣ Información\n5️⃣ Mis datos"
+   ],
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "✅ "
+    },
+    {
+     "type": "bold",
+     "text": "Reserva Confirmada"
+    },
+    {
+     "type": "plain",
+     "text": "\n\n📋 Consulta General con Dr. Test\n🆔 Ref: "
+    },
+    {
+     "type": "code",
+     "text": "741C5A7B"
+    },
+    {
+     "type": "plain",
+     "text": "\n\nRecibirás un recordatorio antes de tu cita.\n\n📱 "
+    },
+    {
+     "type": "bold",
+     "text": "Menú Principal"
+    },
+    {
+     "type": "plain",
+     "text": "\n\n1️⃣ Agendar cita\n2️⃣ Mis citas\n3️⃣ Recordatorios\n4️⃣ Información\n5️⃣ Mis datos"
+    }
+   ]
+  },
+  {
+   "id": 5997,
+   "type": "message",
+   "date": "2026-05-06T17:51:15",
+   "date_unixtime": "1778104275",
+   "from": "Roger Gallegos",
+   "from_id": "user5391760292",
+   "text": "1",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "1"
+    }
+   ]
+  },
+  {
+   "id": 5998,
+   "type": "message",
+   "date": "2026-05-06T17:51:34",
+   "date_unixtime": "1778104294",
+   "from": "AutoAgenda",
+   "from_id": "user8581822135",
+   "text": "Selecciona la especialidad que necesitas:\n\n1. Medicina General",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "Selecciona la especialidad que necesitas:\n\n1. Medicina General"
+    }
+   ]
+  },
+  {
+   "id": 5999,
+   "type": "message",
+   "date": "2026-05-06T17:51:36",
+   "date_unixtime": "1778104296",
+   "from": "Roger Gallegos",
+   "from_id": "user5391760292",
+   "text": "1",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "1"
+    }
+   ]
+  },
+  {
+   "id": 6000,
+   "type": "message",
+   "date": "2026-05-06T17:51:53",
+   "date_unixtime": "1778104313",
+   "from": "AutoAgenda",
+   "from_id": "user8581822135",
+   "text": "¿Con qué doctor deseas tu cita?\n\n1. Dr. Test\n2. Roger Gallegos",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "¿Con qué doctor deseas tu cita?\n\n1. Dr. Test\n2. Roger Gallegos"
+    }
+   ]
+  },
+  {
+   "id": 6001,
+   "type": "message",
+   "date": "2026-05-06T17:51:56",
+   "date_unixtime": "1778104316",
+   "from": "Roger Gallegos",
+   "from_id": "user5391760292",
+   "text": "1",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "1"
+    }
+   ]
+  },
+  {
+   "id": 6002,
+   "type": "message",
+   "date": "2026-05-06T17:52:11",
+   "date_unixtime": "1778104331",
+   "from": "AutoAgenda",
+   "from_id": "user8581822135",
+   "text": "¿Qué horario prefieres?\n\n1. Jue 7 May · 10:20\n2. Jue 7 May · 11:00\n3. Jue 7 May · 11:40\n4. Jue 7 May · 12:20\n5. Jue 7 May · 13:00\n6. Jue 7 May · 13:40\n7. Jue 7 May · 14:20\n8. Jue 7 May · 15:00",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "¿Qué horario prefieres?\n\n1. Jue 7 May · 10:20\n2. Jue 7 May · 11:00\n3. Jue 7 May · 11:40\n4. Jue 7 May · 12:20\n5. Jue 7 May · 13:00\n6. Jue 7 May · 13:40\n7. Jue 7 May · 14:20\n8. Jue 7 May · 15:00"
+    }
+   ]
+  },
+  {
+   "id": 6003,
+   "type": "message",
+   "date": "2026-05-06T17:52:19",
+   "date_unixtime": "1778104339",
+   "from": "Roger Gallegos",
+   "from_id": "user5391760292",
+   "text": "1",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "1"
+    }
+   ]
+  },
+  {
+   "id": 6004,
+   "type": "message",
+   "date": "2026-05-06T17:52:36",
+   "date_unixtime": "1778104356",
+   "from": "AutoAgenda",
+   "from_id": "user8581822135",
+   "text": [
+    "📋 ",
+    {
+     "type": "bold",
+     "text": "Confirmar Cita"
+    },
+    "\n\nDoctor: Dr. Test\nHorario: Jue 7 May · 10:20\n\n¿Confirmas esta cita? Responde \"sí\" o \"no\"."
+   ],
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "📋 "
+    },
+    {
+     "type": "bold",
+     "text": "Confirmar Cita"
+    },
+    {
+     "type": "plain",
+     "text": "\n\nDoctor: Dr. Test\nHorario: Jue 7 May · 10:20\n\n¿Confirmas esta cita? Responde \"sí\" o \"no\"."
+    }
+   ]
+  },
+  {
+   "id": 6005,
+   "type": "message",
+   "date": "2026-05-06T17:52:43",
+   "date_unixtime": "1778104363",
+   "from": "Roger Gallegos",
+   "from_id": "user5391760292",
+   "text": "si",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "si"
+    }
+   ]
+  },
+  {
+   "id": 6006,
+   "type": "message",
+   "date": "2026-05-06T17:53:01",
+   "date_unixtime": "1778104381",
+   "from": "AutoAgenda",
+   "from_id": "user8581822135",
+   "text": [
+    "✅ ",
+    {
+     "type": "bold",
+     "text": "Reserva Confirmada"
+    },
+    "\n\n📋 Consulta General con Dr. Test\n🆔 Ref: ",
+    {
+     "type": "code",
+     "text": "D692919E"
+    },
+    "\n\nRecibirás un recordatorio antes de tu cita.\n\n📱 ",
+    {
+     "type": "bold",
+     "text": "Menú Principal"
+    },
+    "\n\n1️⃣ Agendar cita\n2️⃣ Mis citas\n3️⃣ Recordatorios\n4️⃣ Información\n5️⃣ Mis datos"
+   ],
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "✅ "
+    },
+    {
+     "type": "bold",
+     "text": "Reserva Confirmada"
+    },
+    {
+     "type": "plain",
+     "text": "\n\n📋 Consulta General con Dr. Test\n🆔 Ref: "
+    },
+    {
+     "type": "code",
+     "text": "D692919E"
+    },
+    {
+     "type": "plain",
+     "text": "\n\nRecibirás un recordatorio antes de tu cita.\n\n📱 "
+    },
+    {
+     "type": "bold",
+     "text": "Menú Principal"
+    },
+    {
+     "type": "plain",
+     "text": "\n\n1️⃣ Agendar cita\n2️⃣ Mis citas\n3️⃣ Recordatorios\n4️⃣ Información\n5️⃣ Mis datos"
+    }
+   ]
+  },
+  {
+   "id": 6007,
+   "type": "message",
+   "date": "2026-05-06T18:53:29",
+   "date_unixtime": "1778108009",
+   "from": "Roger Gallegos",
+   "from_id": "user5391760292",
+   "text": "1",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "1"
+    }
+   ]
+  },
+  {
+   "id": 6008,
+   "type": "message",
+   "date": "2026-05-06T18:53:41",
+   "date_unixtime": "1778108021",
+   "from": "AutoAgenda",
+   "from_id": "user8581822135",
+   "text": [
+    "Lo siento, no entendí tu mensaje. 😊\n\nEscribe ",
+    {
+     "type": "bot_command",
+     "text": "/start"
+    },
+    " para ver el menú principal."
+   ],
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "Lo siento, no entendí tu mensaje. 😊\n\nEscribe "
+    },
+    {
+     "type": "bot_command",
+     "text": "/start"
+    },
+    {
+     "type": "plain",
+     "text": " para ver el menú principal."
+    }
+   ]
+  },
+  {
+   "id": 6009,
+   "type": "message",
+   "date": "2026-05-06T18:54:39",
+   "date_unixtime": "1778108079",
+   "from": "Roger Gallegos",
+   "from_id": "user5391760292",
+   "text": [
+    {
+     "type": "bot_command",
+     "text": "/start"
+    }
+   ],
+   "text_entities": [
+    {
+     "type": "bot_command",
+     "text": "/start"
+    }
+   ]
+  },
+  {
+   "id": 6010,
+   "type": "message",
+   "date": "2026-05-06T18:54:54",
+   "date_unixtime": "1778108094",
+   "from": "AutoAgenda",
+   "from_id": "user8581822135",
+   "text": [
+    "¡Hola! Soy tu asistente de reservas. 👋\n\nPuedo ayudarte a agendar, consultar o cancelar una cita médica.\n\n📱 ",
+    {
+     "type": "bold",
+     "text": "Menú Principal"
+    },
+    "\n\n1️⃣ Agendar cita\n2️⃣ Mis citas\n3️⃣ Recordatorios\n4️⃣ Información\n5️⃣ Mis datos"
+   ],
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "¡Hola! Soy tu asistente de reservas. 👋\n\nPuedo ayudarte a agendar, consultar o cancelar una cita médica.\n\n📱 "
+    },
+    {
+     "type": "bold",
+     "text": "Menú Principal"
+    },
+    {
+     "type": "plain",
+     "text": "\n\n1️⃣ Agendar cita\n2️⃣ Mis citas\n3️⃣ Recordatorios\n4️⃣ Información\n5️⃣ Mis datos"
+    }
+   ]
+  },
+  {
+   "id": 6011,
+   "type": "message",
+   "date": "2026-05-06T18:54:56",
+   "date_unixtime": "1778108096",
+   "from": "Roger Gallegos",
+   "from_id": "user5391760292",
+   "text": "1",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "1"
+    }
+   ]
+  },
+  {
+   "id": 6012,
+   "type": "message",
+   "date": "2026-05-06T18:55:10",
+   "date_unixtime": "1778108110",
+   "from": "AutoAgenda",
+   "from_id": "user8581822135",
+   "text": "Selecciona la especialidad que necesitas:\n\n1. Medicina General",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "Selecciona la especialidad que necesitas:\n\n1. Medicina General"
+    }
+   ]
+  },
+  {
+   "id": 6013,
+   "type": "message",
+   "date": "2026-05-06T18:55:13",
+   "date_unixtime": "1778108113",
+   "from": "Roger Gallegos",
+   "from_id": "user5391760292",
+   "text": "1",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "1"
+    }
+   ]
+  },
+  {
+   "id": 6014,
+   "type": "message",
+   "date": "2026-05-06T18:55:31",
+   "date_unixtime": "1778108131",
+   "from": "AutoAgenda",
+   "from_id": "user8581822135",
+   "text": "¿Con qué doctor deseas tu cita?\n\n1. Dr. Test\n2. Roger Gallegos",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "¿Con qué doctor deseas tu cita?\n\n1. Dr. Test\n2. Roger Gallegos"
+    }
+   ]
+  },
+  {
+   "id": 6015,
+   "type": "message",
+   "date": "2026-05-06T18:55:33",
+   "date_unixtime": "1778108133",
+   "from": "Roger Gallegos",
+   "from_id": "user5391760292",
+   "text": "1",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "1"
+    }
+   ]
+  },
+  {
+   "id": 6016,
+   "type": "message",
+   "date": "2026-05-06T18:55:45",
+   "date_unixtime": "1778108145",
+   "from": "AutoAgenda",
+   "from_id": "user8581822135",
+   "text": "¿Qué horario prefieres?\n\n1. Jue 7 May · 11:00\n2. Jue 7 May · 11:40\n3. Jue 7 May · 12:20\n4. Jue 7 May · 13:00\n5. Jue 7 May · 13:40\n6. Jue 7 May · 14:20\n7. Jue 7 May · 15:00\n8. Jue 7 May · 15:40",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "¿Qué horario prefieres?\n\n1. Jue 7 May · 11:00\n2. Jue 7 May · 11:40\n3. Jue 7 May · 12:20\n4. Jue 7 May · 13:00\n5. Jue 7 May · 13:40\n6. Jue 7 May · 14:20\n7. Jue 7 May · 15:00\n8. Jue 7 May · 15:40"
+    }
+   ]
+  },
+  {
+   "id": 6017,
+   "type": "message",
+   "date": "2026-05-06T18:55:59",
+   "date_unixtime": "1778108159",
+   "from": "Roger Gallegos",
+   "from_id": "user5391760292",
+   "text": "1",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "1"
+    }
+   ]
+  },
+  {
+   "id": 6018,
+   "type": "message",
+   "date": "2026-05-06T18:56:14",
+   "date_unixtime": "1778108174",
+   "from": "AutoAgenda",
+   "from_id": "user8581822135",
+   "text": [
+    "📋 ",
+    {
+     "type": "bold",
+     "text": "Confirmar Cita"
+    },
+    "\n\nDoctor: Dr. Test\nHorario: Jue 7 May · 11:00\n\n¿Confirmas esta cita? Responde \"sí\" o \"no\"."
+   ],
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "📋 "
+    },
+    {
+     "type": "bold",
+     "text": "Confirmar Cita"
+    },
+    {
+     "type": "plain",
+     "text": "\n\nDoctor: Dr. Test\nHorario: Jue 7 May · 11:00\n\n¿Confirmas esta cita? Responde \"sí\" o \"no\"."
+    }
+   ]
+  },
+  {
+   "id": 6019,
+   "type": "message",
+   "date": "2026-05-06T18:56:17",
+   "date_unixtime": "1778108177",
+   "from": "Roger Gallegos",
+   "from_id": "user5391760292",
+   "text": "1",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "1"
+    }
+   ]
+  },
+  {
+   "id": 6020,
+   "type": "message",
+   "date": "2026-05-06T18:56:35",
+   "date_unixtime": "1778108195",
+   "from": "AutoAgenda",
+   "from_id": "user8581822135",
+   "text": "Lo siento, hubo un error procesando tu solicitud.",
+   "text_entities": [
+    {
+     "type": "plain",
+     "text": "Lo siento, hubo un error procesando tu solicitud."
+    }
+   ]
+  }
+ ]
+}

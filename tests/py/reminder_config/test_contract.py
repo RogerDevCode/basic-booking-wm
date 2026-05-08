@@ -14,8 +14,25 @@ if TYPE_CHECKING:
 @pytest.mark.asyncio
 async def test_reminder_config_show() -> None:
     mock_db = AsyncMock()
-    # Mock load_preferences (metadata lookup)
-    mock_db.fetch.return_value = [{"metadata": {"reminder_preferences": {"telegram_24h": True}}}]
+    # Mock load_preferences (metadata lookup) con esquema completo
+    mock_db.fetch.return_value = [
+        {
+            "metadata": {
+                "reminder_preferences": {
+                    "channels": {"telegram": True, "email": True},
+                    "windows": {
+                        "w_1day": True,
+                        "w_24h": True,
+                        "w_12h": False,
+                        "w_6h": False,
+                        "w_2h": True,
+                        "w_1h": False,
+                        "w_30min": True,
+                    },
+                }
+            }
+        }
+    ]
 
     async def mock_with_tenant(db: object, tid: str, op: Callable[[], Coroutine[Any, Any, object]]) -> object:
         return await op()
@@ -29,5 +46,5 @@ async def test_reminder_config_show() -> None:
 
         assert err is None
         assert result is not None
-        assert "Configuración" in result["message"]
-        assert result["preferences"]["telegram_24h"] is True
+        assert "Recordatorios" in result.message
+        assert result.preferences.channels.telegram is True

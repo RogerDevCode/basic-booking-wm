@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from collections.abc import Callable, Coroutine, Mapping
+from typing import TYPE_CHECKING, Any
 
-from f.booking_cancel.main import main_async as cancel_booking
 from f.booking_orchestrator._get_entity import get_entity
 from f.internal._result import DBClient, Result, ok
 
@@ -23,13 +23,15 @@ Zod Schemas      : NO
 """
 
 
-async def handle_cancel_booking(conn: DBClient, input_data: OrchestratorInput) -> Result[OrchestratorResult]:
+async def handle_cancel_booking(
+    conn: DBClient, input_data: OrchestratorInput, delegates: Mapping[str, Callable[..., Coroutine[Any, Any, Any]]]
+) -> Result[OrchestratorResult]:
     booking_id = input_data.booking_id or get_entity(input_data.entities, "booking_id")
 
     if not booking_id:
         # If no ID, show current bookings so user can pick
         cloned_input = input_data.model_copy(update={"notes": "Por favor, dime el ID de la cita que deseas cancelar."})
-        return await handle_get_my_bookings(conn, cloned_input)
+        return await handle_get_my_bookings(conn, cloned_input, delegates)
 
     # Call booking_cancel
     args: dict[str, object] = {
@@ -40,7 +42,17 @@ async def handle_cancel_booking(conn: DBClient, input_data: OrchestratorInput) -
         "idempotency_key": f"orch-cancel-{booking_id}",
     }
 
-    err, data = await cancel_booking(args)
+    try:
+        cancel_res = await delegates["book_cancel"](args=args)
+        if isinstance(cancel_res, dict) and "error" in cancel_res:
+            err = str(cancel_res["error"])
+            data = None
+        else:
+            err = None
+            data = cancel_res
+    except Exception as e:
+        err = str(e)
+        data = None
 
     res: OrchestratorResult = {
         "action": "cancelar_cita",

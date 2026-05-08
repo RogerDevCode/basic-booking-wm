@@ -75,16 +75,21 @@ async def _main_async(args: dict[str, object]) -> Result[dict[str, object]]:
                 if not err_dur and d:
                     duration = d
 
+            # Resolve Provider Timezone
+            provider_tz = "UTC"
+            if input_data.provider_id:
+                provider_tz = await repo.get_provider_tz(input_data.provider_id)
+
             view: StepView | None = None
             action = input_data.action
 
             if action == "start":
-                view = WizardUI.build_date_selection(state, 0)
+                view = WizardUI.build_date_selection(state, 0, provider_tz)
 
             elif action == "select_date":
                 if input_data.user_input and "Semana" in input_data.user_input:
                     offset = 7 if "siguiente" in input_data.user_input else 0
-                    view = WizardUI.build_date_selection(state, offset)
+                    view = WizardUI.build_date_selection(state, offset, provider_tz)
                 else:
                     match = re.search(r"(\d{4}-\d{2}-\d{2})", input_data.user_input or "")
                     d_str = match.group(1) if match else state.selected_date
@@ -95,7 +100,7 @@ async def _main_async(args: dict[str, object]) -> Result[dict[str, object]]:
                             return fail(err_slots)
                         view = WizardUI.build_time_selection(state, slots or [])
                     else:
-                        view = WizardUI.build_date_selection(state, 0)
+                        view = WizardUI.build_date_selection(state, 0, provider_tz)
 
             elif action == "select_time":
                 state.selected_time = input_data.user_input
@@ -176,7 +181,7 @@ async def _main_async(args: dict[str, object]) -> Result[dict[str, object]]:
             elif action == "back":
                 prev_step = max(0, state.step - 1)
                 state.step = prev_step
-                view = WizardUI.build_date_selection(state, 0)
+                view = WizardUI.build_date_selection(state, 0, provider_tz)
 
             if not view:
                 return fail("no_view_generated")

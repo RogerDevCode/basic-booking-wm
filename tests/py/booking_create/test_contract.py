@@ -34,6 +34,12 @@ class MockBookingRepository:
     async def has_overlapping_booking(self, provider_id: str, start_time: datetime, end_time: datetime) -> bool:
         return False
 
+    async def has_active_booking_for_client(self, client_id: str) -> bool:
+        return False
+
+    async def has_client_overlap(self, client_id: str, start_time: datetime, end_time: datetime) -> bool:
+        return False
+
     async def insert_booking(
         self,
         input_data: InputSchema,

@@ -38,7 +38,7 @@ async def test_telegram_callback_confirm_success() -> None:
             "client_id": VALID_TENANT_ID,
         }
 
-        err, result = await main(args)
+        err, result = await main(args, AsyncMock())
 
         assert err is None
         assert isinstance(result, dict)
@@ -60,6 +60,6 @@ async def test_telegram_callback_invalid_data() -> None:
             "client_id": VALID_TENANT_ID,
         }
 
-        err, _result = await main(args)
+        err, _result = await main(args, AsyncMock())
         assert err is not None
         assert "Invalid callback data" in str(err)

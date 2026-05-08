@@ -27,6 +27,7 @@ dev = [
     "pre-commit>=4.1.0",
     "mcp>=1.3.0",
     "token-savior>=1.0.0",
+    "pyright>=1.1.396",
 ]
 
 [tool.uv]
@@ -38,7 +39,7 @@ strict = true
 mypy_path = "stubs"
 warn_return_any = true
 warn_unused_ignores = true
-exclude = ["^reset_nlu\\.py$", "^fix_nlu\\.py$", "^scripts/"]
+exclude = ["^reset_nlu\\.py$", "^fix_nlu\\.py$", "^scripts/", "^conftest\\.py$", "^tests/conftest\\.py$"]
 
 [[tool.mypy.overrides]]
 module = "wmill.*"

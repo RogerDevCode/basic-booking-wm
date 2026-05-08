@@ -2,8 +2,8 @@ summary: Telegram Webhook - Phase 4 (+ AutoRegister user_id)
 description: >
   Fase 4: deduplicate → auto_register → prefetch → router FSM.
   normalize+classify inlined into webhook_trigger. telegram_auto_register
-  resuelve chat_id → user_id (UPSERT en clients). user_id queda disponible
-  para booking_create en la siguiente fase.
+  resuelve chat_id → user_id (UPSERT en clients). user_id queda disponible para
+  booking_create en la siguiente fase.
 value:
   modules:
     - id: webhook_trigger
@@ -64,7 +64,8 @@ value:
                 "pg_url": variable("u/admin/DATABASE_URL") }
         path: f/telegram_auto_register/main
       skip_if:
-        expr: '!results.webhook_trigger.chat_id || results.telegram_deduplicate.duplicate'
+        expr: '!results.webhook_trigger.chat_id ||
+          results.telegram_deduplicate.duplicate'
     - id: booking_prefetch
       summary: Pre-fetch especialidades/doctores segun estado FSM actual
       value:
@@ -82,9 +83,13 @@ value:
           user_input:
             type: javascript
             expr: results.webhook_trigger.canonical_text || null
+          client_id:
+            type: javascript
+            expr: results.telegram_auto_register.client_id || null
         path: f/internal/booking_prefetch/main
       skip_if:
-        expr: '!results.webhook_trigger.chat_id || results.telegram_deduplicate.duplicate'
+        expr: '!results.webhook_trigger.chat_id ||
+          results.telegram_deduplicate.duplicate'
     - id: router
       summary: Enrutar via FSM de booking
       value:
@@ -97,10 +102,15 @@ value:
               results.get_conversation_state.data || {}, "items":
               results.booking_prefetch.items || [], "phone":
               results.telegram_auto_register?.phone ?? null, "client_name":
-              results.telegram_auto_register?.name ?? null }'
+              results.telegram_auto_register?.name ?? null,
+              "prefetch_block_reason": results.booking_prefetch.block_reason || null,
+              "client_id": results.telegram_auto_register?.client_id ?? null,
+              "callback_message_id": results.webhook_trigger.callback_message_id ?? null,
+              "pg_url": variable("u/admin/DATABASE_URL") }'
         path: f/internal/telegram_router/main
       skip_if:
-        expr: '!results.webhook_trigger.chat_id || results.telegram_deduplicate.duplicate'
+        expr: '!results.webhook_trigger.chat_id ||
+          results.telegram_deduplicate.duplicate'
     - id: client_register
       summary: Actualizar datos del cliente tras registro
       value:
@@ -144,9 +154,10 @@ value:
             expr: variable("u/admin/REDIS_URL")
         path: f/internal/conversation_update/main
       skip_if:
-        expr: '!results.webhook_trigger.chat_id || results.telegram_deduplicate.duplicate'
+        expr: '!results.webhook_trigger.chat_id ||
+          results.telegram_deduplicate.duplicate'
     - id: booking_commit
-      summary: Crear cita real en DB cuando FSM alcanza estado completed
+      summary: Crear cita real en DB cuando usuario confirma desde estado confirming
       value:
         type: script
         input_transforms:
@@ -167,8 +178,10 @@ value:
             expr: results.get_conversation_state.data?.booking_state?.draft?.start_time
         path: f/internal/booking_confirm/main
       skip_if:
-        expr: results.router?.data?.nextState?.name !== "completed" ||
-          results.telegram_deduplicate.duplicate
+        expr: |-
+          !(results.get_conversation_state?.data?.booking_state?.name === "confirming" && 
+            results.router?.data?.nextState?.name === "idle" &&
+            !results.telegram_deduplicate?.duplicate)
     - id: send_telegram_response
       summary: Enviar respuesta a Telegram
       value:
@@ -181,8 +194,18 @@ value:
             type: javascript
             expr: results.webhook_trigger.chat_id
           mode:
-            type: static
-            value: send_message
+            type: javascript
+            expr: >-
+              results.router?.data?.edit_message ? "edit_message" : "send_message"
+          inline_buttons_json:
+            type: javascript
+            expr: >-
+              results.router?.data?.inline_buttons ?
+              JSON.stringify(results.router.data.inline_buttons) : null
+          message_id:
+            type: javascript
+            expr: >-
+              results.router?.data?.edit_message ? results.webhook_trigger.callback_message_id : null
           text:
             type: javascript
             expr: >-
@@ -190,7 +213,8 @@ value:
               +
                  "📋 " + results.booking_commit.service_name + " con " + results.booking_commit.provider_name + "\n" +
                  "🆔 Ref: `" + results.booking_commit.booking_short_id + "`\n\n" +
-                 "Recibirás un recordatorio antes de tu cita.")
+                 "Recibirás un recordatorio antes de tu cita.\n\n" +
+                 "📱 *Menú Principal*\n\n1️⃣ Agendar cita\n2️⃣ Mis citas\n3️⃣ Recordatorios\n4️⃣ Información\n5️⃣ Mis datos")
               : (results.booking_commit?.error) ? ("❌ No se pudo confirmar la
               cita.\n\n" +
                  (results.booking_commit.user_message || "Por favor intenta de nuevo en unos minutos."))
@@ -200,4 +224,5 @@ value:
               mensaje. 😊\n\nEscribe /start para ver el menú principal."
         path: f/telegram_send/main
       skip_if:
-        expr: '!results.webhook_trigger.chat_id || results.telegram_deduplicate.duplicate'
+        expr: '!results.webhook_trigger.chat_id ||
+          results.telegram_deduplicate.duplicate'

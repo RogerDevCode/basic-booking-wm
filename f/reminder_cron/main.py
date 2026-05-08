@@ -16,25 +16,141 @@ from __future__ import annotations
 
 # ============================================================================
 # PRE-FLIGHT CHECKLIST
-# Mission         : Send 24h/2h/30min appointment reminders
-# DB Tables Used  : bookings, clients, providers, services
-# Concurrency Risk: YES — batch updates
+# Mission         : Process pending reminder dispatches from queue
+# DB Tables Used  : bookings, clients, providers, services, booking_reminder_dispatches
+# Concurrency Risk: NO — uses FOR UPDATE SKIP LOCKED
 # GCal Calls      : NO
-# Idempotency Key : YES — reminder flags in DB
-# RLS Tenant ID   : YES — with_tenant_context wraps each provider's batch
+# Idempotency Key : YES — status in booking_reminder_dispatches
+# RLS Tenant ID   : YES — with_tenant_context wraps each dispatch process
 # Pydantic Schemas: YES — InputSchema validates parameters
 # ============================================================================
-from datetime import UTC, datetime, timedelta
-from typing import Any, cast
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 from ..internal._db_client import create_db_client
-from ..internal._result import Result, fail, ok, with_tenant_context
-from ..internal._wmill_adapter import log, run_script
-from ._reminder_logic import build_booking_details, build_inline_buttons, get_client_preference
-from ._reminder_models import CronResult, InputSchema, ReminderWindow
-from ._reminder_repository import get_bookings_for_window, mark_reminder_sent
+from ..internal._result import Result, fail, ok
+from ..internal._wmill_adapter import log
+from ._delivery_service import dispatch_reminder
+from ._reminder_logic import build_reminder_message, get_client_preference
+from ._reminder_models import CronResult, InputSchema, ReminderDispatchDecision
+from ._reminder_repository import claim_dispatch, get_candidates_between, persist_dispatch_decision
+from ._window_policy import (
+    is_due,
+    is_quiet_hours,
+    offset_window_ranges,
+    one_day_candidate_range,
+    scheduled_time_for_window,
+)
+
+if TYPE_CHECKING:
+    from ..internal._result import DBClient
+    from ..reminder_config._config_models import ReminderChannel, ReminderWindow
+    from ._reminder_models import BookingRecord
 
 MODULE = "reminder_cron"
+
+
+def _channel_recipient(booking: BookingRecord, channel: ReminderChannel) -> str | None:
+    if channel == "telegram":
+        return booking.client_telegram_chat_id
+    return booking.client_email
+
+
+async def _process_channel(
+    booking: BookingRecord,
+    window: ReminderWindow,
+    channel: ReminderChannel,
+    now_utc: datetime,
+    dry_run: bool,
+    result: CronResult,
+    conn: DBClient,
+) -> Result[None]:
+    if not get_client_preference(booking.reminder_preferences, channel, window):
+        return ok(None)
+
+    recipient = _channel_recipient(booking, channel)
+    if recipient is None or not recipient.strip():
+        return ok(None)
+
+    claimed = await claim_dispatch(conn, booking.booking_id, channel, window)
+    if not claimed:
+        return ok(None)
+
+    scheduled_time = scheduled_time_for_window(booking.start_time, booking.provider_timezone, window)
+    if is_quiet_hours(scheduled_time, booking.provider_timezone):
+        await persist_dispatch_decision(
+            conn,
+            ReminderDispatchDecision(
+                booking_id=booking.booking_id,
+                channel=channel,
+                reminder_window=window,
+                status="skipped_quiet_hours",
+                skip_reason="quiet_hours",
+            ),
+        )
+        result.skipped_quiet_hours += 1
+        result.processed_bookings.append(booking.booking_id)
+        return ok(None)
+
+    if dry_run:
+        await persist_dispatch_decision(
+            conn,
+            ReminderDispatchDecision(
+                booking_id=booking.booking_id,
+                channel=channel,
+                reminder_window=window,
+                status="sent",
+                sent_at=now_utc,
+            ),
+        )
+        result.sent += 1
+        result.processed_bookings.append(booking.booking_id)
+        return ok(None)
+
+    dispatch_result = dispatch_reminder(channel, recipient, window, build_reminder_message(booking, window))
+    if dispatch_result[0] is not None:
+        await persist_dispatch_decision(
+            conn,
+            ReminderDispatchDecision(
+                booking_id=booking.booking_id,
+                channel=channel,
+                reminder_window=window,
+                status="failed",
+                last_error=str(dispatch_result[0]),
+            ),
+        )
+        result.failed += 1
+        return fail(dispatch_result[0])
+
+    await persist_dispatch_decision(
+        conn,
+        ReminderDispatchDecision(
+            booking_id=booking.booking_id,
+            channel=channel,
+            reminder_window=window,
+            status="sent",
+            sent_at=now_utc,
+        ),
+    )
+    result.sent += 1
+    result.processed_bookings.append(booking.booking_id)
+    return ok(None)
+
+
+async def _process_candidates_for_window(
+    conn: DBClient,
+    bookings: list[BookingRecord],
+    window: ReminderWindow,
+    now_utc: datetime,
+    dry_run: bool,
+    result: CronResult,
+) -> None:
+    for booking in bookings:
+        if window == "1day" and not is_due(now_utc, booking.start_time, booking.provider_timezone, window):
+            continue
+
+        for channel in ("telegram", "email"):
+            await _process_channel(booking, window, channel, now_utc, dry_run, result, conn)
 
 
 async def _main_async(args: dict[str, object]) -> Result[CronResult]:
@@ -46,83 +162,15 @@ async def _main_async(args: dict[str, object]) -> Result[CronResult]:
     conn = await create_db_client()
     try:
         now = datetime.now(UTC)
+        result = CronResult(dry_run=input_data.dry_run)
 
-        # Calculate Windows
-        windows: list[tuple[ReminderWindow, datetime, datetime]] = [
-            ("24h", now + timedelta(hours=23), now + timedelta(hours=25)),
-            ("2h", now + timedelta(minutes=110), now + timedelta(minutes=130)),
-            ("30min", now + timedelta(minutes=25), now + timedelta(minutes=35)),
-        ]
+        for window, start, end in offset_window_ranges(now):
+            bookings = await get_candidates_between(conn, start, end)
+            await _process_candidates_for_window(conn, bookings, window, now, input_data.dry_run, result)
 
-        result: CronResult = {
-            "reminders_24h_sent": 0,
-            "reminders_2h_sent": 0,
-            "reminders_30min_sent": 0,
-            "errors": 0,
-            "dry_run": input_data.dry_run,
-            "processed_bookings": [],
-        }
-
-        # 1. Fetch all active providers
-        providers = await conn.fetch("SELECT provider_id FROM providers WHERE is_active = True")
-
-        for p in providers:
-            p_id = str(p["provider_id"])
-
-            async def provider_batch() -> Result[None]:
-                for win_name, w_start, w_end in windows:
-                    bookings = await get_bookings_for_window(conn, win_name, w_start, w_end)
-
-                    for b in bookings:
-                        result["processed_bookings"].append(b["booking_id"])
-                        details = build_booking_details(b, input_data.timezone)
-                        buttons = build_inline_buttons(b["booking_id"], win_name)
-
-                        if input_data.dry_run:
-                            # Using cast to Any to satisfy literal keys in TypedDict
-                            counter_key = f"reminders_{win_name}_sent"
-                            cast("Any", result)[counter_key] += 1
-                            continue
-
-                        msg_type = f"reminder_{win_name}"
-
-                        # Telegram
-                        if b["client_telegram_chat_id"] and get_client_preference(
-                            b["reminder_preferences"], "telegram", win_name
-                        ):
-                            err_tg, _ = run_script(
-                                "f/telegram_send/main.py",
-                                {
-                                    "chat_id": b["client_telegram_chat_id"],
-                                    "text": f"🔔 Recordatorio de tu cita:\n\nDoctor: {details['provider_name']}\nFecha: {details['date']}\nHora: {details['time']}",  # noqa: E501
-                                    "mode": "send_message",
-                                    "inline_buttons": buttons,
-                                },
-                            )
-                            if err_tg:
-                                result["errors"] += 1
-
-                        # Gmail
-                        if b["client_email"] and get_client_preference(b["reminder_preferences"], "email", win_name):
-                            err_gm, _ = run_script(
-                                "f/gmail_send/main.py",
-                                {
-                                    "recipient_email": b["client_email"],
-                                    "message_type": msg_type,
-                                    "booking_details": details,
-                                },
-                            )
-                            if err_gm:
-                                result["errors"] += 1
-
-                        # Mark as sent
-                        await mark_reminder_sent(conn, b["booking_id"], win_name)
-                        counter_key_sent = f"reminders_{win_name}_sent"
-                        cast("Any", result)[counter_key_sent] += 1
-
-                return ok(None)
-
-            await with_tenant_context(conn, p_id, provider_batch)
+        one_day_start, one_day_end = one_day_candidate_range(now)
+        one_day_bookings = await get_candidates_between(conn, one_day_start, one_day_end)
+        await _process_candidates_for_window(conn, one_day_bookings, "1day", now, input_data.dry_run, result)
 
         return ok(result)
 

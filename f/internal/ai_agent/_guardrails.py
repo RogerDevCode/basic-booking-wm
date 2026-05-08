@@ -93,7 +93,7 @@ def verify_urgency(result: IntentResult, text: str) -> IntentResult:
     for k, v in accents.items():
         lower = lower.replace(k, v)
 
-    urgency_words = get_nlu_rule("urgency_words", [])
+    urgency_words: list[str] = get_nlu_rule("urgency_words", [])
     has_urgency = any(w in lower for w in urgency_words)
     has_typos = any(x in lower for x in ["urjente", "urgnete", "urjencia", "nececito atencion", "duele"])
 

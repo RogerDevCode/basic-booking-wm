@@ -9,11 +9,13 @@
 #   "beartype>=0.19.0",
 #   "returns>=0.24.0",
 #   "redis>=7.4.0",
-#   "typing-extensions>=4.12.0"
+#   "typing-extensions>=4.12.0",
+#   "wmill>=1.0.0"
 # ]
 # ///
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import TYPE_CHECKING
 
 from ..internal._db_client import create_db_client
@@ -53,7 +55,37 @@ HANDLER_MAP: dict[str, OrchestratorHandler] = {
 }
 
 
-async def _main_async(args: dict[str, object]) -> Result[OrchestratorResult]:
+from collections.abc import Callable, Coroutine
+from typing import Any
+
+
+def _build_default_delegates() -> dict[str, Callable[..., Coroutine[Any, Any, Any]]]:
+    """Build default delegates using Windmill task_script proxies.
+
+    Called lazily to avoid top-level side-effects (LAW-10).
+    Only invoked when _main_async is called without explicit delegates (e.g. in tests
+    that do not care about cross-script isolation).
+    """
+    from wmill import task_script as _ts
+
+    return {
+        "book_create": _ts("f/booking_create/main", timeout=30),
+        "book_cancel": _ts("f/booking_cancel/main", timeout=30),
+        "book_reschedule": _ts("f/booking_reschedule/main", timeout=30),
+        "availability_check": _ts("f/availability_check/main", timeout=30),
+    }
+
+
+async def _main_async(
+    args: dict[str, object],
+    delegates: Mapping[str, Callable[..., Coroutine[Any, Any, Any]]] | None = None,
+) -> Result[OrchestratorResult]:
+    """Core orchestration logic. `delegates` are injected by the @workflow entrypoint
+    (or mocked in unit tests). If omitted, production task_script proxies are used."""
+    resolved_delegates: Mapping[str, Callable[..., Coroutine[Any, Any, Any]]] = (
+        delegates if delegates is not None else _build_default_delegates()
+    )
+
     raw_intent = args.get("intent")
     if not isinstance(raw_intent, str):
         return Exception("Invalid input: intent must be a string"), None
@@ -89,7 +121,7 @@ async def _main_async(args: dict[str, object]) -> Result[OrchestratorResult]:
         )
 
         handler = HANDLER_MAP[intent]
-        exec_err, result = await handler(conn, enriched_input)
+        exec_err, result = await handler(conn, enriched_input, resolved_delegates)
 
         if exec_err:
             log("Orchestration execution failed", error=str(exec_err), module=MODULE)
@@ -110,8 +142,16 @@ async def _main_async(args: dict[str, object]) -> Result[OrchestratorResult]:
         await conn.close()
 
 
-def main(telegram_chat_id: str, intent: str, entities: dict[str, object] | None = None) -> dict[str, object]:
-    import asyncio
+from wmill import task_script, workflow
+
+book_create = task_script("f/booking_create/main", timeout=30)
+book_cancel = task_script("f/booking_cancel/main", timeout=30)
+book_reschedule = task_script("f/booking_reschedule/main", timeout=30)
+availability_check = task_script("f/availability_check/main", timeout=30)
+
+
+@workflow  # type: ignore
+async def main(telegram_chat_id: str, intent: str, entities: dict[str, object] | None = None) -> dict[str, object]:
     import traceback
     from typing import cast
 
@@ -119,7 +159,15 @@ def main(telegram_chat_id: str, intent: str, entities: dict[str, object] | None 
 
     try:
         args: dict[str, object] = {"telegram_chat_id": telegram_chat_id, "intent": intent, "entities": entities or {}}
-        err, result = asyncio.run(_main_async(args))
+
+        delegates = {
+            "book_create": book_create,
+            "book_cancel": book_cancel,
+            "book_reschedule": book_reschedule,
+            "availability_check": availability_check,
+        }
+
+        err, result = await _main_async(args, delegates)
         if err:
             raise err
 
@@ -140,6 +188,6 @@ def main(telegram_chat_id: str, intent: str, entities: dict[str, object] | None 
 
             log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=MODULE)
         except Exception:
-            print(f"CRITICAL ERROR in {__file__}: {e}\n{tb}")
+            pass
 
         raise RuntimeError(f"Execution failed: {e}") from e

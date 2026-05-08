@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import zoneinfo
+from collections.abc import Callable, Coroutine, Mapping
 from datetime import datetime
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from f.internal._result import DBClient, Result, fail, ok, with_tenant_context
 
@@ -21,7 +22,9 @@ Zod Schemas      : NO
 """
 
 
-async def handle_get_my_bookings(conn: DBClient, input_data: OrchestratorInput) -> Result[OrchestratorResult]:
+async def handle_get_my_bookings(
+    conn: DBClient, input_data: OrchestratorInput, delegates: Mapping[str, Callable[..., Coroutine[Any, Any, Any]]]
+) -> Result[OrchestratorResult]:
     client_id = input_data.client_id
     tenant_id = input_data.tenant_id
 

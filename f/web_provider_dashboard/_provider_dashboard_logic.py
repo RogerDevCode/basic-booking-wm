@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import datetime
 
 from ..internal._result import DBClient, Result, fail, ok
 from ._provider_dashboard_models import AgendaItem, DashboardResult, InputSchema, ProviderStats
@@ -6,11 +6,12 @@ from ._provider_dashboard_models import AgendaItem, DashboardResult, InputSchema
 
 async def fetch_provider_dashboard(db: DBClient, input_data: InputSchema) -> Result[DashboardResult]:
     try:
-        # 1. Resolve Provider
+        # 1. Resolve Provider and Timezone
         provider_rows = await db.fetch(
             """
-            SELECT p.provider_id, p.name, p.specialty
+            SELECT p.provider_id, p.name, p.specialty, t.name as tz_name
             FROM providers p
+            LEFT JOIN timezones t ON t.id = p.timezone_id
             WHERE p.provider_id = $1::uuid
                OR p.email = (SELECT email FROM users WHERE user_id = $1::uuid LIMIT 1)
             LIMIT 1
@@ -25,9 +26,13 @@ async def fetch_provider_dashboard(db: DBClient, input_data: InputSchema) -> Res
         p_id = str(p["provider_id"])
         p_name = str(p["name"])
         p_spec = str(p["specialty"])
+        p_tz = str(p["tz_name"]) if p["tz_name"] else "UTC"
 
         # 2. Fetch Agenda
-        target_date = input_data.date or datetime.now(UTC).date().isoformat()
+        import zoneinfo
+
+        tz = zoneinfo.ZoneInfo(p_tz)
+        target_date = input_data.date or datetime.now(tz).date().isoformat()
 
         agenda_rows = await db.fetch(
             """

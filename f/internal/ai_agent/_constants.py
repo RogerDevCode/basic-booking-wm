@@ -81,14 +81,15 @@ CONFIDENCE_THRESHOLDS: Final[dict[str, float]] = {
     "priority_queue_max": 0.6,
     "human_handoff_max": 0.4,
     "tfidf_minimum": 0.4,
+    "urgencia": 0.5,
 }
 
-FAREWELLS: Final[list[str]] = ["adios", "chao"]
+FAREWELLS: Final[list[str]] = ["adios", "adiós", "chao"]
 FAREWELL_PHRASES: Final[list[str]] = ["hasta luego", "nos vemos"]
 GREETINGS: Final[list[str]] = ["hola", "buenas", "saludos"]
 GREETING_PHRASES: Final[list[str]] = ["buenos dias", "buen dia"]
 THANK_YOU_WORDS: Final[list[str]] = ["gracias", "muchas gracias"]
-URGENCY_WORDS: Final[list[str]] = ["urgencia", "emergencia", "rapido"]
+URGENCY_WORDS: Final[list[str]] = ["urgencia", "urgente", "emergencia", "rapido"]
 FLEXIBILITY_KEYWORDS: Final[list[str]] = ["cambio", "otra", "reagendar"]
 DAY_NAMES: Final[dict[str, str]] = {
     "lunes": "Lunes",
@@ -106,6 +107,7 @@ RULE_CONFIDENCE_VALUES: Final[dict[str, float]] = {
     "greeting_phrase": 0.9,
     "farewell_exact": 0.95,
     "farewell_phrase": 0.9,
+    "urgencia_medical": 0.9,
 }
 SOCIAL_CONFIDENCE_VALUES: Final[dict[str, float]] = {
     "greeting_exact": 0.95,
@@ -122,6 +124,9 @@ INTENT_KEYWORDS: Final[dict[str, list[str]]] = {
     "ver_mis_citas": ["mis citas", "ver citas", "mis reservas"],
     "mostrar_menu_principal": ["menu", "inicio", "volver"],
 }
-NORMALIZATION_MAP: Final[dict[str, str]] = {}
+NORMALIZATION_MAP: Final[dict[str, str]] = {
+    "ajendar": "agendar",
+    "cancelar": "cancelar",
+}
 PROFANITY_TO_IGNORE: Final[list[str]] = []
 OFF_TOPIC_PATTERNS: Final[list[str]] = []

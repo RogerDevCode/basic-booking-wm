@@ -1,13 +1,10 @@
 from __future__ import annotations
 
 import sys
-from typing import TYPE_CHECKING, cast
+from typing import cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
-if TYPE_CHECKING:
-    from f.booking_create._booking_create_models import BookingCreated
 
 # Ensure wmill is mocked before imports
 if "wmill" not in sys.modules:
@@ -47,8 +44,10 @@ def mock_booking_repo() -> MagicMock:
     repo.is_provider_blocked = AsyncMock(return_value=False)
     repo.is_provider_scheduled = AsyncMock(return_value=True)
     repo.has_overlapping_booking = AsyncMock(return_value=False)
+    repo.has_active_booking_for_client = AsyncMock(return_value=False)
+    repo.has_client_overlap = AsyncMock(return_value=False)
 
-    booking_result: BookingCreated = {
+    booking_result: dict[str, object] = {
         "booking_id": VALID_BOOKING_ID,
         "provider_name": "Dr. Test",
         "service_name": "Consulta",
@@ -68,14 +67,35 @@ async def test_e2e_booking_happy_path(
     """
     Phase 1: Happy Path test suite for the 'booking creation flow'
     Simulates the end-to-end flow from receiving intent to a successfully confirmed booking.
+
+    NOTE: With @workflow + task_script architecture, cross-script calls go through Windmill's
+    scheduler. In tests, we inject book_create as a delegate that returns the expected result
+    directly — this is the correct isolation boundary.
     """
     # 1. Mock Orchestrator Dependencies
     mock_db = AsyncMock()
     mock_db.close.return_value = None
 
-    async def mock_with_tenant_context(conn: object, pid: object, op: object) -> object:
-        assert callable(op)
-        return await op()
+    # 2. Expected result from booking_create — the delegate returns this directly
+    booking_created: dict[str, object] = {
+        "booking_id": VALID_BOOKING_ID,
+        "provider_name": "Dr. Test",
+        "service_name": "Consulta",
+        "start_time": "2026-06-01T10:00:00",
+        "end_time": "2026-06-01T10:30:00",
+        "status": "confirmed",
+        "client_name": "Ana Test",
+    }
+
+    # 3. Inject book_create as a delegate (correct isolation per @workflow architecture)
+    book_create_mock = AsyncMock(return_value=booking_created)
+
+    delegates = {
+        "book_create": book_create_mock,
+        "book_cancel": AsyncMock(return_value={}),
+        "book_reschedule": AsyncMock(return_value={}),
+        "availability_check": AsyncMock(return_value={}),
+    }
 
     with (
         patch("f.booking_orchestrator.main.create_db_client", return_value=mock_db),
@@ -84,13 +104,8 @@ async def test_e2e_booking_happy_path(
             "f.booking_orchestrator.handlers._create.get_active_booking_for_provider",
             AsyncMock(return_value=(None, None)),
         ),
-        # 2. Mock Booking Engine Dependencies
-        patch("f.booking_create.main.create_db_client", return_value=mock_db),
-        patch("f.booking_create.main.PostgresBookingCreateRepository", return_value=mock_booking_repo),
-        # We bypass the complex with_tenant_context to just execute the block, as we are already isolated in tests
-        patch("f.booking_create.main.with_tenant_context", AsyncMock(side_effect=mock_with_tenant_context)),
     ):
-        # 3. Simulate Orchestrator Input (mimicking Webhook -> Router -> Orchestrator)
+        # 4. Simulate Orchestrator Input (mimicking Webhook -> Router -> Orchestrator)
         args: dict[str, object] = {
             "telegram_chat_id": "987654321",
             "intent": "crear_cita",
@@ -103,10 +118,10 @@ async def test_e2e_booking_happy_path(
             },
         }
 
-        # 4. Execute the Flow
-        err, result = await orchestrator_main(args)
+        # 5. Execute the Flow with injected delegates
+        err, result = await orchestrator_main(args, delegates)
 
-        # 5. Assert Correct State Changes & Flow
+        # 6. Assert Correct State Changes & Flow
         assert err is None, f"Expected no error, got {err}"
         assert result is not None, "Expected a valid result"
 
@@ -122,9 +137,8 @@ async def test_e2e_booking_happy_path(
         assert data_dict["status"] == "confirmed"
         assert data_dict["provider_name"] == "Dr. Test"
 
-        # Verify that booking repository was called correctly
-        mock_booking_repo.get_client_context.assert_awaited_once_with(VALID_CLIENT_ID)
-        mock_booking_repo.get_provider_context.assert_awaited_once_with(VALID_PROVIDER_ID)
-        mock_booking_repo.is_provider_blocked.assert_awaited_once()
-        mock_booking_repo.has_overlapping_booking.assert_awaited_once()
-        mock_booking_repo.insert_booking.assert_awaited_once()
+        # Verify that the delegate was called correctly
+        book_create_mock.assert_awaited_once()
+        call_kwargs = book_create_mock.call_args.kwargs
+        assert call_kwargs.get("args", {}).get("client_id") == VALID_CLIENT_ID
+        assert call_kwargs.get("args", {}).get("provider_id") == VALID_PROVIDER_ID

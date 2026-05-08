@@ -31,8 +31,4 @@ schema:
       description: ''
       default: null
       originalType: string
-  required:
-    - client_id
-    - provider_id
-    - start_time
-    - chat_id
+  required: []

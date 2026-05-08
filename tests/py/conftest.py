@@ -48,6 +48,7 @@ def windmill_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("WM_WORKSPACE", "test")
     monkeypatch.setenv("WM_TOKEN", "test")
     monkeypatch.setenv("WM_BASE_URL", "http://localhost:8000")
+    monkeypatch.setenv("REDIS_URL", "redis://localhost:6379")
 
 
 @pytest.fixture

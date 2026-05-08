@@ -1,6 +1,11 @@
 from __future__ import annotations
 
-from typing import TypeIs, TypeVar, cast
+from typing import TypeVar, cast
+
+try:
+    from typing import TypeIs
+except ImportError:
+    from typing import TypeIs
 
 try:
     import wmill
@@ -65,9 +70,28 @@ def run_script(path: str, args: dict[str, object] | None = None) -> tuple[Except
         return e, None
 
 
+import logging
+
+logger = logging.getLogger("booking_titanium")
+if not logger.handlers:
+    handler = logging.StreamHandler()
+    formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
+
+
 def log(message: str, **kwargs: object) -> None:
     try:
-        # Internal non-leaking log
-        print(f"WMILL_LOG: {message} | {kwargs}")
+        level = logging.INFO
+        msg_upper = message.upper()
+        if "ERROR" in msg_upper or "CATASTROPHE" in msg_upper or "FAIL" in msg_upper:
+            level = logging.ERROR
+        elif "WARN" in msg_upper:
+            level = logging.WARNING
+
+        ctx = " | ".join(f"{k}={v}" for k, v in kwargs.items())
+        final_msg = f"{message} | {ctx}" if kwargs else message
+        logger.log(level, final_msg)
     except Exception:
         pass

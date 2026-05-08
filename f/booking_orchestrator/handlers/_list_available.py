@@ -1,7 +1,9 @@
-from datetime import datetime
-from typing import cast
+from __future__ import annotations
 
-from f.availability_check.main import main_async as check_availability
+from collections.abc import Callable, Coroutine, Mapping
+from datetime import datetime
+from typing import Any, cast
+
 from f.booking_orchestrator._orchestrator_models import AvailabilityData, OrchestratorInput, OrchestratorResult
 from f.internal._result import DBClient, Result, fail, ok
 
@@ -17,7 +19,9 @@ Zod Schemas      : NO
 """
 
 
-async def handle_list_available(conn: DBClient, input_data: OrchestratorInput) -> Result[OrchestratorResult]:
+async def handle_list_available(
+    conn: DBClient, input_data: OrchestratorInput, delegates: Mapping[str, Callable[..., Coroutine[Any, Any, Any]]]
+) -> Result[OrchestratorResult]:
     provider_id = input_data.provider_id
     date = input_data.date
     service_id = input_data.service_id
@@ -37,17 +41,30 @@ async def handle_list_available(conn: DBClient, input_data: OrchestratorInput) -
 
     # 1. CALL AVAILABILITY MODULE
     try:
-        err_msg, data = await check_availability(
-            {
-                "provider_id": provider_id,
-                "date": date,
-                "service_id": service_id,
-            }
-        )
+        args = {
+            "provider_id": provider_id,
+            "date": date,
+            "service_id": service_id,
+        }
+        res = await delegates["availability_check"](args=args)
+        if isinstance(res, dict) and "error" in res:
+            err_msg = str(res["error"])
+            data = None
+        else:
+            err_msg = None
+            data = res
     except Exception as e:
+        import traceback
+
+        from f.internal._wmill_adapter import log
+
+        log("LIST_AVAILABLE_CRASH", error=str(e), traceback=traceback.format_exc(), module="booking_orchestrator")
         return fail(f"Failed to call availability_check: {e}")
 
     if err_msg or data is None:
+        from f.internal._wmill_adapter import log
+
+        log("LIST_AVAILABLE_API_ERROR", err_msg=str(err_msg), module="booking_orchestrator")
         return ok(
             cast(
                 "OrchestratorResult",
@@ -107,14 +124,20 @@ async def handle_list_available(conn: DBClient, input_data: OrchestratorInput) -
         )
 
     # 2. FORMAT RESPONSE
+    tz_name = str(avail.get("timezone", "UTC"))
+    import zoneinfo
+
+    tz = zoneinfo.ZoneInfo(tz_name)
+
     morning: list[str] = []
     afternoon: list[str] = []
     for s in slots:
         # Parse ISO string (e.g. "2026-04-20T10:00:00Z")
         start_str = str(s["start"])
-        dt = datetime.fromisoformat(start_str.replace("Z", "+00:00"))
-        time_str = dt.strftime("%H:%M")
-        if dt.hour < 12:
+        dt_utc = datetime.fromisoformat(start_str.replace("Z", "+00:00"))
+        dt_local = dt_utc.astimezone(tz)
+        time_str = dt_local.strftime("%H:%M")
+        if dt_local.hour < 12:
             morning.append(time_str)
         else:
             afternoon.append(time_str)
@@ -125,11 +148,11 @@ async def handle_list_available(conn: DBClient, input_data: OrchestratorInput) -
     if afternoon:
         message += f"🌇 *Tarde:*\n{', '.join(afternoon)}\n\n"
 
-    res: OrchestratorResult = {
+    res_avail: OrchestratorResult = {
         "action": "ver_disponibilidad",
         "success": True,
         "data": data,
         "message": message,
         "follow_up": "¿Te gustaría agendar alguno de estos horarios?",
     }
-    return ok(res)
+    return ok(res_avail)

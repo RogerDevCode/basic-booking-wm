@@ -14,6 +14,8 @@
 # ///
 from __future__ import annotations
 
+import zoneinfo
+from datetime import UTC, datetime
 from typing import Final, cast
 
 from beartype import beartype
@@ -40,7 +42,7 @@ _RECORDATORIOS_KEYWORDS: Final[frozenset[str]] = frozenset(["3", "recordatorios"
 _INFO_KEYWORDS: Final[frozenset[str]] = frozenset(["4", "información", "informacion", "info", "información"])
 _MIS_DATOS_KEYWORDS: Final[frozenset[str]] = frozenset(["5", "mis datos", "datos", "mi perfil", "perfil"])
 
-_SI_WORDS: Final[frozenset[str]] = frozenset({"si", "sí", "yes", "ok", "dale", "claro", "correcto", "exacto"})
+_SI_WORDS: Final[frozenset[str]] = frozenset({"s", "y", "si", "sí", "yes", "ok", "dale", "claro", "correcto", "exacto"})
 _NO_WORDS: Final[frozenset[str]] = frozenset({"no", "nope", "nel", "negativo"})
 
 _REG_STATES: Final[frozenset[str]] = frozenset(
@@ -77,6 +79,151 @@ def _start_registration(
     )
 
 
+_STATUS_LABELS: Final[dict[str, str]] = {
+    "confirmed": "✅ Confirmada",
+    "pending": "⏳ Pendiente",
+    "scheduled": "📅 Agendada",
+}
+
+_MONTHS_ES: Final[list[str]] = [
+    "",
+    "enero",
+    "febrero",
+    "marzo",
+    "abril",
+    "mayo",
+    "junio",
+    "julio",
+    "agosto",
+    "septiembre",
+    "octubre",
+    "noviembre",
+    "diciembre",
+]
+
+
+def _format_booking_line(
+    provider_name: str,
+    service_name: str,
+    start_utc: datetime,
+    tz_name: str,
+    status: str,
+    booking_id: str,
+) -> str:
+    tz = zoneinfo.ZoneInfo(tz_name)
+    local_dt = start_utc.astimezone(tz)
+    day = local_dt.day
+    month = _MONTHS_ES[local_dt.month]
+    time_str = local_dt.strftime("%H:%M")
+    status_label = _STATUS_LABELS.get(status, "📋 Agendada")
+    raw = booking_id[:8].upper()
+    short_id = f"{raw[:2]}-{raw[2:5]}-{raw[5:8]}"
+    return (
+        f"{status_label}\n"
+        f"👨‍⚕️ {provider_name} — {service_name}\n"
+        f"📅 {day} de {month} a las {time_str}\n"
+        f"🆔 Ref: `{short_id}`"
+    )
+
+
+async def _query_my_bookings(client_id: str, pg_url: str) -> list[dict[str, object]]:
+    import os
+
+    from .._db_client import create_db_client as _factory
+
+    os.environ["DATABASE_URL"] = pg_url
+    db = await _factory()
+    try:
+        rows = await db.fetch(
+            """
+            SELECT
+                b.booking_id::text,
+                b.start_time,
+                b.status,
+                p.name  AS provider_name,
+                s.name  AS service_name,
+                COALESCE(t.name, 'UTC') AS tz_name
+            FROM bookings b
+            JOIN providers p ON p.provider_id = b.provider_id
+            JOIN services  s ON s.service_id  = b.service_id
+            LEFT JOIN timezones t ON t.id = p.timezone_id
+            WHERE b.client_id = $1::uuid
+              AND b.status NOT IN ('cancelled', 'no_show', 'rescheduled')
+              AND b.start_time >= NOW()
+            ORDER BY b.start_time ASC
+            LIMIT 5
+            """,
+            client_id,
+        )
+        return [dict(r) for r in rows]
+    finally:
+        await db.close()
+
+
+async def _handle_mis_citas(
+    input_data: RouterInput,
+    current_state_raw: dict[str, object],
+) -> Result[RouterResult, str]:
+    if not input_data.client_id or not input_data.pg_url:
+        return Success(
+            RouterResult(
+                handled=True,
+                nextState=current_state_raw,
+                response_text=(
+                    "📋 *Mis Citas*\n\nNo pudimos cargar tus citas en este momento.\n\n" + get_main_menu_text()
+                ),
+            )
+        )
+
+    try:
+        rows = await _query_my_bookings(input_data.client_id, input_data.pg_url)
+    except Exception:
+        rows = []
+
+    if not rows:
+        return Success(
+            RouterResult(
+                handled=True,
+                nextState=current_state_raw,
+                response_text=(
+                    "📋 *Mis Citas*\n\n"
+                    "No tienes citas próximas agendadas.\n\n"
+                    "Puedes agendar una nueva cita seleccionando la opción 1.\n\n" + get_main_menu_text()
+                ),
+            )
+        )
+
+    lines: list[str] = []
+    for r in rows:
+        raw_start = r["start_time"]
+        if isinstance(raw_start, datetime):
+            start_utc = raw_start if raw_start.tzinfo else raw_start.replace(tzinfo=UTC)
+        else:
+            start_utc = datetime.fromisoformat(str(raw_start).replace("Z", "+00:00"))
+        lines.append(
+            _format_booking_line(
+                provider_name=str(r["provider_name"]),
+                service_name=str(r["service_name"]),
+                start_utc=start_utc,
+                tz_name=str(r["tz_name"]),
+                status=str(r["status"]),
+                booking_id=str(r["booking_id"]),
+            )
+        )
+
+    body = "\n\n".join(lines)
+    count = len(rows)
+    header = f"📋 *Mis Citas* ({count} próxima{'s' if count > 1 else ''})\n\n"
+
+    return Success(
+        RouterResult(
+            handled=True,
+            nextState=current_state_raw,
+            response_text=header + body + "\n\n" + get_main_menu_text(),
+        )
+    )
+
+
 def _handle_mis_datos(
     input_data: RouterInput,
     current_state_raw: dict[str, object],
@@ -100,6 +247,7 @@ def _handle_mis_datos(
 def _handle_registration_state(
     input_data: RouterInput,
     current_state_name: str,
+    current_state_raw: dict[str, object],
     draft_raw: dict[str, object],
 ) -> Result[RouterResult, str]:
     lower = input_data.user_input.strip().lower()
@@ -132,10 +280,21 @@ def _handle_registration_state(
                     ),
                 )
             )
+        attempts = int(str(current_state_raw.get("invalid_attempts", 0))) + 1
+        if attempts >= 3:
+            return Success(
+                RouterResult(
+                    handled=True,
+                    nextState={"name": "idle"},
+                    nextDraft={},
+                    response_text="❌ Demasiados intentos inválidos. Volviendo al menú principal.\n\n"
+                    + get_main_menu_text(),
+                )
+            )
         return Success(
             RouterResult(
                 handled=True,
-                nextState={"name": "needs_registration"},
+                nextState={"name": "needs_registration", "invalid_attempts": attempts},
                 nextDraft=dict(draft_raw),
                 response_text="¿Empezamos con el registro? Responde *sí* o *no*. 😊",
             )
@@ -161,10 +320,21 @@ def _handle_registration_state(
                     response_text="¿Cómo te llamas? Escribe tu nombre completo.",
                 )
             )
+        attempts = int(str(current_state_raw.get("invalid_attempts", 0))) + 1
+        if attempts >= 3:
+            return Success(
+                RouterResult(
+                    handled=True,
+                    nextState={"name": "idle"},
+                    nextDraft={},
+                    response_text="❌ Demasiados intentos inválidos. Volviendo al menú principal.\n\n"
+                    + get_main_menu_text(),
+                )
+            )
         return Success(
             RouterResult(
                 handled=True,
-                nextState={"name": "reg_confirming_name"},
+                nextState={"name": "reg_confirming_name", "invalid_attempts": attempts},
                 nextDraft=dict(draft_raw),
                 response_text=(f"Tu nombre registrado es *{client_name}*.\n¿Es correcto? Responde *sí* o *no*."),
             )
@@ -260,7 +430,12 @@ async def _route(input_data: RouterInput) -> Result[RouterResult, str]:
 
     # Registration states must be checked before BookingStateRoot.model_validate
     if current_state_name in _REG_STATES:
-        return _handle_registration_state(input_data, current_state_name, draft_raw)
+        return _handle_registration_state(input_data, current_state_name, current_state_raw, draft_raw)
+
+    if current_state_name == "reminders_config" or user_input.startswith("rem:"):
+        from ._router_reminders import handle_reminders_config
+
+        return await handle_reminders_config(input_data, current_state_raw)
 
     from .._nlu_cache import ensure_nlu_cache
 
@@ -277,29 +452,13 @@ async def _route(input_data: RouterInput) -> Result[RouterResult, str]:
                 return _handle_mis_datos(input_data, current_state_raw)
 
             if lower in _MIS_CITAS_KEYWORDS:
-                return Success(
-                    RouterResult(
-                        handled=True,
-                        nextState=current_state_raw,
-                        response_text=(
-                            "📋 *Mis Citas*\n\n"
-                            "La consulta de citas estará disponible muy pronto.\n\n"
-                            "Por ahora puedes agendar una nueva cita.\n\n" + get_main_menu_text()
-                        ),
-                    )
-                )
+                return await _handle_mis_citas(input_data, current_state_raw)
+
             if lower in _RECORDATORIOS_KEYWORDS:
-                return Success(
-                    RouterResult(
-                        handled=True,
-                        nextState=current_state_raw,
-                        response_text=(
-                            "🔔 *Recordatorios*\n\n"
-                            "Los recordatorios se envían automáticamente al confirmar tu cita.\n\n"
-                            + get_main_menu_text()
-                        ),
-                    )
-                )
+                from ._router_reminders import handle_reminders_config
+
+                return await handle_reminders_config(input_data, current_state_raw)
+
             if lower in _INFO_KEYWORDS:
                 return Success(
                     RouterResult(
@@ -321,6 +480,19 @@ async def _route(input_data: RouterInput) -> Result[RouterResult, str]:
                         response_text=("Lo siento, no entendí esa opción. 😊\n\n" + get_main_menu_text()),
                     )
                 )
+
+        # Block transition to time-slot selection if client already has an active booking
+        if current_state_name == "selecting_doctor" and input_data.prefetch_block_reason == "already_booked":
+            return Success(
+                RouterResult(
+                    handled=True,
+                    nextState={"name": "idle"},
+                    response_text=(
+                        "⚠️ Ya tienes una cita agendada.\n\n"
+                        "Debes cancelar tu cita actual antes de reservar una nueva.\n\n" + get_main_menu_text()
+                    ),
+                )
+            )
 
         state_root = BookingStateRoot.model_validate(current_state_raw)
         current_state = state_root.root

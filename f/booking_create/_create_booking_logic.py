@@ -26,6 +26,14 @@ async def fetch_booking_context(repo: BookingCreateRepository, input_data: Input
 async def check_availability(
     repo: BookingCreateRepository, input_data: InputSchema, end_time: datetime
 ) -> Result[None]:
+    has_active = await repo.has_active_booking_for_client(input_data.client_id)
+    if has_active:
+        return fail(Exception("client_already_has_active_booking"))
+
+    has_client_overlap = await repo.has_client_overlap(input_data.client_id, input_data.start_time, end_time)
+    if has_client_overlap:
+        return fail(Exception("client_has_overlapping_booking"))
+
     target_date = input_data.start_time.date()
 
     is_blocked = await repo.is_provider_blocked(input_data.provider_id, target_date)
@@ -52,7 +60,6 @@ async def check_availability(
 async def persist_booking(
     repo: BookingCreateRepository, input_data: InputSchema, context: BookingContext, end_time: datetime
 ) -> Result[BookingCreated]:
-
     err, _ = validate_transition("pending", "confirmed")
     if err is not None:
         return fail(err)
@@ -72,7 +79,6 @@ async def persist_booking(
 
 
 async def execute_create_booking(repo: BookingCreateRepository, input_data: InputSchema) -> Result[BookingCreated]:
-
     err_ctx, context = await fetch_booking_context(repo, input_data)
     if err_ctx is not None or context is None:
         return fail(err_ctx or Exception("Failed to load booking context"))

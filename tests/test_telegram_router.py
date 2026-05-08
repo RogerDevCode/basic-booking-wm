@@ -139,13 +139,42 @@ class TestTelegramRouterMainMenu:
         assert cast("dict[str, Any]", data["nextState"])["name"] == "idle"
 
     @pytest.mark.asyncio
-    async def test_option_3_recordatorios_handled(self) -> None:
-        """'3' at idle must return reminders response, not booking."""
-        args: dict[str, Any] = {"chat_id": "1", "user_input": "3", "state": self._IDLE_STATE}
+    @patch("f.internal.telegram_router._router_reminders.run_reminder_config", new_callable=AsyncMock)
+    async def test_option_3_recordatorios_handled(self, mock_run: AsyncMock) -> None:
+        """'3' at idle must enter the reminder configuration flow."""
+        from f.reminder_config._config_models import (
+            ChannelPreferences,
+            InlineButton,
+            ReminderConfigResult,
+            ReminderPreferences,
+            WindowPreferences,
+        )
+
+        mock_run.return_value = (
+            None,
+            ReminderConfigResult(
+                message="🔔 *Recordatorios*",
+                inline_buttons=[[InlineButton(text="📱 Telegram ✅", callback_data="rem:ch:telegram")]],
+                preferences=ReminderPreferences(
+                    channels=ChannelPreferences(telegram=True, email=True),
+                    windows=WindowPreferences(
+                        w_1day=True,
+                        w_24h=True,
+                        w_12h=False,
+                        w_6h=False,
+                        w_2h=True,
+                        w_1h=False,
+                        w_30min=True,
+                    ),
+                ),
+            ),
+        )
+
+        args: dict[str, Any] = {"chat_id": "1", "user_input": "3", "state": self._IDLE_STATE, "client_id": "c1"}
         res = await main(args)
         data = cast("dict[str, Any]", res["data"])
         assert data["handled"] is True
-        assert cast("dict[str, Any]", data["nextState"])["name"] == "idle"
+        assert cast("dict[str, Any]", data["nextState"])["name"] == "reminders_config"
 
     @pytest.mark.asyncio
     async def test_option_4_info_handled(self) -> None:

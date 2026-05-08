@@ -18,6 +18,19 @@ def _make_input(**kwargs: object) -> OrchestratorInput:
     return OrchestratorInput.model_validate(base)
 
 
+def _make_delegates(**overrides: object) -> dict[str, AsyncMock]:
+    """Return a default delegates dict. Override any key as needed."""
+    d: dict[str, AsyncMock] = {
+        "book_create": AsyncMock(return_value={}),
+        "book_cancel": AsyncMock(return_value={}),
+        "book_reschedule": AsyncMock(return_value={}),
+        "availability_check": AsyncMock(return_value={}),
+    }
+    for k, v in overrides.items():
+        d[k] = v  # type: ignore[assignment]
+    return d
+
+
 @pytest.mark.asyncio
 async def test_handle_create_booking_missing_fields_returns_specialty_wizard() -> None:
     conn = AsyncMock()
@@ -29,7 +42,7 @@ async def test_handle_create_booking_missing_fields_returns_specialty_wizard() -
     )
     input_data = _make_input()
 
-    err, result = await handle_create_booking(conn, input_data)
+    err, result = await handle_create_booking(conn, input_data, _make_delegates())
 
     assert err is None
     assert result is not None
@@ -52,7 +65,7 @@ async def test_handle_create_booking_specialty_with_no_providers_excluded_from_b
     )
     input_data = _make_input()
 
-    err, result = await handle_create_booking(conn, input_data)
+    err, result = await handle_create_booking(conn, input_data, _make_delegates())
 
     assert err is None
     assert result is not None
@@ -68,23 +81,22 @@ async def test_handle_create_booking_all_fields_present_calls_create_module() ->
     conn = AsyncMock()
     input_data = _make_input(provider_id="prov-1", service_id="svc-1", date="2026-05-10", time="09:00")
 
-    with (
-        patch(
-            "f.booking_orchestrator.handlers._create.get_active_booking_for_provider",
-            AsyncMock(return_value=(None, None)),
-        ),
-        patch(
-            "f.booking_orchestrator.handlers._create.create_booking",
-            AsyncMock(return_value=(None, {"booking_id": "bk-1", "status": "confirmed"})),
-        ),
-    ):
-        err, result = await handle_create_booking(conn, input_data)
+    delegates = _make_delegates(
+        book_create=AsyncMock(return_value={"booking_id": "bk-1", "status": "confirmed"}),
+    )
 
-        assert err is None
-        assert result is not None
-        assert result["action"] == "crear_cita"
-        assert result["success"] is True
-        assert "✅" in result["message"]
+    with patch(
+        "f.booking_orchestrator.handlers._create.get_active_booking_for_provider",
+        AsyncMock(return_value=(None, None)),
+    ):
+        err, result = await handle_create_booking(conn, input_data, delegates)
+
+    assert err is None
+    assert result is not None
+    assert result["action"] == "crear_cita"
+    assert result["success"] is True
+    assert "✅" in result["message"]
+    delegates["book_create"].assert_awaited_once()
 
 
 @pytest.mark.asyncio
@@ -92,19 +104,17 @@ async def test_handle_create_booking_create_failure_sets_success_false() -> None
     conn = AsyncMock()
     input_data = _make_input(provider_id="prov-1", service_id="svc-1", date="2026-05-10", time="09:00")
 
-    with (
-        patch(
-            "f.booking_orchestrator.handlers._create.get_active_booking_for_provider",
-            AsyncMock(return_value=(None, None)),
-        ),
-        patch(
-            "f.booking_orchestrator.handlers._create.create_booking",
-            AsyncMock(return_value=(Exception("Slot already taken"), None)),
-        ),
-    ):
-        err, result = await handle_create_booking(conn, input_data)
+    delegates = _make_delegates(
+        book_create=AsyncMock(return_value={"error": "Slot already taken"}),
+    )
 
-        assert err is None
-        assert result is not None
-        assert result["success"] is False
-        assert "❌" in result["message"]
+    with patch(
+        "f.booking_orchestrator.handlers._create.get_active_booking_for_provider",
+        AsyncMock(return_value=(None, None)),
+    ):
+        err, result = await handle_create_booking(conn, input_data, delegates)
+
+    assert err is None
+    assert result is not None
+    assert result["success"] is False
+    assert "❌" in result["message"]

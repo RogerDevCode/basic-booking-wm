@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from collections.abc import Callable, Coroutine, Mapping
+from typing import TYPE_CHECKING, Any
 
 from f.booking_orchestrator._get_entity import get_entity
-from f.booking_reschedule.main import main_async as reschedule_booking
 from f.internal._result import DBClient, Result, ok
 
 if TYPE_CHECKING:
@@ -23,7 +23,9 @@ Zod Schemas      : NO
 """
 
 
-async def handle_reschedule(conn: DBClient, input_data: OrchestratorInput) -> Result[OrchestratorResult]:
+async def handle_reschedule(
+    conn: DBClient, input_data: OrchestratorInput, delegates: Mapping[str, Callable[..., Coroutine[Any, Any, Any]]]
+) -> Result[OrchestratorResult]:
     booking_id = input_data.booking_id or get_entity(input_data.entities, "booking_id")
     date = input_data.date
     time = input_data.time
@@ -32,7 +34,7 @@ async def handle_reschedule(conn: DBClient, input_data: OrchestratorInput) -> Re
         cloned_input = input_data.model_copy(
             update={"notes": "Dime el ID de la cita que quieres mover y la nueva fecha/hora."}
         )
-        return await handle_get_my_bookings(conn, cloned_input)
+        return await handle_get_my_bookings(conn, cloned_input, delegates)
 
     if not date or not time:
         res: OrchestratorResult = {
@@ -73,7 +75,17 @@ async def handle_reschedule(conn: DBClient, input_data: OrchestratorInput) -> Re
         "idempotency_key": f"orch-resch-{booking_id}-{date}-{time}",
     }
 
-    err, data = await reschedule_booking(args)
+    try:
+        resch_res = await delegates["book_reschedule"](args=args)
+        if isinstance(resch_res, dict) and "error" in resch_res:
+            err = str(resch_res["error"])
+            data = None
+        else:
+            err = None
+            data = resch_res
+    except Exception as e:
+        err = str(e)
+        data = None
 
     res_final: OrchestratorResult = {
         "action": "reagendar_cita",

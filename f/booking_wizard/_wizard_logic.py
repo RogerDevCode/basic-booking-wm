@@ -35,9 +35,12 @@ class DateUtils:
         return f"{days[dt.weekday()]}, {dt.day} de {months[dt.month - 1]}"
 
     @staticmethod
-    def get_week_dates(offset: int) -> list[dict[str, str]]:
+    def get_week_dates(offset: int, tz_name: str = "UTC") -> list[dict[str, str]]:
+        import zoneinfo
+
+        tz = zoneinfo.ZoneInfo(tz_name)
         dates = []
-        today = date.today() + timedelta(days=offset)
+        today = datetime.now(tz).date() + timedelta(days=offset)
         days_es = ["lun", "mar", "mié", "jue", "vie", "sáb", "dom"]
         months_es = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"]
 
@@ -59,8 +62,8 @@ class DateUtils:
 
 class WizardUI:
     @staticmethod
-    def build_date_selection(state: WizardState, week_offset: int = 0) -> StepView:
-        dates = DateUtils.get_week_dates(week_offset)
+    def build_date_selection(state: WizardState, week_offset: int = 0, tz_name: str = "UTC") -> StepView:
+        dates = DateUtils.get_week_dates(week_offset, tz_name)
         keyboard: list[list[str]] = []
         for i in range(0, len(dates), 2):
             row = [f"{d['dayName']} {d['label']}" for d in dates[i : i + 2]]
@@ -112,6 +115,21 @@ class WizardRepository:
     def __init__(self, db: DBClient) -> None:
         self.db = db
 
+    async def get_provider_tz(self, provider_id: str) -> str:
+        row = await self.db.fetchrow(
+            """
+            SELECT t.name as tz_name
+            FROM providers p
+            LEFT JOIN timezones t ON t.id = p.timezone_id
+            WHERE p.provider_id = $1::uuid
+            LIMIT 1
+            """,
+            provider_id,
+        )
+        if row and row["tz_name"]:
+            return str(row["tz_name"])
+        return "UTC"
+
     async def get_service_duration(self, service_id: str) -> Result[int]:
         rows = await self.db.fetch(
             "SELECT duration_minutes FROM services WHERE service_id = $1::uuid AND is_active = true LIMIT 1", service_id
@@ -121,32 +139,38 @@ class WizardRepository:
         return ok(int(cast("Any", rows[0]["duration_minutes"])))
 
     async def get_available_slots(self, provider_id: str, date_str: str, duration_min: int) -> Result[list[str]]:
-        try:
-            target_date = date.fromisoformat(date_str)
-        except ValueError:
-            return fail("invalid_date_format")
+        from ..internal.scheduling_engine._scheduling_logic import get_availability
 
-        rows = await self.db.fetch(
-            """
-            SELECT start_time FROM bookings
-            WHERE provider_id = $1::uuid
-              AND start_time::date = $2::date
-              AND status NOT IN ('cancelled', 'no_show', 'rescheduled')
-            """,
+        # Fallback to first service if wizard state doesn't have it explicitly mapped yet
+        service_row = await self.db.fetchrow(
+            "SELECT service_id FROM services WHERE provider_id = $1::uuid AND is_active = true LIMIT 1",
             provider_id,
-            target_date,
         )
-        booked_times = set()
-        for r in rows:
-            st = r["start_time"]
-            if isinstance(st, str):
-                st_dt = datetime.fromisoformat(st.replace("Z", "+00:00"))
-            else:
-                st_dt = cast("datetime", st)
-            booked_times.add(f"{st_dt.hour:02d}:{st_dt.minute:02d}")
+        if not service_row:
+            return fail("no_active_services_for_provider")
 
-        all_slots = DateUtils.generate_time_slots(START_HOUR, END_HOUR, duration_min)
-        available = [s for s in all_slots if s not in booked_times]
+        service_id = str(service_row["service_id"])
+
+        err, avail_res = await get_availability(
+            self.db, {"provider_id": provider_id, "date": date_str, "service_id": service_id}
+        )
+
+        if err or not avail_res:
+            return fail(err or "availability_check_failed")
+
+        import zoneinfo
+
+        tz_name = str(avail_res.get("timezone", "UTC"))
+        tz = zoneinfo.ZoneInfo(tz_name)
+
+        available: list[str] = []
+        for s in avail_res.get("slots", []):
+            if s.get("available"):
+                start_str = str(s["start"])
+                dt_utc = datetime.fromisoformat(start_str.replace("Z", "+00:00"))
+                dt_local = dt_utc.astimezone(tz)
+                available.append(dt_local.strftime("%H:%M"))
+
         return ok(available)
 
     async def get_names(self, provider_id: str, service_id: str) -> Result[dict[str, str]]:

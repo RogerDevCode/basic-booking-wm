@@ -97,11 +97,12 @@ class ConfirmingState(BaseModel):
     doctorName: str
     timeSlot: str
     draft: DraftCore
+    invalid_attempts: int = 0
 
 
 class CompletedState(BaseModel):
     name: Literal["completed"] = "completed"
-    bookingId: str
+    bookingId: str | None = None
 
 
 # Discriminated Union for State

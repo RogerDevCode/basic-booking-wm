@@ -148,28 +148,27 @@ import wmill
 
 RULES:
 
-WM-01 main() SYNC DEFAULT (WRAPPER PATTERN MANDATORY)
+WM-01 main() SYNC (SCRIPTS) OR ASYNC (WORKFLOWS)
 WM-02 FAIL → raise RuntimeError  
-WM-03 wmill.* INSIDE FN ONLY  
+WM-03 wmill.* IMPORTS ALLOWED GLOBALLY FOR WORKFLOWS
 WM-04 RESOURCE = TypedDict/Pydantic  
 WM-05 cancel_running() FIRST  
 WM-06 set_progress() >30s  
-WM-07 task() FOR PARALLEL  
+WM-07 task() y workflow() PARA ORQUESTACIÓN Y PARALELISMO
 WM-08 PARTIAL FAIL → EXPLICIT  
 WM-09 PEP 723 INLINE METADATA MANDATORY
 WM-10 LOCK FILES MUST USE `# py: 3.13` (OVERRIDES PEP 723)
 
 ---
 
-## ENTRYPOINT PATTERN (WRAPPER)
+## ENTRYPOINT PATTERN
 
-ALL Windmill scripts MUST implement the sync wrapper pattern to avoid returning coroutines.
-NEVER use `async def main()`.
+Windmill admite dos patrones según el propósito del archivo:
 
-PATTERN:
+1. **SCRIPT ESTÁNDAR (Sync Wrapper)**
+Para scripts individuales sin orquestación pesada.
 ```python
 async def _main_async(args: dict[str, Any]) -> dict[str, Any]:
-    # Async business logic here
     return {"data": "ok"}
 
 def main(args: dict[str, Any]) -> dict[str, Any]:
@@ -177,8 +176,21 @@ def main(args: dict[str, Any]) -> dict[str, Any]:
     return asyncio.run(_main_async(args))
 ```
 
+2. **WORKFLOWS AS CODE (Async Main)**
+Para orquestadores y procesos multi-etapa con checkpointing.
+MANDATORIO para llamar a otros scripts de Windmill sin monolitos.
+```python
+from wmill import task, workflow, task_script
+
+child_script = task_script("f/folder/main", timeout=30)
+
+@workflow
+async def main(args: dict[str, Any]) -> dict[str, Any]:
+    return await child_script(args=args)
+```
+
 TESTING:
-Tests MUST import `_main_async` directly to test logic. DO NOT test `main()`.
+Para Workflows as Code, testea `main` mockeando las dependencias inyectadas con `task_script`.
 
 ---
 
@@ -190,10 +202,9 @@ get_resource(path)
 set_resource(path,body)  
 run_script_by_path(...)  
 run_script_by_path_async(...)  
-get_result(id)  
-get_state()  
-set_state()  
-set_progress(n)  
+task_script(...)
+@workflow
+@task
 
 FORBIDDEN:
 run_script()  
@@ -401,78 +412,76 @@ Validar end-to-end el flujo en Telegram. El flujo debería poder saludar, manten
 <claude-mem-context>
 # Memory Context
 
-# [booking-titanium-wm] recent context, 2026-04-30 9:27am GMT-4
+# [booking-titanium-wm] recent context, 2026-05-07 1:17pm GMT-4
 
 Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision 🚨security_alert 🔐security_note
 Format: ID TIME TYPE TITLE
 Fetch details: get_observations([IDs]) | Search: mem-search skill
 
-Stats: 50 obs (17,529t read) | 187,401t work | 91% savings
+Stats: 50 obs (16,478t read) | 201,982t work | 92% savings
 
-### Apr 27, 2026
-S55 Multiple parallel subagents re-reading target files in preparation for Phase 1 execution — no code changes yet (Apr 27, 7:05 PM)
-S52 Fix Windmill variable resolution permanently — full audit completed, 3-phase refactor plan produced and awaiting user approval (Apr 27, 7:05 PM)
-S53 User corrected plan — "no TypeScript" note removed, all work is Python only; plan awaiting approval to execute (Apr 27, 7:05 PM)
-S56 Completar la migración de credenciales en booking-titanium-wm: eliminar todos los wmill_adapter.get_variable() y reemplazar con inyección de parámetros Windmill en todas las funciones main() (Apr 27, 7:14 PM)
-### Apr 28, 2026
-S57 Zero Any refactoring plan validation — eliminate all 38 mypy --strict errors in booking-titanium-wm project without disabling rules or using type: ignore (Apr 28, 8:08 AM)
-S58 Debug why Telegram /start command never reaches the booking-titanium-wm Windmill webhook, and fix the connection (Apr 28, 6:41 PM)
-### Apr 29, 2026
-S60 User confirmed enabling includeTriggers: true in wmill.yaml to prevent future webhook loss (Apr 29, 6:21 PM)
-206 6:33p 🔴 flow.yaml First Module Changed from External Script Reference to Inline rawscript
-207 " 🟣 Flow f/flows/telegram_webhook Updated in Production — 9 Changes Including rawscript Fix
-208 " 🔵 New Error — pydantic 2.13.3 Requires typing_inspection Module Not in Lock File
-209 " 🔴 Added typing_inspection==0.4.2 to telegram_webhook_trigger Lock File
-210 6:34p 🔴 Telegram Webhook Flow Now Accepts Messages Without Error — HTTP 200 with Job UUID
-211 " 🔵 get_conversation_state Step Fails — TypeIs Unavailable in Windmill's Python 3.12.12
-212 " 🔴 Fixed TypeIs Import for Python 3.12 Compatibility in _wmill_adapter.py
-213 " 🔵 _wmill_adapter.py Fix Not Applied — Windmill Worker Uses Cached Old Version
-214 6:35p 🔴 TypeIs Import Bug Found in booking_fsm/_fsm_machine.py — Same Python 3.12 Compatibility Issue
-215 " 🔴 Fixed TypeIs Import in booking_fsm/_fsm_machine.py for Python 3.12 Compatibility
-216 " 🔴 Telegram Webhook Flow Now Completes Successfully End-to-End
-217 6:36p 🔴 Third TypeIs Fix Applied to f/internal/_result.py — All Python 3.12 Compatibility Issues Now Resolved
-218 " 🔵 Gate Scripts in flow.yaml Still Use type: script with Path References — Same Pattern as Original webhook_trigger Bug
-219 6:37p 🔴 Gate Script gate_skip_if_router_handled Converted to rawscript Inline in flow.yaml
-220 " 🔴 Gate Script Embedded Directly as Literal Content in flow.yaml — No File Reference Needed
-221 " 🔴 Full Webhook Flow Completes Successfully — success: true on Every Test
-222 6:38p 🔵 execute_action Step Fails — Booking Orchestrator Flow Path Has Same __flow Suffix Mismatch
-223 " 🔴 Fixed Booking Orchestrator Sub-Flow Path — Removed __flow Suffix in flow.yaml Reference
-224 6:39p 🔵 Flow Progresses to send_telegram_response — JavaScript Expression Bug When ai_agent Returns Null
-225 " 🔴 Fixed Null Safety Bug in send_telegram_response JavaScript Expression
-226 " 🔴 Telegram Webhook Flow Fully Fixed — success: True, error: NONE on All Tests
-227 " 🔵 Flow Returns Coroutine Object String — telegram_send/main.py Not Properly Awaited
-228 " 🔵 telegram_send/main.py Is Correctly Async — Coroutine String Came from a Different Step
-230 " 🔵 Telegram Bot Token Is Valid — Health Check Returns Healthy via Windmill API
-229 6:41p 🔵 Coroutine Object String Is a Systemic Issue — Even health_check/main Returns It via wmill script run
-231 6:42p ⚖️ User confirmed: enable includeTriggers in wmill.yaml
-S61 Complete Telegram webhook restoration and prevent future loss — all fixes committed, includeTriggers enabled (Apr 29, 6:42 PM)
-S59 Diagnose and repair Telegram→Windmill webhook connectivity after server migration, then investigate why the previous configuration was lost (Apr 29, 6:42 PM)
-232 7:14p 🔵 Telegram /start triggers coroutine string output in Windmill run logs
-233 " 🔵 All flow scripts use async def main() — systemic coroutine issue across entire /start path
-234 7:15p 🔵 Flow internals: Redis-backed conversation state with FSM routing in telegram_webhook flow
-### Apr 30, 2026
-235 8:21a 🔵 Pending Debug Task: Telegram→Booking Flow Integration
-236 " 🔵 Telegram Booking Flow: Redis FSM Integration Completed (Prior Session)
-237 " 🔵 Windmill Debug Tools: scripts/debug-windmill.sh and Known Fix History
-238 " 🔵 telegram_send Token Resolution: Three-Level Fallback with Windmill get_variable
-239 8:22a 🔵 telegram_webhook__flow Full Architecture: 8-Step Flow with FSM Router Gate
-241 " 🔵 All Internal Flow Scripts WM-01 Compliant: sync def main + async _main_async Pattern
-242 " 🔴 Fixed async def main in telegram_webhook flow.yaml inline script
-243 " 🔵 Fix to telegram_webhook flow.yaml did not persist — async def main still present
-240 " 🔵 WM-01 Violation: Inline async def main in telegram_webhook__flow gate step
-244 8:47a 🔵 telegram_webhook flow.yaml edit not persisting — possible file regeneration loop
-245 " 🔵 Ruff auto-fix resolved 1 of 160 errors; 159 require manual fixes
-246 8:48a 🔵 Ruff 159 remaining errors dominated by F401 unused imports in test __pycache__ files
-247 " 🔵 Ruff error breakdown: systemic F401 in test __init__.py files and UP036 in production code
-248 " 🔵 Ruff config in pyproject.toml lacks __pycache__ exclusion; 58 of 159 errors from cache files
-249 " 🔵 Current session's changes reduced ruff errors from 713 to 159 — a 78% reduction
-250 8:49a 🔵 Massive scope of unstaged changes: ~50+ Windmill scripts and all tests modified in current branch
-251 " 🔵 Only 3 ruff errors exist in production source code — all UP036 in internal utilities
-252 " 🔵 UP036 version blocks are dead code — both branches import identical TypeIs
-253 " 🔴 Fixed UP036 ruff violations in 3 internal files by removing redundant sys.version_info guards
-254 " 🔴 All 3 UP036 ruff violations fixed — production source code is now fully ruff-clean
-255 8:50a 🔵 All quality gates pass: 284 tests, 0 ruff errors in source, 0 mypy --strict errors across 206 files
-S62 Read AGENTS.md and continue pending task from yesterday — fixing async def main in Windmill flow inline scripts and ruff/mypy linting cleanup (Apr 30, 8:50 AM)
+### May 6, 2026
+S88 Add client overlap validation to prevent double-booking with multiple providers at same time (May 6, 5:55 PM)
+S89 Store frontend role-based permission matrix (client, provider, admin, superuser) in persistent memory to preserve scope (May 6, 6:05 PM)
+S90 Fix booking system validation: verify existing appointments before showing available doctor slots (May 6, 6:25 PM)
+458 7:01p 🔵 Missing Appointment Query Feature Blocks Conflict Validation
+459 " 🟣 Active Booking Detection Query Added to Prefetch Service
+460 7:02p 🔴 Business Rule Validation: Block Doctor Selection if Client Has Active Booking
+461 " ✅ Windmill Entrypoint Updated to Accept and Forward client_id
+462 " ✅ RouterInput Model Extended with prefetch_block_reason Field
+463 " 🟣 Router Implements User-Facing Error Handling for Active Booking Conflicts
+464 " ✅ Flow Configured to Pass client_id to Booking Prefetch Service
+465 " ✅ Router Input Updated to Receive prefetch_block_reason from Flow
+466 7:03p ✅ Changes Validated and Deployed to Production
+S91 Fix booking system that adds 40-minute wait time to first slot; reservations should start at 9:00 AM instead of 9:40 AM. Delete current reservations and reset for tomorrow. (May 6, 7:03 PM)
+467 7:22p 🔵 Buffer time added to service duration causing 40-minute booking offset
+468 7:23p 🔵 Python 3.12 import compatibility error in internal adapter module
+469 " 🔵 TypeIs type guard used across multiple internal modules
+470 " 🔴 Add typing_extensions fallback for TypeIs import compatibility
+471 " 🔴 Apply TypeIs import fallback to FSM state machine module
+473 " 🔴 Type checking passes successfully after removing unnecessary ignore comments
+474 7:24p ✅ TypeIs compatibility fix deployed to Windmill workspace
+475 " 🔵 Deployed TypeIs fix not reflected in Windmill worker execution
+476 7:25p 🔵 Services table shows 10-minute buffer, not 40-minute delay reported by user
+478 " ✅ Old test booking and audit record deleted from database
+479 7:26p 🔴 Remove buffer addition from slot duration calculation in scheduling logic
+480 " ✅ Scheduling buffer fix deployed to Windmill workspace
+S92 Diagnose and fix why booking system won't offer appointments for today despite available hours remaining; implement proper buffer time spacing in slot generation. (May 6, 7:26 PM)
+481 7:30p 🔵 Booking system has no test providers or configured schedules
+482 " 🔵 Roger Gallegos provider is configured with working schedule but only for Thursday
+483 7:32p 🔴 Slot generation now respects buffer time between appointments
+484 " ✅ Availability engine now calculates and passes buffer spacing to slot generation
+485 " 🔵 Slot generation correctly produces 13 appointments for Thursday with 40-minute spacing
+486 " ✅ Buffer spacing fix deployed to production Windmill workspace
+S93 Fix booking confirmation flow - system wasn't allowing appointment confirmation for same-day bookings with remaining hours (May 6, 7:33 PM)
+487 7:38p 🔵 Booking system database state and FSM confirmation flow verified
+488 7:40p 🔴 FSM ConfirmingState now handles numeric button inputs for booking confirmation
+489 " ✅ FSM confirmation state fix deployed to Windmill
+S94 Implement "mis citas" (my appointments) feature for Telegram bot to show clients their active appointments with doctor, date/time, and reference ID. Web frontend enhancements (like appointment history) noted as separate work. (May 6, 7:40 PM)
+490 8:58p 🔵 Mis Citas (My Appointments) Module Currently Stubbed
+491 " 🔵 Booking System Data Structure for Mis Citas Implementation
+492 " 🟣 Added Database Access Parameters to Telegram Router
+493 8:59p 🟣 Implemented Mis Citas (My Appointments) Feature in Telegram Router
+494 " ✅ Activated Mis Citas Feature Handler
+495 " ✅ Wired Client ID and Database URL Through Telegram Webhook Flow
+496 " 🔵 Telegram Router Type Safety Verified
+497 " ✅ Mis Citas Feature Deployed to Windmill
+S95 Format booking reference IDs with dash grouping (F13E0DEF → F1-3E0-DEF) for improved readability across all user-facing messages (May 6, 9:00 PM)
+498 9:04p 🔵 Short ID reference generation mapped across booking system
+499 9:05p 🔵 Telegram webhook flow references booking short ID in display template
+500 " 🟣 Booking reference formatting with grouped display
+501 " 🟣 Booking confirmation reference formatting applied
+502 " 🟣 Reminder cron reference formatting applied
+503 9:06p ✅ Reference formatting changes deployed to Windmill
+S96 Create and save a detailed implementation plan for improving the Reminder Module menu in booking-titanium-wm, optimized for LLM readability and continuation in future sessions. (May 6, 9:06 PM)
+504 9:18p 🔵 Existing Reminder System Architecture and Preferences Storage
+505 " 🔵 Reminder Configuration UI and Message Handler Pattern
+506 9:19p 🔵 Hardcoded Reminder Windows and Current Notification Dispatch Pattern
+507 9:21p ⚖️ Comprehensive Reminder System Refactoring Plan: Expandable Windows, Channel Abstraction, Telegram UI Integration
+508 9:31p ⚖️ Reminder Module Expansion Plan — 7-Window Architecture with Quiet Hours
+S97 User initiated primary session with greeting "hi" (May 6, 10:03 PM)
+### May 7, 2026
+509 11:27a ⚖️ Critical review and architectural revision of reminder menu improvement plan
 
-Access 187k tokens of past work via get_observations([IDs]) or mem-search skill.
+Access 202k tokens of past work via get_observations([IDs]) or mem-search skill.
 </claude-mem-context>

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from ..internal._result import DBClient, Result, ok
@@ -36,8 +36,8 @@ async def get_provider_agenda(db: DBClient, input_data: AgendaInput) -> Result[l
 
         if not isinstance(st_raw, datetime) or not isinstance(et_raw, datetime):
             # Fallback for string dates in some environments/mocks
-            st = datetime.fromisoformat(str(st_raw).replace("Z", "+00:00")) if st_raw else datetime.now()
-            et = datetime.fromisoformat(str(et_raw).replace("Z", "+00:00")) if et_raw else datetime.now()
+            st = datetime.fromisoformat(str(st_raw).replace("Z", "+00:00")) if st_raw else datetime.now(UTC)
+            et = datetime.fromisoformat(str(et_raw).replace("Z", "+00:00")) if et_raw else datetime.now(UTC)
         else:
             st = st_raw
             et = et_raw

@@ -5,7 +5,14 @@ from typing import Literal, cast
 
 from .._nlu_cache import get_nlu_rule
 from ._ai_agent_models import AvailabilityContext, ConversationState, EntityMap, EscalationLevel
-from ._constants import INTENT
+from ._constants import (
+    FAREWELL_PHRASES,
+    FAREWELLS,
+    GREETING_PHRASES,
+    GREETINGS,
+    INTENT,
+    URGENCY_WORDS,
+)
 
 # ============================================================================
 # CONTEXT-AWARE INTENT ADJUSTMENT
@@ -45,7 +52,7 @@ def adjust_intent_with_context(
             "reason": f"Context: user wants to exit current flow ({state.active_flow})",
         }
 
-    if state.active_flow == "booking_wizard" and lower in ["si", "sí", "confirmar", "confirmo", "yes"]:
+    if state.active_flow == "booking_wizard" and lower in ["s", "y", "si", "sí", "confirmar", "confirmo", "yes"]:
         return {
             "adjusted": True,
             "intent": INTENT["CREAR_CITA"],
@@ -75,7 +82,7 @@ def extract_entities(text: str) -> EntityMap:
         "reminder_window": None,
     }
 
-    relative_dates = get_nlu_rule("relative_dates", [])
+    relative_dates: list[str] = get_nlu_rule("relative_dates", [])
     for rel in relative_dates:
         if rel in lower_text:
             data["date"] = rel
@@ -94,7 +101,7 @@ def extract_entities(text: str) -> EntityMap:
                 break
 
     if not data["date"]:
-        day_names = get_nlu_rule("day_names", {})
+        day_names: dict[str, str] = get_nlu_rule("day_names", {})
         for day in day_names:
             if day in lower_text:
                 data["date"] = day
@@ -121,7 +128,7 @@ def extract_entities(text: str) -> EntityMap:
             data["provider_name"] = f"Dr. {m.group(1)}"
             break
 
-    service_types = get_nlu_rule("service_types", [])
+    service_types: list[str] = get_nlu_rule("service_types", [])
     for service in service_types:
         if service in lower_text:
             data["service_type"] = service
@@ -142,10 +149,10 @@ def detect_context(text: str, entities: EntityMap) -> AvailabilityContext:
     is_today = "hoy" in lower or entities.date == "hoy"
     is_tomorrow = any(x in lower for x in ["mañana", "manana"]) or entities.date == "mañana"
 
-    urgency_words = get_nlu_rule("urgency_words", [])
+    urgency_words: list[str] = get_nlu_rule("urgency_words", []) or URGENCY_WORDS
     is_urgent = any(w in lower for w in urgency_words)
 
-    flex_keywords = get_nlu_rule("flexibility_keywords", [])
+    flex_keywords: list[str] = get_nlu_rule("flexibility_keywords", [])
     is_flexible = any(w in lower for w in flex_keywords)
 
     time_pref: Literal["morning", "afternoon", "evening", "any"] = "any"
@@ -157,7 +164,7 @@ def detect_context(text: str, entities: EntityMap) -> AvailabilityContext:
         time_pref = "evening"
 
     day_pref = None
-    day_names = get_nlu_rule("day_names", {})
+    day_names: dict[str, str] = get_nlu_rule("day_names", {})
     for day, full in day_names.items():
         if day in lower:
             day_pref = full
@@ -219,10 +226,10 @@ def generate_ai_response(
 def detect_social(text: str) -> tuple[str, float] | None:
     lower = text.lower().strip()
 
-    greetings = get_nlu_rule("greetings", [])
-    greeting_phrases = get_nlu_rule("greeting_phrases", [])
-    farewells = get_nlu_rule("farewells", [])
-    farewell_phrases = get_nlu_rule("farewell_phrases", [])
+    greetings: list[str] = get_nlu_rule("greetings", []) or GREETINGS
+    greeting_phrases: list[str] = get_nlu_rule("greeting_phrases", []) or GREETING_PHRASES
+    farewells: list[str] = get_nlu_rule("farewells", []) or FAREWELLS
+    farewell_phrases: list[str] = get_nlu_rule("farewell_phrases", []) or FAREWELL_PHRASES
 
     if lower in greetings:
         return cast("tuple[str, float]", (INTENT["SALUDO"], 0.95))

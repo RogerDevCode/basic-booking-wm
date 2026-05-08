@@ -19,6 +19,18 @@ def _make_input(**kwargs: object) -> OrchestratorInput:
     return OrchestratorInput.model_validate(base)
 
 
+def _make_delegates(**overrides: object) -> dict[str, AsyncMock]:
+    d: dict[str, AsyncMock] = {
+        "book_create": AsyncMock(return_value={}),
+        "book_cancel": AsyncMock(return_value={}),
+        "book_reschedule": AsyncMock(return_value={}),
+        "availability_check": AsyncMock(return_value={}),
+    }
+    for k, v in overrides.items():
+        d[k] = v  # type: ignore[assignment]
+    return d
+
+
 @pytest.mark.asyncio
 async def test_handle_cancel_booking_no_id_delegates_to_get_my_bookings() -> None:
     conn = AsyncMock()
@@ -32,7 +44,7 @@ async def test_handle_cancel_booking_no_id_delegates_to_get_my_bookings() -> Non
         AsyncMock(return_value=mock_result),
     ) as mock_list:
         input_data = _make_input()
-        err, result = await handle_cancel_booking(conn, input_data)
+        err, result = await handle_cancel_booking(conn, input_data, _make_delegates())
 
         assert err is None
         assert result is not None
@@ -47,17 +59,18 @@ async def test_handle_cancel_booking_with_id_calls_cancel_module_successfully() 
     conn = AsyncMock()
     input_data = _make_input(booking_id="booking-abc-123")
 
-    with patch(
-        "f.booking_orchestrator.handlers._cancel.cancel_booking",
-        AsyncMock(return_value=(None, {"booking_id": "booking-abc-123", "status": "cancelled"})),
-    ):
-        err, result = await handle_cancel_booking(conn, input_data)
+    delegates = _make_delegates(
+        book_cancel=AsyncMock(return_value={"booking_id": "booking-abc-123", "status": "cancelled"}),
+    )
 
-        assert err is None
-        assert result is not None
-        assert result["action"] == "cancelar_cita"
-        assert result["success"] is True
-        assert "✅" in result["message"]
+    err, result = await handle_cancel_booking(conn, input_data, delegates)
+
+    assert err is None
+    assert result is not None
+    assert result["action"] == "cancelar_cita"
+    assert result["success"] is True
+    assert "✅" in result["message"]
+    delegates["book_cancel"].assert_awaited_once()
 
 
 @pytest.mark.asyncio
@@ -65,13 +78,13 @@ async def test_handle_cancel_booking_cancel_failure_sets_success_false() -> None
     conn = AsyncMock()
     input_data = _make_input(booking_id="booking-xyz")
 
-    with patch(
-        "f.booking_orchestrator.handlers._cancel.cancel_booking",
-        AsyncMock(return_value=(Exception("Booking not found"), None)),
-    ):
-        err, result = await handle_cancel_booking(conn, input_data)
+    delegates = _make_delegates(
+        book_cancel=AsyncMock(side_effect=Exception("Booking not found")),
+    )
 
-        assert err is None
-        assert result is not None
-        assert result["success"] is False
-        assert "❌" in result["message"]
+    err, result = await handle_cancel_booking(conn, input_data, delegates)
+
+    assert err is None
+    assert result is not None
+    assert result["success"] is False
+    assert "❌" in result["message"]

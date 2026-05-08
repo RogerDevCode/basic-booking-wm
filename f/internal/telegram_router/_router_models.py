@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from typing import Any
-
 from pydantic import BaseModel, ConfigDict
+
+from ...reminder_config._config_models import InlineButton  # noqa: TC001
 
 
 class RouterInput(BaseModel):
@@ -10,18 +10,23 @@ class RouterInput(BaseModel):
 
     chat_id: str
     user_input: str
-    state: dict[str, Any] | None = None
-    items: list[dict[str, Any]] | None = None
+    state: dict[str, object] | None = None
+    items: list[dict[str, object]] | None = None
     phone: str | None = None
     client_name: str | None = None
+    prefetch_block_reason: str | None = None
+    client_id: str | None = None
+    pg_url: str | None = None
+    callback_message_id: int | None = None
 
 
 class RouterResult(BaseModel):
     model_config = ConfigDict(strict=True)
     handled: bool
     response_text: str | None = None
-    nextState: dict[str, Any] | None = None
-    nextDraft: dict[str, Any] | None = None
-    inline_buttons: list[dict[str, Any]] | None = None
+    nextState: dict[str, object] | None = None
+    nextDraft: dict[str, object] | None = None
+    inline_buttons: list[list[InlineButton]] | None = None
     active_flow: str | None = None
     registration_data: dict[str, str | None] | None = None
+    edit_message: bool = False

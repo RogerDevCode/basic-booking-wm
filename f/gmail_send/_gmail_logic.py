@@ -75,12 +75,29 @@ def build_email_content(
             {"<p><strong>Motivo:</strong> " + reason + "</p>" if reason else ""}
             <p style="color: #666;">Si deseas agendar una nueva cita, contáctanos por Telegram o responde a este correo.</p>"""  # noqa: E501
 
-    elif message_type == "reminder_24h":
-        subject = "⏰ Recordatorio: Tu cita es mañana"
+    elif message_type in {
+        "reminder_1day",
+        "reminder_24h",
+        "reminder_12h",
+        "reminder_6h",
+        "reminder_2h",
+        "reminder_1h",
+        "reminder_30min",
+    }:
+        subject_map = {
+            "reminder_1day": "⏰ Recordatorio: Tu cita es mañana",
+            "reminder_24h": "⏰ Recordatorio: Tu cita es en 24 horas",
+            "reminder_12h": "⏰ Recordatorio: Tu cita es en 12 horas",
+            "reminder_6h": "⏰ Recordatorio: Tu cita es en 6 horas",
+            "reminder_2h": "⏰ Recordatorio: Tu cita es en 2 horas",
+            "reminder_1h": "⏰ Recordatorio: Tu cita es en 1 hora",
+            "reminder_30min": "⏰ Recordatorio: Tu cita es en 30 minutos",
+        }
+        subject = subject_map[message_type]
         icon = "⏰"
         color = "#2196F3"
         body = f"""<h2 style="color: {color};">Recordatorio de Cita</h2>
-            <p style="font-size: 18px;">Tu cita es <strong>mañana</strong>:</p>
+            <p style="font-size: 18px;">No olvides tu próxima cita:</p>
             <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
               <tr><td style="padding: 8px 0; font-weight: bold;">📅 Fecha:</td><td>{date}</td></tr>
               <tr><td style="padding: 8px 0; font-weight: bold;">🕐 Hora:</td><td>{time_val}</td></tr>
@@ -121,7 +138,6 @@ def build_email_content(
 async def send_with_retry(
     smtp_config: dict[str, object], from_addr: str, to_addr: str, subject: str, html: str, max_retries: int = 3
 ) -> tuple[Exception | None, str | None]:
-
     last_err: Exception | None = None
     for attempt in range(max_retries):
         try:

@@ -169,7 +169,7 @@ def normalize(text: str) -> list[str]:
     text = re.sub(r"[?¿!¡.,;:()]", " ", text)
     tokens = text.split()
 
-    typo_map = get_nlu_rule("normalization_map", {})
+    typo_map = cast("dict[str, str]", get_nlu_rule("normalization_map", {}))
     result = []
     for t in tokens:
         t = typo_map.get(t, t)
@@ -243,7 +243,7 @@ def classify_intent(text: str) -> TfIdfResult:
     corpus = {}
     for intent in intent_keys:
         rule_key = f"intent_keywords_{intent}"
-        data = get_nlu_rule(rule_key, {"keywords": []})
+        data: dict[str, list[str]] = get_nlu_rule(rule_key, {"keywords": []})
         corpus[intent] = data.get("keywords", [])
 
     m = TfIdfModel(cast("dict[str, list[str]]", corpus))
