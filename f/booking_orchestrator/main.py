@@ -9,14 +9,16 @@
 #   "beartype>=0.19.0",
 #   "returns>=0.24.0",
 #   "redis>=7.4.0",
-#   "typing-extensions>=4.12.0",
-#   "wmill>=1.0.0"
+#   "typing-extensions>=4.12.0"
 # ]
 # ///
 from __future__ import annotations
 
-from collections.abc import Mapping
-from typing import TYPE_CHECKING
+import asyncio
+import traceback
+from collections.abc import Callable, Coroutine, Mapping
+from typing import TYPE_CHECKING, Any, cast
+from pydantic import BaseModel
 
 from ..internal._db_client import create_db_client
 from ..internal._wmill_adapter import log
@@ -28,6 +30,11 @@ from .handlers._create import handle_create_booking
 from .handlers._get_my_bookings import handle_get_my_bookings
 from .handlers._list_available import handle_list_available
 from .handlers._reschedule import handle_reschedule
+
+from ..booking_create.main import main_async as booking_create_async
+from ..booking_cancel.main import main_async as booking_cancel_async
+from ..booking_reschedule.main import main_async as booking_reschedule_async
+from ..availability_check.main import main_async as availability_check_async
 
 if TYPE_CHECKING:
     from ..internal._result import Result
@@ -55,24 +62,13 @@ HANDLER_MAP: dict[str, OrchestratorHandler] = {
 }
 
 
-from collections.abc import Callable, Coroutine
-from typing import Any
-
-
 def _build_default_delegates() -> dict[str, Callable[..., Coroutine[Any, Any, Any]]]:
-    """Build default delegates using Windmill task_script proxies.
-
-    Called lazily to avoid top-level side-effects (LAW-10).
-    Only invoked when _main_async is called without explicit delegates (e.g. in tests
-    that do not care about cross-script isolation).
-    """
-    from wmill import task_script as _ts
-
+    """Build default delegates using direct async function references."""
     return {
-        "book_create": _ts("f/booking_create/main", timeout=30),
-        "book_cancel": _ts("f/booking_cancel/main", timeout=30),
-        "book_reschedule": _ts("f/booking_reschedule/main", timeout=30),
-        "availability_check": _ts("f/availability_check/main", timeout=30),
+        "book_create": booking_create_async,
+        "book_cancel": booking_cancel_async,
+        "book_reschedule": booking_reschedule_async,
+        "availability_check": availability_check_async,
     }
 
 
@@ -80,8 +76,7 @@ async def _main_async(
     args: dict[str, object],
     delegates: Mapping[str, Callable[..., Coroutine[Any, Any, Any]]] | None = None,
 ) -> Result[OrchestratorResult]:
-    """Core orchestration logic. `delegates` are injected by the @workflow entrypoint
-    (or mocked in unit tests). If omitted, production task_script proxies are used."""
+    """Core orchestration logic. `delegates` are injected by the entrypoint."""
     resolved_delegates: Mapping[str, Callable[..., Coroutine[Any, Any, Any]]] = (
         delegates if delegates is not None else _build_default_delegates()
     )
@@ -133,8 +128,6 @@ async def _main_async(
         return None, result
 
     except Exception as e:
-        import traceback
-
         tb = traceback.format_exc()
         log("Unexpected orchestrator error", error=str(e), traceback=tb, module=MODULE)
         return Exception(f"Internal orchestrator error: {e}"), None
@@ -142,32 +135,11 @@ async def _main_async(
         await conn.close()
 
 
-from wmill import task_script, workflow
-
-book_create = task_script("f/booking_create/main", timeout=30)
-book_cancel = task_script("f/booking_cancel/main", timeout=30)
-book_reschedule = task_script("f/booking_reschedule/main", timeout=30)
-availability_check = task_script("f/availability_check/main", timeout=30)
-
-
-@workflow  # type: ignore
-async def main(telegram_chat_id: str, intent: str, entities: dict[str, object] | None = None) -> dict[str, object]:
-    import traceback
-    from typing import cast
-
-    from pydantic import BaseModel
-
+def main(telegram_chat_id: str, intent: str, entities: dict[str, object] | None = None) -> dict[str, object]:
     try:
         args: dict[str, object] = {"telegram_chat_id": telegram_chat_id, "intent": intent, "entities": entities or {}}
 
-        delegates = {
-            "book_create": book_create,
-            "book_cancel": book_cancel,
-            "book_reschedule": book_reschedule,
-            "availability_check": availability_check,
-        }
-
-        err, result = await _main_async(args, delegates)
+        err, result = asyncio.run(_main_async(args, _build_default_delegates()))
         if err:
             raise err
 
@@ -184,8 +156,6 @@ async def main(telegram_chat_id: str, intent: str, entities: dict[str, object] |
     except Exception as e:
         tb = traceback.format_exc()
         try:
-            from ..internal._wmill_adapter import log
-
             log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=MODULE)
         except Exception:
             pass

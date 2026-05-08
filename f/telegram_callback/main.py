@@ -9,11 +9,16 @@
 #   "beartype>=0.19.0",
 #   "returns>=0.24.0",
 #   "redis>=7.4.0",
-#   "typing-extensions>=4.12.0",
-#   "wmill>=1.0.0"
+#   "typing-extensions>=4.12.0"
 # ]
 # ///
 from __future__ import annotations
+
+import asyncio
+import traceback
+from typing import TYPE_CHECKING, Any, cast
+from collections.abc import Callable, Coroutine
+from pydantic import BaseModel
 
 # ============================================================================
 # PRE-FLIGHT CHECKLIST
@@ -25,21 +30,17 @@ from __future__ import annotations
 # RLS Tenant ID   : YES — with_tenant_context wraps all DB ops
 # Pydantic Schemas: YES — InputSchema validates callback_data format
 # ============================================================================
-from typing import TYPE_CHECKING
 
-from ..internal._wmill_adapter import get_variable
+from ..internal._wmill_adapter import get_variable, log
 from ._callback_logic import answer_callback_query, parse_callback_data, send_followup_message
 from ._callback_models import ActionContext, InputSchema
-from ._callback_router import AcknowledgeHandler, CancelHandler, ConfirmHandler, TelegramRouter
+from ._callback_router import AcknowledgeHandler, AutoRescheduleHandler, CancelHandler, ConfirmHandler, TelegramRouter
+from ..booking_reschedule.main import main_async as booking_reschedule_async
 
 if TYPE_CHECKING:
     from ..internal._result import Result
 
 MODULE = "telegram_callback"
-
-
-from collections.abc import Callable, Coroutine
-from typing import Any
 
 
 async def _main_async(
@@ -77,8 +78,6 @@ async def _main_async(
     router.register("confirm", ConfirmHandler())
     router.register("cancel", CancelHandler())
     router.register("acknowledge", AcknowledgeHandler())
-    from ._callback_router import AutoRescheduleHandler
-
     router.register("auto_reschedule", AutoRescheduleHandler(book_reschedule_fn))
 
     context: ActionContext = {
@@ -111,25 +110,14 @@ async def _main_async(
     return None, res
 
 
-from wmill import task_script, workflow
-
-book_reschedule = task_script("f/booking_reschedule/main", timeout=30)
-
-
-@workflow  # type: ignore
-async def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
-    import traceback
-    from typing import cast
-
-    from pydantic import BaseModel
-
+def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
     try:
         if isinstance(args, InputSchema):
             validated = args
         else:
             validated = InputSchema.model_validate(args)
 
-        err, result = await _main_async(validated.model_dump(), book_reschedule)
+        err, result = asyncio.run(_main_async(validated.model_dump(), booking_reschedule_async))
         if err:
             raise err
 
@@ -146,8 +134,6 @@ async def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
     except Exception as e:
         tb = traceback.format_exc()
         try:
-            from ..internal._wmill_adapter import log
-
             log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=MODULE)
         except Exception:
             pass

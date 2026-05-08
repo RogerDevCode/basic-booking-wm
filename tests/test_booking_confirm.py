@@ -13,7 +13,7 @@ sys.modules["wmill"] = wmill_mock
 
 import pytest
 
-from f.internal.booking_confirm.main import main
+from f.internal.booking_confirm.main import _main_async
 
 if TYPE_CHECKING:
     from contextlib import AbstractContextManager
@@ -46,13 +46,13 @@ def _make_booking_create_mock(
     err: object = None,
     result: dict[str, object] | None = None,
 ) -> Iterator[MagicMock]:
-    async def _fake_booking_create(args: dict[str, object]) -> dict[str, object]:
+    async def _fake_booking_create(args: dict[str, object]) -> tuple[object, dict[str, object] | None]:
         if err:
-            return {"error": str(err)}
-        return {"data": result} if result else {}
+            return Exception(str(err)), None
+        return None, result
 
     # Patch the global book_create task_script proxy directly
-    with patch("f.internal.booking_confirm.main.book_create", side_effect=_fake_booking_create) as m:
+    with patch("f.internal.booking_confirm.main.booking_create_async", side_effect=_fake_booking_create) as m:
         yield m
 
 
@@ -81,7 +81,7 @@ class TestBookingConfirmServiceResolution:
     async def test_no_service_for_provider_returns_error(self) -> None:
         """When no active service exists for provider, returns success=False."""
         with _patch_resolve_service(None):
-            result = await main(
+            result = await _main_async(
                 client_id=_CLIENT_ID,
                 provider_id=_PROVIDER_ID,
                 start_time=_START_TIME,
@@ -96,7 +96,7 @@ class TestBookingConfirmServiceResolution:
         """_resolve_service_id is called with the correct provider_id."""
         mock_resolve = AsyncMock(return_value=None)
         with patch("f.internal.booking_confirm.main._resolve_service_id", mock_resolve):
-            await main(
+            await _main_async(
                 client_id=_CLIENT_ID,
                 provider_id=_PROVIDER_ID,
                 start_time=_START_TIME,
@@ -123,7 +123,7 @@ class TestBookingConfirmDelegation:
             "client_name": "Ana García",
         }
         with _patch_resolve_service(_SERVICE_ID), _make_booking_create_mock(result=booking_result):
-            result = await main(
+            result = await _main_async(
                 client_id=_CLIENT_ID,
                 provider_id=_PROVIDER_ID,
                 start_time=_START_TIME,
@@ -139,7 +139,7 @@ class TestBookingConfirmDelegation:
     async def test_booking_create_failure_returns_error(self) -> None:
         """When booking_create returns an error, success=False with error message."""
         with _patch_resolve_service(_SERVICE_ID), _make_booking_create_mock(err=Exception("slot_taken")):
-            result = await main(
+            result = await _main_async(
                 client_id=_CLIENT_ID,
                 provider_id=_PROVIDER_ID,
                 start_time=_START_TIME,
@@ -153,7 +153,7 @@ class TestBookingConfirmDelegation:
     async def test_booking_create_returns_none_result(self) -> None:
         """When booking_create returns (None, None), success=False with sentinel error."""
         with _patch_resolve_service(_SERVICE_ID), _make_booking_create_mock(err=None, result=None):
-            result = await main(
+            result = await _main_async(
                 client_id=_CLIENT_ID,
                 provider_id=_PROVIDER_ID,
                 start_time=_START_TIME,
@@ -168,25 +168,23 @@ class TestBookingConfirmDelegation:
         """Idempotency key is formatted as 'tg:{chat_id}:{start_time}'."""
         captured_args: list[dict[str, object]] = []
 
-        async def _capture(args: dict[str, object]) -> dict[str, object]:
+        async def _capture(args: dict[str, object]) -> tuple[object, dict[str, object] | None]:
             captured_args.append(args)
-            return {
-                "data": {
-                    "booking_id": _BOOKING_ID,
-                    "provider_name": "P",
-                    "service_name": "S",
-                    "start_time": _START_TIME,
-                    "status": "pending",
-                    "end_time": "2026-06-01T10:30:00+00:00",
-                    "client_name": "C",
-                }
+            return None, {
+                "booking_id": _BOOKING_ID,
+                "provider_name": "P",
+                "service_name": "S",
+                "start_time": _START_TIME,
+                "status": "pending",
+                "end_time": "2026-06-01T10:30:00+00:00",
+                "client_name": "C",
             }
 
         with (
             _patch_resolve_service(_SERVICE_ID),
-            patch("f.internal.booking_confirm.main.book_create", side_effect=_capture),
+            patch("f.internal.booking_confirm.main.booking_create_async", side_effect=_capture),
         ):
-            await main(
+            await _main_async(
                 client_id=_CLIENT_ID,
                 provider_id=_PROVIDER_ID,
                 start_time=_START_TIME,
@@ -201,25 +199,23 @@ class TestBookingConfirmDelegation:
         """booking_create is called with channel='telegram' and actor='client'."""
         captured_args: list[dict[str, object]] = []
 
-        async def _capture(args: dict[str, object]) -> dict[str, object]:
+        async def _capture(args: dict[str, object]) -> tuple[object, dict[str, object] | None]:
             captured_args.append(args)
-            return {
-                "data": {
-                    "booking_id": _BOOKING_ID,
-                    "provider_name": "P",
-                    "service_name": "S",
-                    "start_time": _START_TIME,
-                    "status": "pending",
-                    "end_time": "2026-06-01T10:30:00+00:00",
-                    "client_name": "C",
-                }
+            return None, {
+                "booking_id": _BOOKING_ID,
+                "provider_name": "P",
+                "service_name": "S",
+                "start_time": _START_TIME,
+                "status": "pending",
+                "end_time": "2026-06-01T10:30:00+00:00",
+                "client_name": "C",
             }
 
         with (
             _patch_resolve_service(_SERVICE_ID),
-            patch("f.internal.booking_confirm.main.book_create", side_effect=_capture),
+            patch("f.internal.booking_confirm.main.booking_create_async", side_effect=_capture),
         ):
-            await main(
+            await _main_async(
                 client_id=_CLIENT_ID,
                 provider_id=_PROVIDER_ID,
                 start_time=_START_TIME,
