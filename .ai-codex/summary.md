@@ -875,7 +875,7 @@
 - ⚡ `async_fn` `route` (L141)
 
 ### `f/telegram_callback/main.py`
-- 🔧 `fn` `main` (L113)
+- 🔧 `fn` `main` (L114)
 
 ### `f/telegram_gateway/_gateway_logic.py`
 - 📦 `class` `TelegramClient` (L14)

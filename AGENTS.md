@@ -20,6 +20,9 @@ LAW-07  Pydantic v2 strict @ ALL BOUNDARIES
 LAW-08  NO dict CROSSING FN BOUNDARIES  
 LAW-09  FAIL = EXCEPTION (NO STATUS OBJECTS)  
 LAW-10  NO SIDE-EFFECTS @ TOP LEVEL  
+LAW-11  ZERO REMOTE OVERHEAD → NO internal task_script  
+LAW-12  TOP-LEVEL IMPORTS ONLY → NO lazy imports  
+LAW-13  ONE EVENT LOOP → NO asyncio.run inside main_async  
 
 ---
 
@@ -282,6 +285,8 @@ BANNED-04 error dict return
 BANNED-05 live calls in tests  
 BANNED-06 mutable defaults  
 BANNED-07 Any leakage  
+BANNED-08 task_script for internal module calls  
+BANNED-09 "Error." or placeholder strings in logic  
 
 ---
 
