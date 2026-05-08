@@ -16,9 +16,12 @@ from __future__ import annotations
 
 import asyncio
 import traceback
-from typing import TYPE_CHECKING, Any, cast
 from collections.abc import Callable, Coroutine
+from typing import TYPE_CHECKING, Any, cast
+
 from pydantic import BaseModel
+
+from ..booking_reschedule.main import main_async as booking_reschedule_async
 
 # ============================================================================
 # PRE-FLIGHT CHECKLIST
@@ -30,12 +33,10 @@ from pydantic import BaseModel
 # RLS Tenant ID   : YES — with_tenant_context wraps all DB ops
 # Pydantic Schemas: YES — InputSchema validates callback_data format
 # ============================================================================
-
 from ..internal._wmill_adapter import get_variable, log
 from ._callback_logic import answer_callback_query, parse_callback_data, send_followup_message
 from ._callback_models import ActionContext, InputSchema
 from ._callback_router import AcknowledgeHandler, AutoRescheduleHandler, CancelHandler, ConfirmHandler, TelegramRouter
-from ..booking_reschedule.main import main_async as booking_reschedule_async
 
 if TYPE_CHECKING:
     from ..internal._result import Result

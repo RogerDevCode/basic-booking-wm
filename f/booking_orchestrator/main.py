@@ -18,8 +18,13 @@ import asyncio
 import traceback
 from collections.abc import Callable, Coroutine, Mapping
 from typing import TYPE_CHECKING, Any, cast
+
 from pydantic import BaseModel
 
+from ..availability_check.main import main_async as availability_check_async
+from ..booking_cancel.main import main_async as booking_cancel_async
+from ..booking_create.main import main_async as booking_create_async
+from ..booking_reschedule.main import main_async as booking_reschedule_async
 from ..internal._db_client import create_db_client
 from ..internal._wmill_adapter import log
 from ._context_resolver import resolve_context
@@ -30,11 +35,6 @@ from .handlers._create import handle_create_booking
 from .handlers._get_my_bookings import handle_get_my_bookings
 from .handlers._list_available import handle_list_available
 from .handlers._reschedule import handle_reschedule
-
-from ..booking_create.main import main_async as booking_create_async
-from ..booking_cancel.main import main_async as booking_cancel_async
-from ..booking_reschedule.main import main_async as booking_reschedule_async
-from ..availability_check.main import main_async as availability_check_async
 
 if TYPE_CHECKING:
     from ..internal._result import Result

@@ -80,7 +80,7 @@ async def ensure_nlu_cache() -> None:
             ),
             "msg_slot_taken": "Ese horario ya fue reservado.",
             "msg_no_service": "No hay servicios.",
-            "msg_generic": "Error.",
+            "msg_generic": "No pudimos confirmar tu cita en este momento. Por favor intenta de nuevo en unos minutos.",
             "intent_keywords_saludo": ["hola", "buenas"],
             "intent_keywords_urgencia": ["urgencia", "emergencia"],
             "urgencia": ["urgencia"],
