@@ -19,7 +19,6 @@ from datetime import UTC, datetime
 from typing import Final, cast
 
 from beartype import beartype
-from returns.result import Failure, Result, Success
 
 from .._redis_client import REDIS_TTL, create_redis_client
 from .._wmill_adapter import log
@@ -31,14 +30,14 @@ MODULE: Final[str] = "conversation_update"
 @beartype
 async def _update_conversation(
     input_data: ConversationUpdateInput, redis_url: str | None = None
-) -> Result[ConversationUpdateResult, str]:
+) -> ConversationUpdateResult:
     redis = await create_redis_client()
     try:
         key = f"conv:{input_data.chat_id}"
 
         if input_data.clear:
             await redis.delete(key)
-            return Success(ConversationUpdateResult(success=True, chat_id=input_data.chat_id))
+            return ConversationUpdateResult(success=True, chat_id=input_data.chat_id)
 
         # Atomic update
         async with redis.pipeline(transaction=True):
@@ -64,11 +63,11 @@ async def _update_conversation(
 
             await redis.set(key, json.dumps(updated), ex=REDIS_TTL)
 
-        return Success(ConversationUpdateResult(success=True, chat_id=input_data.chat_id))
+        return ConversationUpdateResult(success=True, chat_id=input_data.chat_id)
 
     except Exception as e:
         log("REDIS_UPDATE_ERROR", error=str(e), chat_id=input_data.chat_id, module=MODULE)
-        return Failure(f"redis_error: {e}")
+        raise RuntimeError(f"redis_error: {e}") from e
     finally:
         await redis.aclose()
 
@@ -85,14 +84,8 @@ async def _main_async(args: object, redis_url: str | None = None) -> dict[str, o
         log("conversation_update validation error", error=str(e), module=MODULE)
         return {"data": {"success": False, "chat_id": "", "skipped": True, "reason": "validation_error"}}
 
-    res = await _update_conversation(input_data, redis_url)  # type: ignore[call-arg]
-    match res:
-        case Success(val):
-            return {"data": cast("dict[str, object]", val.model_dump())}
-        case Failure(err):
-            raise RuntimeError(f"update_failed: {err}")
-
-    return {"data": {"success": False}}
+    result = await _update_conversation(input_data, redis_url)  # type: ignore[call-arg]
+    return {"data": cast("dict[str, object]", result.model_dump())}
 
 
 def main(args: object, redis_url: str | None = None) -> dict[str, object]:

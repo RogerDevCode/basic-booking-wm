@@ -4,9 +4,8 @@ import os
 from typing import Final
 
 from redis.asyncio import Redis
-from returns.result import Success
 
-from ._wmill_adapter import get_variable_safe
+from ._wmill_adapter import get_variable
 
 # ============================================================================
 # REDIS CLIENT — Single Source of Truth for Redis connections
@@ -24,9 +23,9 @@ def _resolve_redis_url() -> str | None:
     # 2. Windmill variables (Priority order)
     paths = ["g/all/REDIS_URL", "u/admin/REDIS_URL", "REDIS_URL"]
     for path in paths:
-        res = get_variable_safe(path)
-        if isinstance(res, Success):
-            return str(res.unwrap())
+        res = get_variable(path)
+        if res is not None:
+            return res
 
     return None
 

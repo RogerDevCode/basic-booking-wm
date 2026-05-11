@@ -3,7 +3,6 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from returns.result import Failure, Success
 
 from f.internal.telegram_router._router_models import RouterInput, RouterResult
 from f.internal.telegram_router._router_reminders import handle_reminders_config
@@ -43,13 +42,9 @@ async def test_handle_reminders_config_show_returns_reminders_state(mock_run: As
 
     result = await handle_reminders_config(input_data, {"name": "idle"})
 
-    match result:
-        case Success(payload):
-            assert isinstance(payload, RouterResult)
-            assert payload.nextState == {"name": "reminders_config", "client_id": "c1"}
-            assert payload.inline_buttons is not None
-        case Failure(err):
-            raise AssertionError(str(err))
+    assert isinstance(result, RouterResult)
+    assert result.nextState == {"name": "reminders_config", "client_id": "c1"}
+    assert result.inline_buttons is not None
 
 
 @pytest.mark.asyncio
@@ -66,8 +61,4 @@ async def test_handle_reminders_config_callback_sets_edit_message(mock_run: Asyn
 
     result = await handle_reminders_config(input_data, {"name": "reminders_config", "client_id": "c1"})
 
-    match result:
-        case Success(payload):
-            assert payload.edit_message is True
-        case Failure(err):
-            raise AssertionError(str(err))
+    assert result.edit_message is True

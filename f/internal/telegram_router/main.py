@@ -19,7 +19,6 @@ from datetime import UTC, datetime
 from typing import Final, cast
 
 from beartype import beartype
-from returns.result import Failure, Result, Success
 
 from .._wmill_adapter import log
 from ..booking_fsm._fsm_machine import apply_transition, get_main_menu_text, parse_action, parse_callback_data
@@ -62,20 +61,18 @@ def _start_registration(
     input_data: RouterInput,
     source: str,
     draft_raw: dict[str, object],
-) -> Result[RouterResult, str]:
+) -> RouterResult:
     new_draft: dict[str, object] = {**draft_raw, "reg_source": source}
-    return Success(
-        RouterResult(
-            handled=True,
-            nextState={"name": "needs_registration"},
-            nextDraft=new_draft,
-            active_flow="booking",
-            response_text=(
-                "Para agendar una cita necesito registrarte primero.\n\n"
-                "Solo necesito tu número de teléfono. Es rápido. 😊\n\n"
-                "¿Empezamos? Responde *sí* para continuar o *no* para volver al menú."
-            ),
-        )
+    return RouterResult(
+        handled=True,
+        nextState={"name": "needs_registration"},
+        nextDraft=new_draft,
+        active_flow="booking",
+        response_text=(
+            "Para agendar una cita necesito registrarte primero.\n\n"
+            "Solo necesito tu número de teléfono. Es rápido. 😊\n\n"
+            "¿Empezamos? Responde *sí* para continuar o *no* para volver al menú."
+        ),
     )
 
 
@@ -163,16 +160,12 @@ async def _query_my_bookings(client_id: str, pg_url: str) -> list[dict[str, obje
 async def _handle_mis_citas(
     input_data: RouterInput,
     current_state_raw: dict[str, object],
-) -> Result[RouterResult, str]:
+) -> RouterResult:
     if not input_data.client_id or not input_data.pg_url:
-        return Success(
-            RouterResult(
-                handled=True,
-                nextState=current_state_raw,
-                response_text=(
-                    "📋 *Mis Citas*\n\nNo pudimos cargar tus citas en este momento.\n\n" + get_main_menu_text()
-                ),
-            )
+        return RouterResult(
+            handled=True,
+            nextState=current_state_raw,
+            response_text=("📋 *Mis Citas*\n\nNo pudimos cargar tus citas en este momento.\n\n" + get_main_menu_text()),
         )
 
     try:
@@ -181,16 +174,14 @@ async def _handle_mis_citas(
         rows = []
 
     if not rows:
-        return Success(
-            RouterResult(
-                handled=True,
-                nextState=current_state_raw,
-                response_text=(
-                    "📋 *Mis Citas*\n\n"
-                    "No tienes citas próximas agendadas.\n\n"
-                    "Puedes agendar una nueva cita seleccionando la opción 1.\n\n" + get_main_menu_text()
-                ),
-            )
+        return RouterResult(
+            handled=True,
+            nextState=current_state_raw,
+            response_text=(
+                "📋 *Mis Citas*\n\n"
+                "No tienes citas próximas agendadas.\n\n"
+                "Puedes agendar una nueva cita seleccionando la opción 1.\n\n" + get_main_menu_text()
+            ),
         )
 
     lines: list[str] = []
@@ -215,32 +206,28 @@ async def _handle_mis_citas(
     count = len(rows)
     header = f"📋 *Mis Citas* ({count} próxima{'s' if count > 1 else ''})\n\n"
 
-    return Success(
-        RouterResult(
-            handled=True,
-            nextState=current_state_raw,
-            response_text=header + body + "\n\n" + get_main_menu_text(),
-        )
+    return RouterResult(
+        handled=True,
+        nextState=current_state_raw,
+        response_text=header + body + "\n\n" + get_main_menu_text(),
     )
 
 
 def _handle_mis_datos(
     input_data: RouterInput,
     current_state_raw: dict[str, object],
-) -> Result[RouterResult, str]:
+) -> RouterResult:
     if not input_data.phone:
         return _start_registration(input_data, source="mis_datos", draft_raw={})
-    return Success(
-        RouterResult(
-            handled=True,
-            nextState=current_state_raw,
-            response_text=(
-                "👤 *Mis Datos*\n\n"
-                f"📛 Nombre: {input_data.client_name or 'No registrado'}\n"
-                "📱 Teléfono: ✅ Registrado\n\n"
-                "Para actualizar tu información, contáctanos.\n\n" + get_main_menu_text()
-            ),
-        )
+    return RouterResult(
+        handled=True,
+        nextState=current_state_raw,
+        response_text=(
+            "👤 *Mis Datos*\n\n"
+            f"📛 Nombre: {input_data.client_name or 'No registrado'}\n"
+            "📱 Teléfono: ✅ Registrado\n\n"
+            "Para actualizar tu información, contáctanos.\n\n" + get_main_menu_text()
+        ),
     )
 
 
@@ -249,137 +236,108 @@ def _handle_registration_state(
     current_state_name: str,
     current_state_raw: dict[str, object],
     draft_raw: dict[str, object],
-) -> Result[RouterResult, str]:
+) -> RouterResult:
     lower = input_data.user_input.strip().lower()
     user_text = input_data.user_input.strip()
     client_name = input_data.client_name or "amigo"
 
     if current_state_name == "needs_registration":
         if lower in _SI_WORDS:
-            return Success(
-                RouterResult(
-                    handled=True,
-                    nextState={"name": "reg_confirming_name"},
-                    nextDraft=dict(draft_raw),
-                    response_text=(
-                        f"¡Perfecto! 😊\n\n"
-                        f"Tu nombre registrado es *{client_name}*.\n"
-                        "¿Es correcto? Responde *sí* o *no*."
-                    ),
-                )
+            return RouterResult(
+                handled=True,
+                nextState={"name": "reg_confirming_name"},
+                nextDraft=dict(draft_raw),
+                response_text=(
+                    f"¡Perfecto! 😊\n\nTu nombre registrado es *{client_name}*.\n¿Es correcto? Responde *sí* o *no*."
+                ),
             )
         if lower in _NO_WORDS:
-            return Success(
-                RouterResult(
-                    handled=True,
-                    nextState={"name": "idle"},
-                    nextDraft={},
-                    response_text=(
-                        "Entendido. 👍\n\nPuedes registrarte cuando quieras para agendar citas.\n\n"
-                        + get_main_menu_text()
-                    ),
-                )
+            return RouterResult(
+                handled=True,
+                nextState={"name": "idle"},
+                nextDraft={},
+                response_text=(
+                    "Entendido. 👍\n\nPuedes registrarte cuando quieras para agendar citas.\n\n" + get_main_menu_text()
+                ),
             )
         attempts = int(str(current_state_raw.get("invalid_attempts", 0))) + 1
         if attempts >= 3:
-            return Success(
-                RouterResult(
-                    handled=True,
-                    nextState={"name": "idle"},
-                    nextDraft={},
-                    response_text="❌ Demasiados intentos inválidos. Volviendo al menú principal.\n\n"
-                    + get_main_menu_text(),
-                )
-            )
-        return Success(
-            RouterResult(
+            return RouterResult(
                 handled=True,
-                nextState={"name": "needs_registration", "invalid_attempts": attempts},
-                nextDraft=dict(draft_raw),
-                response_text="¿Empezamos con el registro? Responde *sí* o *no*. 😊",
+                nextState={"name": "idle"},
+                nextDraft={},
+                response_text="❌ Demasiados intentos inválidos. Volviendo al menú principal.\n\n"
+                + get_main_menu_text(),
             )
+        return RouterResult(
+            handled=True,
+            nextState={"name": "needs_registration", "invalid_attempts": attempts},
+            nextDraft=dict(draft_raw),
+            response_text="¿Empezamos con el registro? Responde *sí* o *no*. 😊",
         )
 
     if current_state_name == "reg_confirming_name":
         if lower in _SI_WORDS:
             new_draft: dict[str, object] = {**dict(draft_raw), "reg_name": client_name}
-            return Success(
-                RouterResult(
-                    handled=True,
-                    nextState={"name": "reg_collecting_phone"},
-                    nextDraft=new_draft,
-                    response_text="📱 ¿Cuál es tu número de teléfono?\n\nEjemplo: +34600000000",
-                )
+            return RouterResult(
+                handled=True,
+                nextState={"name": "reg_collecting_phone"},
+                nextDraft=new_draft,
+                response_text="📱 ¿Cuál es tu número de teléfono?\n\nEjemplo: +34600000000",
             )
         if lower in _NO_WORDS:
-            return Success(
-                RouterResult(
-                    handled=True,
-                    nextState={"name": "reg_entering_name"},
-                    nextDraft=dict(draft_raw),
-                    response_text="¿Cómo te llamas? Escribe tu nombre completo.",
-                )
+            return RouterResult(
+                handled=True,
+                nextState={"name": "reg_entering_name"},
+                nextDraft=dict(draft_raw),
+                response_text="¿Cómo te llamas? Escribe tu nombre completo.",
             )
         attempts = int(str(current_state_raw.get("invalid_attempts", 0))) + 1
         if attempts >= 3:
-            return Success(
-                RouterResult(
-                    handled=True,
-                    nextState={"name": "idle"},
-                    nextDraft={},
-                    response_text="❌ Demasiados intentos inválidos. Volviendo al menú principal.\n\n"
-                    + get_main_menu_text(),
-                )
-            )
-        return Success(
-            RouterResult(
+            return RouterResult(
                 handled=True,
-                nextState={"name": "reg_confirming_name", "invalid_attempts": attempts},
-                nextDraft=dict(draft_raw),
-                response_text=(f"Tu nombre registrado es *{client_name}*.\n¿Es correcto? Responde *sí* o *no*."),
+                nextState={"name": "idle"},
+                nextDraft={},
+                response_text="❌ Demasiados intentos inválidos. Volviendo al menú principal.\n\n"
+                + get_main_menu_text(),
             )
+        return RouterResult(
+            handled=True,
+            nextState={"name": "reg_confirming_name", "invalid_attempts": attempts},
+            nextDraft=dict(draft_raw),
+            response_text=(f"Tu nombre registrado es *{client_name}*.\n¿Es correcto? Responde *sí* o *no*."),
         )
 
     if current_state_name == "reg_entering_name":
         if not user_text:
-            return Success(
-                RouterResult(
-                    handled=True,
-                    nextState={"name": "reg_entering_name"},
-                    nextDraft=dict(draft_raw),
-                    response_text="Por favor escribe tu nombre completo.",
-                )
+            return RouterResult(
+                handled=True,
+                nextState={"name": "reg_entering_name"},
+                nextDraft=dict(draft_raw),
+                response_text="Por favor escribe tu nombre completo.",
             )
         new_draft2: dict[str, object] = {**dict(draft_raw), "reg_name": user_text}
-        return Success(
-            RouterResult(
-                handled=True,
-                nextState={"name": "reg_collecting_phone"},
-                nextDraft=new_draft2,
-                response_text="📱 ¿Cuál es tu número de teléfono?\n\nEjemplo: +34600000000",
-            )
+        return RouterResult(
+            handled=True,
+            nextState={"name": "reg_collecting_phone"},
+            nextDraft=new_draft2,
+            response_text="📱 ¿Cuál es tu número de teléfono?\n\nEjemplo: +34600000000",
         )
 
     if current_state_name == "reg_collecting_phone":
         if not user_text:
-            return Success(
-                RouterResult(
-                    handled=True,
-                    nextState={"name": "reg_collecting_phone"},
-                    nextDraft=dict(draft_raw),
-                    response_text="Por favor escribe tu número de teléfono.",
-                )
+            return RouterResult(
+                handled=True,
+                nextState={"name": "reg_collecting_phone"},
+                nextDraft=dict(draft_raw),
+                response_text="Por favor escribe tu número de teléfono.",
             )
         new_draft3: dict[str, object] = {**dict(draft_raw), "reg_phone": user_text}
-        return Success(
-            RouterResult(
-                handled=True,
-                nextState={"name": "reg_collecting_email"},
-                nextDraft=new_draft3,
-                response_text=(
-                    "📧 ¿Tienes correo electrónico? (opcional)\n\nEscríbelo o envía *saltar* para omitirlo."
-                ),
-            )
+        return RouterResult(
+            handled=True,
+            nextState={"name": "reg_collecting_email"},
+            nextDraft=new_draft3,
+            response_text=("📧 ¿Tienes correo electrónico? (opcional)\n\nEscríbelo o envía *saltar* para omitirlo."),
         )
 
     if current_state_name == "reg_collecting_email":
@@ -387,21 +345,19 @@ def _handle_registration_state(
         reg_phone = str(draft_raw.get("reg_phone") or "")
         reg_email: str | None = None if lower in _SKIP_WORDS or lower in _NO_WORDS else user_text
 
-        return Success(
-            RouterResult(
-                handled=True,
-                nextState={"name": "idle"},
-                nextDraft={},
-                registration_data={"name": reg_name, "phone": reg_phone, "email": reg_email},
-                response_text=("✅ ¡Registro completado!\n\nYa puedes agendar tu cita. 🗓️\n\n" + get_main_menu_text()),
-            )
+        return RouterResult(
+            handled=True,
+            nextState={"name": "idle"},
+            nextDraft={},
+            registration_data={"name": reg_name, "phone": reg_phone, "email": reg_email},
+            response_text=("✅ ¡Registro completado!\n\nYa puedes agendar tu cita. 🗓️\n\n" + get_main_menu_text()),
         )
 
-    return Success(RouterResult(handled=False))
+    return RouterResult(handled=False)
 
 
 @beartype
-async def _route(input_data: RouterInput) -> Result[RouterResult, str]:
+async def _route(input_data: RouterInput) -> RouterResult:
     state_dict = input_data.state or {}
     active_flow = cast("str | None", state_dict.get("active_flow"))
 
@@ -409,20 +365,18 @@ async def _route(input_data: RouterInput) -> Result[RouterResult, str]:
     is_callback = ":" in user_input or user_input in ["back", "cancel", "cfm:yes", "cfm:no"]
 
     if user_input.strip() == "/start":
-        return Success(
-            RouterResult(
-                handled=True,
-                active_flow="booking",
-                nextState={"name": "idle"},
-                response_text=_get_start_text(),
-            )
+        return RouterResult(
+            handled=True,
+            active_flow="booking",
+            nextState={"name": "idle"},
+            response_text=_get_start_text(),
         )
 
     if not active_flow and not is_callback:
-        return Success(RouterResult(handled=False))
+        return RouterResult(handled=False)
 
     if active_flow and active_flow != "booking":
-        return Success(RouterResult(handled=False))
+        return RouterResult(handled=False)
 
     current_state_raw = cast("dict[str, object]", state_dict.get("booking_state") or {"name": "idle"})
     current_state_name = str(current_state_raw.get("name", "idle"))
@@ -460,38 +414,31 @@ async def _route(input_data: RouterInput) -> Result[RouterResult, str]:
                 return await handle_reminders_config(input_data, current_state_raw)
 
             if lower in _INFO_KEYWORDS:
-                return Success(
-                    RouterResult(
-                        handled=True,
-                        nextState=current_state_raw,
-                        response_text=(
-                            "\U00002139️ *Información*\n\n"
-                            "Este es tu asistente de reservas médicas.\n"
-                            "Puedes agendar, consultar o cancelar citas en cualquier momento.\n\n"
-                            + get_main_menu_text()
-                        ),
-                    )
+                return RouterResult(
+                    handled=True,
+                    nextState=current_state_raw,
+                    response_text=(
+                        "\U00002139️ *Información*\n\n"
+                        "Este es tu asistente de reservas médicas.\n"
+                        "Puedes agendar, consultar o cancelar citas en cualquier momento.\n\n" + get_main_menu_text()
+                    ),
                 )
             if lower not in _AGENDAR_KEYWORDS:
-                return Success(
-                    RouterResult(
-                        handled=True,
-                        nextState=current_state_raw,
-                        response_text=("Lo siento, no entendí esa opción. 😊\n\n" + get_main_menu_text()),
-                    )
+                return RouterResult(
+                    handled=True,
+                    nextState=current_state_raw,
+                    response_text=("Lo siento, no entendí esa opción. 😊\n\n" + get_main_menu_text()),
                 )
 
         # Block transition to time-slot selection if client already has an active booking
         if current_state_name == "selecting_doctor" and input_data.prefetch_block_reason == "already_booked":
-            return Success(
-                RouterResult(
-                    handled=True,
-                    nextState={"name": "idle"},
-                    response_text=(
-                        "⚠️ Ya tienes una cita agendada.\n\n"
-                        "Debes cancelar tu cita actual antes de reservar una nueva.\n\n" + get_main_menu_text()
-                    ),
-                )
+            return RouterResult(
+                handled=True,
+                nextState={"name": "idle"},
+                response_text=(
+                    "⚠️ Ya tienes una cita agendada.\n\n"
+                    "Debes cancelar tu cita actual antes de reservar una nueva.\n\n" + get_main_menu_text()
+                ),
             )
 
         state_root = BookingStateRoot.model_validate(current_state_raw)
@@ -504,35 +451,29 @@ async def _route(input_data: RouterInput) -> Result[RouterResult, str]:
         action = parse_callback_data(user_input) if is_callback else parse_action(user_input)
 
         if not action:
-            return Success(RouterResult(handled=False))
+            return RouterResult(handled=False)
 
         prefetched_items = list(input_data.items) if input_data.items is not None else None
         try:
             outcome = apply_transition(current_state, action, draft, items=prefetched_items)
         except Exception as e:
             log("FSM_TRANSITION_ERROR", error=str(e), chat_id=input_data.chat_id)
-            return Success(
-                RouterResult(handled=True, response_text="Lo siento, hubo un error procesando tu solicitud.")
-            )
+            return RouterResult(handled=True, response_text="Lo siento, hubo un error procesando tu solicitud.")
 
         if not outcome:
-            return Success(RouterResult(handled=False))
+            return RouterResult(handled=False)
 
-        return Success(
-            RouterResult(
-                handled=True,
-                response_text=outcome["responseText"],
-                nextState=cast("dict[str, object]", outcome["nextState"].model_dump())
-                if outcome["nextState"]
-                else None,
-                nextDraft=None,
-                inline_buttons=[],
-            )
+        return RouterResult(
+            handled=True,
+            response_text=outcome["responseText"],
+            nextState=cast("dict[str, object]", outcome["nextState"].model_dump()) if outcome["nextState"] else None,
+            nextDraft=None,
+            inline_buttons=[],
         )
 
     except Exception as e:
         log("ROUTER_INTERNAL_ERROR", error=str(e), chat_id=input_data.chat_id, module=MODULE)
-        return Success(RouterResult(handled=False))
+        return RouterResult(handled=False)
 
 
 async def _main_async(args: dict[str, object]) -> dict[str, object]:
@@ -542,14 +483,8 @@ async def _main_async(args: dict[str, object]) -> dict[str, object]:
     except Exception as e:
         return {"data": {"handled": False, "error": f"validation_error: {e}"}}
 
-    res = await _route(input_data)
-    match res:
-        case Success(val):
-            return {"data": cast("dict[str, object]", val.model_dump())}
-        case Failure(err):
-            return {"data": {"handled": False, "error": str(err)}}
-
-    return {"data": {"handled": False}}
+    result = await _route(input_data)
+    return {"data": cast("dict[str, object]", result.model_dump())}
 
 
 def main(args: dict[str, object]) -> dict[str, object]:

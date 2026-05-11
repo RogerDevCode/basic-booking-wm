@@ -411,18 +411,18 @@
 - 🔧 `fn` `today_ymd` (L167)
 
 ### `f/internal/_db_client.py`
-- ⚡ `async_fn` `fetch` (L15)
-- ⚡ `async_fn` `fetchrow` (L17)
-- ⚡ `async_fn` `fetchval` (L19)
-- ⚡ `async_fn` `execute` (L21)
-- ⚡ `async_fn` `close` (L23)
-- ⚡ `async_fn` `create_db_client` (L48)
-- 📦 `class` `AsyncpgWrapper` (L60)
-- ⚡ `async_fn` `fetch` (L64)
-- ⚡ `async_fn` `fetchrow` (L68)
-- ⚡ `async_fn` `fetchval` (L72)
-- ⚡ `async_fn` `execute` (L76)
-- ⚡ `async_fn` `close` (L80)
+- ⚡ `async_fn` `fetch` (L13)
+- ⚡ `async_fn` `fetchrow` (L15)
+- ⚡ `async_fn` `fetchval` (L17)
+- ⚡ `async_fn` `execute` (L19)
+- ⚡ `async_fn` `close` (L21)
+- ⚡ `async_fn` `create_db_client` (L46)
+- 📦 `class` `AsyncpgWrapper` (L58)
+- ⚡ `async_fn` `fetch` (L62)
+- ⚡ `async_fn` `fetchrow` (L66)
+- ⚡ `async_fn` `fetchval` (L70)
+- ⚡ `async_fn` `execute` (L74)
+- ⚡ `async_fn` `close` (L78)
 
 ### `f/internal/_file_lock.py`
 - 📦 `class` `FileLockError` (L17)
@@ -436,7 +436,7 @@
 - 🔧 `fn` `get_nlu_rule` (L100)
 
 ### `f/internal/_redis_client.py`
-- ⚡ `async_fn` `create_redis_client` (L34)
+- ⚡ `async_fn` `create_redis_client` (L33)
 
 ### `f/internal/_result.py`
 - 📦 `class` `DBClient` (L15)
@@ -452,12 +452,11 @@
 - 🔧 `fn` `validate_transition` (L32)
 
 ### `f/internal/_wmill_adapter.py`
-- 🔧 `fn` `is_dict_str_obj` (L26)
-- 🔧 `fn` `get_variable_safe` (L30)
-- 🔧 `fn` `get_variable` (L40)
-- 🔧 `fn` `get_resource_safe` (L51)
-- 🔧 `fn` `run_script` (L62)
-- 🔧 `fn` `log` (L92)
+- 🔧 `fn` `is_dict_str_obj` (L21)
+- 🔧 `fn` `get_variable` (L25)
+- 🔧 `fn` `get_resource` (L36)
+- 🔧 `fn` `run_script` (L47)
+- 🔧 `fn` `log` (L77)
 
 ### `f/internal/ai_agent/_ai_agent_logic.py`
 - 🔧 `fn` `adjust_intent_with_context` (L22)
@@ -578,14 +577,14 @@
 - 📦 `class` `ConversationGetResult` (L21)
 
 ### `f/internal/conversation_get/main.py`
-- 🔧 `fn` `main` (L79)
+- 🔧 `fn` `main` (L71)
 
 ### `f/internal/conversation_update/_update_models.py`
 - 📦 `class` `ConversationUpdateInput` (L8)
 - 📦 `class` `ConversationUpdateResult` (L21)
 
 ### `f/internal/conversation_update/main.py`
-- 🔧 `fn` `main` (L98)
+- 🔧 `fn` `main` (L91)
 
 ### `f/internal/conversation_verify/_verify_models.py`
 - 📦 `class` `PersistedConversationState` (L6)
@@ -672,10 +671,10 @@
 - 📦 `class` `RouterResult` (L23)
 
 ### `f/internal/telegram_router/_router_reminders.py`
-- ⚡ `async_fn` `handle_reminders_config` (L29)
+- ⚡ `async_fn` `handle_reminders_config` (L27)
 
 ### `f/internal/telegram_router/main.py`
-- 🔧 `fn` `main` (L555)
+- 🔧 `fn` `main` (L490)
 
 ### `f/nlu/_tfidf_classifier.py`
 - 📦 `class` `ModelData` (L234)

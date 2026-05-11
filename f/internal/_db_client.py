@@ -3,10 +3,8 @@ from __future__ import annotations
 import os
 from typing import Protocol, cast
 
-from returns.result import Success
-
 from ._result import DBClient  # noqa: TC001
-from ._wmill_adapter import get_variable_safe
+from ._wmill_adapter import get_variable
 
 
 class _AsyncpgConn(Protocol):
@@ -38,9 +36,9 @@ def _resolve_db_url() -> str | None:
         "f/internal/db_url",
     ]
     for path in paths:
-        res = get_variable_safe(path)
-        if isinstance(res, Success):
-            return str(res.unwrap())
+        res = get_variable(path)
+        if res is not None:
+            return res
 
     return None
 

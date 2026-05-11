@@ -19,7 +19,6 @@ from datetime import UTC, datetime
 from typing import Final, cast
 
 from beartype import beartype
-from returns.result import Failure, Result, Success
 
 from .._redis_client import create_redis_client
 from .._wmill_adapter import log
@@ -29,14 +28,14 @@ MODULE: Final[str] = "conversation_get"
 
 
 @beartype
-async def _get_conversation(chat_id: str, redis_url: str | None = None) -> Result[ConversationGetResult, str]:
+async def _get_conversation(chat_id: str, redis_url: str | None = None) -> ConversationGetResult:
     redis = await create_redis_client()
     try:
         key = f"conv:{chat_id}"
         raw = await redis.get(key)
 
         if not raw:
-            return Success(ConversationGetResult(data=None))
+            return ConversationGetResult(data=None)
 
         try:
             data = cast("dict[str, object]", json.loads(str(raw)))
@@ -51,29 +50,22 @@ async def _get_conversation(chat_id: str, redis_url: str | None = None) -> Resul
                 message_id=cast("int | None", data.get("message_id")),
                 updated_at=cast("str", data.get("updated_at", datetime.now(UTC).isoformat())),
             )
-            return Success(ConversationGetResult(data=state))
+            return ConversationGetResult(data=state)
         except Exception as e:
             log("CONVERSATION_PARSE_ERROR", error=str(e), chat_id=chat_id, module=MODULE)
-            return Success(ConversationGetResult(data=None))
+            return ConversationGetResult(data=None)
 
     except Exception as e:
         log("REDIS_GET_ERROR", error=str(e), chat_id=chat_id, module=MODULE)
-        return Failure(f"redis_error: {e}")
+        raise RuntimeError(f"redis_error: {e}") from e
     finally:
         await redis.aclose()
 
 
 async def _main_async(chat_id: str, redis_url: str | None = None) -> dict[str, object]:
     """Windmill entrypoint."""
-    res = await _get_conversation(chat_id, redis_url)  # type: ignore[call-arg]
-    match res:
-        case Success(val):
-            return cast("dict[str, object]", val.model_dump())
-        case Failure(err):
-            # Graceful degradation: return empty state on redis failure but log it
-            return {"data": None, "error": str(err)}
-
-    return {"data": None}
+    result = await _get_conversation(chat_id, redis_url)  # type: ignore[call-arg]
+    return cast("dict[str, object]", result.model_dump())
 
 
 def main(chat_id: str, redis_url: str | None = None) -> dict[str, object]:

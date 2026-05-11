@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-from typing import TypeVar, cast
 
 try:
     from typing import TypeIs
@@ -18,45 +17,31 @@ except ImportError:
 
     wmill = MagicMock()
 
-from returns.result import Failure, Result, Success
-
-T = TypeVar("T")
-
 
 def is_dict_str_obj(val: object) -> TypeIs[dict[str, object]]:
     return isinstance(val, dict) and all(isinstance(k, str) for k in val.keys())
 
 
-def get_variable_safe(path: str) -> Result[str, Exception]:
+def get_variable(path: str) -> str | None:
+    """Wrapper for backward compatibility, returns None on failure."""
     try:
         val = wmill.get_variable(path)
         if val is None:
-            return Failure(KeyError(f"Variable {path} not found or inaccessible"))
-        return Success(str(val))
-    except Exception as e:
-        return Failure(e)
-
-
-def get_variable(path: str) -> str | None:
-    """Wrapper for backward compatibility, returns None on failure."""
-    res = get_variable_safe(path)
-    match res:
-        case Success(val):
-            return str(val)
-        case Failure(_):
             return None
-    return None
+        return str(val)
+    except Exception:
+        return None
 
 
-def get_resource_safe[T](path: str, schema: type[T]) -> Result[T, Exception]:
+def get_resource(path: str) -> dict[str, object] | None:
+    """Fetch a Windmill resource and validate it is a dict[str, object]."""
     try:
         raw: object = wmill.get_resource(path)
         if not is_dict_str_obj(raw):
-            return Failure(TypeError(f"Resource at {path} is not a valid dictionary"))
-
-        return Success(cast("T", raw))
-    except Exception as e:
-        return Failure(e)
+            return None
+        return raw
+    except Exception:
+        return None
 
 
 def run_script(path: str, args: dict[str, object] | None = None) -> tuple[Exception | None, object]:
