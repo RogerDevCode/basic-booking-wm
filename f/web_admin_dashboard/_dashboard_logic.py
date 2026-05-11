@@ -2,19 +2,18 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, cast
 
-from ..internal._result import DBClient, Result, fail, ok
-
 if TYPE_CHECKING:
+    from ..internal._result import DBClient
     from ._dashboard_models import AdminDashboardResult, InputSchema
 
 
-async def fetch_dashboard_stats(db: DBClient, input_data: InputSchema) -> Result[AdminDashboardResult]:
+async def fetch_dashboard_stats(db: DBClient, input_data: InputSchema) -> AdminDashboardResult:
     # 1. Verify Admin
     admin_rows = await db.fetch(
         "SELECT role FROM users WHERE user_id = $1::uuid AND is_active = true LIMIT 1", input_data.admin_user_id
     )
     if not admin_rows or str(admin_rows[0]["role"]) != "admin":
-        return fail("Forbidden: admin access required")
+        raise RuntimeError("Forbidden: admin access required")
 
     # 2. Main Stats
     stats_rows = await db.fetch(
@@ -32,7 +31,7 @@ async def fetch_dashboard_stats(db: DBClient, input_data: InputSchema) -> Result
     )
 
     if not stats_rows:
-        return fail("Failed to fetch dashboard stats")
+        raise RuntimeError("Failed to fetch dashboard stats")
 
     s = stats_rows[0]
 
@@ -62,4 +61,4 @@ async def fetch_dashboard_stats(db: DBClient, input_data: InputSchema) -> Result
         "active_providers": int(cast("Any", s["active_providers"])),
         "pending_bookings": int(cast("Any", s["pending_bookings"])),
     }
-    return ok(res)
+    return res

@@ -29,7 +29,6 @@ import os
 from datetime import UTC, datetime
 from typing import Literal
 
-from ..internal._result import Result, fail, ok
 from ..internal._wmill_adapter import get_variable
 from ._health_logic import check_database, check_gcal, check_gmail, check_telegram
 from ._health_models import ComponentStatus, HealthResult, InputSchema
@@ -37,12 +36,12 @@ from ._health_models import ComponentStatus, HealthResult, InputSchema
 MODULE = "health_check"
 
 
-async def _main_async(args: dict[str, object]) -> Result[HealthResult]:
+async def _main_async(args: dict[str, object]) -> HealthResult:
     # 1. Validate Input
     try:
         input_data = InputSchema.model_validate(args)
     except Exception as e:
-        return fail(f"Validation error: {e}")
+        raise RuntimeError(f"Validation error: {e}") from e
 
     gcal_token = str(get_variable("GCAL_ACCESS_TOKEN")) if get_variable("GCAL_ACCESS_TOKEN") else None
     tg_token = str(get_variable("TELEGRAM_BOT_TOKEN")) if get_variable("TELEGRAM_BOT_TOKEN") else None
@@ -76,7 +75,7 @@ async def _main_async(args: dict[str, object]) -> Result[HealthResult]:
         overall = "degraded"
 
     res: HealthResult = {"overall": overall, "timestamp": datetime.now(UTC).isoformat(), "components": components}
-    return ok(res)
+    return res
 
 
 def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
@@ -92,9 +91,7 @@ def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
         else:
             validated = InputSchema.model_validate(args)
 
-        err, result = asyncio.run(_main_async(validated.model_dump()))
-        if err:
-            raise err
+        result = asyncio.run(_main_async(validated.model_dump()))
 
         if result is None:
             return {}

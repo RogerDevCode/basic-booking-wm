@@ -31,19 +31,15 @@ async def test_availability_check_e2e_mocked() -> None:
     with patch("f.availability_check.main.create_db_client", return_value=mock_db):
         with patch("f.availability_check.main.get_provider", AsyncMock(return_value=provider_row)):
             with patch("f.availability_check.main.get_provider_service_id", AsyncMock(return_value="svc-1")):
-                with patch(
-                    "f.availability_check.main.get_availability", AsyncMock(return_value=(None, mock_avail_result))
-                ):
+                with patch("f.availability_check.main.get_availability", AsyncMock(return_value=mock_avail_result)):
                     args: dict[str, Any] = {
                         "tenant_id": "00000000-0000-0000-0000-000000000001",
                         "provider_id": "00000000-0000-0000-0000-000000000002",
                         "date": "2026-05-01",
                     }
 
-                    err, result = await main_async(args)
+                    result = await main_async(args)
 
-                    assert err is None
-                    assert result is not None
                     assert result["provider_name"] == "Dr. Smith"
                     assert result["timezone"] == "America/Santiago"
                     assert len(result["slots"]) == 2
@@ -62,8 +58,5 @@ async def test_availability_check_provider_not_found() -> None:
                 "date": "2026-05-01",
             }
 
-            err, result = await main_async(args)
-
-            assert err is not None
-            assert "not found" in str(err)
-            assert result is None
+            with pytest.raises(RuntimeError, match="not found"):
+                await main_async(args)

@@ -22,8 +22,7 @@ def test_fsm_flow_success() -> None:
     # The handler expects items to be passed for idle -> selecting_specialty
     items = [{"id": "s1", "name": "Cardiología"}]
 
-    err, result = apply_transition(state, {"type": "select", "value": "1"}, draft, items=items)
-    assert err is None
+    result = apply_transition(state, {"type": "select", "value": "1"}, draft, items=items)
     assert result is not None
     assert isinstance(result["nextState"], SelectingSpecialtyState)
     assert result["nextState"].items == items
@@ -33,8 +32,7 @@ def test_fsm_flow_success() -> None:
 
     state = cast("Any", result["nextState"])
     action = cast("Any", {"type": "select", "value": "1"})  # Cardiología
-    err, result = apply_transition(state, action, draft)
-    assert err is None
+    result = apply_transition(state, action, draft)
     assert result is not None
     assert isinstance(result["nextState"], SelectingDoctorState)
     assert result["nextState"].specialtyId == "s1"
@@ -45,8 +43,7 @@ def test_fsm_flow_success() -> None:
     state = cast("Any", result["nextState"])
     doctor_items = [{"id": "d1", "name": "Dr. House"}]
     action = cast("Any", {"type": "select", "value": "1"})
-    err, result = apply_transition(state, action, draft, items=doctor_items)
-    assert err is None
+    result = apply_transition(state, action, draft, items=doctor_items)
     assert result is not None
     assert isinstance(result["nextState"], SelectingTimeState)
     assert result["nextState"].doctorId == "d1"
@@ -57,8 +54,7 @@ def test_fsm_flow_success() -> None:
     state = cast("Any", result["nextState"])
     time_items = [{"id": "t1", "label": "10:00", "start_time": "2026-05-01T10:00:00Z"}]
     action = cast("Any", {"type": "select", "value": "1"})
-    err, result = apply_transition(state, action, draft, items=time_items)
-    assert err is None
+    result = apply_transition(state, action, draft, items=time_items)
     assert result is not None
     assert isinstance(result["nextState"], ConfirmingState)
     assert result["nextState"].timeSlot == "10:00"
@@ -72,8 +68,7 @@ def test_fsm_flow_success() -> None:
     # Draft is updated by apply_transition
     updated_draft = DraftBooking(**result["nextState"].draft.model_dump())
     action = cast("Any", {"type": "confirm_yes"})
-    err, result = apply_transition(state, action, updated_draft)
-    assert err is None
+    result = apply_transition(state, action, updated_draft)
     assert result is not None
     assert isinstance(result["nextState"], IdleState)
 
@@ -84,9 +79,8 @@ def test_fsm_back_navigation() -> None:
     items = [{"id": "s1", "name": "Cardiología"}]
 
     action = cast("Any", {"type": "back"})
-    err, result = apply_transition(state, action, draft, items=items)
+    result = apply_transition(state, action, draft, items=items)
 
-    assert err is None
     assert result is not None
     assert isinstance(result["nextState"], SelectingSpecialtyState)
     assert result["nextState"].items == items

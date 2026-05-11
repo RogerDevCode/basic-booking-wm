@@ -19,10 +19,9 @@ async def test_telegram_orchestrator_ambiguous_intent_graceful_exit() -> None:
     args: dict[str, Any] = {"intent": "duda_general", "message": "¿Qué tiempo hace?"}
 
     # Act
-    err, result = await _main_async(args)
+    result = await _main_async(args)
 
     # Assert
-    assert err is None
     assert result is None
 
 
@@ -32,9 +31,7 @@ async def test_telegram_orchestrator_create_booking_fails_without_db() -> None:
     # Arrange
     args: dict[str, Any] = {"intent": "crear_cita", "message": "Quiero reservar"}
 
-    # Act
-    err, _result = await _main_async(args)
-
-    # Assert
+    # Act & Assert
     # Orchestrator tries to resolve context via DB
-    assert err is not None
+    with pytest.raises(RuntimeError):
+        await _main_async(args)

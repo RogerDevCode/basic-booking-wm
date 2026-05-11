@@ -48,9 +48,8 @@ async def test_reschedule_success() -> None:
 
     service = {"service_id": "s1", "duration_minutes": 30}
 
-    err, result = await execute_reschedule_logic(repo, input_data, cast("Any", old_booking), cast("Any", service))
+    result = await execute_reschedule_logic(repo, input_data, cast("Any", old_booking), cast("Any", service))
 
-    assert err is None
     assert result is not None
     assert result["new_status"] == "confirmed"
     assert result["old_status"] == "rescheduled"

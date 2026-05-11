@@ -24,8 +24,10 @@ from __future__ import annotations
 # RLS Tenant ID   : YES — provider_id used for all queries
 # Pydantic Schemas: YES — InputSchema validates action and key
 # ============================================================================
+from typing import cast
+
 from ..internal._db_client import create_db_client
-from ..internal._result import Result, fail, with_tenant_context
+from ..internal._result import with_tenant_context
 from ..internal._wmill_adapter import log
 from ._lock_logic import acquire_lock, check_lock, cleanup_locks, release_lock
 from ._lock_models import InputSchema, LockResult
@@ -33,18 +35,18 @@ from ._lock_models import InputSchema, LockResult
 MODULE = "distributed_lock"
 
 
-async def _main_async(args: dict[str, object]) -> Result[LockResult]:
+async def _main_async(args: dict[str, object]) -> dict[str, object]:
     # 1. Validate Input
     try:
         data = args.get("rawInput", args)
         input_data = InputSchema.model_validate(data)
     except Exception as e:
-        return fail(f"validation_failed: {e}")
+        raise RuntimeError(f"validation_failed: {e}") from e
 
     conn = await create_db_client()
     try:
         # 2. Execute within Tenant Context
-        async def operation() -> Result[LockResult]:
+        async def operation() -> LockResult:
             if input_data.action == "acquire":
                 return await acquire_lock(conn, input_data)
             elif input_data.action == "release":
@@ -54,13 +56,16 @@ async def _main_async(args: dict[str, object]) -> Result[LockResult]:
             elif input_data.action == "cleanup":
                 return await cleanup_locks(conn)
 
-            return fail(f"unsupported_action: {input_data.action}")
+            raise RuntimeError(f"unsupported_action: {input_data.action}")
 
-        return await with_tenant_context(conn, input_data.provider_id, operation)
+        result = await with_tenant_context(conn, input_data.provider_id, operation)
+        if result is None:
+            raise RuntimeError("Distributed lock returned no result")
+        return cast("dict[str, object]", result)
 
     except Exception as e:
         log("Distributed Lock Internal Error", error=str(e), module=MODULE)
-        return fail(f"internal_error: {e}")
+        raise RuntimeError(f"internal_error: {e}") from e
     finally:
         await conn.close()
 
@@ -68,7 +73,6 @@ async def _main_async(args: dict[str, object]) -> Result[LockResult]:
 def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
     import asyncio
     import traceback
-    from typing import cast
 
     from pydantic import BaseModel
 
@@ -78,17 +82,15 @@ def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
         else:
             validated = InputSchema.model_validate(args)
 
-        err, result = asyncio.run(_main_async(validated.model_dump()))
-        if err:
-            raise err
+        result = asyncio.run(_main_async(validated.model_dump()))
 
         if result is None:
             return {}
 
         if isinstance(result, BaseModel):
-            return cast("dict[str, object]", result.model_dump())
+            return result.model_dump()
         elif isinstance(result, dict):
-            return cast("dict[str, object]", result)
+            return result
         else:
             return {"data": result}
 

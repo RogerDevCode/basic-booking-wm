@@ -30,9 +30,8 @@ async def test_booking_search_success() -> None:
         {"provider_id": "00000000-0000-0000-0000-000000000000", "offset": 0, "limit": 20}
     )
 
-    err, result = await execute_search(client, input_data)
+    result = await execute_search(client, input_data)
 
-    assert err is None
     assert result is not None
     assert result["total"] == 0
     assert result["bookings"] == []

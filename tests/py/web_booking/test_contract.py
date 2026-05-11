@@ -44,9 +44,7 @@ async def test_web_booking_crear_success() -> None:
             "start_time": "2026-05-01T10:00:00Z",
         }
 
-        err, result = await main(args)
+        result = await main(args)
 
-        assert err is None
-        assert result is not None
         assert result["booking_id"] == "b1"
         assert result["status"] == "pending"

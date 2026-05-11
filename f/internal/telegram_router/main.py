@@ -507,10 +507,10 @@ async def _route(input_data: RouterInput) -> Result[RouterResult, str]:
             return Success(RouterResult(handled=False))
 
         prefetched_items = list(input_data.items) if input_data.items is not None else None
-        err, outcome = apply_transition(current_state, action, draft, items=prefetched_items)
-
-        if err:
-            log("FSM_TRANSITION_ERROR", error=str(err), chat_id=input_data.chat_id)
+        try:
+            outcome = apply_transition(current_state, action, draft, items=prefetched_items)
+        except Exception as e:
+            log("FSM_TRANSITION_ERROR", error=str(e), chat_id=input_data.chat_id)
             return Success(
                 RouterResult(handled=True, response_text="Lo siento, hubo un error procesando tu solicitud.")
             )

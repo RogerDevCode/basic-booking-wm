@@ -35,9 +35,7 @@ async def test_admin_provider_list_success() -> None:
     ):
         args: dict[str, Any] = {"action": "list"}
         # main returns result now, not (err, result)
-        err, result = await main(args)
-        assert err is None
-        assert result is not None
+        result = await main(args)
 
         assert result is not None
         assert isinstance(result, list)

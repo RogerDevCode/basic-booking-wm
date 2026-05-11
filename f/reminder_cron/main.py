@@ -28,7 +28,6 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from ..internal._db_client import create_db_client
-from ..internal._result import Result, fail, ok
 from ..internal._wmill_adapter import log
 from ._delivery_service import dispatch_reminder
 from ._reminder_logic import build_reminder_message, get_client_preference
@@ -64,17 +63,17 @@ async def _process_channel(
     dry_run: bool,
     result: CronResult,
     conn: DBClient,
-) -> Result[None]:
+) -> None:
     if not get_client_preference(booking.reminder_preferences, channel, window):
-        return ok(None)
+        return
 
     recipient = _channel_recipient(booking, channel)
     if recipient is None or not recipient.strip():
-        return ok(None)
+        return
 
     claimed = await claim_dispatch(conn, booking.booking_id, channel, window)
     if not claimed:
-        return ok(None)
+        return
 
     scheduled_time = scheduled_time_for_window(booking.start_time, booking.provider_timezone, window)
     if is_quiet_hours(scheduled_time, booking.provider_timezone):
@@ -90,7 +89,7 @@ async def _process_channel(
         )
         result.skipped_quiet_hours += 1
         result.processed_bookings.append(booking.booking_id)
-        return ok(None)
+        return
 
     if dry_run:
         await persist_dispatch_decision(
@@ -105,10 +104,11 @@ async def _process_channel(
         )
         result.sent += 1
         result.processed_bookings.append(booking.booking_id)
-        return ok(None)
+        return
 
-    dispatch_result = dispatch_reminder(channel, recipient, window, build_reminder_message(booking, window))
-    if dispatch_result[0] is not None:
+    try:
+        dispatch_reminder(channel, recipient, window, build_reminder_message(booking, window))
+    except RuntimeError as dispatch_err:
         await persist_dispatch_decision(
             conn,
             ReminderDispatchDecision(
@@ -116,11 +116,12 @@ async def _process_channel(
                 channel=channel,
                 reminder_window=window,
                 status="failed",
-                last_error=str(dispatch_result[0]),
+                last_error=str(dispatch_err),
             ),
         )
         result.failed += 1
-        return fail(dispatch_result[0])
+        result.processed_bookings.append(booking.booking_id)
+        return
 
     await persist_dispatch_decision(
         conn,
@@ -134,7 +135,7 @@ async def _process_channel(
     )
     result.sent += 1
     result.processed_bookings.append(booking.booking_id)
-    return ok(None)
+    return
 
 
 async def _process_candidates_for_window(
@@ -153,11 +154,11 @@ async def _process_candidates_for_window(
             await _process_channel(booking, window, channel, now_utc, dry_run, result, conn)
 
 
-async def _main_async(args: dict[str, object]) -> Result[CronResult]:
+async def _main_async(args: dict[str, object]) -> CronResult:
     try:
         input_data = InputSchema.model_validate(args)
     except Exception as e:
-        return fail(f"Invalid input: {e}")
+        raise RuntimeError(f"Invalid input: {e}") from e
 
     conn = await create_db_client()
     try:
@@ -172,11 +173,11 @@ async def _main_async(args: dict[str, object]) -> Result[CronResult]:
         one_day_bookings = await get_candidates_between(conn, one_day_start, one_day_end)
         await _process_candidates_for_window(conn, one_day_bookings, "1day", now, input_data.dry_run, result)
 
-        return ok(result)
+        return result
 
     except Exception as e:
         log("Unexpected error in reminder_cron", error=str(e), module=MODULE)
-        return fail(f"Internal error: {e}")
+        raise RuntimeError(f"Internal error: {e}") from e
     finally:
         await conn.close()
 
@@ -194,9 +195,7 @@ def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
         else:
             validated = InputSchema.model_validate(args)
 
-        err, result = asyncio.run(_main_async(validated.model_dump()))
-        if err:
-            raise err
+        result = asyncio.run(_main_async(validated.model_dump()))
 
         if result is None:
             return {}

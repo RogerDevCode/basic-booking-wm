@@ -38,9 +38,8 @@ async def test_waitlist_join_success() -> None:
     ):
         args: dict[str, Any] = {"action": "join", "user_id": VALID_ID, "service_id": VALID_ID}
 
-        err, result = await main(args)
+        result = await main(args)
 
-        assert err is None
         assert result is not None
         assert result["position"] == 6
         assert "Joined waitlist" in result["message"]

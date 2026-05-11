@@ -3,8 +3,6 @@ from __future__ import annotations
 import os
 from typing import Final
 
-from ._result import Result, fail, ok
-
 # ============================================================================
 # CONFIG — Single Source of Truth for all constants and configuration
 # ============================================================================
@@ -55,12 +53,12 @@ def get_env(name: str, default: str | None = None) -> str | None:
     return os.getenv(name, default)
 
 
-def require_env(name: str) -> Result[str]:
+def require_env(name: str) -> str:
     val = os.getenv(name)
     if not val:
-        return fail(f"CONFIGURATION_ERROR: Required environment variable {name} is not set.")
-    return ok(val)
+        raise RuntimeError(f"CONFIGURATION_ERROR: Required environment variable {name} is not set.")
+    return val
 
 
-def require_database_url() -> Result[str]:
+def require_database_url() -> str:
     return require_env("DATABASE_URL")

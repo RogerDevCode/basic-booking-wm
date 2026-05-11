@@ -42,9 +42,8 @@ async def test_execute_reschedule_logic_success() -> None:
         "old_status": "rescheduled",
     }
 
-    err, res = await execute_reschedule_logic(repo, input_data, old_booking, service)
+    res = await execute_reschedule_logic(repo, input_data, old_booking, service)
 
-    assert err is None
     assert res is not None
     assert res["new_booking_id"] == "new-bk"
     repo.check_overlap.assert_called_once()
@@ -71,8 +70,5 @@ async def test_execute_reschedule_logic_overlap() -> None:
 
     repo.check_overlap.return_value = True
 
-    err, res = await execute_reschedule_logic(repo, input_data, old_booking, service)
-
-    assert err is not None
-    assert "already_booked" in str(err)
-    assert res is None
+    with pytest.raises(RuntimeError, match="new_time_slot_already_booked"):
+        await execute_reschedule_logic(repo, input_data, old_booking, service)

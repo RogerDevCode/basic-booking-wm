@@ -30,10 +30,8 @@ async def test_telegram_auto_register_success() -> None:
     ):
         args: dict[str, Any] = {"chat_id": "123456", "first_name": "Test", "last_name": "User"}
 
-        err, result = await main(args)
+        result = await main(args)
 
-        assert err is None
-        assert result is not None
         assert result["client_id"] == "c456"
         assert result["user_id"] == "c456"  # user_id aliases client_id
         assert result["is_new"] is True

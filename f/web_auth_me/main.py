@@ -24,10 +24,10 @@ import asyncio
 # RLS Tenant ID   : YES — with_tenant_context wraps all DB ops
 # Pydantic Schemas: YES — InputSchema validates user_id
 # ============================================================================
-from typing import Any
+from typing import Any, cast
 
 from ..internal._db_client import create_db_client
-from ..internal._result import Result, fail, with_tenant_context
+from ..internal._result import with_tenant_context
 from ..internal._wmill_adapter import log
 from ._me_logic import get_user_profile
 from ._me_models import InputSchema, UserProfileResult
@@ -35,33 +35,32 @@ from ._me_models import InputSchema, UserProfileResult
 MODULE = "web_auth_me"
 
 
-async def _main_async(args: dict[str, Any]) -> Result[UserProfileResult]:
+async def _main_async(args: dict[str, Any]) -> UserProfileResult:
     # 1. Validate Input
     try:
         input_data = InputSchema.model_validate(args)
     except Exception as e:
-        return fail(f"Validation error: {e}")
+        raise RuntimeError(f"Validation error: {e}") from e
 
     conn = await create_db_client()
     try:
         # 2. Execute within Tenant Context
-        async def operation() -> Result[UserProfileResult]:
-            return await get_user_profile(conn, input_data.user_id)
+        async def operation() -> UserProfileResult:
+            result = await get_user_profile(conn, input_data.user_id)
+            return result
 
-        return await with_tenant_context(conn, input_data.user_id, operation)
+        result = await with_tenant_context(conn, input_data.user_id, operation)
+        return result
 
     except Exception as e:
         log("Internal error in web_auth_me", error=str(e), module=MODULE)
-        return fail(f"Internal error: {e}")
+        raise RuntimeError(f"Internal error: {e}") from e
     finally:
         await conn.close()  # pyright: ignore[reportUnknownMemberType]
 
 
 def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
     import traceback
-    from typing import cast
-
-    from pydantic import BaseModel
 
     try:
         if isinstance(args, InputSchema):
@@ -69,19 +68,8 @@ def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
         else:
             validated = InputSchema.model_validate(args)
 
-        err, result = asyncio.run(_main_async(validated.model_dump()))
-        if err:
-            raise err
-
-        if result is None:
-            return {}
-
-        if isinstance(result, BaseModel):
-            return cast("dict[str, object]", result.model_dump())
-        elif isinstance(result, dict):
-            return cast("dict[str, object]", result)
-        else:
-            return {"data": result}
+        result = asyncio.run(_main_async(validated.model_dump()))
+        return cast("dict[str, object]", result)
 
     except Exception as e:
         tb = traceback.format_exc()

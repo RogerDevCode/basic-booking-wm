@@ -4,9 +4,8 @@ import json
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Literal, cast
 
-from ..internal._result import DBClient, Result, fail, ok
-
 if TYPE_CHECKING:
+    from ..internal._result import DBClient
     from ._dlq_models import DLQEntry, DLQListResult
 
 
@@ -48,7 +47,7 @@ def map_row_to_dlq_entry(row: object) -> DLQEntry:
     }
 
 
-async def list_dlq(db: DBClient, status_filter: str | None) -> Result[DLQListResult]:
+async def list_dlq(db: DBClient, status_filter: str | None) -> DLQListResult:
     status = status_filter if status_filter in ["pending", "resolved", "discarded"] else "pending"
     rows = await db.fetch(
         """
@@ -61,10 +60,10 @@ async def list_dlq(db: DBClient, status_filter: str | None) -> Result[DLQListRes
     )
     entries = [map_row_to_dlq_entry(r) for r in rows]
     res: DLQListResult = {"entries": entries, "total": len(entries)}
-    return ok(res)
+    return res
 
 
-async def retry_dlq(db: DBClient, dlq_id: int | None) -> Result[dict[str, Any]]:
+async def retry_dlq(db: DBClient, dlq_id: int | None) -> dict[str, Any]:
     if dlq_id is None:
         # Batch retry
         rows = await db.fetch(
@@ -81,19 +80,19 @@ async def retry_dlq(db: DBClient, dlq_id: int | None) -> Result[dict[str, Any]]:
             await db.execute("UPDATE booking_dlq SET updated_at = NOW() WHERE dlq_id = $1", r["dlq_id"])
             retried_ids.append(int(cast("Any", r["dlq_id"])))
         res_batch: dict[str, Any] = {"retried": retried_ids, "count": len(retried_ids)}
-        return ok(res_batch)
+        return res_batch
 
     # Single retry
     rows = await db.fetch("SELECT dlq_id FROM booking_dlq WHERE dlq_id = $1 AND status = 'pending' FOR UPDATE", dlq_id)
     if not rows:
-        return fail(f"dlq_entry_not_found_or_not_pending: ID {dlq_id}")
+        raise RuntimeError(f"dlq_entry_not_found_or_not_pending: ID {dlq_id}")
 
     await db.execute("UPDATE booking_dlq SET updated_at = NOW() WHERE dlq_id = $1", dlq_id)
     res_single: dict[str, Any] = {"retried": [dlq_id]}
-    return ok(res_single)
+    return res_single
 
 
-async def resolve_dlq(db: DBClient, dlq_id: int, resolved_by: str | None, notes: str | None) -> Result[dict[str, int]]:
+async def resolve_dlq(db: DBClient, dlq_id: int, resolved_by: str | None, notes: str | None) -> dict[str, int]:
     res = await db.execute(
         """
         UPDATE booking_dlq
@@ -109,11 +108,11 @@ async def resolve_dlq(db: DBClient, dlq_id: int, resolved_by: str | None, notes:
         dlq_id,
     )
     if "UPDATE 1" not in res:
-        return fail(f"dlq_entry_not_found: ID {dlq_id}")
-    return ok({"resolved": dlq_id})
+        raise RuntimeError(f"dlq_entry_not_found: ID {dlq_id}")
+    return {"resolved": dlq_id}
 
 
-async def discard_dlq(db: DBClient, dlq_id: int, notes: str | None) -> Result[dict[str, int]]:
+async def discard_dlq(db: DBClient, dlq_id: int, notes: str | None) -> dict[str, int]:
     res = await db.execute(
         """
         UPDATE booking_dlq
@@ -127,11 +126,11 @@ async def discard_dlq(db: DBClient, dlq_id: int, notes: str | None) -> Result[di
         dlq_id,
     )
     if "UPDATE 1" not in res:
-        return fail(f"dlq_entry_not_found: ID {dlq_id}")
-    return ok({"discarded": dlq_id})
+        raise RuntimeError(f"dlq_entry_not_found: ID {dlq_id}")
+    return {"discarded": dlq_id}
 
 
-async def get_dlq_status_stats(db: DBClient) -> Result[dict[str, int]]:
+async def get_dlq_status_stats(db: DBClient) -> dict[str, int]:
     rows = await db.fetch("SELECT status, COUNT(*) as count FROM booking_dlq GROUP BY status")
     stats: dict[str, int] = {str(r["status"]): int(cast("Any", r["count"])) for r in rows}
-    return ok(stats)
+    return stats

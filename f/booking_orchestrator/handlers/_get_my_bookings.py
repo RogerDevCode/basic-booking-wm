@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import zoneinfo
-from collections.abc import Callable, Coroutine, Mapping
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, cast
 
-from f.internal._result import DBClient, Result, fail, ok, with_tenant_context
+from f.internal._result import DBClient, with_tenant_context
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, Coroutine, Mapping
+
     from f.booking_orchestrator._orchestrator_models import OrchestratorInput, OrchestratorResult
 
 """
@@ -24,14 +25,14 @@ Zod Schemas      : NO
 
 async def handle_get_my_bookings(
     conn: DBClient, input_data: OrchestratorInput, delegates: Mapping[str, Callable[..., Coroutine[Any, Any, Any]]]
-) -> Result[OrchestratorResult]:
+) -> OrchestratorResult:
     client_id = input_data.client_id
     tenant_id = input_data.tenant_id
 
     if not client_id or not tenant_id:
-        return fail("Falta identificación de paciente o establecimiento.")
+        raise RuntimeError("Falta identificación de paciente o establecimiento.")
 
-    async def operation() -> Result[list[dict[str, object]]]:
+    async def operation() -> list[dict[str, object]]:
         # Get UI preference for limits
         prefs_row = await conn.fetchrow(
             "SELECT ui_preferences->>'max_bookings_per_query' as max_b"
@@ -60,11 +61,9 @@ async def handle_get_my_bookings(
             client_id,
             limit,
         )
-        return None, rows
+        return rows
 
-    err, rows = await with_tenant_context(conn, tenant_id, operation)
-    if err or rows is None:
-        return err or Exception("Failed to fetch bookings"), None
+    rows = await with_tenant_context(conn, tenant_id, operation)
 
     tz = zoneinfo.ZoneInfo("America/Santiago")
     lines: list[str] = []
@@ -90,4 +89,4 @@ async def handle_get_my_bookings(
         "message": f"📋 Tus próximas citas:\n{msg_body}" if lines else "📋 No tienes próximas citas.",
         "follow_up": input_data.notes,
     }
-    return ok(res_data)
+    return res_data

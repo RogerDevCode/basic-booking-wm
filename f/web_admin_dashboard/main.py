@@ -25,7 +25,7 @@ from __future__ import annotations
 # Pydantic Schemas: YES — InputSchema validates admin_user_id
 # ============================================================================
 from ..internal._db_client import create_db_client
-from ..internal._result import Result, fail, with_tenant_context
+from ..internal._result import with_tenant_context
 from ..internal._wmill_adapter import log
 from ._dashboard_logic import fetch_dashboard_stats
 from ._dashboard_models import AdminDashboardResult, InputSchema
@@ -33,24 +33,24 @@ from ._dashboard_models import AdminDashboardResult, InputSchema
 MODULE = "web_admin_dashboard"
 
 
-async def _main_async(args: dict[str, object]) -> Result[AdminDashboardResult]:
+async def _main_async(args: dict[str, object]) -> AdminDashboardResult:
     # 1. Validate Input
     try:
         input_data = InputSchema.model_validate(args)
     except Exception as e:
-        return fail(f"Validation error: {e}")
+        raise RuntimeError(f"Validation error: {e}") from e
 
     conn = await create_db_client()
     try:
         # 2. Execute within Tenant Context (admin_user_id is the tenant filter for with_tenant_context)
-        async def operation() -> Result[AdminDashboardResult]:
+        async def operation() -> AdminDashboardResult:
             return await fetch_dashboard_stats(conn, input_data)
 
         return await with_tenant_context(conn, input_data.admin_user_id, operation)
 
     except Exception as e:
         log("Admin Dashboard Internal Error", error=str(e), module=MODULE)
-        return fail(f"internal_error: {e}")
+        raise RuntimeError(f"internal_error: {e}") from e
     finally:
         await conn.close()
 
@@ -68,9 +68,7 @@ def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
         else:
             validated = InputSchema.model_validate(args)
 
-        err, result = asyncio.run(_main_async(validated.model_dump()))
-        if err:
-            raise err
+        result = asyncio.run(_main_async(validated.model_dump()))
 
         if result is None:
             return {}

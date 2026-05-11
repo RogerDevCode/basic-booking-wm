@@ -45,8 +45,7 @@ async def test_provider_agenda_success() -> None:
         args: dict[str, Any] = {"provider_id": VALID_ID, "date_from": "2026-05-01", "date_to": "2026-05-01"}
 
         # main returns result or raises
-        err, result = await main(args)
-        assert err is None
+        result = await main(args)
         assert result is not None
         assert isinstance(result, list)
         assert len(result) == 1

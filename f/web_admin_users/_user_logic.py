@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any
 
-from ..internal._result import DBClient, Result, fail, ok
+from ..internal._result import DBClient
 from ._user_models import InputSchema, UserInfo, UsersListResult
 
 
@@ -26,7 +26,7 @@ def map_row(r: dict[str, Any]) -> UserInfo:
     }
 
 
-async def handle_user_actions(db: DBClient, input_data: InputSchema) -> Result[UserInfo | UsersListResult]:
+async def handle_user_actions(db: DBClient, input_data: InputSchema) -> UserInfo | UsersListResult:
     action = input_data.action
 
     if action == "list":
@@ -42,22 +42,25 @@ async def handle_user_actions(db: DBClient, input_data: InputSchema) -> Result[U
         users = [map_row(r) for r in rows]
         count_rows = await db.fetch("SELECT COUNT(*) AS total FROM users")
         total = int(count_rows[0]["total"]) if count_rows else 0  # type: ignore[call-overload]
-        return ok({"users": users, "total": total})
+        return {"users": users, "total": total}
 
     if not input_data.target_user_id:
-        return fail(f"{action}_failed: target_user_id is required")
+        raise RuntimeError(f"{action}_failed: target_user_id is required")
 
     if action == "get":
         rows = await db.fetch("SELECT * FROM users WHERE user_id = $1::uuid LIMIT 1", input_data.target_user_id)
         if not rows:
-            return fail("User not found")
-        return ok(map_row(rows[0]))
+            raise RuntimeError("User not found")
+        return map_row(rows[0])
 
     elif action == "update":
+        _ALLOWED = {"full_name", "email", "phone", "role"}
         fields = []
         params = []
         idx = 1
         for field in ["full_name", "email", "phone", "role"]:
+            if field not in _ALLOWED:
+                continue
             val = getattr(input_data, field)
             if val is not None:
                 fields.append(f"{field} = ${idx}")
@@ -65,14 +68,14 @@ async def handle_user_actions(db: DBClient, input_data: InputSchema) -> Result[U
                 idx += 1
 
         if not fields:
-            return fail("update_failed: no fields provided")
+            raise RuntimeError("update_failed: no fields provided")
 
         params.append(input_data.target_user_id)
         query = f"UPDATE users SET {', '.join(fields)}, updated_at = NOW() WHERE user_id = ${idx}::uuid RETURNING *"
         rows = await db.fetch(query, *params)
         if not rows:
-            return fail("User not found")
-        return ok(map_row(rows[0]))
+            raise RuntimeError("User not found")
+        return map_row(rows[0])
 
     elif action == "activate" or action == "deactivate":
         active = action == "activate"
@@ -82,7 +85,7 @@ async def handle_user_actions(db: DBClient, input_data: InputSchema) -> Result[U
             input_data.target_user_id,
         )
         if not rows:
-            return fail("User not found")
-        return ok(map_row(rows[0]))
+            raise RuntimeError("User not found")
+        return map_row(rows[0])
 
-    return fail(f"Unsupported action: {action}")
+    raise RuntimeError(f"Unsupported action: {action}")

@@ -3,11 +3,12 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from f.internal._date_resolver import resolve_date, resolve_time
-from f.internal._result import DBClient, Result, fail, ok
 
 from ._get_entity import get_entity
 
 if TYPE_CHECKING:
+    from f.internal._result import DBClient
+
     from ._orchestrator_models import OrchestratorInput, ResolvedContext
 
 """
@@ -20,7 +21,7 @@ Zod Schemas      : NO
 """
 
 
-async def resolve_context(db: DBClient, input_data: OrchestratorInput) -> Result[ResolvedContext]:
+async def resolve_context(db: DBClient, input_data: OrchestratorInput) -> ResolvedContext:
     """
     Intelligently resolves missing IDs and normalises date/time.
     """
@@ -96,7 +97,7 @@ async def resolve_context(db: DBClient, input_data: OrchestratorInput) -> Result
                 timezone = str(rows[0]["timezone"])
 
         if not timezone:
-            return fail("Timezone resolution failed. A provider or client with a valid timezone is required.")
+            raise RuntimeError("Timezone resolution failed. A provider or client with a valid timezone is required.")
 
         # 5. Date/Time Parsing
         if res_date:
@@ -121,7 +122,7 @@ async def resolve_context(db: DBClient, input_data: OrchestratorInput) -> Result
                     provider_id = tenant_id
 
         if not tenant_id:
-            return fail("Could not resolve tenant_id")
+            raise RuntimeError("Could not resolve tenant_id")
 
         # 7. Service Fallback (Pick first service of the provider)
         if not service_id and provider_id:
@@ -137,6 +138,8 @@ async def resolve_context(db: DBClient, input_data: OrchestratorInput) -> Result
             "date": res_date,
             "time": res_time,
         }
-        return ok(res)
+        return res
     except Exception as e:
-        return fail(f"Context resolution error: {e}")
+        if isinstance(e, RuntimeError):
+            raise
+        raise RuntimeError(f"Context resolution error: {e}") from e

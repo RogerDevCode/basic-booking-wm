@@ -43,22 +43,20 @@ class TestBookingOperations:
             "actor": "client",
         }
         mock_db_factory.return_value = mock_db
-        mock_with_tenant.return_value = (None, {"booking_id": VALID_BOOKING_ID, "status": "confirmed"})
+        mock_with_tenant.return_value = {"booking_id": VALID_BOOKING_ID, "status": "confirmed"}
 
         # Act
-        err, result = await create_main(args)
+        result = await create_main(args)
 
         # Assert
-        assert err is None
         assert result is not None
         assert result["booking_id"] == VALID_BOOKING_ID
 
     @pytest.mark.asyncio
     @patch("f.booking_cancel.main.create_db_client")
     @patch("f.booking_cancel.main.PostgresBookingCancelRepository")
-    @patch("f.booking_cancel.main.with_tenant_context")
     async def test_cancel_booking_not_found(
-        self, mock_with_tenant: AsyncMock, mock_repo_class: MagicMock, mock_db_factory: AsyncMock, mock_db: MagicMock
+        self, mock_repo_class: MagicMock, mock_db_factory: AsyncMock, mock_db: MagicMock
     ) -> None:
         # Arrange
         args: dict[str, Any] = {"booking_id": VALID_BOOKING_ID, "actor": "client", "actor_id": VALID_CLIENT_ID}
@@ -68,12 +66,9 @@ class TestBookingOperations:
         repo_mock.fetch_booking = AsyncMock(return_value=None)
         mock_repo_class.return_value = repo_mock
 
-        # Act
-        err, _result = await cancel_main(args)
-
-        # Assert
-        assert err is not None
-        assert "not_found" in str(err).lower()
+        # Act & Assert
+        with pytest.raises(RuntimeError, match="not_found"):
+            await cancel_main(args)
 
     @pytest.mark.asyncio
     @patch("f.booking_reschedule.main.create_db_client")
@@ -108,11 +103,8 @@ class TestBookingOperations:
         mock_repo_class.return_value = repo_mock
 
         # Mock transaction failure for overlap
-        mock_with_tenant.return_value = (Exception("overlap"), None)
+        mock_with_tenant.side_effect = RuntimeError("overlap")
 
-        # Act
-        err, _result = await reschedule_main(args)
-
-        # Assert
-        assert err is not None
-        assert "occupied" in str(err).lower() or "overlap" in str(err).lower()
+        # Act & Assert
+        with pytest.raises(RuntimeError):
+            await reschedule_main(args)

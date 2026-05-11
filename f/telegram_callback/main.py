@@ -16,12 +16,9 @@ from __future__ import annotations
 
 import asyncio
 import traceback
-from collections.abc import Callable, Coroutine
-from typing import TYPE_CHECKING, Any, cast
+from typing import cast
 
 from pydantic import BaseModel
-
-from ..booking_reschedule.main import main_async as booking_reschedule_async
 
 # ============================================================================
 # PRE-FLIGHT CHECKLIST
@@ -38,32 +35,28 @@ from ._callback_logic import answer_callback_query, parse_callback_data, send_fo
 from ._callback_models import ActionContext, InputSchema
 from ._callback_router import AcknowledgeHandler, AutoRescheduleHandler, CancelHandler, ConfirmHandler, TelegramRouter
 
-if TYPE_CHECKING:
-    from ..internal._result import Result
-
 MODULE = "telegram_callback"
 
 
 async def _main_async(
     args: dict[str, object],
-    book_reschedule_fn: Callable[[Any], Coroutine[Any, Any, Any]],
-) -> Result[dict[str, object]]:
+) -> dict[str, object]:
     # 1. Validate Input
     try:
         input_data = InputSchema.model_validate(args)
     except Exception as e:
-        return Exception(f"Invalid input: {e}"), None
+        raise RuntimeError(f"Invalid input: {e}") from e
 
     # 2. Resolve bot token
     bot_token = get_variable("TELEGRAM_BOT_TOKEN")
     if not bot_token:
-        return Exception("TELEGRAM_BOT_TOKEN not configured"), None
+        raise RuntimeError("TELEGRAM_BOT_TOKEN not configured")
 
     # 3. Parse callback data
     parsed_cb = parse_callback_data(input_data.callback_data)
     if not parsed_cb:
         await answer_callback_query(bot_token, input_data.callback_query_id, "⚠️ Acción no reconocida")
-        return Exception(f"Invalid callback data format: {input_data.callback_data}"), None
+        raise RuntimeError(f"Invalid callback data format: {input_data.callback_data}")
 
     action = parsed_cb["action"]
     booking_id = parsed_cb["booking_id"]
@@ -72,14 +65,14 @@ async def _main_async(
     tenant_id = input_data.client_id or input_data.user_id
     if not tenant_id:
         await answer_callback_query(bot_token, input_data.callback_query_id, "⚠️ Error de identificación")
-        return Exception("tenant_id could not be determined"), None
+        raise RuntimeError("tenant_id could not be determined")
 
     # 5. Route and execute action
     router = TelegramRouter()
     router.register("confirm", ConfirmHandler())
     router.register("cancel", CancelHandler())
     router.register("acknowledge", AcknowledgeHandler())
-    router.register("auto_reschedule", AutoRescheduleHandler(book_reschedule_fn))
+    router.register("auto_reschedule", AutoRescheduleHandler())
 
     context: ActionContext = {
         "botToken": bot_token,
@@ -92,9 +85,7 @@ async def _main_async(
         "time": parsed_cb.get("time"),
     }
 
-    err_route, result = await router.route(action, context)
-    if err_route or not result:
-        return err_route or Exception("Route failed"), None
+    result = await router.route(action, context)
 
     # 6. Response to Telegram
     await answer_callback_query(bot_token, input_data.callback_query_id, result["responseText"])
@@ -102,13 +93,12 @@ async def _main_async(
     if result.get("followUpText"):
         await send_followup_message(bot_token, input_data.chat_id, str(result["followUpText"]))
 
-    res: dict[str, object] = {
+    return {
         "action": action,
         "booking_id": booking_id,
         "callback_query_id": input_data.callback_query_id,
         "response_text": result["responseText"],
     }
-    return None, res
 
 
 def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
@@ -118,9 +108,7 @@ def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
         else:
             validated = InputSchema.model_validate(args)
 
-        err, result = asyncio.run(_main_async(validated.model_dump(), booking_reschedule_async))
-        if err:
-            raise err
+        result = asyncio.run(_main_async(validated.model_dump()))
 
         if result is None:
             return {}

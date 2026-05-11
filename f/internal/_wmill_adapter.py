@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import TypeVar, cast
 
 try:
@@ -70,19 +71,27 @@ def run_script(path: str, args: dict[str, object] | None = None) -> tuple[Except
         return e, None
 
 
-import logging
+_logger: logging.Logger | None = None
 
-logger = logging.getLogger("booking_titanium")
-if not logger.handlers:
-    handler = logging.StreamHandler()
-    formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
-    logger.setLevel(logging.INFO)
+
+def _init_logging() -> logging.Logger:
+    global _logger
+    if _logger is not None:
+        return _logger
+    logger = logging.getLogger("booking_titanium")
+    if not logger.handlers:
+        handler = logging.StreamHandler()
+        formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+        logger.setLevel(logging.INFO)
+    _logger = logger
+    return logger
 
 
 def log(message: str, **kwargs: object) -> None:
     try:
+        logger = _init_logging()
         level = logging.INFO
         msg_upper = message.upper()
         if "ERROR" in msg_upper or "CATASTROPHE" in msg_upper or "FAIL" in msg_upper:

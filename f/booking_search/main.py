@@ -24,8 +24,6 @@ from __future__ import annotations
 # RLS Tenant ID   : YES (if provider_id is supplied, but since it is optional, we might query globally if authorized)
 # Zod Schemas     : YES — SearchInput validates all inputs
 # ============================================================================
-from typing import TYPE_CHECKING
-
 from pydantic import ValidationError
 
 from ..internal._db_client import create_db_client
@@ -33,13 +31,10 @@ from ..internal._wmill_adapter import log
 from ._search_logic import execute_search
 from ._search_models import BookingSearchResult, SearchInput
 
-if TYPE_CHECKING:
-    from ..internal._result import Result
-
 MODULE = "booking_search"
 
 
-async def _main_async(args: dict[str, object]) -> Result[BookingSearchResult]:
+async def _main_async(args: dict[str, object]) -> BookingSearchResult:
     raw_input: object
     if "rawInput" in args:
         raw_input = args["rawInput"]
@@ -52,29 +47,23 @@ async def _main_async(args: dict[str, object]) -> Result[BookingSearchResult]:
         input_data = SearchInput.model_validate(raw_input)
     except ValidationError as e:
         log("Validation error", error=str(e), module=MODULE)
-        return Exception(f"Validation error: {e}"), None
+        raise RuntimeError(f"Validation error: {e}") from e
     except Exception as e:
         log("Validation error", error=str(e), module=MODULE)
-        return Exception(f"Validation error: {e}"), None
+        raise RuntimeError(f"Validation error: {e}") from e
 
     try:
         conn = await create_db_client()
     except Exception as e:
-        return Exception(f"CONFIGURATION_ERROR: {e}"), None
+        raise RuntimeError(f"CONFIGURATION_ERROR: {e}") from e
 
     try:
-        err, result = await execute_search(conn, input_data)
-        if err is not None:
-            return err, None
-
-        if not result:
-            return Exception("Search failed: no result returned"), None
-
-        return None, result
+        result = await execute_search(conn, input_data)
+        return result
     except Exception as e:
         msg = str(e)
         log("Internal error", error=msg, module=MODULE)
-        return Exception(f"Internal error: {msg}"), None
+        raise RuntimeError(f"Internal error: {msg}") from e
     finally:
         await conn.close()
 
@@ -92,9 +81,7 @@ def main(args: SearchInput | dict[str, object]) -> dict[str, object]:
         else:
             validated = SearchInput.model_validate(args)
 
-        err, result = asyncio.run(_main_async(validated.model_dump()))
-        if err:
-            raise err
+        result = asyncio.run(_main_async(validated.model_dump()))
 
         if result is None:
             return {}

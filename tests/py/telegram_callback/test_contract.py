@@ -17,8 +17,8 @@ VALID_BOOKING_ID = "b2c3d4e5-f6a7-8901-bcde-f12345678901"
 @pytest.mark.asyncio
 async def test_telegram_callback_confirm_success() -> None:
     mock_db = AsyncMock()
-    # 1. SELECT in confirm_booking
-    mock_db.fetch.return_value = [{"booking_id": VALID_BOOKING_ID, "status": "pending", "client_id": VALID_TENANT_ID}]
+    # 1. UPDATE ... RETURNING in confirm_booking (now uses fetchrow)
+    mock_db.fetchrow.return_value = {"booking_id": VALID_BOOKING_ID, "status": "pending", "client_id": VALID_TENANT_ID}
 
     # Mock with_tenant_context
     async def mock_with_tenant(db: object, tid: str, op: Callable[[], Coroutine[Any, Any, object]]) -> object:
@@ -38,9 +38,8 @@ async def test_telegram_callback_confirm_success() -> None:
             "client_id": VALID_TENANT_ID,
         }
 
-        err, result = await main(args, AsyncMock())
+        result = await main(args)
 
-        assert err is None
         assert isinstance(result, dict)
         assert result["action"] == "confirm"
         assert "Cita confirmada" in str(result["response_text"])
@@ -60,6 +59,5 @@ async def test_telegram_callback_invalid_data() -> None:
             "client_id": VALID_TENANT_ID,
         }
 
-        err, _result = await main(args, AsyncMock())
-        assert err is not None
-        assert "Invalid callback data" in str(err)
+        with pytest.raises(RuntimeError, match="Invalid callback data"):
+            await main(args)

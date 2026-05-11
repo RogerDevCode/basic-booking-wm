@@ -1,12 +1,12 @@
 from typing import TYPE_CHECKING, Any
 
-from ..internal._result import DBClient, Result, fail, ok
+from ..internal._result import DBClient
 
 if TYPE_CHECKING:
     from ._regions_models import CommuneRow, RegionRow
 
 
-async def list_regions(db: DBClient) -> Result[dict[str, Any]]:
+async def list_regions(db: DBClient) -> dict[str, Any]:
     try:
         rows = await db.fetch(
             "SELECT region_id, name, code, is_active, sort_order FROM regions WHERE is_active = true ORDER BY sort_order ASC, name ASC"  # noqa: E501
@@ -21,12 +21,12 @@ async def list_regions(db: DBClient) -> Result[dict[str, Any]]:
             }
             for r in rows
         ]
-        return ok({"regions": regions, "count": len(regions)})
+        return {"regions": regions, "count": len(regions)}
     except Exception as e:
-        return fail(f"list_regions_failed: {e}")
+        raise RuntimeError(f"list_regions_failed: {e}") from e
 
 
-async def list_communes(db: DBClient, region_id: int | None) -> Result[dict[str, Any]]:
+async def list_communes(db: DBClient, region_id: int | None) -> dict[str, Any]:
     try:
         if region_id is not None:
             rows = await db.fetch(
@@ -57,12 +57,12 @@ async def list_communes(db: DBClient, region_id: int | None) -> Result[dict[str,
             }
             for r in rows
         ]
-        return ok({"communes": communes, "count": len(communes)})
+        return {"communes": communes, "count": len(communes)}
     except Exception as e:
-        return fail(f"list_communes_failed: {e}")
+        raise RuntimeError(f"list_communes_failed: {e}") from e
 
 
-async def search_communes(db: DBClient, search: str, region_id: int | None) -> Result[dict[str, Any]]:
+async def search_communes(db: DBClient, search: str, region_id: int | None) -> dict[str, Any]:
     try:
         pattern = f"%{search}%"
         if region_id is not None:
@@ -98,6 +98,6 @@ async def search_communes(db: DBClient, search: str, region_id: int | None) -> R
             }
             for r in rows
         ]
-        return ok({"communes": communes, "count": len(communes)})
+        return {"communes": communes, "count": len(communes)}
     except Exception as e:
-        return fail(f"search_communes_failed: {e}")
+        raise RuntimeError(f"search_communes_failed: {e}") from e

@@ -2,9 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, TypedDict
 
-from ..internal._result import DBClient, Result, fail, ok
-
 if TYPE_CHECKING:
+    from ..internal._result import DBClient
     from ._rag_models import KBEntry, KBRow
 
 
@@ -12,7 +11,7 @@ class KBRepository:
     def __init__(self, db: DBClient) -> None:
         self.db = db
 
-    async def fetch_active_entries(self, category: str | None = None) -> Result[list[KBRow]]:
+    async def fetch_active_entries(self, category: str | None = None) -> list[KBRow]:
         try:
             if category:
                 rows = await self.db.fetch(
@@ -42,9 +41,9 @@ class KBRepository:
                 }
                 for r in rows
             ]
-            return ok(result)
+            return result
         except Exception as e:
-            return fail(f"kb_fetch_failed: {e}")
+            raise RuntimeError(f"kb_fetch_failed: {e}") from e
 
 
 class ScoredEntry(TypedDict):

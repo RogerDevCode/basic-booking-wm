@@ -25,7 +25,7 @@ from __future__ import annotations
 # Pydantic Schemas: YES — InputSchema validates action and fields
 # ============================================================================
 from ..internal._db_client import create_db_client
-from ..internal._result import Result, fail, with_tenant_context
+from ..internal._result import with_tenant_context
 from ..internal._wmill_adapter import log
 from ._manage_logic import (
     handle_override_actions,
@@ -38,12 +38,12 @@ from ._manage_models import InputSchema
 MODULE = "provider_manage"
 
 
-async def _main_async(args: dict[str, object]) -> Result[dict[str, object]]:
+async def _main_async(args: dict[str, object]) -> dict[str, object]:
     # 1. Validate Input
     try:
         input_data = InputSchema.model_validate(args)
     except Exception as e:
-        return fail(f"VALIDATION_ERROR: {e}")
+        raise RuntimeError(f"VALIDATION_ERROR: {e}") from e
 
     # For list_providers, provider_id might be None initially, but for others it is required
     # However, list_providers usually runs in admin context or with a specific provider filter.
@@ -52,7 +52,7 @@ async def _main_async(args: dict[str, object]) -> Result[dict[str, object]]:
     conn = await create_db_client()
     try:
         # 2. Execute within Tenant Context (if provider_id supplied)
-        async def operation() -> Result[dict[str, object]]:
+        async def operation() -> dict[str, object]:
             action = input_data.action
             if "provider" in action:
                 return await handle_provider_actions(conn, input_data)
@@ -63,7 +63,7 @@ async def _main_async(args: dict[str, object]) -> Result[dict[str, object]]:
             if "override" in action:
                 return await handle_override_actions(conn, input_data)
 
-            return fail(f"ROUTING_ERROR: Unknown action group: {action}")
+            raise RuntimeError(f"ROUTING_ERROR: Unknown action group: {action}")
 
         # If it's a global action like 'list_providers', we could use a dummy tenant or admin context
         tenant_id = input_data.provider_id or "00000000-0000-0000-0000-000000000000"
@@ -71,7 +71,7 @@ async def _main_async(args: dict[str, object]) -> Result[dict[str, object]]:
 
     except Exception as e:
         log("Provider Manage Internal Error", error=str(e), module=MODULE)
-        return fail(f"INTERNAL_ERROR: {e}")
+        raise RuntimeError(f"INTERNAL_ERROR: {e}") from e
     finally:
         await conn.close()
 
@@ -89,9 +89,7 @@ def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
         else:
             validated = InputSchema.model_validate(args)
 
-        err, result = asyncio.run(_main_async(validated.model_dump()))
-        if err:
-            raise err
+        result = asyncio.run(_main_async(validated.model_dump()))
 
         if result is None:
             return {}

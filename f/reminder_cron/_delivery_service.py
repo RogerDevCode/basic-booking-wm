@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from ..internal._result import Result, fail, ok
 from ..internal._wmill_adapter import run_script
 
 if TYPE_CHECKING:
@@ -15,7 +14,7 @@ def dispatch_reminder(
     recipient_id: str,
     reminder_window: ReminderWindow,
     message: ReminderMessage,
-) -> Result[None]:
+) -> None:
     if channel == "telegram":
         err, _ = run_script(
             "f/telegram_send/main.py",
@@ -27,8 +26,8 @@ def dispatch_reminder(
             },
         )
         if err is not None:
-            return fail(err)
-        return ok(None)
+            raise RuntimeError(err)
+        return
 
     err, _ = run_script(
         "f/gmail_send/main.py",
@@ -39,5 +38,5 @@ def dispatch_reminder(
         },
     )
     if err is not None:
-        return fail(err)
-    return ok(None)
+        raise RuntimeError(err)
+    return

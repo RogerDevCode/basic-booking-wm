@@ -29,7 +29,7 @@ from ..internal._booking_utils import get_active_booking_for_provider
 # Pydantic Schemas: YES — InputSchema validates parameters
 # ============================================================================
 from ..internal._db_client import create_db_client
-from ..internal._result import Result, fail, with_tenant_context
+from ..internal._result import with_tenant_context
 from ..internal._wmill_adapter import log
 from ._wizard_logic import WizardRepository, WizardUI
 from ._wizard_models import InputSchema, StepView, WizardState
@@ -37,12 +37,12 @@ from ._wizard_models import InputSchema, StepView, WizardState
 MODULE = "booking_wizard"
 
 
-async def _main_async(args: dict[str, object]) -> Result[dict[str, object]]:
+async def _main_async(args: dict[str, object]) -> dict[str, object]:
     # 1. Validate Input
     try:
         input_data = InputSchema.model_validate(args)
     except Exception as e:
-        return fail(f"invalid_input: {e}")
+        raise RuntimeError(f"invalid_input: {e}") from e
 
     conn = await create_db_client()
     try:
@@ -52,10 +52,10 @@ async def _main_async(args: dict[str, object]) -> Result[dict[str, object]]:
             tenant_id = str(input_data.wizard_state.get("client_id", ""))
 
         if not tenant_id:
-            return fail("authentication_error: tenant_id_required")
+            raise RuntimeError("authentication_error: tenant_id_required")
 
         # 2. Execute within Tenant Context
-        async def operation() -> Result[dict[str, object]]:
+        async def operation() -> dict[str, object]:
             repo = WizardRepository(conn)
 
             # Initial state
@@ -71,8 +71,8 @@ async def _main_async(args: dict[str, object]) -> Result[dict[str, object]]:
             # Resolve Service Duration
             duration = 30
             if input_data.service_id:
-                err_dur, d = await repo.get_service_duration(input_data.service_id)
-                if not err_dur and d:
+                d = await repo.get_service_duration(input_data.service_id)
+                if d:
                     duration = d
 
             # Resolve Provider Timezone
@@ -95,29 +95,25 @@ async def _main_async(args: dict[str, object]) -> Result[dict[str, object]]:
                     d_str = match.group(1) if match else state.selected_date
                     if d_str:
                         state.selected_date = d_str
-                        err_slots, slots = await repo.get_available_slots(input_data.provider_id or "", d_str, duration)
-                        if err_slots:
-                            return fail(err_slots)
-                        view = WizardUI.build_time_selection(state, slots or [])
+                        slots = await repo.get_available_slots(input_data.provider_id or "", d_str, duration)
+                        view = WizardUI.build_time_selection(state, slots)
                     else:
                         view = WizardUI.build_date_selection(state, 0, provider_tz)
 
             elif action == "select_time":
                 state.selected_time = input_data.user_input
-                err_names, names = await repo.get_names(input_data.provider_id or "", input_data.service_id or "")
-                if err_names or not names:
-                    return fail(err_names or "names_not_found")
+                names = await repo.get_names(input_data.provider_id or "", input_data.service_id or "")
+                if not names:
+                    raise RuntimeError("names_not_found")
                 view = WizardUI.build_confirmation(state, names["provider"], names["service"])
 
             elif action == "confirm":
                 if not input_data.provider_id or not input_data.service_id:
-                    return fail("missing_data_for_confirm")
+                    raise RuntimeError("missing_data_for_confirm")
 
                 # Check for duplicate active booking (Rule BE-02)
-                err_dup, active_booking = await get_active_booking_for_provider(
-                    conn, state.client_id, input_data.provider_id
-                )
-                if not err_dup and active_booking:
+                active_booking = await get_active_booking_for_provider(conn, state.client_id, input_data.provider_id)
+                if active_booking:
                     st = active_booking["start_time"]
                     fmt_time = st.strftime("%d/%m %H:%M") if hasattr(st, "strftime") else str(st)
 
@@ -138,7 +134,7 @@ async def _main_async(args: dict[str, object]) -> Result[dict[str, object]]:
                         ["\u00ab Volver al men\u00fa"],
                     ]
 
-                    return None, {
+                    return {
                         "message": message,
                         "reply_keyboard": reply_kb,
                         "new_state": state,
@@ -147,7 +143,7 @@ async def _main_async(args: dict[str, object]) -> Result[dict[str, object]]:
                         "is_complete": False,
                     }
 
-                err_create, _bid = await repo.create_booking(
+                await repo.create_booking(
                     state.client_id,
                     input_data.provider_id,
                     input_data.service_id,
@@ -156,8 +152,6 @@ async def _main_async(args: dict[str, object]) -> Result[dict[str, object]]:
                     input_data.timezone,
                     duration,
                 )
-                if err_create:
-                    return fail(err_create)
 
                 state.step = 99
                 view = {
@@ -184,7 +178,7 @@ async def _main_async(args: dict[str, object]) -> Result[dict[str, object]]:
                 view = WizardUI.build_date_selection(state, 0, provider_tz)
 
             if not view:
-                return fail("no_view_generated")
+                raise RuntimeError("no_view_generated")
 
             res: dict[str, object] = {
                 "message": view["message"],
@@ -194,13 +188,13 @@ async def _main_async(args: dict[str, object]) -> Result[dict[str, object]]:
                 "wizard_state": view["new_state"].model_dump(),
                 "is_complete": view["new_state"].step == 99,
             }
-            return None, res
+            return res
 
         return await with_tenant_context(conn, tenant_id, operation)
 
     except Exception as e:
         log("Wizard Orchestrator Error", error=str(e), module=MODULE)
-        return fail(f"internal_error: {e}")
+        raise RuntimeError(f"internal_error: {e}") from e
     finally:
         await conn.close()
 
@@ -218,9 +212,7 @@ def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
         else:
             validated = InputSchema.model_validate(args)
 
-        err, result = asyncio.run(_main_async(validated.model_dump()))
-        if err:
-            raise err
+        result = asyncio.run(_main_async(validated.model_dump()))
 
         if result is None:
             return {}

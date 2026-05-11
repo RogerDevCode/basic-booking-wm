@@ -25,7 +25,7 @@ from __future__ import annotations
 # Pydantic Schemas: YES — InputSchema validates provider_id, date_range
 # ============================================================================
 from ..internal._db_client import create_db_client
-from ..internal._result import Result, fail, with_tenant_context
+from ..internal._result import with_tenant_context
 from ..internal._wmill_adapter import log
 from ._agenda_logic import get_provider_agenda
 from ._agenda_models import InputSchema
@@ -33,17 +33,17 @@ from ._agenda_models import InputSchema
 MODULE = "provider_agenda"
 
 
-async def _main_async(args: dict[str, object]) -> Result[object]:
+async def _main_async(args: dict[str, object]) -> object:
     # 1. Validate Input
     try:
         input_data = InputSchema.model_validate(args)
     except Exception as e:
-        return fail(f"Validation error: {e}")
+        raise RuntimeError(f"Validation error: {e}") from e
 
     conn = await create_db_client()
     try:
         # 2. Execute within Tenant Context
-        async def operation() -> Result[object]:
+        async def operation() -> object:
             # Construct AgendaInput from InputSchema
             from datetime import date
 
@@ -59,7 +59,7 @@ async def _main_async(args: dict[str, object]) -> Result[object]:
 
     except Exception as e:
         log("Provider Agenda Internal Error", error=str(e), module=MODULE)
-        return fail(f"internal_error: {e}")
+        raise RuntimeError(f"internal_error: {e}") from e
     finally:
         await conn.close()
 
@@ -77,9 +77,7 @@ def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
         else:
             validated = InputSchema.model_validate(args)
 
-        err, result = asyncio.run(_main_async(validated.model_dump()))
-        if err:
-            raise err
+        result = asyncio.run(_main_async(validated.model_dump()))
 
         if result is None:
             return {}

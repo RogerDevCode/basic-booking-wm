@@ -25,9 +25,8 @@ async def test_register_success() -> None:
             "password_confirm": "Password123!",
         }
 
-        err, result = await main(args)
+        result = await main(args)
 
-        assert err is None
         assert result is not None
         assert result["user_id"] == "u1"
 
@@ -43,6 +42,5 @@ async def test_register_invalid_rut() -> None:
         "password": "Password123!",
         "password_confirm": "Password123!",
     }
-    err, _result = await main(args)
-    assert err is not None
-    assert "Invalid Chilean RUT" in str(err)
+    with pytest.raises(RuntimeError, match="Invalid Chilean RUT"):
+        await main(args)

@@ -22,9 +22,8 @@ async def test_gmail_send_success() -> None:
             "booking_details": {"provider_name": "Dr. House", "date": "2026-05-01"},
         }
 
-        err, result = await main(args)
+        result = await main(args)
 
-        assert err is None
         assert result is not None
         assert result["sent"] is True
         assert result["message_id"] == "msg-123"
@@ -33,6 +32,5 @@ async def test_gmail_send_success() -> None:
 @pytest.mark.asyncio
 async def test_gmail_send_invalid_input() -> None:
     args: dict[str, Any] = {"recipient_email": "invalid-email", "message_type": "booking_created"}
-    err, result = await main(args)
-    assert err is not None
-    assert result is None
+    with pytest.raises(RuntimeError):
+        await main(args)

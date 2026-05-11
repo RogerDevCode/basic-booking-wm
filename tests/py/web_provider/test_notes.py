@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -51,9 +51,8 @@ async def test_provider_notes_create_success() -> None:
             "content": "Test Content",
             "tag_ids": ["t1"],
         }
-        err, result = await main(args)
+        result = cast("dict[str, Any]", await main(args))
 
-        assert err is None
         assert result is not None
         assert result["note_id"] == "n1"
         assert result["content"] == "Test Content"

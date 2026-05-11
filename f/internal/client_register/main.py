@@ -37,6 +37,7 @@ async def _main_async(
         os.environ["DATABASE_URL"] = pg_url
 
     # Build the SET clause from provided fields
+    _ALLOWED_COLS = {"name", "phone", "email"}
     fields: dict[str, str] = {}
     if name is not None:
         fields["name"] = name
@@ -44,6 +45,11 @@ async def _main_async(
         fields["phone"] = phone
     if email is not None:
         fields["email"] = email
+
+    # Sanitise: reject any column not in whitelist
+    for col in fields:
+        if col not in _ALLOWED_COLS:
+            raise ValueError(f"Invalid column for client update: {col}")
 
     if not fields:
         log("client_register.skip", client_id=client_id, reason="no_fields_provided")

@@ -2,14 +2,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from ..internal._result import Result, fail, ok
-
 if TYPE_CHECKING:
     from ..internal._result import DBClient
     from ._patient_models import ClientResult, InputSchema
 
 
-async def upsert_client(db: DBClient, input_data: InputSchema) -> Result[ClientResult]:
+async def upsert_client(db: DBClient, input_data: InputSchema) -> ClientResult:
     """
     Business logic to create or update a patient record.
     Priority identification: Telegram > Email > Phone.
@@ -27,7 +25,7 @@ async def upsert_client(db: DBClient, input_data: InputSchema) -> Result[ClientR
                 if rows:
                     existing_id = str(rows[0]["client_id"])
             except Exception as e:
-                return fail(f"db_search_telegram_failed: {e}")
+                raise RuntimeError(f"db_search_telegram_failed: {e}") from e
 
         # Identification by Email (if telegram didn't match)
         if not existing_id and input_data.email:
@@ -36,7 +34,7 @@ async def upsert_client(db: DBClient, input_data: InputSchema) -> Result[ClientR
                 if rows:
                     existing_id = str(rows[0]["client_id"])
             except Exception as e:
-                return fail(f"db_search_email_failed: {e}")
+                raise RuntimeError(f"db_search_email_failed: {e}") from e
 
         # Identification by Phone (if still not found)
         if not existing_id and input_data.phone:
@@ -45,7 +43,7 @@ async def upsert_client(db: DBClient, input_data: InputSchema) -> Result[ClientR
                 if rows:
                     existing_id = str(rows[0]["client_id"])
             except Exception as e:
-                return fail(f"db_search_phone_failed: {e}")
+                raise RuntimeError(f"db_search_phone_failed: {e}") from e
 
         # 2. Update or Insert
         if existing_id:
@@ -70,11 +68,11 @@ async def upsert_client(db: DBClient, input_data: InputSchema) -> Result[ClientR
                     existing_id,
                 )
                 if not update_rows:
-                    return fail("db_update_returned_empty")
+                    raise RuntimeError("db_update_returned_empty")
                 created = False
                 r = update_rows[0]
             except Exception as e:
-                return fail(f"db_update_failed: {e}")
+                raise RuntimeError(f"db_update_failed: {e}") from e
         else:
             try:
                 insert_rows = await db.fetch(
@@ -90,23 +88,21 @@ async def upsert_client(db: DBClient, input_data: InputSchema) -> Result[ClientR
                     input_data.timezone,
                 )
                 if not insert_rows:
-                    return fail("db_insert_returned_empty")
+                    raise RuntimeError("db_insert_returned_empty")
                 created = True
                 r = insert_rows[0]
             except Exception as e:
-                return fail(f"db_insert_failed: {e}")
+                raise RuntimeError(f"db_insert_failed: {e}") from e
 
-        return ok(
-            {
-                "client_id": str(r["client_id"]),
-                "name": str(r["name"]),
-                "email": str(r["email"]) if r.get("email") else None,
-                "phone": str(r["phone"]) if r.get("phone") else None,
-                "telegram_chat_id": str(r["telegram_chat_id"]) if r.get("telegram_chat_id") else None,
-                "timezone": str(r["timezone"]) if r.get("timezone") else "America/Santiago",
-                "created": created,
-            }
-        )
+        return {
+            "client_id": str(r["client_id"]),
+            "name": str(r["name"]),
+            "email": str(r["email"]) if r.get("email") else None,
+            "phone": str(r["phone"]) if r.get("phone") else None,
+            "telegram_chat_id": str(r["telegram_chat_id"]) if r.get("telegram_chat_id") else None,
+            "timezone": str(r["timezone"]) if r.get("timezone") else "America/Santiago",
+            "created": created,
+        }
 
     except Exception as e:
-        return fail(f"unexpected_logic_error: {e}")
+        raise RuntimeError(f"unexpected_logic_error: {e}") from e

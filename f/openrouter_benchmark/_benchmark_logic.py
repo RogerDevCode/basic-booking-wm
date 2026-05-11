@@ -5,7 +5,6 @@ from typing import Any, cast
 
 import httpx
 
-from ..internal._result import Result, fail, ok
 from ._benchmark_models import ModelCandidate, ModelTestResult, NLUIntent, OpenRouterResponse, TaskPrompt
 
 MODELS: list[ModelCandidate] = [
@@ -74,7 +73,7 @@ def extract_json(text: str) -> dict[str, Any] | None:
     return None
 
 
-async def run_benchmark_task(api_key: str, model: ModelCandidate, task: TaskPrompt) -> Result[ModelTestResult]:
+async def run_benchmark_task(api_key: str, model: ModelCandidate, task: TaskPrompt) -> ModelTestResult:
     start_time = time.time()
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
@@ -99,7 +98,7 @@ async def run_benchmark_task(api_key: str, model: ModelCandidate, task: TaskProm
             latency = int((time.time() - start_time) * 1000)
 
             if res.status_code != 200:
-                return fail(f"HTTP {res.status_code}: {res.text[:100]}")
+                raise RuntimeError(f"HTTP {res.status_code}: {res.text[:100]}")
 
             data = res.json()
             parsed_res = OpenRouterResponse.model_validate(data)
@@ -121,19 +120,19 @@ async def run_benchmark_task(api_key: str, model: ModelCandidate, task: TaskProm
             else:
                 error = "JSON extraction failed"
 
-            return ok(
-                {
-                    "model": model["name"],
-                    "taskId": task["name"],
-                    "success": True,
-                    "rawResponse": content,
-                    "parsed": parsed_intent,
-                    "error": error,
-                    "correct": correct,
-                    "latencyMs": latency,
-                    "totalTokens": usage.total_tokens if usage else None,
-                }
-            )
+            return {
+                "model": model["name"],
+                "taskId": task["name"],
+                "success": True,
+                "rawResponse": content,
+                "parsed": parsed_intent,
+                "error": error,
+                "correct": correct,
+                "latencyMs": latency,
+                "totalTokens": usage.total_tokens if usage else None,
+            }
 
     except Exception as e:
-        return fail(str(e))
+        if isinstance(e, RuntimeError):
+            raise
+        raise RuntimeError(str(e)) from e

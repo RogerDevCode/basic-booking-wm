@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -51,9 +51,8 @@ async def test_provider_profile_get_success() -> None:
         patch("f.web_provider_profile.main.with_tenant_context", side_effect=mock_with_tenant),
     ):
         args: dict[str, Any] = {"action": "get_profile", "provider_id": VALID_ID}
-        err, result = await main(args)
+        result = cast("dict[str, Any]", await main(args))
 
-        assert err is None
         assert result is not None
         assert result["id"] == VALID_ID
         assert result["name"] == "Dr. Smith"

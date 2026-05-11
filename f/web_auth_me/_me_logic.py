@@ -1,10 +1,10 @@
 from datetime import datetime
 
-from ..internal._result import DBClient, Result, fail, ok
+from ..internal._result import DBClient
 from ._me_models import UserProfileResult
 
 
-async def get_user_profile(db: DBClient, user_id: str) -> Result[UserProfileResult]:
+async def get_user_profile(db: DBClient, user_id: str) -> UserProfileResult:
     rows = await db.fetch(
         """
         SELECT user_id, email, full_name, role, rut, phone, address,
@@ -19,11 +19,11 @@ async def get_user_profile(db: DBClient, user_id: str) -> Result[UserProfileResu
     )
 
     if not rows:
-        return fail("User not found")
+        raise RuntimeError("User not found")
 
     r = rows[0]
     if not r["is_active"]:
-        return fail("Account is disabled. Contact support.")
+        raise RuntimeError("Account is disabled. Contact support.")
 
     result: UserProfileResult = {
         "user_id": str(r["user_id"]),
@@ -42,4 +42,4 @@ async def get_user_profile(db: DBClient, user_id: str) -> Result[UserProfileResu
         else None,
     }
 
-    return ok(result)
+    return result

@@ -1,13 +1,14 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Coroutine, Mapping
 from typing import TYPE_CHECKING, Any
 
 from f.booking_orchestrator._get_entity import get_entity
-from f.internal._result import DBClient, Result, ok
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, Coroutine, Mapping
+
     from f.booking_orchestrator._orchestrator_models import OrchestratorInput, OrchestratorResult
+    from f.internal._result import DBClient
 
 from ._get_my_bookings import handle_get_my_bookings
 
@@ -25,7 +26,7 @@ Zod Schemas      : NO
 
 async def handle_reschedule(
     conn: DBClient, input_data: OrchestratorInput, delegates: Mapping[str, Callable[..., Coroutine[Any, Any, Any]]]
-) -> Result[OrchestratorResult]:
+) -> OrchestratorResult:
     booking_id = input_data.booking_id or get_entity(input_data.entities, "booking_id")
     date = input_data.date
     time = input_data.time
@@ -63,9 +64,9 @@ async def handle_reschedule(
                 "client_id": input_data.client_id,
             },
         }
-        return ok(res)
+        return res
 
-    # Call booking_reschedule
+    # Call booking_reschedule core directly (in-process)
     args: dict[str, object] = {
         "booking_id": booking_id,
         "new_start_time": f"{date}T{time}:00",
@@ -75,14 +76,11 @@ async def handle_reschedule(
         "idempotency_key": f"orch-resch-{booking_id}-{date}-{time}",
     }
 
+    from ...booking_reschedule.main import run_reschedule_booking
+
     try:
-        resch_res = await delegates["book_reschedule"](args=args)
-        if isinstance(resch_res, dict) and "error" in resch_res:
-            err = str(resch_res["error"])
-            data = None
-        else:
-            err = None
-            data = resch_res
+        data = await run_reschedule_booking(conn, args)
+        err = None
     except Exception as e:
         err = str(e)
         data = None
@@ -93,4 +91,4 @@ async def handle_reschedule(
         "data": data,
         "message": f"❌ No se pudo reagendar: {err}" if err else f"✅ Reagendada para el {date} a las {time}.",
     }
-    return ok(res_final)
+    return res_final

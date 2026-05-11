@@ -45,9 +45,10 @@ async def _main_async(
 
         return {"duplicate": is_duplicate, "update_id": update_id}
     except Exception as e:
-        # On Redis failure, allow processing (fail open — better to double-process than drop)
+        # FAIL CLOSED: Redis failure means we CANNOT verify deduplication.
+        # Windmill will retry the webhook automatically.
         log("DEDUP_REDIS_ERROR", error=str(e), update_id=update_id, module=MODULE)
-        return {"duplicate": False, "update_id": update_id}
+        raise RuntimeError(f"Redis deduplication unavailable: {e}") from e
     finally:
         await redis.aclose()
 

@@ -52,13 +52,12 @@ async def test_reminder_cron_success() -> None:
         patch("f.reminder_cron.main.get_candidates_between", side_effect=[[candidate], []]),
         patch("f.reminder_cron.main.claim_dispatch", new_callable=AsyncMock, return_value=True),
         patch("f.reminder_cron.main.persist_dispatch_decision", new_callable=AsyncMock),
-        patch("f.reminder_cron.main.dispatch_reminder", return_value=(None, None)),
+        patch("f.reminder_cron.main.dispatch_reminder", return_value=None),
         patch("f.reminder_cron.main.scheduled_time_for_window", return_value=datetime.now(UTC).replace(hour=15)),
     ):
         args: dict[str, Any] = {"dry_run": False}
-        err, result = await main(args)
+        result = await main(args)
 
-        assert err is None
         assert result is not None
         assert result.sent == 2
         assert result.failed == 0

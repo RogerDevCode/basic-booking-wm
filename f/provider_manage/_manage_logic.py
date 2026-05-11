@@ -3,17 +3,16 @@ from __future__ import annotations
 from datetime import date, time
 from typing import TYPE_CHECKING
 
-from ..internal._result import DBClient, Result, fail, ok
-
 if TYPE_CHECKING:
+    from ..internal._result import DBClient
     from ._manage_models import InputSchema
 
 
-async def handle_provider_actions(db: DBClient, input_data: InputSchema) -> Result[dict[str, object]]:
+async def handle_provider_actions(db: DBClient, input_data: InputSchema) -> dict[str, object]:
     action = input_data.action
     if action == "create_provider":
         if not input_data.name or not input_data.email:
-            return fail("MISSING_FIELDS: name and email are required")
+            raise RuntimeError("MISSING_FIELDS: name and email are required")
         rows = await db.fetch(
             """
             INSERT INTO providers (name, email, phone, specialty_id, timezone_id)
@@ -27,17 +26,17 @@ async def handle_provider_actions(db: DBClient, input_data: InputSchema) -> Resu
             input_data.timezone_id,
         )
         if not rows:
-            return fail("DATABASE_ERROR: Failed to create provider")
+            raise RuntimeError("DATABASE_ERROR: Failed to create provider")
         res_create: dict[str, object] = {
             "created": True,
             "provider_id": str(rows[0]["provider_id"]),
             "name": str(rows[0]["name"]),
         }
-        return ok(res_create)
+        return res_create
 
     elif action == "update_provider":
         if not input_data.provider_id:
-            return fail("MISSING_FIELDS: provider_id is required")
+            raise RuntimeError("MISSING_FIELDS: provider_id is required")
         await db.execute(
             """
             UPDATE providers
@@ -57,7 +56,7 @@ async def handle_provider_actions(db: DBClient, input_data: InputSchema) -> Resu
             input_data.provider_id,
         )
         res_upd: dict[str, object] = {"updated": True}
-        return ok(res_upd)
+        return res_upd
 
     elif action == "list_providers":
         rows = await db.fetch(
@@ -65,16 +64,16 @@ async def handle_provider_actions(db: DBClient, input_data: InputSchema) -> Resu
             "FROM providers ORDER BY name ASC"
         )
         res_list: dict[str, object] = {"providers": [dict(r) for r in rows]}
-        return ok(res_list)
+        return res_list
 
-    return fail(f"ROUTING_ERROR: Action {action} not handled by Provider handler")
+    raise RuntimeError(f"ROUTING_ERROR: Action {action} not handled by Provider handler")
 
 
-async def handle_service_actions(db: DBClient, input_data: InputSchema) -> Result[dict[str, object]]:
+async def handle_service_actions(db: DBClient, input_data: InputSchema) -> dict[str, object]:
     action = input_data.action
     if action == "create_service":
         if not input_data.provider_id or not input_data.service_name:
-            return fail("MISSING_FIELDS: provider_id and service_name are required")
+            raise RuntimeError("MISSING_FIELDS: provider_id and service_name are required")
         rows = await db.fetch(
             """
             INSERT INTO services (provider_id, name, description, duration_minutes, buffer_minutes, price_cents, currency)  # noqa: E501
@@ -90,17 +89,17 @@ async def handle_service_actions(db: DBClient, input_data: InputSchema) -> Resul
             input_data.currency or "MXN",
         )
         if not rows:
-            return fail("DATABASE_ERROR: Failed to create service")
+            raise RuntimeError("DATABASE_ERROR: Failed to create service")
         res_create: dict[str, object] = {
             "created": True,
             "service_id": str(rows[0]["service_id"]),
             "name": str(rows[0]["name"]),
         }
-        return ok(res_create)
+        return res_create
 
     elif action == "update_service":
         if not input_data.service_id:
-            return fail("MISSING_FIELDS: service_id is required")
+            raise RuntimeError("MISSING_FIELDS: service_id is required")
         await db.execute(
             """
             UPDATE services
@@ -123,7 +122,7 @@ async def handle_service_actions(db: DBClient, input_data: InputSchema) -> Resul
             input_data.service_id,
         )
         res_upd: dict[str, object] = {"updated": True}
-        return ok(res_upd)
+        return res_upd
 
     elif action == "list_services":
         rows = await db.fetch(
@@ -135,12 +134,12 @@ async def handle_service_actions(db: DBClient, input_data: InputSchema) -> Resul
             """
         )
         res_list: dict[str, object] = {"services": [dict(r) for r in rows]}
-        return ok(res_list)
+        return res_list
 
-    return fail(f"ROUTING_ERROR: Action {action} not handled by Service handler")
+    raise RuntimeError(f"ROUTING_ERROR: Action {action} not handled by Service handler")
 
 
-async def handle_schedule_actions(db: DBClient, input_data: InputSchema) -> Result[dict[str, object]]:
+async def handle_schedule_actions(db: DBClient, input_data: InputSchema) -> dict[str, object]:
     action = input_data.action
     if action == "set_schedule":
         if (
@@ -149,13 +148,13 @@ async def handle_schedule_actions(db: DBClient, input_data: InputSchema) -> Resu
             or not input_data.start_time
             or not input_data.end_time
         ):
-            return fail("MISSING_FIELDS: provider_id, day_of_week, start_time, end_time are required")
+            raise RuntimeError("MISSING_FIELDS: provider_id, day_of_week, start_time, end_time are required")
 
         try:
             t_start = time.fromisoformat(input_data.start_time)
             t_end = time.fromisoformat(input_data.end_time)
         except ValueError:
-            return fail("INVALID_TIME_FORMAT")
+            raise RuntimeError("INVALID_TIME_FORMAT") from None
 
         await db.execute(
             """
@@ -170,34 +169,34 @@ async def handle_schedule_actions(db: DBClient, input_data: InputSchema) -> Resu
             t_end,
         )
         res_upd: dict[str, object] = {"updated": True}
-        return ok(res_upd)
+        return res_upd
 
     elif action == "remove_schedule":
         if input_data.provider_id is None or input_data.day_of_week is None:
-            return fail("MISSING_FIELDS: provider_id and day_of_week are required")
+            raise RuntimeError("MISSING_FIELDS: provider_id and day_of_week are required")
         await db.execute(
             "UPDATE provider_schedules SET is_active = false WHERE provider_id = $1::uuid AND day_of_week = $2",
             input_data.provider_id,
             input_data.day_of_week,
         )
         res_de: dict[str, object] = {"deactivated": True}
-        return ok(res_de)
+        return res_de
 
-    return fail(f"ROUTING_ERROR: Action {action} not handled by Schedule handler")
+    raise RuntimeError(f"ROUTING_ERROR: Action {action} not handled by Schedule handler")
 
 
-async def handle_override_actions(db: DBClient, input_data: InputSchema) -> Result[dict[str, object]]:
+async def handle_override_actions(db: DBClient, input_data: InputSchema) -> dict[str, object]:
     action = input_data.action
     if action == "set_override":
         if not input_data.provider_id or not input_data.override_date:
-            return fail("MISSING_FIELDS: provider_id and override_date are required")
+            raise RuntimeError("MISSING_FIELDS: provider_id and override_date are required")
 
         try:
             d_override = date.fromisoformat(input_data.override_date)
             t_start = time.fromisoformat(input_data.start_time) if input_data.start_time else None
             t_end = time.fromisoformat(input_data.end_time) if input_data.end_time else None
         except ValueError:
-            return fail("INVALID_DATE_OR_TIME_FORMAT")
+            raise RuntimeError("INVALID_DATE_OR_TIME_FORMAT") from None
 
         await db.execute(
             """
@@ -217,16 +216,16 @@ async def handle_override_actions(db: DBClient, input_data: InputSchema) -> Resu
             input_data.override_reason,
         )
         res_upd: dict[str, object] = {"updated": True}
-        return ok(res_upd)
+        return res_upd
 
     elif action == "remove_override":
         if not input_data.provider_id or not input_data.override_date:
-            return fail("MISSING_FIELDS: provider_id and override_date are required")
+            raise RuntimeError("MISSING_FIELDS: provider_id and override_date are required")
 
         try:
             d_override = date.fromisoformat(input_data.override_date)
         except ValueError:
-            return fail("INVALID_DATE_FORMAT")
+            raise RuntimeError("INVALID_DATE_FORMAT") from None
 
         await db.execute(
             "DELETE FROM schedule_overrides WHERE provider_id = $1::uuid AND override_date = $2::date",
@@ -234,6 +233,6 @@ async def handle_override_actions(db: DBClient, input_data: InputSchema) -> Resu
             d_override,
         )
         res_del: dict[str, object] = {"deleted": True}
-        return ok(res_del)
+        return res_del
 
-    return fail(f"ROUTING_ERROR: Action {action} not handled by Override handler")
+    raise RuntimeError(f"ROUTING_ERROR: Action {action} not handled by Override handler")

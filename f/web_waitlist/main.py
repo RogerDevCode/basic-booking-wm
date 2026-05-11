@@ -24,10 +24,10 @@ import asyncio
 # RLS Tenant ID   : YES — with_tenant_context wraps all DB ops
 # Pydantic Schemas: YES — InputSchema validates action and fields
 # ============================================================================
-from typing import Any
+from typing import Any, cast
 
 from ..internal._db_client import create_db_client
-from ..internal._result import Result, fail, with_tenant_context
+from ..internal._result import with_tenant_context
 from ..internal._wmill_adapter import log
 from ._waitlist_logic import handle_check_position, handle_join, handle_leave, handle_list, resolve_client_id
 from ._waitlist_models import InputSchema, WaitlistResult
@@ -35,23 +35,21 @@ from ._waitlist_models import InputSchema, WaitlistResult
 MODULE = "web_waitlist"
 
 
-async def _main_async(args: dict[str, Any]) -> Result[WaitlistResult]:
+async def _main_async(args: dict[str, Any]) -> WaitlistResult:
     # 1. Validate Input
     try:
         input_data = InputSchema.model_validate(args)
     except Exception as e:
-        return fail(f"validation_error: {e}")
+        raise RuntimeError(f"validation_error: {e}") from e
 
     conn = await create_db_client()
     try:
         tenant_id = input_data.client_id or input_data.user_id
 
         # 2. Execute within Tenant Context
-        async def operation() -> Result[WaitlistResult]:
+        async def operation() -> WaitlistResult:
             # 2.1 Resolve Identity
-            err_id, client_id = await resolve_client_id(conn, input_data.user_id, input_data.client_id)
-            if err_id or not client_id:
-                return fail(err_id or "unresolved_client")
+            client_id = await resolve_client_id(conn, input_data.user_id, input_data.client_id)
 
             # 2.2 Dispatch Action
             action = input_data.action
@@ -64,22 +62,20 @@ async def _main_async(args: dict[str, Any]) -> Result[WaitlistResult]:
             elif action == "check_position":
                 return await handle_check_position(conn, client_id, input_data.waitlist_id)
 
-            return fail(f"unsupported_action: {action}")
+            raise RuntimeError(f"unsupported_action: {action}")
 
-        return await with_tenant_context(conn, tenant_id, operation)
+        result = await with_tenant_context(conn, tenant_id, operation)
+        return result
 
     except Exception as e:
         log("Web Waitlist Internal Error", error=str(e), module=MODULE)
-        return fail(f"internal_error: {e}")
+        raise RuntimeError(f"internal_error: {e}") from e
     finally:
         await conn.close()  # pyright: ignore[reportUnknownMemberType]
 
 
 def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
     import traceback
-    from typing import cast
-
-    from pydantic import BaseModel
 
     try:
         if isinstance(args, InputSchema):
@@ -87,19 +83,8 @@ def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
         else:
             validated = InputSchema.model_validate(args)
 
-        err, result = asyncio.run(_main_async(validated.model_dump()))
-        if err:
-            raise err
-
-        if result is None:
-            return {}
-
-        if isinstance(result, BaseModel):
-            return cast("dict[str, object]", result.model_dump())
-        elif isinstance(result, dict):
-            return cast("dict[str, object]", result)
-        else:
-            return {"data": result}
+        result = asyncio.run(_main_async(validated.model_dump()))
+        return cast("dict[str, object]", result)
 
     except Exception as e:
         tb = traceback.format_exc()

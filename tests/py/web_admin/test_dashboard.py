@@ -39,9 +39,8 @@ async def test_admin_dashboard_success() -> None:
         patch("f.web_admin_dashboard.main.with_tenant_context", side_effect=mock_with_tenant),
     ):
         args: dict[str, Any] = {"admin_user_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"}
-        err, result = await main(args)
+        result = await main(args)
 
-        assert err is None
         assert result is not None
         assert result["total_users"] == 10
         assert result["no_show_rate"] == "10.0"

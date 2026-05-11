@@ -35,15 +35,12 @@ class TestTelegramRouter:
             },
         }
 
-        # apply_transition returns (Error, Outcome)
-        mock_transition.return_value = (
-            None,
-            {
-                "nextState": AsyncMock(model_dump=lambda: {"name": "selecting_doctor"}),
-                "responseText": "Selecciona doctor:",
-                "advance": True,
-            },
-        )
+        # apply_transition returns Outcome directly
+        mock_transition.return_value = {
+            "nextState": AsyncMock(model_dump=lambda: {"name": "selecting_doctor"}),
+            "responseText": "Selecciona doctor:",
+            "advance": True,
+        }
 
         # Act
         res = await main(args)
@@ -150,22 +147,19 @@ class TestTelegramRouterMainMenu:
             WindowPreferences,
         )
 
-        mock_run.return_value = (
-            None,
-            ReminderConfigResult(
-                message="🔔 *Recordatorios*",
-                inline_buttons=[[InlineButton(text="📱 Telegram ✅", callback_data="rem:ch:telegram")]],
-                preferences=ReminderPreferences(
-                    channels=ChannelPreferences(telegram=True, email=True),
-                    windows=WindowPreferences(
-                        w_1day=True,
-                        w_24h=True,
-                        w_12h=False,
-                        w_6h=False,
-                        w_2h=True,
-                        w_1h=False,
-                        w_30min=True,
-                    ),
+        mock_run.return_value = ReminderConfigResult(
+            message="🔔 *Recordatorios*",
+            inline_buttons=[[InlineButton(text="📱 Telegram ✅", callback_data="rem:ch:telegram")]],
+            preferences=ReminderPreferences(
+                channels=ChannelPreferences(telegram=True, email=True),
+                windows=WindowPreferences(
+                    w_1day=True,
+                    w_24h=True,
+                    w_12h=False,
+                    w_6h=False,
+                    w_2h=True,
+                    w_1h=False,
+                    w_30min=True,
                 ),
             ),
         )

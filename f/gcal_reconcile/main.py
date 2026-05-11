@@ -27,7 +27,7 @@ from __future__ import annotations
 from typing import Any, cast
 
 from ..internal._db_client import create_db_client
-from ..internal._result import Result, ok, with_tenant_context
+from ..internal._result import with_tenant_context
 from ..internal._wmill_adapter import log
 from ._reconcile_logic import sync_booking_to_gcal
 from ._reconcile_models import BookingRow, InputSchema, ReconcileResult
@@ -35,11 +35,11 @@ from ._reconcile_models import BookingRow, InputSchema, ReconcileResult
 MODULE = "gcal_reconcile"
 
 
-async def _main_async(args: dict[str, object]) -> Result[ReconcileResult]:
+async def _main_async(args: dict[str, object]) -> ReconcileResult:
     try:
         input_data = InputSchema.model_validate(args)
     except Exception as e:
-        return Exception(f"Validation error: {e}"), None
+        raise RuntimeError(f"Validation error: {e}") from e
 
     conn = await create_db_client()
     try:
@@ -58,7 +58,7 @@ async def _main_async(args: dict[str, object]) -> Result[ReconcileResult]:
         for p in providers:
             p_id = str(p["provider_id"])
 
-            async def provider_batch() -> Result[ReconcileResult]:
+            async def provider_batch() -> ReconcileResult:
                 # Fetch pending bookings for this provider
                 booking_rows = await conn.fetch(
                     """
@@ -156,10 +156,11 @@ async def _main_async(args: dict[str, object]) -> Result[ReconcileResult]:
                         status,
                         booking["booking_id"],
                     )
-                return ok(res)
+                return res
 
-            err_batch, res_batch = await with_tenant_context(conn, p_id, provider_batch)
-            if err_batch or not res_batch:
+            try:
+                res_batch = await with_tenant_context(conn, p_id, provider_batch)
+            except RuntimeError as err_batch:
                 aggregate["errors"].append(f"Provider {p_id}: {err_batch}")
                 continue
 
@@ -170,11 +171,11 @@ async def _main_async(args: dict[str, object]) -> Result[ReconcileResult]:
             aggregate["skipped"] += res_batch["skipped"]
             aggregate["errors"].extend(res_batch["errors"])
 
-        return None, aggregate
+        return aggregate
 
     except Exception as e:
         log("Unexpected error in gcal_reconcile", error=str(e), module=MODULE)
-        return Exception(f"Internal error: {e}"), None
+        raise RuntimeError(f"Internal error: {e}") from e
     finally:
         await conn.close()
 
@@ -192,9 +193,7 @@ def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
         else:
             validated = InputSchema.model_validate(args)
 
-        err, result = asyncio.run(_main_async(validated.model_dump()))
-        if err:
-            raise err
+        result = asyncio.run(_main_async(validated.model_dump()))
 
         if result is None:
             return {}

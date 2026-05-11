@@ -10,6 +10,12 @@
 # ///
 from __future__ import annotations
 
+import asyncio
+from typing import Final
+
+from ..internal._db_client import create_db_client
+from ..internal._wmill_adapter import log
+
 """
 PRE-FLIGHT CHECKLIST
 Mission         : Seed correct provider schedules (Mon-Fri 09:00-18:00, America/Santiago)
@@ -19,12 +25,6 @@ GCal Calls      : NO
 Idempotency Key : ON CONFLICT clause
 RLS Tenant ID   : NO — admin operation
 """
-
-import asyncio
-from typing import Final
-
-from ..internal._db_client import create_db_client
-from ..internal._wmill_adapter import log
 
 MODULE: Final[str] = "admin_schedule_seed"
 

@@ -1,14 +1,15 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Coroutine, Mapping
 from typing import TYPE_CHECKING, Any, cast
 
 from f.booking_orchestrator._get_entity import get_entity
 from f.internal._booking_utils import get_active_booking_for_provider
-from f.internal._result import DBClient, Result, ok
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, Coroutine, Mapping
+
     from f.booking_orchestrator._orchestrator_models import OrchestratorInput, OrchestratorResult
+    from f.internal._result import DBClient
 
 """
 PRE-FLIGHT
@@ -24,7 +25,7 @@ Zod Schemas      : NO
 
 async def handle_create_booking(
     conn: DBClient, input_data: OrchestratorInput, delegates: Mapping[str, Callable[..., Coroutine[Any, Any, Any]]]
-) -> Result[OrchestratorResult]:
+) -> OrchestratorResult:
     client_id = input_data.client_id
     provider_id = input_data.provider_id
     service_id = input_data.service_id
@@ -87,14 +88,14 @@ async def handle_create_booking(
                 "client_id": client_id,
             },
         }
-        return ok(res)
+        return res
 
     # 2. CHECK FOR DUPLICATE ACTIVE BOOKING (Rule BE-02)
     # client_id and provider_id are guaranteed non-None by the all() guard above
     assert client_id is not None
     assert provider_id is not None
-    err_dup, active_booking = await get_active_booking_for_provider(conn, client_id, provider_id)
-    if not err_dup and active_booking:
+    active_booking = await get_active_booking_for_provider(conn, client_id, provider_id)
+    if active_booking:
         st = active_booking["start_time"]
         fmt_time = st.strftime("%d/%m %H:%M") if hasattr(st, "strftime") else str(st)
 
@@ -119,9 +120,9 @@ async def handle_create_booking(
                 [{"text": "\u00ab Volver al men\u00fa", "callback_data": "cancel"}],
             ],
         }
-        return ok(res_dup)
+        return res_dup
 
-    # 3. CALL CORE MODULE
+    # 3. CALL CORE MODULE DIRECTLY (in-process, no cross-script dispatch)
     args: dict[str, object] = {
         "client_id": client_id,
         "provider_id": provider_id,
@@ -133,14 +134,11 @@ async def handle_create_booking(
         "channel": input_data.channel,
     }
 
+    from ...booking_create.main import run_create_booking
+
     try:
-        book_create_res = await delegates["book_create"](args=args)
-        if isinstance(book_create_res, dict) and "error" in book_create_res:
-            err = str(book_create_res["error"])
-            data = None
-        else:
-            err = None
-            data = book_create_res
+        data = await run_create_booking(conn, args)
+        err = None
     except Exception as e:
         err = str(e)
         data = None
@@ -152,4 +150,4 @@ async def handle_create_booking(
         "message": f"❌ No se pudo agendar: {err}" if err else f"✅ Cita agendada para el {date} a las {time}.",
         "follow_up": "¿Quieres intentar otro horario?" if err else None,
     }
-    return ok(res_final)
+    return res_final

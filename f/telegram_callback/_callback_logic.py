@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+import uuid
+from typing import TYPE_CHECKING
+
 import httpx
 
-from ..internal._result import DBClient, Result, fail, ok
 from ..internal._wmill_adapter import log
+
+if TYPE_CHECKING:
+    from ..internal._result import DBClient
 
 ACTION_MAP: dict[str, str] = {
     "cnf": "confirm",
@@ -16,15 +21,26 @@ ACTION_MAP: dict[str, str] = {
 }
 
 
+def _safe_uuid(val: str) -> str | None:
+    try:
+        return str(uuid.UUID(val))
+    except ValueError:
+        return None
+
+
 def parse_callback_data(data: str) -> dict[str, str] | None:
     parts = data.split(":")
     if len(parts) < 2:
         return None
     action_code = parts[0]
-    booking_id = parts[1]
+    booking_id_raw = parts[1]
 
     action = ACTION_MAP.get(action_code)
     if not action:
+        return None
+
+    booking_id = _safe_uuid(booking_id_raw)
+    if not booking_id:
         return None
 
     res = {"action": action, "booking_id": booking_id}
@@ -36,72 +52,60 @@ def parse_callback_data(data: str) -> dict[str, str] | None:
     return res
 
 
-async def confirm_booking(db: DBClient, booking_id: str, client_id: str | None) -> Result[bool]:
-    rows = await db.fetch(
+async def confirm_booking(db: DBClient, booking_id: str, client_id: str | None) -> bool:
+    """Atomic confirm using UPDATE ... RETURNING (eliminates SELECT→UPDATE race)."""
+    row = await db.fetchrow(
         """
-        SELECT booking_id, status, client_id
-        FROM bookings
+        UPDATE bookings
+        SET status = 'confirmed', updated_at = NOW()
         WHERE booking_id = $1::uuid
           AND status = 'pending'
-        LIMIT 1
+        RETURNING booking_id, status, client_id
         """,
         booking_id,
     )
-    if not rows:
-        return fail("Booking not found or not in pending status")
+    if not row:
+        raise RuntimeError("Booking not found or not in pending status")
 
-    row = rows[0]
     if client_id and str(row["client_id"]) != client_id:
-        return fail("Unauthorized: client mismatch")
+        # Rollback would be handled by the caller's transaction wrapper
+        raise RuntimeError("Unauthorized: client mismatch")
 
-    await db.execute(
-        "UPDATE bookings SET status = 'confirmed', updated_at = NOW() WHERE booking_id = $1::uuid", booking_id
-    )
     await db.execute(
         """
         INSERT INTO booking_audit (booking_id, from_status, to_status, changed_by, actor_id, reason)
         VALUES ($1::uuid, $2, 'confirmed', 'client', $3::uuid, 'Confirmed via Telegram inline button')
         """,
         booking_id,
-        row["status"],
+        "pending",
         client_id,
     )
-    return ok(True)
+    return True
 
 
 async def update_booking_status(
     db: DBClient, booking_id: str, new_status: str, client_id: str | None, actor: str
-) -> Result[bool]:
-    rows = await db.fetch(
-        """
-        SELECT booking_id, status, client_id, start_time, end_time
-        FROM bookings
-        WHERE booking_id = $1::uuid
-          AND status NOT IN ('cancelled', 'completed', 'no_show', 'rescheduled')
-        LIMIT 1
-        """,
-        booking_id,
-    )
-    if not rows:
-        return fail("Booking not found or already terminal")
-
-    row = rows[0]
-    if client_id and str(row["client_id"]) != client_id:
-        return fail("Unauthorized: client mismatch")
-
-    cancelled_by = actor if new_status == "cancelled" else None
-    await db.execute(
+) -> bool:
+    """Atomic status update using UPDATE ... RETURNING (eliminates SELECT→UPDATE race)."""
+    row = await db.fetchrow(
         """
         UPDATE bookings
         SET status = $1,
             cancelled_by = $2,
             updated_at = NOW()
         WHERE booking_id = $3::uuid
+          AND status NOT IN ('cancelled', 'completed', 'no_show', 'rescheduled')
+        RETURNING booking_id, status, client_id, start_time, end_time
         """,
         new_status,
-        cancelled_by,
+        actor if new_status == "cancelled" else None,
         booking_id,
     )
+    if not row:
+        raise RuntimeError("Booking not found or already terminal")
+
+    if client_id and str(row["client_id"]) != client_id:
+        raise RuntimeError("Unauthorized: client mismatch")
 
     reason = "Cancelled via Telegram inline button" if new_status == "cancelled" else "Status updated via Telegram"
     await db.execute(
@@ -116,7 +120,7 @@ async def update_booking_status(
         client_id,
         reason,
     )
-    return ok(True)
+    return True
 
 
 async def answer_callback_query(bot_token: str, callback_query_id: str, text: str, show_alert: bool = False) -> bool:

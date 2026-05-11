@@ -47,10 +47,8 @@ async def test_patient_register_e2e_mocked() -> None:
             "provider_id": VALID_ID,
         }
 
-        err, result = await main_async(args)
+        result = await main_async(args)
 
-        assert err is None
-        assert result is not None
         assert result["client_id"] == VALID_ID
         assert result["created"] is True
 
@@ -62,8 +60,5 @@ async def test_patient_register_missing_tenant() -> None:
         "email": "jane@example.com",
     }
 
-    err, result = await main_async(args)
-
-    assert err is not None
-    assert "tenant_id required" in str(err)
-    assert result is None
+    with pytest.raises(RuntimeError, match="tenant_id required"):
+        await main_async(args)

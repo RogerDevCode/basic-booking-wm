@@ -31,9 +31,8 @@ async def test_dlq_list_success() -> None:
 
     with patch("f.dlq_processor.main.create_db_client", return_value=mock_db):
         args: dict[str, Any] = {"action": "list", "status_filter": "pending"}
-        err, result = await main(args)
+        result = await main(args)
 
-        assert err is None
         assert isinstance(result, dict)
         assert result["total"] == 1
         assert result["entries"][0]["failure_reason"] == "API Error"

@@ -21,9 +21,6 @@ def _make_input(**kwargs: object) -> OrchestratorInput:
 def _make_delegates(**overrides: object) -> dict[str, AsyncMock]:
     """Return a default delegates dict. Override any key as needed."""
     d: dict[str, AsyncMock] = {
-        "book_create": AsyncMock(return_value={}),
-        "book_cancel": AsyncMock(return_value={}),
-        "book_reschedule": AsyncMock(return_value={}),
         "availability_check": AsyncMock(return_value={}),
     }
     for k, v in overrides.items():
@@ -42,9 +39,8 @@ async def test_handle_create_booking_missing_fields_returns_specialty_wizard() -
     )
     input_data = _make_input()
 
-    err, result = await handle_create_booking(conn, input_data, _make_delegates())
+    result = await handle_create_booking(conn, input_data, _make_delegates())
 
-    assert err is None
     assert result is not None
     assert result["action"] == "crear_cita"
     assert result["success"] is False
@@ -65,9 +61,8 @@ async def test_handle_create_booking_specialty_with_no_providers_excluded_from_b
     )
     input_data = _make_input()
 
-    err, result = await handle_create_booking(conn, input_data, _make_delegates())
+    result = await handle_create_booking(conn, input_data, _make_delegates())
 
-    assert err is None
     assert result is not None
     buttons: list[list[dict[str, str]]] = result.get("inline_buttons", [])  # type: ignore[assignment]
     flat = [btn for row in buttons for btn in row]
@@ -81,22 +76,23 @@ async def test_handle_create_booking_all_fields_present_calls_create_module() ->
     conn = AsyncMock()
     input_data = _make_input(provider_id="prov-1", service_id="svc-1", date="2026-05-10", time="09:00")
 
-    delegates = _make_delegates(
-        book_create=AsyncMock(return_value={"booking_id": "bk-1", "status": "confirmed"}),
-    )
-
-    with patch(
-        "f.booking_orchestrator.handlers._create.get_active_booking_for_provider",
-        AsyncMock(return_value=(None, None)),
+    with (
+        patch(
+            "f.booking_orchestrator.handlers._create.get_active_booking_for_provider",
+            AsyncMock(return_value=None),
+        ),
+        patch(
+            "f.booking_create.main.run_create_booking",
+            AsyncMock(return_value={"booking_id": "bk-1", "status": "confirmed"}),
+        ) as mock_run,
     ):
-        err, result = await handle_create_booking(conn, input_data, delegates)
+        result = await handle_create_booking(conn, input_data, _make_delegates())
 
-    assert err is None
     assert result is not None
     assert result["action"] == "crear_cita"
     assert result["success"] is True
     assert "✅" in result["message"]
-    delegates["book_create"].assert_awaited_once()
+    mock_run.assert_awaited_once()
 
 
 @pytest.mark.asyncio
@@ -104,17 +100,18 @@ async def test_handle_create_booking_create_failure_sets_success_false() -> None
     conn = AsyncMock()
     input_data = _make_input(provider_id="prov-1", service_id="svc-1", date="2026-05-10", time="09:00")
 
-    delegates = _make_delegates(
-        book_create=AsyncMock(return_value={"error": "Slot already taken"}),
-    )
-
-    with patch(
-        "f.booking_orchestrator.handlers._create.get_active_booking_for_provider",
-        AsyncMock(return_value=(None, None)),
+    with (
+        patch(
+            "f.booking_orchestrator.handlers._create.get_active_booking_for_provider",
+            AsyncMock(return_value=None),
+        ),
+        patch(
+            "f.booking_create.main.run_create_booking",
+            AsyncMock(side_effect=RuntimeError("Slot already taken")),
+        ),
     ):
-        err, result = await handle_create_booking(conn, input_data, delegates)
+        result = await handle_create_booking(conn, input_data, _make_delegates())
 
-    assert err is None
     assert result is not None
     assert result["success"] is False
     assert "❌" in result["message"]

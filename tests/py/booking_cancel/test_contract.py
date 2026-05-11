@@ -36,7 +36,6 @@ class MockCancelRepository:
 
 @pytest.mark.asyncio
 async def test_booking_cancel_success() -> None:
-
     repo = MockCancelRepository()
     input_data = CancelBookingInput.model_validate(
         {
@@ -49,9 +48,8 @@ async def test_booking_cancel_success() -> None:
     booking = await repo.fetch_booking(input_data.booking_id)
     assert booking is not None
 
-    err, result = await execute_cancel_booking(repo, input_data, booking)
+    result = await execute_cancel_booking(repo, input_data, booking)
 
-    assert err is None
     assert result is not None
     assert result["status"] == "cancelled"
     assert result["cancelled_by"] == "client"

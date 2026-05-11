@@ -15,7 +15,6 @@
 from __future__ import annotations
 
 from ..internal._db_client import _resolve_db_url
-from ..internal._result import Result, fail, ok
 from ..internal._wmill_adapter import get_variable
 from ._gateway_logic import ClientRepository, TelegramClient
 from ._gateway_models import TelegramCallback, TelegramMessage, TelegramUpdate
@@ -28,26 +27,26 @@ class TelegramRouter:
         self.telegram = telegram
         self.repository = repository
 
-    async def route_update(self, update: TelegramUpdate) -> Result[str]:
+    async def route_update(self, update: TelegramUpdate) -> str:
         if update.callback_query:
             return await self.handle_callback(update.callback_query)
         if update.message:
             return await self.handle_message(update.message)
-        return fail("unsupported_update_type")
+        raise RuntimeError("unsupported_update_type")
 
-    async def handle_callback(self, query: TelegramCallback) -> Result[str]:
+    async def handle_callback(self, query: TelegramCallback) -> str:
         data = query.data
         parts = data.split(":")
         if len(parts) < 2:
-            return ok(f"callback_handled:{data}")
+            return f"callback_handled:{data}"
 
         category, action = parts[0], parts[1]
         if category == "cmd":
-            return ok(f"flow_triggered:{action}")
+            return f"flow_triggered:{action}"
 
-        return ok(f"callback_handled:{data}")
+        return f"callback_handled:{data}"
 
-    async def handle_message(self, message: TelegramMessage) -> Result[str]:
+    async def handle_message(self, message: TelegramMessage) -> str:
         text = (message.text or "").strip()
         f_name = message.from_user.first_name if message.from_user else "Usuario"
         l_name = message.from_user.last_name if message.from_user else ""
@@ -56,9 +55,9 @@ class TelegramRouter:
         await self.repository.ensure_registered(full_name)
 
         if text == "/start":
-            return ok("start_command")
+            return "start_command"
 
-        return ok("message_received")
+        return "message_received"
 
 
 async def _main_async(args: dict[str, object]) -> dict[str, object]:
@@ -74,7 +73,7 @@ async def _main_async(args: dict[str, object]) -> dict[str, object]:
     repo = ClientRepository(db_url)
     router = TelegramRouter(client, repo)
 
-    err, res = await router.route_update(update)
+    res = await router.route_update(update)
 
     chat_id: str | None = None
     text: str = ""
@@ -99,12 +98,12 @@ async def _main_async(args: dict[str, object]) -> dict[str, object]:
         )
 
     return {
-        "success": not err,
+        "success": True,
         "chat_id": chat_id,
         "text": text,
         "callback_data": callback_data,
         "username": username,
-        "message": res if not err else str(err),
+        "message": res,
     }
 
 

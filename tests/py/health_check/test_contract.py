@@ -28,9 +28,8 @@ async def test_health_check_success() -> None:
         ),
     ):
         args: dict[str, Any] = {"component": "all"}
-        err, result = await main(args)
+        result = await main(args)
 
-        assert err is None
         assert result is not None
         assert result["overall"] == "healthy"
         assert len(result["components"]) == 4
@@ -65,8 +64,7 @@ async def test_health_check_unhealthy() -> None:
         ),
     ):
         args: dict[str, Any] = {"component": "all"}
-        err, result = await main(args)
+        result = await main(args)
 
-        assert err is None
         assert result is not None
         assert result["overall"] == "unhealthy"

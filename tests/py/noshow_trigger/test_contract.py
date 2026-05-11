@@ -29,9 +29,8 @@ async def test_noshow_trigger_success() -> None:
         patch("f.noshow_trigger.main.with_tenant_context", side_effect=mock_with_tenant),
     ):
         args: dict[str, Any] = {"lookback_minutes": 30, "dry_run": False}
-        err, result = await main(args)
+        result = await main(args)
 
-        assert err is None
         assert result is not None
         assert result["marked"] == 1
         assert "b1" in result["booking_ids"]

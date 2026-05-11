@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import zoneinfo
 from datetime import date, datetime, timedelta
 from typing import TYPE_CHECKING, Any, Final, cast
 
-from ..internal._result import DBClient, Result, fail, ok
+from ..internal.scheduling_engine._scheduling_logic import get_availability
 
 if TYPE_CHECKING:
+    from ..internal._result import DBClient
     from ._wizard_models import StepView, WizardState
 
 # Constants
@@ -36,8 +38,6 @@ class DateUtils:
 
     @staticmethod
     def get_week_dates(offset: int, tz_name: str = "UTC") -> list[dict[str, str]]:
-        import zoneinfo
-
         tz = zoneinfo.ZoneInfo(tz_name)
         dates = []
         today = datetime.now(tz).date() + timedelta(days=offset)
@@ -130,35 +130,31 @@ class WizardRepository:
             return str(row["tz_name"])
         return "UTC"
 
-    async def get_service_duration(self, service_id: str) -> Result[int]:
+    async def get_service_duration(self, service_id: str) -> int:
         rows = await self.db.fetch(
             "SELECT duration_minutes FROM services WHERE service_id = $1::uuid AND is_active = true LIMIT 1", service_id
         )
         if not rows:
-            return fail(f"service_not_found: {service_id}")
-        return ok(int(cast("Any", rows[0]["duration_minutes"])))
+            raise RuntimeError(f"service_not_found: {service_id}")
+        return int(cast("Any", rows[0]["duration_minutes"]))
 
-    async def get_available_slots(self, provider_id: str, date_str: str, duration_min: int) -> Result[list[str]]:
-        from ..internal.scheduling_engine._scheduling_logic import get_availability
-
+    async def get_available_slots(self, provider_id: str, date_str: str, duration_min: int) -> list[str]:
         # Fallback to first service if wizard state doesn't have it explicitly mapped yet
         service_row = await self.db.fetchrow(
             "SELECT service_id FROM services WHERE provider_id = $1::uuid AND is_active = true LIMIT 1",
             provider_id,
         )
         if not service_row:
-            return fail("no_active_services_for_provider")
+            raise RuntimeError("no_active_services_for_provider")
 
         service_id = str(service_row["service_id"])
 
-        err, avail_res = await get_availability(
+        avail_res = await get_availability(
             self.db, {"provider_id": provider_id, "date": date_str, "service_id": service_id}
         )
 
-        if err or not avail_res:
-            return fail(err or "availability_check_failed")
-
-        import zoneinfo
+        if not avail_res:
+            raise RuntimeError("availability_check_failed")
 
         tz_name = str(avail_res.get("timezone", "UTC"))
         tz = zoneinfo.ZoneInfo(tz_name)
@@ -171,14 +167,14 @@ class WizardRepository:
                 dt_local = dt_utc.astimezone(tz)
                 available.append(dt_local.strftime("%H:%M"))
 
-        return ok(available)
+        return available
 
-    async def get_names(self, provider_id: str, service_id: str) -> Result[dict[str, str]]:
+    async def get_names(self, provider_id: str, service_id: str) -> dict[str, str]:
         p = await self.db.fetch("SELECT name FROM providers WHERE provider_id = $1::uuid LIMIT 1", provider_id)
         s = await self.db.fetch("SELECT name FROM services WHERE service_id = $1::uuid LIMIT 1", service_id)
         if not p or not s:
-            return fail("integrity_error")
-        return ok({"provider": str(p[0]["name"]), "service": str(s[0]["name"])})
+            raise RuntimeError("integrity_error")
+        return {"provider": str(p[0]["name"]), "service": str(s[0]["name"])}
 
     async def create_booking(
         self,
@@ -189,16 +185,17 @@ class WizardRepository:
         time_str: str,
         tz: str,
         duration_min: int,
-    ) -> Result[str]:
+    ) -> str:
         local_ts_str = f"{date_str}T{time_str}:00"
         try:
             # We don't attach TZ here because SQL uses AT TIME ZONE $5
             # So we pass a naive timestamp and the TZ name separately
             local_dt = datetime.fromisoformat(local_ts_str)
         except ValueError:
-            return fail("invalid_timestamp_format")
+            raise RuntimeError("invalid_timestamp_format") from None
 
         ik = f"wizard-{client_id}-{provider_id}-{service_id}-{date_str}-{time_str}"
+        await self.db.execute("BEGIN")
         try:
             rows = await self.db.fetch(
                 """
@@ -223,7 +220,8 @@ class WizardRepository:
                 ik,
             )
             if not rows:
-                return fail("insert_failed")
+                await self.db.execute("ROLLBACK")
+                raise RuntimeError("insert_failed")
             bid = str(rows[0]["booking_id"])
 
             await self.db.execute(
@@ -234,6 +232,11 @@ class WizardRepository:
                 bid,
                 client_id,
             )
-            return ok(bid)
-        except Exception as e:
-            return fail(f"create_failed: {e}")
+            await self.db.execute("COMMIT")
+            return bid
+        except Exception as exc:
+            await self.db.execute("ROLLBACK")
+            msg = str(exc)
+            if "no_overlapping_active_bookings" in msg or "exclusion constraint" in msg:
+                raise RuntimeError("time_slot_occupied") from exc
+            raise RuntimeError(f"create_failed: {exc}") from exc

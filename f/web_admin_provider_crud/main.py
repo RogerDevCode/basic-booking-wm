@@ -25,7 +25,7 @@ from __future__ import annotations
 # Pydantic Schemas: YES — InputSchema validates all fields
 # ============================================================================
 from ..internal._db_client import create_db_client
-from ..internal._result import Result, fail, ok, with_admin_context, with_tenant_context
+from ..internal._result import with_admin_context, with_tenant_context
 from ..internal._wmill_adapter import log
 from ._provider_logic import create_provider, list_providers, reset_provider_password, update_provider
 from ._provider_models import InputSchema, ProviderRow
@@ -35,12 +35,12 @@ MODULE = "web_admin_provider_crud"
 type ProviderCRUDResult = list[ProviderRow] | ProviderRow | dict[str, object]
 
 
-async def _main_async(args: dict[str, object]) -> Result[ProviderCRUDResult]:
+async def _main_async(args: dict[str, object]) -> ProviderCRUDResult:
     # 1. Validate Input
     try:
         input_data = InputSchema.model_validate(args)
     except Exception as e:
-        return fail(f"Validation error: {e}")
+        raise RuntimeError(f"Validation error: {e}") from e
 
     conn = await create_db_client()
     try:
@@ -52,7 +52,7 @@ async def _main_async(args: dict[str, object]) -> Result[ProviderCRUDResult]:
         # For create, we use a global admin context or a temporary ID
         if input_data.action == "create":
 
-            async def create_op() -> Result[ProviderRow]:
+            async def create_op() -> ProviderRow:
                 return await create_provider(conn, input_data)
 
             return await with_admin_context(conn, create_op)
@@ -60,9 +60,9 @@ async def _main_async(args: dict[str, object]) -> Result[ProviderCRUDResult]:
         # Other actions require provider_id (tenant context)
         provider_id = input_data.provider_id
         if not provider_id:
-            return fail("provider_id is required for non-list/create operations")
+            raise RuntimeError("provider_id is required for non-list/create operations")
 
-        async def operation() -> Result[ProviderCRUDResult]:
+        async def operation() -> ProviderCRUDResult:
             if input_data.action == "update":
                 return await update_provider(conn, input_data)
             elif input_data.action == "activate" or input_data.action == "deactivate":
@@ -75,17 +75,17 @@ async def _main_async(args: dict[str, object]) -> Result[ProviderCRUDResult]:
                     provider_id,
                 )
                 res: dict[str, object] = {"provider_id": provider_id, "is_active": active}
-                return ok(res)
+                return res
             elif input_data.action == "reset_password":
                 return await reset_provider_password(conn, provider_id)
 
-            return fail(f"Unsupported action: {input_data.action}")
+            raise RuntimeError(f"Unsupported action: {input_data.action}")
 
         return await with_tenant_context(conn, provider_id, operation)
 
     except Exception as e:
         log("Admin Provider CRUD Internal Error", error=str(e), module=MODULE)
-        return fail(f"internal_error: {e}")
+        raise RuntimeError(f"internal_error: {e}") from e
     finally:
         await conn.close()
 
@@ -103,9 +103,7 @@ def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
         else:
             validated = InputSchema.model_validate(args)
 
-        err, result = asyncio.run(_main_async(validated.model_dump()))
-        if err:
-            raise err
+        result = asyncio.run(_main_async(validated.model_dump()))
 
         if result is None:
             return {}

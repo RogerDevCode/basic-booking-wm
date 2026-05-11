@@ -6,6 +6,7 @@ from typing import cast
 import pytest
 
 from f.booking_create._booking_create_models import (
+    BookingContext,
     BookingCreated,
     ClientContext,
     InputSchema,
@@ -24,6 +25,13 @@ class MockBookingRepository:
 
     async def get_service_context(self, service_id: str, provider_id: str) -> ServiceContext | None:
         return {"id": service_id, "name": "General Checkup", "duration": 30}
+
+    async def get_booking_context(self, client_id: str, provider_id: str, service_id: str) -> BookingContext | None:
+        return {
+            "client": {"id": client_id, "name": "Test Client"},
+            "provider": cast("ProviderContext", {"id": provider_id, "name": "Dr. Test", "timezone": "UTC"}),
+            "service": {"id": service_id, "name": "General Checkup", "duration": 30},
+        }
 
     async def is_provider_blocked(self, provider_id: str, target_date: object) -> bool:
         return False
@@ -74,9 +82,8 @@ async def test_booking_create_success() -> None:
         }
     )
 
-    err, result = await execute_create_booking(repo, input_data)
+    result = await execute_create_booking(repo, input_data)
 
-    assert err is None
     assert result is not None
     assert result["status"] == "confirmed"
     assert result["provider_name"] == "Dr. Test"

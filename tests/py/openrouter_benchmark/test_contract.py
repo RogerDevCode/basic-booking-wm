@@ -22,7 +22,7 @@ async def test_openrouter_benchmark_success() -> None:
 
     with (
         patch("f.openrouter_benchmark.main.get_variable", return_value="fake-key"),
-        patch("f.openrouter_benchmark.main.run_benchmark_task", AsyncMock(return_value=(None, mock_res))),
+        patch("f.openrouter_benchmark.main.run_benchmark_task", AsyncMock(return_value=mock_res)),
     ):
         # Limit models and tasks for test speed if possible,
         # but here we test the orchestration of the list
@@ -35,9 +35,8 @@ async def test_openrouter_benchmark_success() -> None:
                 [{"name": "t1", "userMessage": "hi", "expectedIntent": "i", "expectedHuman": False}],
             ),
         ):
-            err, result = await main({})
+            result = await main({})
 
-            assert err is None
             assert result is not None
             assert result["modelsTested"] == 1
             assert result["summaries"][0]["correct"] == 1

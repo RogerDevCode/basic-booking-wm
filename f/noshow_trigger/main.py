@@ -25,7 +25,7 @@ from __future__ import annotations
 # Pydantic Schemas: YES — InputSchema validates parameters
 # ============================================================================
 from ..internal._db_client import create_db_client
-from ..internal._result import Result, fail, ok, with_tenant_context
+from ..internal._result import with_tenant_context
 from ..internal._wmill_adapter import log
 from ._noshow_logic import BookingRepository
 from ._noshow_models import InputSchema, NoShowStats
@@ -33,12 +33,12 @@ from ._noshow_models import InputSchema, NoShowStats
 MODULE = "noshow_trigger"
 
 
-async def _main_async(args: dict[str, object]) -> Result[NoShowStats]:
+async def _main_async(args: dict[str, object]) -> NoShowStats:
     # 1. Validate Input
     try:
         input_data = InputSchema.model_validate(args)
     except Exception as e:
-        return fail(f"validation_error: {e}")
+        raise RuntimeError(f"validation_error: {e}") from e
 
     conn = await create_db_client()
     try:
@@ -50,14 +50,12 @@ async def _main_async(args: dict[str, object]) -> Result[NoShowStats]:
         for prow in provider_rows:
             p_id = str(prow["provider_id"])
 
-            async def provider_batch() -> Result[NoShowStats]:
+            async def provider_batch() -> NoShowStats:
                 repo = BookingRepository(conn)
-                err_fetch, ids = await repo.find_expired_confirmed(input_data.lookback_minutes)
-                if err_fetch:
-                    return fail(err_fetch)
+                ids = await repo.find_expired_confirmed(input_data.lookback_minutes)
                 if not ids:
                     res_empty: NoShowStats = {"processed": 0, "marked": 0, "skipped": 0, "booking_ids": []}
-                    return ok(res_empty)
+                    return res_empty
 
                 marked = 0
                 skipped = 0
@@ -69,12 +67,13 @@ async def _main_async(args: dict[str, object]) -> Result[NoShowStats]:
                         processed_ids.append(bid)
                         continue
 
-                    err_mark, _ = await repo.mark_as_no_show(bid)
-                    if err_mark:
+                    try:
+                        await repo.mark_as_no_show(bid)
+                        marked += 1
+                    except Exception as err_mark:
                         log(f"Failed to mark booking {bid} as no-show", error=str(err_mark), module=MODULE)
                         continue
 
-                    marked += 1
                     processed_ids.append(bid)
 
                 res_batch: NoShowStats = {
@@ -83,20 +82,19 @@ async def _main_async(args: dict[str, object]) -> Result[NoShowStats]:
                     "skipped": skipped,
                     "booking_ids": processed_ids,
                 }
-                return ok(res_batch)
+                return res_batch
 
-            err_p, res_p = await with_tenant_context(conn, p_id, provider_batch)
-            if not err_p and res_p:
-                aggregate["processed"] += res_p["processed"]
-                aggregate["marked"] += res_p["marked"]
-                aggregate["skipped"] += res_p["skipped"]
-                aggregate["booking_ids"].extend(res_p["booking_ids"])
+            res_p = await with_tenant_context(conn, p_id, provider_batch)
+            aggregate["processed"] += res_p["processed"]
+            aggregate["marked"] += res_p["marked"]
+            aggregate["skipped"] += res_p["skipped"]
+            aggregate["booking_ids"].extend(res_p["booking_ids"])
 
-        return ok(aggregate)
+        return aggregate
 
     except Exception as e:
         log("No-Show Trigger Internal Error", error=str(e), module=MODULE)
-        return fail(f"internal_error: {e}")
+        raise RuntimeError(f"internal_error: {e}") from e
     finally:
         await conn.close()
 
@@ -114,9 +112,7 @@ def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
         else:
             validated = InputSchema.model_validate(args)
 
-        err, result = asyncio.run(_main_async(validated.model_dump()))
-        if err:
-            raise err
+        result = asyncio.run(_main_async(validated.model_dump()))
 
         if result is None:
             return {}

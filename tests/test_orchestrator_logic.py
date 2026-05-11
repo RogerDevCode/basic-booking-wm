@@ -15,9 +15,8 @@ class TestOrchestrator:
     async def test_main_async_invalid_input(self) -> None:
         # Arrange
         args: dict[str, Any] = {"intent": "invalid_intent"}
-        err, result = await _main_async(args)
+        result = await _main_async(args)
         # Assert
-        assert err is None
         assert result is None
 
     @pytest.mark.asyncio
@@ -30,27 +29,23 @@ class TestOrchestrator:
         # Arrange
         args: dict[str, Any] = {"telegram_chat_id": "123", "intent": "ver_mis_citas", "entities": {}}
 
-        mock_resolve.return_value = (
-            None,
-            {
-                "tenantId": "t1",
-                "clientId": "c1",
-                "providerId": "p1",
-                "serviceId": "s1",
-                "date": "2026-05-15",
-                "time": "10:00",
-            },
-        )
+        mock_resolve.return_value = {
+            "tenantId": "t1",
+            "clientId": "c1",
+            "providerId": "p1",
+            "serviceId": "s1",
+            "date": "2026-05-15",
+            "time": "10:00",
+        }
 
         handler_mock = AsyncMock()
-        handler_mock.return_value = (None, {"action": "mis_citas", "success": True, "message": "OK"})
+        handler_mock.return_value = {"action": "mis_citas", "success": True, "message": "OK"}
         mock_handler_map.__getitem__.return_value = handler_mock
 
         # Act
-        err, result = await _main_async(args)
+        result = await _main_async(args)
 
         # Assert
-        assert err is None
         assert result is not None
         assert mock_resolve.await_args is not None
         resolved_input = mock_resolve.await_args.args[1]
@@ -75,27 +70,23 @@ class TestOrchestrator:
         # Arrange
         args: dict[str, Any] = {"telegram_chat_id": "123", "intent": "mis_citas", "entities": {}}
 
-        mock_resolve.return_value = (
-            None,
-            {
-                "tenantId": "t1",
-                "clientId": "c1",
-                "providerId": "p1",
-                "serviceId": "s1",
-                "date": "2026-05-15",
-                "time": "10:00",
-            },
-        )
+        mock_resolve.return_value = {
+            "tenantId": "t1",
+            "clientId": "c1",
+            "providerId": "p1",
+            "serviceId": "s1",
+            "date": "2026-05-15",
+            "time": "10:00",
+        }
 
         handler_mock = AsyncMock()
-        handler_mock.return_value = (None, {"action": "mis_citas", "success": True, "message": "OK"})
+        handler_mock.return_value = {"action": "mis_citas", "success": True, "message": "OK"}
         mock_handler_map.__getitem__.return_value = handler_mock
 
         # Act
-        err, result = await _main_async(args)
+        result = await _main_async(args)
 
         # Assert
-        assert err is None
         assert result is not None
         assert result["action"] == "mis_citas"
         assert result["success"] is True

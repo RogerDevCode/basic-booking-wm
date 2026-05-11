@@ -2,13 +2,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from ..internal._result import DBClient, Result, fail, ok
-
 if TYPE_CHECKING:
+    from ..internal._result import DBClient
     from ._auto_register_models import InputSchema, RegisterResult
 
 
-async def register_telegram_user(db: DBClient, input_data: InputSchema) -> Result[RegisterResult]:
+async def register_telegram_user(db: DBClient, input_data: InputSchema) -> RegisterResult:
     """UPSERT Telegram user into clients table. users table belongs to Windmill internals."""
     full_name = f"{input_data.first_name} {input_data.last_name or ''}".strip()
 
@@ -29,9 +28,9 @@ async def register_telegram_user(db: DBClient, input_data: InputSchema) -> Resul
             input_data.chat_id,
         )
         if not new_rows:
-            return fail("Failed to create client record")
+            raise RuntimeError("Failed to create client record")
         client_id = str(new_rows[0]["client_id"])
         name = str(new_rows[0]["name"] or full_name)
         phone = None
 
-    return ok({"user_id": client_id, "client_id": client_id, "is_new": is_new, "name": name, "phone": phone})
+    return {"user_id": client_id, "client_id": client_id, "is_new": is_new, "name": name, "phone": phone}

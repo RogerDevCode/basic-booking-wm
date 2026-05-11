@@ -45,9 +45,8 @@ async def test_rag_query_success() -> None:
             "top_k": 5,
         }
 
-        err, result = await main(args)
+        result = await main(args)
 
-        assert err is None
         assert result is not None
         assert result["count"] >= 1
         assert "Horarios" in result["entries"][0]["title"]

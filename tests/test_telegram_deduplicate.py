@@ -127,8 +127,8 @@ class TestDeduplicateNullUpdateId:
 
 class TestDeduplicateRedisFailure:
     @pytest.mark.asyncio
-    async def test_redis_error_fails_open(self) -> None:
-        """Redis connection failure → fail-open: duplicate=False so message is processed."""
+    async def test_redis_error_fails_closed(self) -> None:
+        """Redis connection failure → fail-closed: exception raised so Windmill retries."""
         redis = MagicMock()
         redis.set = AsyncMock(side_effect=ConnectionError("Redis unreachable"))
         redis.aclose = AsyncMock()
@@ -139,10 +139,8 @@ class TestDeduplicateRedisFailure:
         ):
             from f.internal.telegram_deduplicate.main import _main_async
 
-            result = await _main_async(update_id=300, chat_id="42")
-
-        assert result["duplicate"] is False
-        assert result["update_id"] == 300
+            with pytest.raises(RuntimeError, match="Redis deduplication unavailable"):
+                await _main_async(update_id=300, chat_id="42")
 
     @pytest.mark.asyncio
     async def test_redis_error_still_closes_connection(self) -> None:
@@ -157,7 +155,8 @@ class TestDeduplicateRedisFailure:
         ):
             from f.internal.telegram_deduplicate.main import _main_async
 
-            await _main_async(update_id=301, chat_id="42")
+            with pytest.raises(RuntimeError, match="Redis deduplication unavailable"):
+                await _main_async(update_id=301, chat_id="42")
 
         redis.aclose.assert_awaited_once()
 

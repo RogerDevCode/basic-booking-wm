@@ -26,7 +26,6 @@ import os
 # RLS Tenant ID   : NO
 # Pydantic Schemas: YES — InputSchema validates recipient and message type
 # ============================================================================
-from ..internal._result import Result, fail, ok
 from ..internal._wmill_adapter import log
 from ._gmail_logic import build_email_content, send_with_retry
 from ._gmail_models import GmailSendData, InputSchema
@@ -34,12 +33,12 @@ from ._gmail_models import GmailSendData, InputSchema
 MODULE = "gmail_send"
 
 
-async def _main_async(args: dict[str, object]) -> Result[GmailSendData]:
+async def _main_async(args: dict[str, object]) -> GmailSendData:
     # 1. Validate Input
     try:
         input_data = InputSchema.model_validate(args)
     except Exception as e:
-        return fail(f"Invalid input: {e}")
+        raise RuntimeError(f"Invalid input: {e}") from e
 
     # 2. Resolve SMTP Configuration
     smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
@@ -54,7 +53,7 @@ async def _main_async(args: dict[str, object]) -> Result[GmailSendData]:
     from_name = os.getenv("GMAIL_FROM_NAME", "Sistema de Citas Médicas")
 
     if not smtp_user or not smtp_pass:
-        return fail("SMTP credentials not configured (GMAIL_USER/GMAIL_PASSWORD)")
+        raise RuntimeError("SMTP credentials not configured (GMAIL_USER/GMAIL_PASSWORD)")
 
     smtp_config: dict[str, object] = {"host": smtp_host, "port": smtp_port, "user": smtp_user, "password": smtp_pass}
 
@@ -67,7 +66,7 @@ async def _main_async(args: dict[str, object]) -> Result[GmailSendData]:
 
     if err_send:
         log("Gmail send failed", error=str(err_send), module=MODULE)
-        return fail(err_send)
+        raise RuntimeError(str(err_send))
 
     res: GmailSendData = {
         "sent": True,
@@ -76,7 +75,7 @@ async def _main_async(args: dict[str, object]) -> Result[GmailSendData]:
         "message_type": input_data.message_type,
         "subject": subject,
     }
-    return ok(res)
+    return res
 
 
 def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
@@ -92,9 +91,7 @@ def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
         else:
             validated = InputSchema.model_validate(args)
 
-        err, result = asyncio.run(_main_async(validated.model_dump()))
-        if err:
-            raise err
+        result = asyncio.run(_main_async(validated.model_dump()))
 
         if result is None:
             return {}

@@ -63,12 +63,8 @@ class TestAutoRegisterNewUser:
         with _patch_db(db), _patch_admin_ctx():
             from f.telegram_auto_register.main import _main_async
 
-            err, result = await _main_async(
-                {"chat_id": "111", "first_name": "Ana", "last_name": None, "username": "ana_t"}
-            )
+            result = await _main_async({"chat_id": "111", "first_name": "Ana", "last_name": None, "username": "ana_t"})
 
-        assert err is None
-        assert result is not None
         assert result["client_id"] == _NEW_CLIENT_ID
         assert result["user_id"] == _NEW_CLIENT_ID  # user_id aliases client_id
         assert result["is_new"] is True
@@ -106,12 +102,10 @@ class TestAutoRegisterExistingUser:
         with _patch_db(db), _patch_admin_ctx():
             from f.telegram_auto_register.main import _main_async
 
-            err, result = await _main_async(
+            result = await _main_async(
                 {"chat_id": "444", "first_name": "Carlos", "last_name": None, "username": "carlos_x"}
             )
 
-        assert err is None
-        assert result is not None
         assert result["client_id"] == _EXISTING_CLIENT_ID
         assert result["user_id"] == _EXISTING_CLIENT_ID
         assert result["is_new"] is False
@@ -131,15 +125,13 @@ class TestAutoRegisterExistingUser:
 class TestAutoRegisterValidation:
     @pytest.mark.asyncio
     async def test_missing_chat_id_returns_error(self) -> None:
-        """chat_id is required — validation failure returns err tuple."""
+        """chat_id is required — validation failure raises RuntimeError."""
         db = _make_db()
         with _patch_db(db), _patch_admin_ctx():
             from f.telegram_auto_register.main import _main_async
 
-            err, result = await _main_async({"first_name": "X"})
-
-        assert err is not None
-        assert result is None
+            with pytest.raises(RuntimeError, match="chat_id"):
+                await _main_async({"first_name": "X"})
 
     @pytest.mark.asyncio
     async def test_empty_chat_id_returns_error(self) -> None:
@@ -148,27 +140,24 @@ class TestAutoRegisterValidation:
         with _patch_db(db), _patch_admin_ctx():
             from f.telegram_auto_register.main import _main_async
 
-            err, result = await _main_async({"chat_id": "", "first_name": "X"})
-
-        assert err is not None
-        assert result is None
+            with pytest.raises(RuntimeError, match="chat_id"):
+                await _main_async({"chat_id": "", "first_name": "X"})
 
     @pytest.mark.asyncio
     async def test_missing_first_name_returns_error(self) -> None:
-        """first_name is required — validation failure returns err tuple."""
+        """first_name is required — validation failure raises RuntimeError."""
         db = _make_db()
         with _patch_db(db), _patch_admin_ctx():
             from f.telegram_auto_register.main import _main_async
 
-            err, _result = await _main_async({"chat_id": "777"})
-
-        assert err is not None
+            with pytest.raises(RuntimeError, match="first_name"):
+                await _main_async({"chat_id": "777"})
 
 
 class TestAutoRegisterDBFailure:
     @pytest.mark.asyncio
     async def test_insert_failure_returns_error(self) -> None:
-        """Failed INSERT returns error tuple, does not raise."""
+        """Failed INSERT raises RuntimeError."""
         db = MagicMock()
         # SELECT clients → [] (new), INSERT clients → [] (failure)
         db.fetch = AsyncMock(side_effect=[[], []])
@@ -176,24 +165,20 @@ class TestAutoRegisterDBFailure:
         with _patch_db(db), _patch_admin_ctx():
             from f.telegram_auto_register.main import _main_async
 
-            err, result = await _main_async({"chat_id": "888", "first_name": "Test"})
-
-        assert err is not None
-        assert result is None
+            with pytest.raises(RuntimeError):
+                await _main_async({"chat_id": "888", "first_name": "Test"})
 
     @pytest.mark.asyncio
     async def test_db_exception_returns_error(self) -> None:
-        """DB exception is caught and returned as error tuple."""
+        """DB exception raises RuntimeError."""
         db = MagicMock()
         db.fetch = AsyncMock(side_effect=ConnectionError("DB down"))
         db.close = AsyncMock()
         with _patch_db(db), _patch_admin_ctx():
             from f.telegram_auto_register.main import _main_async
 
-            err, result = await _main_async({"chat_id": "999", "first_name": "Test"})
-
-        assert err is not None
-        assert result is None
+            with pytest.raises(RuntimeError):
+                await _main_async({"chat_id": "999", "first_name": "Test"})
 
 
 class TestAutoRegisterSyncWrapper:

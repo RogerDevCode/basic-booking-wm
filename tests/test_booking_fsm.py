@@ -30,9 +30,8 @@ class TestBookingFSM:
         action = CancelAction()
         draft = DraftBooking()
         # Act
-        err, outcome = apply_transition(state, action, draft)
+        outcome = apply_transition(state, action, draft)
         # Assert
-        assert err is None
         assert outcome is not None
         assert outcome["nextState"].name == "idle"
         assert "Menú Principal" in outcome["responseText"]
@@ -44,8 +43,7 @@ class TestBookingFSM:
         draft = DraftBooking()
         items = [{"id": "s1", "name": "General"}]
         # Act
-        err, outcome = apply_transition(state, action, draft, items=items)
+        outcome = apply_transition(state, action, draft, items=items)
         # Assert
-        assert err is None
         assert outcome is not None
         assert outcome["nextState"].name == "selecting_specialty"

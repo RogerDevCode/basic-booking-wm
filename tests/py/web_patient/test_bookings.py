@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -44,10 +44,8 @@ async def test_patient_bookings_list_success() -> None:
         patch("f.web_patient_bookings.main.with_tenant_context", side_effect=mock_with_tenant),
     ):
         args: dict[str, Any] = {"client_user_id": VALID_ID}
-        err, result = await main(args)
+        result = cast("dict[str, Any]", await main(args))
 
-        assert err is None
-        assert result is not None
         assert result["total"] == 1
         # Result split into upcoming/past based on current time (mocking time would be better but let's assume now < May 2026)  # noqa: E501
         assert len(result["upcoming"]) + len(result["past"]) == 1

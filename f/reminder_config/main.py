@@ -25,7 +25,7 @@ from __future__ import annotations
 # Pydantic Schemas: YES — InputSchema validates action and client_id
 # ============================================================================
 from ..internal._db_client import create_db_client
-from ..internal._result import Result, fail, ok, with_tenant_context
+from ..internal._result import with_tenant_context
 from ..internal._wmill_adapter import log
 from ._config_models import InputSchema, ReminderConfigResult
 from ._config_repository import load_preferences, save_preferences
@@ -35,22 +35,22 @@ from ._config_view import build_config_view
 MODULE = "reminder_config"
 
 
-async def run_reminder_config(input_data: InputSchema) -> Result[ReminderConfigResult]:
+async def run_reminder_config(input_data: InputSchema) -> ReminderConfigResult:
     conn = await create_db_client()
     try:
 
-        async def operation() -> Result[ReminderConfigResult]:
+        async def operation() -> ReminderConfigResult:
             preferences = await load_preferences(conn, input_data.client_id)
 
             match input_data.action:
                 case "toggle_channel":
                     if input_data.channel is None:
-                        return fail("missing_channel")
+                        raise RuntimeError("missing_channel")
                     preferences = toggle_channel(preferences, input_data.channel)
                     await save_preferences(conn, input_data.client_id, preferences)
                 case "toggle_window":
                     if input_data.window is None:
-                        return fail("missing_window")
+                        raise RuntimeError("missing_window")
                     preferences = toggle_window(preferences, input_data.window)
                     await save_preferences(conn, input_data.client_id, preferences)
                 case "deactivate_all":
@@ -63,27 +63,25 @@ async def run_reminder_config(input_data: InputSchema) -> Result[ReminderConfigR
                     pass
 
             view = build_config_view(preferences)
-            return ok(
-                ReminderConfigResult(
-                    message=view.message,
-                    inline_buttons=view.inline_buttons,
-                    preferences=preferences,
-                )
+            return ReminderConfigResult(
+                message=view.message,
+                inline_buttons=view.inline_buttons,
+                preferences=preferences,
             )
 
         return await with_tenant_context(conn, input_data.client_id, operation)
     except Exception as e:
         log("Reminder Config Internal Error", error=str(e), module=MODULE)
-        return fail(f"internal_error: {e}")
+        raise RuntimeError(f"internal_error: {e}") from e
     finally:
         await conn.close()
 
 
-async def _main_async(args: dict[str, object]) -> Result[ReminderConfigResult]:
+async def _main_async(args: dict[str, object]) -> ReminderConfigResult:
     try:
         input_data = InputSchema.model_validate(args)
     except Exception as e:
-        return fail(f"Invalid input: {e}")
+        raise RuntimeError(f"Invalid input: {e}") from e
 
     return await run_reminder_config(input_data)
 
@@ -101,9 +99,7 @@ def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
         else:
             validated = InputSchema.model_validate(args)
 
-        err, result = asyncio.run(_main_async(validated.model_dump()))
-        if err:
-            raise err
+        result = asyncio.run(_main_async(validated.model_dump()))
 
         if result is None:
             return {}

@@ -38,7 +38,7 @@ def _result_payload() -> ReminderConfigResult:
 @pytest.mark.asyncio
 @patch("f.internal.telegram_router._router_reminders.run_reminder_config", new_callable=AsyncMock)
 async def test_handle_reminders_config_show_returns_reminders_state(mock_run: AsyncMock) -> None:
-    mock_run.return_value = (None, _result_payload())
+    mock_run.return_value = _result_payload()
     input_data = RouterInput(chat_id="1", user_input="3", state={}, client_id="c1")
 
     result = await handle_reminders_config(input_data, {"name": "idle"})
@@ -55,7 +55,7 @@ async def test_handle_reminders_config_show_returns_reminders_state(mock_run: As
 @pytest.mark.asyncio
 @patch("f.internal.telegram_router._router_reminders.run_reminder_config", new_callable=AsyncMock)
 async def test_handle_reminders_config_callback_sets_edit_message(mock_run: AsyncMock) -> None:
-    mock_run.return_value = (None, _result_payload())
+    mock_run.return_value = _result_payload()
     input_data = RouterInput(
         chat_id="1",
         user_input="rem:w:12h",

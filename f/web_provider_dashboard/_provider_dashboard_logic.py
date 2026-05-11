@@ -1,10 +1,10 @@
 from datetime import datetime
 
-from ..internal._result import DBClient, Result, fail, ok
+from ..internal._result import DBClient
 from ._provider_dashboard_models import AgendaItem, DashboardResult, InputSchema, ProviderStats
 
 
-async def fetch_provider_dashboard(db: DBClient, input_data: InputSchema) -> Result[DashboardResult]:
+async def fetch_provider_dashboard(db: DBClient, input_data: InputSchema) -> DashboardResult:
     try:
         # 1. Resolve Provider and Timezone
         provider_rows = await db.fetch(
@@ -20,7 +20,7 @@ async def fetch_provider_dashboard(db: DBClient, input_data: InputSchema) -> Res
         )
 
         if not provider_rows:
-            return fail("Provider record not found")
+            raise RuntimeError("Provider record not found")
 
         p = provider_rows[0]
         p_id = str(p["provider_id"])
@@ -102,7 +102,7 @@ async def fetch_provider_dashboard(db: DBClient, input_data: InputSchema) -> Res
             "attendance_rate": rate,
         }
 
-        return ok({"provider_id": p_id, "provider_name": p_name, "specialty": p_spec, "agenda": agenda, "stats": stats})
+        return {"provider_id": p_id, "provider_name": p_name, "specialty": p_spec, "agenda": agenda, "stats": stats}
 
     except Exception as e:
-        return fail(f"dashboard_failed: {e}")
+        raise RuntimeError(f"dashboard_failed: {e}") from e

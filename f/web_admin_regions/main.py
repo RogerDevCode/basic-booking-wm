@@ -27,7 +27,6 @@ import asyncio
 from typing import Any
 
 from ..internal._db_client import create_db_client
-from ..internal._result import Result, fail
 from ..internal._wmill_adapter import log
 from ._regions_logic import list_communes, list_regions, search_communes
 from ._regions_models import InputSchema
@@ -35,12 +34,12 @@ from ._regions_models import InputSchema
 MODULE = "web_admin_regions"
 
 
-async def _main_async(args: dict[str, Any]) -> Result[Any]:
+async def _main_async(args: dict[str, Any]) -> object:
     # 1. Validate Input
     try:
         input_data = InputSchema.model_validate(args)
     except Exception as e:
-        return fail(f"Validation error: {e}")
+        raise RuntimeError(f"Validation error: {e}") from e
 
     conn = await create_db_client()
     try:
@@ -53,11 +52,11 @@ async def _main_async(args: dict[str, Any]) -> Result[Any]:
         elif input_data.action == "search_communes":
             return await search_communes(conn, input_data.search or "", input_data.region_id)
 
-        return fail(f"Unsupported action: {input_data.action}")
+        raise RuntimeError(f"Unsupported action: {input_data.action}")
 
     except Exception as e:
         log("Admin Regions Internal Error", error=str(e), module=MODULE)
-        return fail(f"internal_error: {e}")
+        raise RuntimeError(f"internal_error: {e}") from e
     finally:
         await conn.close()  # pyright: ignore[reportUnknownMemberType]
 
@@ -74,9 +73,7 @@ def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
         else:
             validated = InputSchema.model_validate(args)
 
-        err, result = asyncio.run(_main_async(validated.model_dump()))
-        if err:
-            raise err
+        result = asyncio.run(_main_async(validated.model_dump()))
 
         if result is None:
             return {}

@@ -17,7 +17,7 @@ from __future__ import annotations
 from typing import Any, cast
 
 from ..internal._db_client import create_db_client
-from ..internal._result import Result, fail, with_tenant_context
+from ..internal._result import with_tenant_context
 from ..internal._wmill_adapter import log
 from ._patient_logic import upsert_client
 from ._patient_models import ClientResult, InputSchema
@@ -36,7 +36,7 @@ from ._patient_models import ClientResult, InputSchema
 MODULE = "patient_register"
 
 
-async def main_async(args: dict[str, Any]) -> Result[ClientResult]:
+async def main_async(args: dict[str, Any]) -> dict[str, Any]:
     """
     Main business logic execution.
     """
@@ -44,32 +44,32 @@ async def main_async(args: dict[str, Any]) -> Result[ClientResult]:
     try:
         input_data = InputSchema.model_validate(args)
     except Exception as e:
-        return fail(f"Validation error: {e}")
+        raise RuntimeError(f"Validation error: {e}") from e
 
     # 2. Resolve Tenant Identifier
     # We require a tenant ID (provider_id or client_id) to activate RLS
     tenant_id = input_data.provider_id or input_data.client_id
     if not tenant_id:
-        return fail("tenant_id required for isolation (provider_id or client_id)")
+        raise RuntimeError("tenant_id required for isolation (provider_id or client_id)")
 
     # 3. Minimum Identification Requirement
     if not any([input_data.email, input_data.phone, input_data.telegram_chat_id]):
-        return fail("At least one identifier required (email, phone, or telegram_chat_id)")
+        raise RuntimeError("At least one identifier required (email, phone, or telegram_chat_id)")
 
     conn = await create_db_client()
     try:
         # 4. Execute operation within tenant context
-        async def operation() -> Result[ClientResult]:
-            try:
-                return await upsert_client(conn, input_data)
-            except Exception as e_logic:
-                return fail(f"logic_execution_error: {e_logic}")
+        async def operation() -> ClientResult:
+            return await upsert_client(conn, input_data)
 
-        return await with_tenant_context(conn, tenant_id, operation)
+        result = await with_tenant_context(conn, tenant_id, operation)
+        if result is None:
+            raise RuntimeError("patient_register returned no result")
+        return cast("dict[str, Any]", result)
 
     except Exception as e:
         log("Unexpected error in patient_register", error=str(e), module=MODULE)
-        return fail(f"internal_database_error: {e}")
+        raise RuntimeError(f"internal_database_error: {e}") from e
     finally:
         await conn.close()
 
@@ -89,17 +89,15 @@ def main(args: InputSchema | dict[str, Any]) -> dict[str, Any]:
         else:
             validated = InputSchema.model_validate(args)
 
-        err, result = asyncio.run(main_async(validated.model_dump()))
-        if err:
-            raise err
+        result = asyncio.run(main_async(validated.model_dump()))
 
         if result is None:
             return {}
 
         if isinstance(result, BaseModel):
-            return cast("dict[str, Any]", result.model_dump())
+            return result.model_dump()
 
-        return cast("dict[str, Any]", result)
+        return result
 
     except Exception as e:
         tb = traceback.format_exc()

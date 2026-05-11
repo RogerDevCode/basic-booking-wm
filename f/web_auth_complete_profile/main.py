@@ -24,11 +24,11 @@ import asyncio
 # RLS Tenant ID   : YES — with_admin_context used for initial discovery
 # Pydantic Schemas: YES — InputSchema validates all fields
 # ============================================================================
-from typing import Any
+from typing import Any, cast
 
 from ..internal._crypto import hash_password, validate_password_policy
 from ..internal._db_client import create_db_client
-from ..internal._result import Result, fail, ok, with_admin_context
+from ..internal._result import with_admin_context
 from ..internal._wmill_adapter import log
 from ..web_auth_register._register_logic import validate_rut
 from ._complete_profile_models import CompleteProfileResult, InputSchema
@@ -36,34 +36,34 @@ from ._complete_profile_models import CompleteProfileResult, InputSchema
 MODULE = "web_auth_complete_profile"
 
 
-async def _main_async(args: dict[str, Any]) -> Result[CompleteProfileResult]:
+async def _main_async(args: dict[str, Any]) -> CompleteProfileResult:
     # 1. Validate Input
     try:
         input_data = InputSchema.model_validate(args)
     except Exception as e:
-        return fail(f"Validation error: {e}")
+        raise RuntimeError(f"Validation error: {e}") from e
 
     if input_data.password != input_data.password_confirm:
-        return fail("Passwords do not match")
+        raise RuntimeError("Passwords do not match")
 
     policy = validate_password_policy(input_data.password)
     if not policy["valid"]:
-        return fail(f"Password policy violation: {', '.join(policy['errors'])}")
+        raise RuntimeError(f"Password policy violation: {', '.join(policy['errors'])}")
 
     if not validate_rut(input_data.rut):
-        return fail("Invalid Chilean RUT format or verification digit")
+        raise RuntimeError("Invalid Chilean RUT format or verification digit")
 
     conn = await create_db_client()
     try:
 
-        async def operation() -> Result[CompleteProfileResult]:
+        async def operation() -> CompleteProfileResult:
             # Find the user by Telegram Chat ID
             user_rows = await conn.fetch(
                 "SELECT user_id, full_name, email, rut, role FROM users WHERE telegram_chat_id = $1 LIMIT 1",
                 input_data.chat_id,
             )
             if not user_rows:
-                return fail("No Telegram user found. Please interact with the bot first.")
+                raise RuntimeError("No Telegram user found. Please interact with the bot first.")
 
             user = user_rows[0]
             user_id = str(user["user_id"])
@@ -81,7 +81,7 @@ async def _main_async(args: dict[str, Any]) -> Result[CompleteProfileResult]:
                 user_id,
             )
             if existing_rows:
-                return fail("This email or RUT is already in use by another account")
+                raise RuntimeError("This email or RUT is already in use by another account")
 
             # Hash and Update
             pwd_hash = hash_password(input_data.password)
@@ -109,36 +109,33 @@ async def _main_async(args: dict[str, Any]) -> Result[CompleteProfileResult]:
             )
 
             if not update_rows:
-                return fail("Failed to update profile")
+                raise RuntimeError("Failed to update profile")
 
             r = update_rows[0]
-            return ok(
-                {
-                    "user_id": str(r["user_id"]),
-                    "full_name": str(r["full_name"]),
-                    "email": str(r["email"]),
-                    "rut": str(r["rut"]),
-                    "role": str(r["role"]),
-                }
-            )
+            result: CompleteProfileResult = {
+                "user_id": str(r["user_id"]),
+                "full_name": str(r["full_name"]),
+                "email": str(r["email"]),
+                "rut": str(r["rut"]),
+                "role": str(r["role"]),
+            }
+            return result
 
-        return await with_admin_context(conn, operation)
+        result = await with_admin_context(conn, operation)
+        return result
 
     except Exception as e:
         msg = str(e)
         if "duplicate key" in msg or "unique constraint" in msg:
-            return fail("This email or RUT is already in use by another account")
+            raise RuntimeError("This email or RUT is already in use by another account") from e
         log("Internal error in profile completion", error=msg, module=MODULE)
-        return fail(f"Internal error: {e}")
+        raise RuntimeError(f"Internal error: {e}") from e
     finally:
         await conn.close()  # pyright: ignore[reportUnknownMemberType]
 
 
 def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
     import traceback
-    from typing import cast
-
-    from pydantic import BaseModel
 
     try:
         if isinstance(args, InputSchema):
@@ -146,19 +143,8 @@ def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
         else:
             validated = InputSchema.model_validate(args)
 
-        err, result = asyncio.run(_main_async(validated.model_dump()))
-        if err:
-            raise err
-
-        if result is None:
-            return {}
-
-        if isinstance(result, BaseModel):
-            return cast("dict[str, object]", result.model_dump())
-        elif isinstance(result, dict):
-            return cast("dict[str, object]", result)
-        else:
-            return {"data": result}
+        result = asyncio.run(_main_async(validated.model_dump()))
+        return cast("dict[str, object]", result)
 
     except Exception as e:
         tb = traceback.format_exc()

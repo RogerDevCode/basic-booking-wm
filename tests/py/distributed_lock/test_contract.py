@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -44,10 +44,8 @@ async def test_acquire_lock_success() -> None:
             "start_time": "2026-05-01T10:00:00Z",
         }
 
-        err, result = await main(args)
+        result = cast("dict[str, Any]", await main(args))
 
-        assert err is None
-        assert result is not None
         assert result["acquired"] is True
         assert result["lock"]["lock_key"] == "k1"
 
@@ -73,9 +71,7 @@ async def test_acquire_lock_already_held() -> None:
             "start_time": "2026-05-01T10:00:00Z",
         }
 
-        err, result = await main(args)
+        result = cast("dict[str, Any]", await main(args))
 
-        assert err is None
-        assert result is not None
         assert result["acquired"] is False
         assert result["reason"] == "lock_already_held"

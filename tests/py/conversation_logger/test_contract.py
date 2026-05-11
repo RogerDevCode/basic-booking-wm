@@ -33,9 +33,8 @@ async def test_conversation_logger_success() -> None:
             "content": "Hello bot",
         }
 
-        err, result = await main(args)
+        result = await main(args)
 
-        assert err is None
         assert result is not None
         assert result["message_id"] == "m1"
         assert mock_db.fetch.called

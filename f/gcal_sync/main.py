@@ -24,7 +24,7 @@ from __future__ import annotations
 # RLS Tenant ID   : YES — with_tenant_context wraps all DB ops
 # Pydantic Schemas: YES — InputSchema validates all inputs
 # ============================================================================
-from typing import TYPE_CHECKING, Literal
+from typing import Literal
 
 from ..internal._db_client import create_db_client
 from ..internal._wmill_adapter import log
@@ -33,40 +33,37 @@ from ._gcal_sync_models import GCalSyncResult, InputSchema
 from ._sync_event_logic import sync_event
 from ._update_sync_status import update_booking_sync_status
 
-if TYPE_CHECKING:
-    from ..internal._result import Result
-
 MODULE = "gcal_sync"
 
 
-async def _main_async(args: dict[str, object]) -> Result[GCalSyncResult]:
+async def _main_async(args: dict[str, object]) -> GCalSyncResult:
     try:
         input_data = InputSchema.model_validate(args)
     except Exception as e:
-        return Exception(f"Validation error: {e}"), None
+        raise RuntimeError(f"Validation error: {e}") from e
 
     conn = await create_db_client()
     try:
         # 1. Fetch Details
-        err_details, details = await fetch_booking_details(conn, input_data.tenant_id, input_data.booking_id)
-        if err_details or not details:
-            return err_details or Exception("Booking details not found"), None
+        details = await fetch_booking_details(conn, input_data.tenant_id, input_data.booking_id)
 
         errors: list[str] = []
         provider_event_id: str | None = details["gcal_provider_event_id"]
         client_event_id: str | None = details["gcal_client_event_id"]
 
         # 2. Sync Provider Calendar
-        err_prov, new_prov_id = await sync_event(conn, details, "provider", input_data.action)
-        if err_prov:
+        try:
+            new_prov_id = await sync_event(conn, details, "provider", input_data.action)
+        except RuntimeError as err_prov:
             errors.append(f"Provider sync failed: {err_prov}")
         else:
             provider_event_id = new_prov_id or provider_event_id
 
         # 3. Sync Client Calendar (if available)
         if details["client_calendar_id"]:
-            err_cli, new_cli_id = await sync_event(conn, details, "client", input_data.action)
-            if err_cli:
+            try:
+                new_cli_id = await sync_event(conn, details, "client", input_data.action)
+            except RuntimeError as err_cli:
                 errors.append(f"Client sync failed: {err_cli}")
             else:
                 client_event_id = new_cli_id or client_event_id
@@ -96,11 +93,11 @@ async def _main_async(args: dict[str, object]) -> Result[GCalSyncResult]:
             "errors": errors,
         }
 
-        return None, result
+        return result
 
     except Exception as e:
         log("Unexpected error in gcal_sync", error=str(e), module=MODULE)
-        return Exception(f"Internal error: {e}"), None
+        raise RuntimeError(f"Internal error: {e}") from e
     finally:
         await conn.close()
 
@@ -118,9 +115,7 @@ def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
         else:
             validated = InputSchema.model_validate(args)
 
-        err, result = asyncio.run(_main_async(validated.model_dump()))
-        if err:
-            raise err
+        result = asyncio.run(_main_async(validated.model_dump()))
 
         if result is None:
             return {}

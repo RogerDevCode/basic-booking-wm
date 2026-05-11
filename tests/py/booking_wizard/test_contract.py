@@ -32,9 +32,8 @@ async def test_booking_wizard_start() -> None:
             "wizard_state": {"client_id": "c1", "chat_id": "123"},
         }
 
-        err, result = await main(args)
+        result = await main(args)
 
-        assert err is None
         assert result is not None
         message = str(result["message"])
         assert "Elige una fecha" in message
@@ -55,24 +54,21 @@ async def test_booking_wizard_select_date_success() -> None:
     async def mock_with_tenant(db: object, tid: str, op: Callable[[], Coroutine[Any, Any, object]]) -> object:
         return await op()
 
-    mock_avail = (
-        None,
-        {
-            "provider_id": VALID_ID,
-            "date": "2026-05-01",
-            "timezone": "UTC",
-            "slots": [{"start": "2026-05-01T09:00:00Z", "end": "2026-05-01T09:30:00Z", "available": True}],
-            "total_available": 1,
-            "total_booked": 0,
-            "is_blocked": False,
-            "block_reason": None,
-        },
-    )
+    mock_avail = {
+        "provider_id": VALID_ID,
+        "date": "2026-05-01",
+        "timezone": "UTC",
+        "slots": [{"start": "2026-05-01T09:00:00Z", "end": "2026-05-01T09:30:00Z", "available": True}],
+        "total_available": 1,
+        "total_booked": 0,
+        "is_blocked": False,
+        "block_reason": None,
+    }
 
     with (
         patch("f.booking_wizard.main.create_db_client", return_value=mock_db),
         patch("f.booking_wizard.main.with_tenant_context", side_effect=mock_with_tenant),
-        patch("f.internal.scheduling_engine._scheduling_logic.get_availability", return_value=mock_avail),
+        patch("f.booking_wizard._wizard_logic.get_availability", return_value=mock_avail),
     ):
         args: dict[str, Any] = {
             "action": "select_date",
@@ -82,9 +78,8 @@ async def test_booking_wizard_select_date_success() -> None:
             "wizard_state": {"client_id": "c1", "chat_id": "123", "step": 1},
         }
 
-        err, result = await main(args)
+        result = await main(args)
 
-        assert err is None
         assert result is not None
         message = str(result["message"])
         assert "Elige un horario" in message

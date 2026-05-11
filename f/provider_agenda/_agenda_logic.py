@@ -3,13 +3,12 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from ..internal._result import DBClient, Result, ok
-
 if TYPE_CHECKING:
+    from ..internal._result import DBClient
     from ._agenda_models import AgendaInput, AgendaRow
 
 
-async def get_provider_agenda(db: DBClient, input_data: AgendaInput) -> Result[list[AgendaRow]]:
+async def get_provider_agenda(db: DBClient, input_data: AgendaInput) -> list[AgendaRow]:
     # 1. Base Query
     sql = """
         SELECT b.booking_id, b.status, b.start_time, b.end_time,
@@ -54,4 +53,4 @@ async def get_provider_agenda(db: DBClient, input_data: AgendaInput) -> Result[l
             }
         )
 
-    return ok(res)
+    return res

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -42,12 +42,9 @@ async def test_provider_dashboard_success() -> None:
         patch("f.web_provider_dashboard.main.with_tenant_context", side_effect=mock_with_tenant),
     ):
         args: dict[str, Any] = {"provider_user_id": VALID_ID, "date": "2026-05-01"}
-        err, result = await main(args)
+        result = cast("dict[str, Any]", await main(args))
 
-        assert err is None
-        assert result is not None
         assert result["provider_id"] == "p1"
         assert len(result["agenda"]) == 1
-        assert result is not None
         assert result["stats"]["month_completed"] == 10
         assert result["stats"]["attendance_rate"] == "90.9"

@@ -7,7 +7,6 @@ from typing import cast  # noqa: E402
 import httpx  # noqa: E402
 
 from ..internal._config import MAX_RETRIES, TIMEOUT_TELEGRAM_API_MS  # noqa: E402
-from ..internal._result import Result, fail, ok  # noqa: E402
 from ._telegram_models import (  # noqa: E402
     AnswerCallbackInput,
     DeleteMessageInput,
@@ -24,7 +23,7 @@ class TelegramService:
         self.bot_token = bot_token
         self.base_url = f"https://api.telegram.org/bot{bot_token}"
 
-    async def execute(self, input_data: TelegramInput) -> Result[TelegramSendData]:
+    async def execute(self, input_data: TelegramInput) -> TelegramSendData:
         endpoint, body = self.prepare_request(input_data)
 
         last_err: Exception | str | None = None
@@ -42,13 +41,13 @@ class TelegramService:
                 res: TelegramSendData = TelegramSendData(
                     sent=True, message_id=msg_id, mode=input_data.mode, chat_id=chat_id
                 )
-                return ok(res)
+                return res
             except Exception as e:
                 last_err = e
                 if attempt < MAX_RETRIES - 1:
                     await asyncio.sleep(0.5 * (2**attempt))
 
-        return fail(str(last_err) or "Telegram API failed")
+        raise RuntimeError(str(last_err) or "Telegram API failed")
 
     def prepare_request(self, input_data: TelegramInput) -> tuple[str, dict[str, object]]:
         mode = input_data.mode

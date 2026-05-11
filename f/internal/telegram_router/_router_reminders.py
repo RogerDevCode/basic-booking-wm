@@ -18,7 +18,6 @@ from ...reminder_config._config_models import (
 from ...reminder_config._config_models import (
     ReminderChannel,
     ReminderConfigAction,
-    ReminderConfigResult,
     ReminderWindow,
 )
 from ...reminder_config.main import run_reminder_config
@@ -91,16 +90,7 @@ async def handle_reminders_config(
         channel=channel,
         window=window,
     )
-    config_result = await run_reminder_config(config_input)
-    res_config: ReminderConfigResult
-    match config_result:
-        case (None, result_value):
-            if result_value is None:
-                return Failure("reminder_config_empty")
-            res_config = result_value
-        case (err, _):
-            assert err is not None
-            return Failure(str(err))
+    res_config = await run_reminder_config(config_input)
 
     if action == "back":
         from ..booking_fsm._fsm_machine import get_main_menu_text

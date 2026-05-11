@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from ..internal._result import DBClient, Result, fail, ok
+from ..internal._result import DBClient
 from ._profile_models import InputSchema, ProfileRow
 
 
@@ -8,7 +8,7 @@ class ProfileRepository:
     def __init__(self, db: DBClient) -> None:
         self.db = db
 
-    async def find_by_id(self, provider_id: str) -> Result[ProfileRow]:
+    async def find_by_id(self, provider_id: str) -> ProfileRow:
         try:
             rows = await self.db.fetch(
                 """
@@ -32,7 +32,7 @@ class ProfileRepository:
                 provider_id,
             )
             if not rows:
-                return fail("profile_not_found")
+                raise RuntimeError("profile_not_found")
 
             r = rows[0]
             res: ProfileRow = {
@@ -58,29 +58,30 @@ class ProfileRepository:
                 if r.get("last_password_change") and isinstance(r["last_password_change"], datetime)
                 else None,
             }
-            return ok(res)
+            return res
         except Exception as e:
-            return fail(f"fetch_profile_failed: {e}")
+            raise RuntimeError(f"fetch_profile_failed: {e}") from e
 
-    async def update(self, provider_id: str, data: InputSchema) -> Result[None]:
-        allowed = [
+    async def update(self, provider_id: str, data: InputSchema) -> None:
+        _ALLOWED = {
             "name",
+            "description",
+            "specialty_id",
+            "phone",
             "email",
-            "phone_app",
-            "phone_contact",
-            "telegram_chat_id",
-            "gcal_calendar_id",
+            "website",
+            "photo_url",
             "address_street",
             "address_number",
             "address_complement",
             "address_sector",
             "region_id",
             "commune_id",
-        ]
+        }
         fields = []
         params = []
         idx = 1
-        for f in allowed:
+        for f in _ALLOWED:
             val = getattr(data, f)
             if val is not None:
                 fields.append(f"{f} = ${idx}")
@@ -88,32 +89,30 @@ class ProfileRepository:
                 idx += 1
 
         if not fields:
-            return fail("no_changes_provided")
+            raise RuntimeError("no_changes_provided")
 
         params.append(provider_id)
         query = f"UPDATE providers SET {', '.join(fields)}, updated_at = NOW() WHERE id = ${idx}::uuid"
         try:
             await self.db.execute(query, *params)
-            return ok(None)
         except Exception as e:
-            return fail(f"update_failed: {e}")
+            raise RuntimeError(f"update_failed: {e}") from e
 
-    async def get_password_hash(self, provider_id: str) -> Result[str]:
+    async def get_password_hash(self, provider_id: str) -> str:
         rows = await self.db.fetch("SELECT password_hash FROM providers WHERE id = $1::uuid LIMIT 1", provider_id)
         if not rows:
-            return fail("provider_not_found")
+            raise RuntimeError("provider_not_found")
         h = rows[0].get("password_hash")
         if not h:
-            return fail("no_password_set")
-        return ok(str(h))
+            raise RuntimeError("no_password_set")
+        return str(h)
 
-    async def update_password(self, provider_id: str, new_hash: str) -> Result[None]:
+    async def update_password(self, provider_id: str, new_hash: str) -> None:
         try:
             await self.db.execute(
                 "UPDATE providers SET password_hash = $1, last_password_change = NOW(), updated_at = NOW() WHERE id = $2::uuid",  # noqa: E501
                 new_hash,
                 provider_id,
             )
-            return ok(None)
         except Exception as e:
-            return fail(f"password_update_failed: {e}")
+            raise RuntimeError(f"password_update_failed: {e}") from e

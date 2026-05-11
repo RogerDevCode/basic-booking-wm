@@ -100,10 +100,7 @@ async def _fetch_slots_for_doctor(db: DBClient, doctor_id: str) -> list[dict[str
     date_from = (provider_today + timedelta(days=1) if require_advance else provider_today).isoformat()
     date_to = (provider_today + timedelta(days=7)).isoformat()
 
-    err, results = await get_availability_range(db, doctor_id, service_id, date_from, date_to)
-    if err:
-        log("PREFETCH_SLOTS_ERROR", error=str(err), doctor_id=doctor_id, module=MODULE)
-        return []
+    results = await get_availability_range(db, doctor_id, service_id, date_from, date_to)
     if not results:
         return []
 

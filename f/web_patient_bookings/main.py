@@ -24,10 +24,10 @@ import asyncio
 # RLS Tenant ID   : YES — with_tenant_context wraps all DB ops
 # Pydantic Schemas: YES — InputSchema validates parameters
 # ============================================================================
-from typing import Any
+from typing import Any, cast
 
 from ..internal._db_client import create_db_client
-from ..internal._result import Result, fail, with_tenant_context
+from ..internal._result import with_tenant_context
 from ..internal._wmill_adapter import log
 from ._bookings_logic import get_patient_bookings, resolve_client_id
 from ._bookings_models import BookingsResult, InputSchema
@@ -35,37 +35,35 @@ from ._bookings_models import BookingsResult, InputSchema
 MODULE = "web_patient_bookings"
 
 
-async def _main_async(args: dict[str, Any]) -> Result[BookingsResult]:
+async def _main_async(args: dict[str, Any]) -> dict[str, object]:
     # 1. Validate Input
     try:
         input_data = InputSchema.model_validate(args)
     except Exception as e:
-        return fail(f"Validation error: {e}")
+        raise RuntimeError(f"Validation error: {e}") from e
 
     conn = await create_db_client()
     try:
         # 2. Execute within Tenant Context (client_user_id)
-        async def operation() -> Result[BookingsResult]:
-            err_id, client_id = await resolve_client_id(conn, input_data.client_user_id)
-            if err_id or not client_id:
-                return fail(err_id or "client_not_found")
+        async def operation() -> BookingsResult:
+            client_id = await resolve_client_id(conn, input_data.client_user_id)
+            if not client_id:
+                raise RuntimeError("client_not_found")
 
             return await get_patient_bookings(conn, client_id, input_data)
 
-        return await with_tenant_context(conn, input_data.client_user_id, operation)
+        result = await with_tenant_context(conn, input_data.client_user_id, operation)
+        return cast("dict[str, object]", result)
 
     except Exception as e:
         log("Patient Bookings Internal Error", error=str(e), module=MODULE)
-        return fail(f"internal_error: {e}")
+        raise RuntimeError(f"internal_error: {e}") from e
     finally:
         await conn.close()  # pyright: ignore[reportUnknownMemberType]
 
 
 def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
     import traceback
-    from typing import cast
-
-    from pydantic import BaseModel
 
     try:
         if isinstance(args, InputSchema):
@@ -73,19 +71,7 @@ def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
         else:
             validated = InputSchema.model_validate(args)
 
-        err, result = asyncio.run(_main_async(validated.model_dump()))
-        if err:
-            raise err
-
-        if result is None:
-            return {}
-
-        if isinstance(result, BaseModel):
-            return cast("dict[str, object]", result.model_dump())
-        elif isinstance(result, dict):
-            return cast("dict[str, object]", result)
-        else:
-            return {"data": result}
+        return asyncio.run(_main_async(validated.model_dump()))
 
     except Exception as e:
         tb = traceback.format_exc()

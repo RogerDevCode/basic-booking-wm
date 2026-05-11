@@ -1,13 +1,14 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Coroutine, Mapping
 from typing import TYPE_CHECKING, Any
 
 from f.booking_orchestrator._get_entity import get_entity
-from f.internal._result import DBClient, Result, ok
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, Coroutine, Mapping
+
     from f.booking_orchestrator._orchestrator_models import OrchestratorInput, OrchestratorResult
+    from f.internal._result import DBClient
 
 from ._get_my_bookings import handle_get_my_bookings
 
@@ -25,7 +26,7 @@ Zod Schemas      : NO
 
 async def handle_cancel_booking(
     conn: DBClient, input_data: OrchestratorInput, delegates: Mapping[str, Callable[..., Coroutine[Any, Any, Any]]]
-) -> Result[OrchestratorResult]:
+) -> OrchestratorResult:
     booking_id = input_data.booking_id or get_entity(input_data.entities, "booking_id")
 
     if not booking_id:
@@ -33,7 +34,7 @@ async def handle_cancel_booking(
         cloned_input = input_data.model_copy(update={"notes": "Por favor, dime el ID de la cita que deseas cancelar."})
         return await handle_get_my_bookings(conn, cloned_input, delegates)
 
-    # Call booking_cancel
+    # Call booking_cancel core directly (in-process)
     args: dict[str, object] = {
         "booking_id": booking_id,
         "actor": "client",
@@ -42,14 +43,11 @@ async def handle_cancel_booking(
         "idempotency_key": f"orch-cancel-{booking_id}",
     }
 
+    from ...booking_cancel.main import run_cancel_booking
+
     try:
-        cancel_res = await delegates["book_cancel"](args=args)
-        if isinstance(cancel_res, dict) and "error" in cancel_res:
-            err = str(cancel_res["error"])
-            data = None
-        else:
-            err = None
-            data = cancel_res
+        data = await run_cancel_booking(conn, args)
+        err = None
     except Exception as e:
         err = str(e)
         data = None
@@ -60,4 +58,4 @@ async def handle_cancel_booking(
         "data": data,
         "message": f"❌ No se pudo cancelar: {err}" if err else "✅ Tu cita ha sido cancelada exitosamente.",
     }
-    return ok(res)
+    return res

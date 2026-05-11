@@ -36,13 +36,12 @@ async def test_gcal_sync_success() -> None:
 
     with (
         patch("f.gcal_sync.main.create_db_client", return_value=mock_db),
-        patch("f.gcal_sync._sync_event_logic.call_gcal_api", AsyncMock(return_value=(None, {"id": "new-event-123"}))),
+        patch("f.gcal_sync._sync_event_logic.call_gcal_api", AsyncMock(return_value={"id": "new-event-123"})),
     ):
         args: dict[str, Any] = {"booking_id": VALID_BOOKING_ID, "tenant_id": VALID_TENANT_ID, "action": "create"}
 
-        err, result = await main(args)
+        result = await main(args)
 
-        assert err is None
         assert result is not None
         assert result["sync_status"] == "synced"
         assert result["provider_event_id"] == "new-event-123"
@@ -73,13 +72,12 @@ async def test_gcal_sync_failure() -> None:
 
     with (
         patch("f.gcal_sync.main.create_db_client", return_value=mock_db),
-        patch("f.gcal_sync._sync_event_logic.call_gcal_api", AsyncMock(return_value=(Exception("API Error"), None))),
+        patch("f.gcal_sync._sync_event_logic.call_gcal_api", AsyncMock(side_effect=RuntimeError("API Error"))),
     ):
         args: dict[str, Any] = {"booking_id": VALID_BOOKING_ID, "tenant_id": VALID_TENANT_ID, "action": "create"}
 
-        err, result = await main(args)
+        result = await main(args)
 
-        assert err is None
         assert result is not None
         assert result["sync_status"] == "pending"
         assert len(result["errors"]) > 0

@@ -1,93 +1,47 @@
 from datetime import datetime, timedelta
-from typing import cast
 
-from ..internal._result import Result, fail, ok
 from ..internal._state_machine import validate_transition
 from ._booking_create_models import BookingContext, BookingCreated, InputSchema
 from ._booking_create_repository import BookingCreateRepository
 
 
-async def fetch_booking_context(repo: BookingCreateRepository, input_data: InputSchema) -> Result[BookingContext]:
-    client_ctx = await repo.get_client_context(input_data.client_id)
-    if not client_ctx:
-        return fail(Exception(f"Client {input_data.client_id} not found"))
-
-    provider_ctx = await repo.get_provider_context(input_data.provider_id)
-    if not provider_ctx:
-        return fail(Exception(f"Provider {input_data.provider_id} not found or inactive"))
-
-    service_ctx = await repo.get_service_context(input_data.service_id, input_data.provider_id)
-    if not service_ctx:
-        return fail(Exception(f"Service {input_data.service_id} not found or inactive for this provider"))
-
-    return ok(cast("BookingContext", {"client": client_ctx, "provider": provider_ctx, "service": service_ctx}))
-
-
-async def check_availability(
-    repo: BookingCreateRepository, input_data: InputSchema, end_time: datetime
-) -> Result[None]:
-    has_active = await repo.has_active_booking_for_client(input_data.client_id)
-    if has_active:
-        return fail(Exception("client_already_has_active_booking"))
-
-    has_client_overlap = await repo.has_client_overlap(input_data.client_id, input_data.start_time, end_time)
-    if has_client_overlap:
-        return fail(Exception("client_has_overlapping_booking"))
-
-    target_date = input_data.start_time.date()
-
-    is_blocked = await repo.is_provider_blocked(input_data.provider_id, target_date)
-    if is_blocked:
-        return fail(Exception(f"Provider unavailable on {target_date}"))
-
-    # getweekday returns 0-6 where 0 is Monday. In JS it's 0 is Sunday.
-    # We must match the Postgres day_of_week logic. Postgres extracts 0-6 where 0 is Sunday.
-    # Python's isoweekday() is 1-7 (Mon=1, Sun=7).
-    # To match Postgres 0=Sun, 1=Mon:
-    day_of_week = input_data.start_time.isoweekday() % 7
-
-    is_scheduled = await repo.is_provider_scheduled(input_data.provider_id, day_of_week)
-    if not is_scheduled:
-        return fail(Exception(f"Provider not available on day {day_of_week}"))
-
-    has_overlap = await repo.has_overlapping_booking(input_data.provider_id, input_data.start_time, end_time)
-    if has_overlap:
-        return fail(Exception("This time slot is already booked"))
-
-    return ok(None)
+async def fetch_booking_context(repo: BookingCreateRepository, input_data: InputSchema) -> BookingContext:
+    context = await repo.get_booking_context(input_data.client_id, input_data.provider_id, input_data.service_id)
+    if not context:
+        raise ValueError(
+            f"Booking context invalid: client={input_data.client_id}, "
+            f"provider={input_data.provider_id}, service={input_data.service_id}"
+        )
+    return context
 
 
 async def persist_booking(
     repo: BookingCreateRepository, input_data: InputSchema, context: BookingContext, end_time: datetime
-) -> Result[BookingCreated]:
+) -> BookingCreated:
     err, _ = validate_transition("pending", "confirmed")
     if err is not None:
-        return fail(err)
+        raise RuntimeError(f"Invalid transition: {err}")
 
-    try:
-        booking = await repo.insert_booking(
-            input_data,
-            end_time,
-            "confirmed",
-            provider_name=context["provider"]["name"],
-            service_name=context["service"]["name"],
-            client_name=context["client"]["name"],
-        )
-        return ok(booking)
-    except Exception as e:
-        return fail(e)
+    return await repo.insert_booking(
+        input_data,
+        end_time,
+        "confirmed",
+        provider_name=context["provider"]["name"],
+        service_name=context["service"]["name"],
+        client_name=context["client"]["name"],
+    )
 
 
-async def execute_create_booking(repo: BookingCreateRepository, input_data: InputSchema) -> Result[BookingCreated]:
-    err_ctx, context = await fetch_booking_context(repo, input_data)
-    if err_ctx is not None or context is None:
-        return fail(err_ctx or Exception("Failed to load booking context"))
+async def execute_create_booking(repo: BookingCreateRepository, input_data: InputSchema) -> BookingCreated:
+    context = await fetch_booking_context(repo, input_data)
 
     duration_minutes = context["service"]["duration"]
     end_time = input_data.start_time + timedelta(minutes=duration_minutes)
 
-    err_avail, _ = await check_availability(repo, input_data, end_time)
-    if err_avail is not None:
-        return fail(err_avail)
+    # BE-02: one active booking per client (not enforced by DB GIST)
+    has_active = await repo.has_active_booking_for_client(input_data.client_id)
+    if has_active:
+        raise RuntimeError("client_already_has_active_booking")
 
+    # Slot overlap is enforced atomically by the DB GIST exclusion constraint
     return await persist_booking(repo, input_data, context, end_time)

@@ -3,9 +3,8 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, cast
 
-from ..internal._result import DBClient, Result, fail, ok
-
 if TYPE_CHECKING:
+    from ..internal._result import DBClient
     from ._lock_models import InputSchema, LockInfo, LockResult
 
 
@@ -28,9 +27,9 @@ def map_row_to_lock_info(row: object) -> LockInfo:
     }
 
 
-async def acquire_lock(db: DBClient, input_data: InputSchema) -> Result[LockResult]:
+async def acquire_lock(db: DBClient, input_data: InputSchema) -> LockResult:
     if not input_data.owner_token or not input_data.start_time:
-        return fail("acquire_failed: owner_token and start_time are required")
+        raise RuntimeError("acquire_failed: owner_token and start_time are required")
 
     expires_at = datetime.now(UTC) + timedelta(seconds=input_data.ttl_seconds)
 
@@ -50,7 +49,7 @@ async def acquire_lock(db: DBClient, input_data: InputSchema) -> Result[LockResu
     )
 
     if rows:
-        return ok({"acquired": True, "lock": map_row_to_lock_info(rows[0])})
+        return {"acquired": True, "lock": map_row_to_lock_info(rows[0])}
 
     # 2. Try steal expired
     rows = await db.fetch(
@@ -71,15 +70,15 @@ async def acquire_lock(db: DBClient, input_data: InputSchema) -> Result[LockResu
     )
 
     if rows:
-        return ok({"acquired": True, "lock": map_row_to_lock_info(rows[0])})
+        return {"acquired": True, "lock": map_row_to_lock_info(rows[0])}
 
     res: LockResult = {"acquired": False, "reason": "lock_already_held"}
-    return ok(res)
+    return res
 
 
-async def release_lock(db: DBClient, input_data: InputSchema) -> Result[LockResult]:
+async def release_lock(db: DBClient, input_data: InputSchema) -> LockResult:
     if not input_data.owner_token:
-        return fail("release_failed: owner_token is required")
+        raise RuntimeError("release_failed: owner_token is required")
 
     rows = await db.fetch(
         "DELETE FROM booking_locks WHERE lock_key = $1 AND owner_token = $2 RETURNING lock_key",
@@ -89,13 +88,13 @@ async def release_lock(db: DBClient, input_data: InputSchema) -> Result[LockResu
 
     if not rows:
         res_fail: LockResult = {"released": False, "reason": "lock_not_found_or_unauthorized"}
-        return ok(res_fail)
+        return res_fail
 
     res_ok: LockResult = {"released": True}
-    return ok(res_ok)
+    return res_ok
 
 
-async def check_lock(db: DBClient, lock_key: str) -> Result[LockResult]:
+async def check_lock(db: DBClient, lock_key: str) -> LockResult:
     rows = await db.fetch(
         """
         SELECT owner_token, expires_at FROM booking_locks
@@ -106,16 +105,16 @@ async def check_lock(db: DBClient, lock_key: str) -> Result[LockResult]:
     )
     if not rows:
         res_no: LockResult = {"locked": False}
-        return ok(res_no)
+        return res_no
 
     r = rows[0]
     exp_raw = r.get("expires_at")
     exp = exp_raw.isoformat() if isinstance(exp_raw, datetime) else str(exp_raw)
     res_yes: LockResult = {"locked": True, "owner": str(r["owner_token"]), "expires_at": exp}
-    return ok(res_yes)
+    return res_yes
 
 
-async def cleanup_locks(db: DBClient) -> Result[LockResult]:
+async def cleanup_locks(db: DBClient) -> LockResult:
     rows = await db.fetch("DELETE FROM booking_locks WHERE expires_at < NOW() RETURNING lock_key")
     res: LockResult = {"cleaned": len(rows)}
-    return ok(res)
+    return res

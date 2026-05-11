@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Coroutine, Mapping
 from datetime import datetime
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
-from f.booking_orchestrator._orchestrator_models import AvailabilityData, OrchestratorInput, OrchestratorResult
-from f.internal._result import DBClient, Result, fail, ok
+if TYPE_CHECKING:
+    from collections.abc import Callable, Coroutine, Mapping
+
+    from f.booking_orchestrator._orchestrator_models import AvailabilityData, OrchestratorInput, OrchestratorResult
+    from f.internal._result import DBClient
 
 """
 PRE-FLIGHT
@@ -21,74 +23,67 @@ Zod Schemas      : NO
 
 async def handle_list_available(
     conn: DBClient, input_data: OrchestratorInput, delegates: Mapping[str, Callable[..., Coroutine[Any, Any, Any]]]
-) -> Result[OrchestratorResult]:
+) -> OrchestratorResult:
+    _ = delegates  # kept for signature compatibility
     provider_id = input_data.provider_id
     date = input_data.date
     service_id = input_data.service_id
 
     if not provider_id or not date:
-        return ok(
-            cast(
-                "OrchestratorResult",
-                {
-                    "action": "ver_disponibilidad",
-                    "success": False,
-                    "data": None,
-                    "message": "Necesito el doctor y la fecha para consultar disponibilidad.",
-                },
-            )
+        return cast(
+            "OrchestratorResult",
+            {
+                "action": "ver_disponibilidad",
+                "success": False,
+                "data": None,
+                "message": "Necesito el doctor y la fecha para consultar disponibilidad.",
+            },
         )
 
-    # 1. CALL AVAILABILITY MODULE
+    # 1. CALL AVAILABILITY MODULE DIRECTLY (in-process)
+    args = {
+        "provider_id": provider_id,
+        "date": date,
+        "service_id": service_id,
+        "tenant_id": input_data.tenant_id,
+    }
+
+    from ...availability_check.main import run_availability_check
+
     try:
-        args = {
-            "provider_id": provider_id,
-            "date": date,
-            "service_id": service_id,
-        }
-        res = await delegates["availability_check"](args=args)
-        if isinstance(res, dict) and "error" in res:
-            err_msg = str(res["error"])
-            data = None
-        else:
-            err_msg = None
-            data = res
+        data = await run_availability_check(conn, args)
     except Exception as e:
         import traceback
 
         from f.internal._wmill_adapter import log
 
         log("LIST_AVAILABLE_CRASH", error=str(e), traceback=traceback.format_exc(), module="booking_orchestrator")
-        return fail(f"Failed to call availability_check: {e}")
+        raise RuntimeError(f"Failed to call availability_check: {e}") from e
 
-    if err_msg or data is None:
+    if data is None:
         from f.internal._wmill_adapter import log
 
-        log("LIST_AVAILABLE_API_ERROR", err_msg=str(err_msg), module="booking_orchestrator")
-        return ok(
-            cast(
-                "OrchestratorResult",
-                {
-                    "action": "ver_disponibilidad",
-                    "success": False,
-                    "data": None,
-                    "message": f"❌ Error: {err_msg or 'Desconocido'}",
-                },
-            )
+        log("LIST_AVAILABLE_API_ERROR", module="booking_orchestrator")
+        return cast(
+            "OrchestratorResult",
+            {
+                "action": "ver_disponibilidad",
+                "success": False,
+                "data": None,
+                "message": "❌ Error: Desconocido",
+            },
         )
 
     avail = cast("AvailabilityData", data)
     if avail.get("is_blocked"):
-        return ok(
-            cast(
-                "OrchestratorResult",
-                {
-                    "action": "ver_disponibilidad",
-                    "success": True,
-                    "data": data,
-                    "message": f"😅 No hay disponibilidad el {date}: {avail.get('block_reason', 'Motivo desconocido')}",
-                },
-            )
+        return cast(
+            "OrchestratorResult",
+            {
+                "action": "ver_disponibilidad",
+                "success": True,
+                "data": data,
+                "message": f"😅 No hay disponibilidad el {date}: {avail.get('block_reason', 'Motivo desconocido')}",
+            },
         )
 
     # Resolve UI limits
@@ -111,16 +106,14 @@ async def handle_list_available(
     slots = slots[:limit]
 
     if not slots:
-        return ok(
-            cast(
-                "OrchestratorResult",
-                {
-                    "action": "ver_disponibilidad",
-                    "success": True,
-                    "data": data,
-                    "message": f"😅 No hay horarios disponibles el {date}.",
-                },
-            )
+        return cast(
+            "OrchestratorResult",
+            {
+                "action": "ver_disponibilidad",
+                "success": True,
+                "data": data,
+                "message": f"😅 No hay horarios disponibles el {date}.",
+            },
         )
 
     # 2. FORMAT RESPONSE
@@ -155,4 +148,4 @@ async def handle_list_available(
         "message": message,
         "follow_up": "¿Te gustaría agendar alguno de estos horarios?",
     }
-    return ok(res_avail)
+    return res_avail

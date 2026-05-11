@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, TypedDict
 
 if TYPE_CHECKING:
-    from ._result import DBClient, Result
+    from ._result import DBClient
 
 
 class ActiveBookingInfo(TypedDict):
@@ -13,9 +13,7 @@ class ActiveBookingInfo(TypedDict):
     service_name: str
 
 
-async def get_active_booking_for_provider(
-    conn: DBClient, client_id: str, provider_id: str
-) -> Result[ActiveBookingInfo | None]:
+async def get_active_booking_for_provider(conn: DBClient, client_id: str, provider_id: str) -> ActiveBookingInfo | None:
     """
     Checks if a client has an active (confirmed/pending) booking with a specific provider.
     """
@@ -34,7 +32,7 @@ async def get_active_booking_for_provider(
     try:
         row = await conn.fetchrow(query, client_id, provider_id)
         if not row:
-            return None, None
+            return None
 
         res: ActiveBookingInfo = {
             "booking_id": str(row["booking_id"]),
@@ -42,6 +40,6 @@ async def get_active_booking_for_provider(
             "provider_name": str(row["provider_name"]),
             "service_name": str(row["service_name"]),
         }
-        return None, res
+        return res
     except Exception as e:
-        return Exception(f"Error checking active bookings: {e}"), None
+        raise RuntimeError(f"Error checking active bookings: {e}") from e

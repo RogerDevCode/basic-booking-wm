@@ -34,9 +34,8 @@ async def test_admin_honorifics_list() -> None:
         patch("f.admin_honorifics.main.with_admin_context", side_effect=mock_with_admin),
     ):
         args: dict[str, Any] = {"action": "list", "tenant_id": "t1"}
-        err, result = await main(args)
+        result = await main(args)
 
-        assert err is None
         assert len(result or []) == 1
         assert result is not None
         assert cast("list[dict[str, object]]", result)[0]["code"] == "Dr."

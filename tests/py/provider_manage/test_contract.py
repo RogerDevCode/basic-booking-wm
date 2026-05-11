@@ -31,9 +31,8 @@ async def test_provider_manage_update_success() -> None:
             "specialty_id": VALID_ID,
         }
 
-        err, result = await main(args)
+        result = await main(args)
 
-        assert err is None
         assert result is not None
         assert result["updated"] is True
         assert mock_db.execute.called

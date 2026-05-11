@@ -1,0 +1,16 @@
+from __future__ import annotations
+
+
+class BookingNotFoundError(RuntimeError): ...
+
+
+class BookingAlreadyCancelledError(RuntimeError): ...
+
+
+class BookingAlreadyRescheduledError(RuntimeError): ...
+
+
+class BookingSlotUnavailableError(RuntimeError): ...
+
+
+class BookingPermissionError(PermissionError): ...

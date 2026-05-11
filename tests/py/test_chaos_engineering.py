@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import time
-from typing import cast
 from unittest.mock import AsyncMock
 
 import pytest
@@ -52,12 +51,10 @@ async def test_gb_02_malformed_json_recovery() -> None:
     args = {"intent": "crear_cita", "campo_fantasma": "malicioso"}
 
     # El orchestrator debe atajar que args no es un dict válido o falla en Pydantic
-    err, result = await orchestrator_main(args)  # type: ignore[arg-type]
 
     # Debe capturar el error y devolver un fail, NO lanzar excepción al event loop
-    assert err is not None
-    assert "validation_error" in str(err) or "Invalid input" in str(err)
-    assert result is None
+    with pytest.raises(RuntimeError):
+        await orchestrator_main(args)  # type: ignore[arg-type]
 
 
 @pytest.mark.asyncio
@@ -102,8 +99,7 @@ async def test_rt_01_prompt_injection_guardrail() -> None:
     )
 
     # Si pasamos un intent destructivo, OrchestratorInput validation or normalize_intent will drop it
-    err, res = await orchestrator_main({"intent": malicious_input})
-    assert err is None
+    res = await orchestrator_main({"intent": malicious_input})
     assert res is None  # Gracefully ignored, falls back to LLM natural response
 
 
@@ -201,6 +197,11 @@ async def test_da_01_race_condition_double_booking() -> None:
     repo.get_client_context.return_value = {"id": "c1", "name": "Test"}
     repo.get_provider_context.return_value = {"id": "p1", "name": "P", "timezone": "UTC"}
     repo.get_service_context.return_value = {"id": "s1", "duration": 30, "name": "S"}
+    repo.get_booking_context.return_value = {
+        "client": {"id": "c1", "name": "Test"},
+        "provider": {"id": "p1", "name": "P"},
+        "service": {"id": "s1", "name": "S", "duration": 30},
+    }
     repo.is_provider_blocked.return_value = False
     repo.is_provider_scheduled.return_value = True
     repo.has_overlapping_booking.return_value = False  # Check is clean, race condition happens ON insert
@@ -228,14 +229,13 @@ async def test_da_01_race_condition_double_booking() -> None:
         sem_attempt("client-1"), sem_attempt("client-2"), sem_attempt("client-3"), return_exceptions=True
     )
 
-    _Pair = tuple[object, object]
-    successes = [r for r in results if cast("_Pair", r)[0] is None]
-    failures = [r for r in results if cast("_Pair", r)[0] is not None]
+    successes = [r for r in results if not isinstance(r, Exception)]
+    failures = [r for r in results if isinstance(r, Exception)]
 
     # ASERCIÓN PARANOICA: SÓLO 1 GANA.
     assert len(successes) == 1
     assert len(failures) == 2
-    assert any("exclusion_constraint_violation" in str(cast("_Pair", f)[0]) for f in failures)
+    assert any("exclusion_constraint_violation" in str(f) for f in failures)
 
 
 @pytest.mark.asyncio
@@ -252,6 +252,11 @@ async def test_da_02_network_failure_db_timeout() -> None:
     repo.get_client_context.return_value = {"id": "c1", "name": "Test"}
     repo.get_provider_context.return_value = {"id": "p1", "name": "P", "timezone": "UTC"}
     repo.get_service_context.return_value = {"id": "s1", "duration": 30, "name": "S"}
+    repo.get_booking_context.return_value = {
+        "client": {"id": "c1", "name": "Test"},
+        "provider": {"id": "p1", "name": "P"},
+        "service": {"id": "s1", "name": "S", "duration": 30},
+    }
     repo.is_provider_blocked.return_value = False
     repo.is_provider_scheduled.return_value = True
     repo.has_overlapping_booking.return_value = False
@@ -263,12 +268,8 @@ async def test_da_02_network_failure_db_timeout() -> None:
 
     input_data.start_time = datetime(2026, 5, 20, 10, 0)
 
-    err, res = await execute_create_booking(repo, input_data)
-
-    # Debe atajar el error y devolver fail limpio
-    assert err is not None
-    assert "DB Timeout" in str(err)
-    assert res is None
+    with pytest.raises(TimeoutError, match="DB Timeout"):
+        await execute_create_booking(repo, input_data)
 
 
 @pytest.mark.asyncio

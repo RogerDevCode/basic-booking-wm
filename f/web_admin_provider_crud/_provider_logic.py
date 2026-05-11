@@ -2,9 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, cast
 
-from ..internal._result import DBClient, Result, fail, ok
-
 if TYPE_CHECKING:
+    from ..internal._result import DBClient
     from ._provider_models import InputSchema, ProviderRow
 
 
@@ -40,11 +39,11 @@ def map_row_to_provider(row: object) -> ProviderRow:
     }
 
 
-async def list_providers(db: DBClient) -> Result[list[ProviderRow]]:
+async def list_providers(db: DBClient) -> list[ProviderRow]:
     try:
         rows = await db.fetch(
             """
-            SELECT p.*, 
+            SELECT p.*,
                    h.label as honorific_label,
                    s.name as specialty_name,
                    tz.name as timezone_name,
@@ -60,14 +59,14 @@ async def list_providers(db: DBClient) -> Result[list[ProviderRow]]:
             ORDER BY p.name ASC
             """
         )
-        return ok([map_row_to_provider(r) for r in rows])
+        return [map_row_to_provider(r) for r in rows]
     except Exception as e:
-        return fail(f"db_error: {e}")
+        raise RuntimeError(f"db_error: {e}") from e
 
 
-async def create_provider(db: DBClient, input_data: InputSchema) -> Result[ProviderRow]:
+async def create_provider(db: DBClient, input_data: InputSchema) -> ProviderRow:
     if not input_data.name or not input_data.email:
-        return fail("missing_fields: name and email are required")
+        raise RuntimeError("missing_fields: name and email are required")
 
     try:
         rows = await db.fetch(
@@ -78,8 +77,8 @@ async def create_provider(db: DBClient, input_data: InputSchema) -> Result[Provi
                 address_street, address_number, address_complement, address_sector,
                 region_id, commune_id
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
-            RETURNING *, (password_hash IS NOT NULL) as has_password, 
-                      NULL as honorific_label, NULL as specialty_name, NULL as timezone_name, 
+            RETURNING *, (password_hash IS NOT NULL) as has_password,
+                      NULL as honorific_label, NULL as specialty_name, NULL as timezone_name,
                       NULL as region_name, NULL as commune_name
             """,
             input_data.name,
@@ -99,15 +98,15 @@ async def create_provider(db: DBClient, input_data: InputSchema) -> Result[Provi
             input_data.commune_id,
         )
         if not rows:
-            return fail("insert_failed")
-        return ok(map_row_to_provider(rows[0]))
+            raise RuntimeError("insert_failed")
+        return map_row_to_provider(rows[0])
     except Exception as e:
-        return fail(f"db_error: {e}")
+        raise RuntimeError(f"db_error: {e}") from e
 
 
-async def update_provider(db: DBClient, input_data: InputSchema) -> Result[ProviderRow]:
+async def update_provider(db: DBClient, input_data: InputSchema) -> ProviderRow:
     if not input_data.provider_id:
-        return fail("missing_provider_id")
+        raise RuntimeError("missing_provider_id")
 
     try:
         rows = await db.fetch(
@@ -132,7 +131,7 @@ async def update_provider(db: DBClient, input_data: InputSchema) -> Result[Provi
                 updated_at = NOW()
             WHERE provider_id = $17::uuid
             RETURNING *, (password_hash IS NOT NULL) as has_password,
-                      NULL as honorific_label, NULL as specialty_name, NULL as timezone_name, 
+                      NULL as honorific_label, NULL as specialty_name, NULL as timezone_name,
                       NULL as region_name, NULL as commune_name
             """,
             input_data.name,
@@ -154,13 +153,13 @@ async def update_provider(db: DBClient, input_data: InputSchema) -> Result[Provi
             input_data.provider_id,
         )
         if not rows:
-            return fail("update_failed_or_not_found")
-        return ok(map_row_to_provider(rows[0]))
+            raise RuntimeError("update_failed_or_not_found")
+        return map_row_to_provider(rows[0])
     except Exception as e:
-        return fail(f"db_error: {e}")
+        raise RuntimeError(f"db_error: {e}") from e
 
 
-async def reset_provider_password(db: DBClient, provider_id: str) -> Result[ProviderRow]:
+async def reset_provider_password(db: DBClient, provider_id: str) -> ProviderRow:
     import random
     import string
 
@@ -179,14 +178,14 @@ async def reset_provider_password(db: DBClient, provider_id: str) -> Result[Prov
                 updated_at = NOW()
             WHERE provider_id = $2::uuid
             RETURNING *, (password_hash IS NOT NULL) as has_password,
-                      NULL as honorific_label, NULL as specialty_name, NULL as timezone_name, 
+                      NULL as honorific_label, NULL as specialty_name, NULL as timezone_name,
                       NULL as region_name, NULL as commune_name
             """,
             pwd_hash,
             provider_id,
         )
         if not rows:
-            return fail("provider_not_found")
-        return ok(map_row_to_provider(rows[0]))
+            raise RuntimeError("provider_not_found")
+        return map_row_to_provider(rows[0])
     except Exception as e:
-        return fail(f"db_error: {e}")
+        raise RuntimeError(f"db_error: {e}") from e

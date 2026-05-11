@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -44,9 +44,7 @@ async def test_admin_users_list_success() -> None:
         patch("f.web_admin_users.main.with_tenant_context", side_effect=mock_with_tenant),
     ):
         args: dict[str, Any] = {"action": "list", "admin_user_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"}
-        err, result = await main(args)
+        result = cast("dict[str, Any]", await main(args))
 
-        assert err is None
-        assert result is not None
         assert result["total"] == 1
         assert result["users"][0]["full_name"] == "Test User"

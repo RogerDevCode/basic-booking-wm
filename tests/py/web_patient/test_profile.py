@@ -41,9 +41,8 @@ async def test_patient_profile_get_success() -> None:
         patch("f.web_patient_profile.main.with_tenant_context", side_effect=mock_with_tenant),
     ):
         args: dict[str, Any] = {"user_id": VALID_ID, "action": "get"}
-        err, result = await main(args)
+        result = await main(args)
 
-        assert err is None
         assert result is not None
         assert result["client_id"] == "c1"
         assert result["name"] == "Test User"

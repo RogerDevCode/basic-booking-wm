@@ -1,6 +1,6 @@
 from typing import Literal
 
-from ..internal._result import DBClient, Result, ok, with_tenant_context
+from ..internal._result import DBClient, with_tenant_context
 
 
 async def update_booking_sync_status(
@@ -12,9 +12,8 @@ async def update_booking_sync_status(
     status: Literal["synced", "partial", "pending"],
     retry_count: int,
     error_msg: str | None = None,
-) -> Result[None]:
-
-    async def operation() -> Result[None]:
+) -> None:
+    async def operation() -> None:
         # 1. Update Booking
         await db.execute(
             """
@@ -45,6 +44,6 @@ async def update_booking_sync_status(
                 '{"error": "' + error_msg.replace('"', '\\"') + '"}',
             )
 
-        return ok(None)
+        return
 
     return await with_tenant_context(db, tenant_id, operation)

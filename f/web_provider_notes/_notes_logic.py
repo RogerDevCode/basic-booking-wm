@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Any
 
 from ..internal._crypto import decrypt_data, encrypt_data
-from ..internal._result import DBClient, Result, fail, ok
+from ..internal._result import DBClient
 from ._notes_models import NoteRow, Tag
 
 
@@ -70,7 +70,7 @@ class NoteRepository:
 
     async def create(
         self, provider_id: str, booking_id: str, client_id: str, content: str, tag_ids: list[str]
-    ) -> Result[NoteRow]:
+    ) -> NoteRow:
         try:
             encrypted = encrypt_data(content)
             version = 1
@@ -88,27 +88,27 @@ class NoteRepository:
                 version,
             )
             if not rows:
-                return fail("create_failed")
+                raise RuntimeError("create_failed")
 
             note_id = str(rows[0]["note_id"])
             await self.assign_tags(note_id, tag_ids)
             tags = await self.get_tags(note_id)
-            return ok(map_row_to_note(rows[0], tags))
+            return map_row_to_note(rows[0], tags)
         except Exception as e:
-            return fail(f"create_failed: {e}")
+            raise RuntimeError(f"create_failed: {e}") from e
 
-    async def read(self, provider_id: str, note_id: str) -> Result[NoteRow]:
+    async def read(self, provider_id: str, note_id: str) -> NoteRow:
         rows = await self.db.fetch(
             "SELECT * FROM service_notes WHERE note_id = $1::uuid AND provider_id = $2::uuid LIMIT 1",
             note_id,
             provider_id,
         )
         if not rows:
-            return fail("Note not found or access denied")
+            raise RuntimeError("Note not found or access denied")
         tags = await self.get_tags(note_id)
-        return ok(map_row_to_note(rows[0], tags))
+        return map_row_to_note(rows[0], tags)
 
-    async def list_notes(self, provider_id: str, booking_id: str | None) -> Result[list[NoteRow]]:
+    async def list_notes(self, provider_id: str, booking_id: str | None) -> list[NoteRow]:
         try:
             query = """
                 SELECT sn.*, t.tag_id, t.name as tag_name, t.color as tag_color
@@ -136,14 +136,14 @@ class NoteRepository:
                         {"tag_id": str(r["tag_id"]), "name": str(r["tag_name"]), "color": str(r["tag_color"])}
                     )
 
-            return ok(list(note_map.values()))
+            return list(note_map.values())
         except Exception as e:
-            return fail(f"list_failed: {e}")
+            raise RuntimeError(f"list_failed: {e}") from e
 
-    async def delete(self, provider_id: str, note_id: str) -> Result[dict[str, bool]]:
+    async def delete(self, provider_id: str, note_id: str) -> dict[str, bool]:
         res = await self.db.execute(
             "DELETE FROM service_notes WHERE note_id = $1::uuid AND provider_id = $2::uuid", note_id, provider_id
         )
         if "DELETE 1" not in res:
-            return fail("Note not found or access denied")
-        return ok({"deleted": True})
+            raise RuntimeError("Note not found or access denied")
+        return {"deleted": True}

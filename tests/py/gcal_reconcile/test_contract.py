@@ -55,9 +55,8 @@ async def test_gcal_reconcile_success() -> None:
     ):
         args: dict[str, Any] = {"dry_run": False, "batch_size": 10}
 
-        err, result = await main(args)
+        result = await main(args)
 
-        assert err is None
         assert result is not None
         assert result["processed"] == 1
         assert result["synced"] == 1

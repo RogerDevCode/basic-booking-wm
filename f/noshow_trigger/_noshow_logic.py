@@ -1,4 +1,4 @@
-from ..internal._result import DBClient, Result, fail, ok
+from ..internal._result import DBClient
 from ..internal._state_machine import validate_transition
 
 
@@ -6,7 +6,7 @@ class BookingRepository:
     def __init__(self, db: DBClient) -> None:
         self.db = db
 
-    async def find_expired_confirmed(self, lookback_minutes: int) -> Result[list[str]]:
+    async def find_expired_confirmed(self, lookback_minutes: int) -> list[str]:
         try:
             rows = await self.db.fetch(
                 """
@@ -18,14 +18,14 @@ class BookingRepository:
                 """,
                 str(lookback_minutes),
             )
-            return ok([str(r["booking_id"]) for r in rows])
+            return [str(r["booking_id"]) for r in rows]
         except Exception as e:
-            return fail(f"find_expired_failed: {e}")
+            raise RuntimeError(f"find_expired_failed: {e}") from e
 
-    async def mark_as_no_show(self, booking_id: str) -> Result[bool]:
+    async def mark_as_no_show(self, booking_id: str) -> bool:
         err_trans, _ = validate_transition("confirmed", "no_show")
         if err_trans:
-            return fail(err_trans)
+            raise RuntimeError(str(err_trans))
 
         try:
             # Atomic update
@@ -39,6 +39,6 @@ class BookingRepository:
                 """,
                 booking_id,
             )
-            return ok(True)
+            return True
         except Exception as e:
-            return fail(f"mark_no_show_failed: {e}")
+            raise RuntimeError(f"mark_no_show_failed: {e}") from e

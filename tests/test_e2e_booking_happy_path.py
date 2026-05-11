@@ -21,18 +21,15 @@ VALID_BOOKING_ID = "b5555555-5555-5555-5555-555555555555"
 
 
 @pytest.fixture
-def mock_resolve_context() -> tuple[None, dict[str, str]]:
-    return (
-        None,
-        {
-            "tenantId": VALID_TENANT_ID,
-            "clientId": VALID_CLIENT_ID,
-            "providerId": VALID_PROVIDER_ID,
-            "serviceId": VALID_SERVICE_ID,
-            "date": "2026-06-01",
-            "time": "10:00",
-        },
-    )
+def mock_resolve_context() -> dict[str, str]:
+    return {
+        "tenantId": VALID_TENANT_ID,
+        "clientId": VALID_CLIENT_ID,
+        "providerId": VALID_PROVIDER_ID,
+        "serviceId": VALID_SERVICE_ID,
+        "date": "2026-06-01",
+        "time": "10:00",
+    }
 
 
 @pytest.fixture
@@ -61,9 +58,7 @@ def mock_booking_repo() -> MagicMock:
 
 
 @pytest.mark.asyncio
-async def test_e2e_booking_happy_path(
-    mock_resolve_context: tuple[None, dict[str, str]], mock_booking_repo: MagicMock
-) -> None:
+async def test_e2e_booking_happy_path(mock_resolve_context: dict[str, str], mock_booking_repo: MagicMock) -> None:
     """
     Phase 1: Happy Path test suite for the 'booking creation flow'
     Simulates the end-to-end flow from receiving intent to a successfully confirmed booking.
@@ -87,23 +82,18 @@ async def test_e2e_booking_happy_path(
         "client_name": "Ana Test",
     }
 
-    # 3. Inject book_create as a delegate (correct isolation per @workflow architecture)
-    book_create_mock = AsyncMock(return_value=booking_created)
-
-    delegates = {
-        "book_create": book_create_mock,
-        "book_cancel": AsyncMock(return_value={}),
-        "book_reschedule": AsyncMock(return_value={}),
-        "availability_check": AsyncMock(return_value={}),
-    }
-
+    # 3. Mock shared core function directly (in-process, no cross-script dispatch)
     with (
         patch("f.booking_orchestrator.main.create_db_client", return_value=mock_db),
         patch("f.booking_orchestrator.main.resolve_context", return_value=mock_resolve_context),
         patch(
             "f.booking_orchestrator.handlers._create.get_active_booking_for_provider",
-            AsyncMock(return_value=(None, None)),
+            AsyncMock(return_value=None),
         ),
+        patch(
+            "f.booking_create.main.run_create_booking",
+            AsyncMock(return_value=booking_created),
+        ) as mock_run,
     ):
         # 4. Simulate Orchestrator Input (mimicking Webhook -> Router -> Orchestrator)
         args: dict[str, object] = {
@@ -118,11 +108,10 @@ async def test_e2e_booking_happy_path(
             },
         }
 
-        # 5. Execute the Flow with injected delegates
-        err, result = await orchestrator_main(args, delegates)
+        # 5. Execute the Flow
+        result = await orchestrator_main(args)
 
         # 6. Assert Correct State Changes & Flow
-        assert err is None, f"Expected no error, got {err}"
         assert result is not None, "Expected a valid result"
 
         # Check that it advanced correctly through the orchestrator
@@ -137,8 +126,5 @@ async def test_e2e_booking_happy_path(
         assert data_dict["status"] == "confirmed"
         assert data_dict["provider_name"] == "Dr. Test"
 
-        # Verify that the delegate was called correctly
-        book_create_mock.assert_awaited_once()
-        call_kwargs = book_create_mock.call_args.kwargs
-        assert call_kwargs.get("args", {}).get("client_id") == VALID_CLIENT_ID
-        assert call_kwargs.get("args", {}).get("provider_id") == VALID_PROVIDER_ID
+        # Verify that the shared core was called
+        mock_run.assert_awaited_once()

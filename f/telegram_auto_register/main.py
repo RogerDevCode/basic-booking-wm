@@ -24,8 +24,10 @@ from __future__ import annotations
 # RLS Tenant ID   : YES — with_admin_context bypasses RLS for user discovery
 # Pydantic Schemas: YES — InputSchema validates Telegram webhook structure
 # ============================================================================
+from typing import cast
+
 from ..internal._db_client import create_db_client
-from ..internal._result import Result, fail, with_admin_context
+from ..internal._result import with_admin_context
 from ..internal._wmill_adapter import log
 from ._auto_register_logic import register_telegram_user
 from ._auto_register_models import InputSchema, RegisterResult
@@ -33,24 +35,27 @@ from ._auto_register_models import InputSchema, RegisterResult
 MODULE = "telegram_auto_register"
 
 
-async def _main_async(args: dict[str, object]) -> Result[RegisterResult]:
+async def _main_async(args: dict[str, object]) -> dict[str, object]:
     # 1. Validate Input (pg_url already stripped by main() before calling here)
     try:
         input_data = InputSchema.model_validate(args)
     except Exception as e:
-        return fail(f"Validation error: {e}")
+        raise RuntimeError(f"Validation error: {e}") from e
 
     conn = await create_db_client()
     try:
         # 2. Execute Auth Transaction with Admin Context (bypass RLS)
-        async def operation() -> Result[RegisterResult]:
+        async def operation() -> RegisterResult:
             return await register_telegram_user(conn, input_data)
 
-        return await with_admin_context(conn, operation)
+        result = await with_admin_context(conn, operation)
+        if result is None:
+            raise RuntimeError("telegram_auto_register returned no result")
+        return cast("dict[str, object]", result)
 
     except Exception as e:
         log("Internal error in auto_register", error=str(e), module=MODULE)
-        return fail(f"Internal error: {e}")
+        raise RuntimeError(f"Internal error: {e}") from e
     finally:
         await conn.close()
 
@@ -59,7 +64,6 @@ def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
     import asyncio
     import os
     import traceback
-    from typing import cast
 
     from pydantic import BaseModel
 
@@ -74,17 +78,15 @@ def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
             clean = {k: v for k, v in args.items() if k != "pg_url"}
             validated = InputSchema.model_validate(clean)
 
-        err, result = asyncio.run(_main_async(validated.model_dump()))
-        if err:
-            raise err
+        result = asyncio.run(_main_async(validated.model_dump()))
 
         if result is None:
             return {}
 
         if isinstance(result, BaseModel):
-            return cast("dict[str, object]", result.model_dump())
+            return result.model_dump()
         elif isinstance(result, dict):
-            return cast("dict[str, object]", result)
+            return result
         else:
             return {"data": result}
 

@@ -27,7 +27,7 @@ import asyncio
 from typing import Any, cast
 
 from ..internal._db_client import create_db_client
-from ..internal._result import Result, fail, ok, with_tenant_context
+from ..internal._result import with_tenant_context
 from ..internal._wmill_adapter import log
 from ._booking_logic import BookingRepository, calculate_end_time, derive_idempotency_key
 from ._booking_models import BookingResult, InputSchema
@@ -35,12 +35,12 @@ from ._booking_models import BookingResult, InputSchema
 MODULE = "web_booking_api"
 
 
-async def _main_async(args: dict[str, Any]) -> Result[BookingResult]:
+async def _main_async(args: dict[str, Any]) -> dict[str, object]:
     # 1. Validate Input
     try:
         input_data = InputSchema.model_validate(args)
     except Exception as e:
-        return fail(f"error_validacion: {e}")
+        raise RuntimeError(f"error_validacion: {e}") from e
 
     conn = await create_db_client()
     try:
@@ -50,45 +50,32 @@ async def _main_async(args: dict[str, Any]) -> Result[BookingResult]:
         tenant_id: str
         if input_data.action == "crear":
             if not input_data.provider_id:
-                return fail("provider_id_requerido")
+                raise RuntimeError("provider_id_requerido")
             tenant_id = input_data.provider_id
         else:
             if not input_data.booking_id:
-                return fail("booking_id_requerido")
-            err_t, resolved_t = await repo.resolve_tenant_for_booking(input_data.booking_id)
-            if err_t or not resolved_t:
-                return fail(err_t or "resolucion_tenant_fallida")
-            tenant_id = resolved_t
+                raise RuntimeError("booking_id_requerido")
+            tenant_id = await repo.resolve_tenant_for_booking(input_data.booking_id)
 
         # 3. Execute within Tenant Context
-        async def operation() -> Result[BookingResult]:
+        async def operation() -> BookingResult:
             # 3.1 Resolve Client ID
-            err_c, client_id = await repo.resolve_client_id(input_data.user_id)
-            if err_c or not client_id:
-                return fail(err_c or "resolucion_cliente_fallida")
+            client_id = await repo.resolve_client_id(input_data.user_id)
 
             if input_data.action == "crear":
                 if not input_data.service_id or not input_data.start_time:
-                    return fail("datos_insuficientes_crear")
+                    raise RuntimeError("datos_insuficientes_crear")
 
                 await repo.lock_provider(tenant_id)
-                err_dur, duration = await repo.get_service_duration(input_data.service_id)
-                if err_dur:
-                    return fail(err_dur)
-
-                err_time, end_time = calculate_end_time(input_data.start_time, cast("int", duration))
-                if err_time or not end_time:
-                    return fail(err_time)
-
-                err_overlap, _ = await repo.check_overlap(tenant_id, input_data.start_time, end_time)
-                if err_overlap:
-                    return fail(err_overlap)
+                duration = await repo.get_service_duration(input_data.service_id)
+                end_time = calculate_end_time(input_data.start_time, duration)
+                await repo.check_overlap(tenant_id, input_data.start_time, end_time)
 
                 ik = input_data.idempotency_key or derive_idempotency_key(
                     "crear", [tenant_id, client_id, input_data.service_id, input_data.start_time]
                 )
 
-                err_ins, b = await repo.insert_booking(
+                b = await repo.insert_booking(
                     {
                         "tenant_id": tenant_id,
                         "client_id": client_id,
@@ -98,63 +85,45 @@ async def _main_async(args: dict[str, Any]) -> Result[BookingResult]:
                         "idempotency_key": ik,
                     }
                 )
-                if err_ins or not b:
-                    return fail(err_ins)
 
-                return ok({**cast("Any", b), "message": "Cita creada exitosamente"})  # type: ignore[arg-type]  # type: ignore[misc]
+                return {"booking_id": b["booking_id"], "status": b["status"], "message": "Cita creada exitosamente"}
 
             elif input_data.action == "cancelar":
                 if not input_data.booking_id:
-                    return fail("booking_id_requerido")
-                err_b, booking = await repo.get_booking(input_data.booking_id)
-                if err_b or not booking:
-                    return fail(err_b)
+                    raise RuntimeError("booking_id_requerido")
+                booking = await repo.get_booking(input_data.booking_id)
                 if booking["client_id"] != client_id:
-                    return fail("permiso_denegado_cita")
-                if booking["status"] not in ["pending", "confirmed"]:  # English statuses
-                    return fail(f"estado_invalido_cancelar: {booking['status']}")
+                    raise RuntimeError("permiso_denegado_cita")
+                if booking["status"] not in ["pending", "confirmed"]:
+                    raise RuntimeError(f"estado_invalido_cancelar: {booking['status']}")
 
                 await repo.update_status(input_data.booking_id, "cancelled", input_data.cancellation_reason)
-                return ok(
-                    {
-                        "booking_id": input_data.booking_id,
-                        "status": "cancelled",
-                        "message": "Cita cancelada exitosamente",
-                    }
-                )
+                return {
+                    "booking_id": input_data.booking_id,
+                    "status": "cancelled",
+                    "message": "Cita cancelada exitosamente",
+                }
 
             elif input_data.action == "reagendar":
                 if not input_data.booking_id or not input_data.start_time:
-                    return fail("datos_insuficientes_reagendar")
+                    raise RuntimeError("datos_insuficientes_reagendar")
 
-                err_b, old = await repo.get_booking(input_data.booking_id)
-                if err_b or not old:
-                    return fail(err_b)
+                old = await repo.get_booking(input_data.booking_id)
                 if old["client_id"] != client_id:
-                    return fail("permiso_denegado_cita")
+                    raise RuntimeError("permiso_denegado_cita")
                 if old["status"] not in ["pending", "confirmed"]:
-                    return fail("estado_invalido_reagendar")
+                    raise RuntimeError("estado_invalido_reagendar")
 
                 await repo.lock_provider(tenant_id)
-                err_dur, duration = await repo.get_service_duration(old["service_id"])
-                if err_dur:
-                    return fail(err_dur)
-
-                err_time, end_time = calculate_end_time(input_data.start_time, cast("int", duration))
-                if err_time or not end_time:
-                    return fail(err_time)
-
-                err_overlap, _ = await repo.check_overlap(
-                    tenant_id, input_data.start_time, end_time, input_data.booking_id
-                )
-                if err_overlap:
-                    return fail(err_overlap)
+                duration = await repo.get_service_duration(old["service_id"])
+                end_time = calculate_end_time(input_data.start_time, duration)
+                await repo.check_overlap(tenant_id, input_data.start_time, end_time, input_data.booking_id)
 
                 ik = input_data.idempotency_key or derive_idempotency_key(
                     "reagendar", [input_data.booking_id, input_data.start_time]
                 )
 
-                err_ins, b = await repo.insert_booking(
+                b = await repo.insert_booking(
                     {
                         "tenant_id": tenant_id,
                         "client_id": client_id,
@@ -165,26 +134,23 @@ async def _main_async(args: dict[str, Any]) -> Result[BookingResult]:
                         "rescheduled_from": input_data.booking_id,
                     }
                 )
-                if err_ins or not b:
-                    return fail(err_ins)
 
                 await repo.update_status(input_data.booking_id, "rescheduled")
-                return ok({**cast("Any", b), "message": "Cita reagendada exitosamente"})  # type: ignore[arg-type]  # type: ignore[misc]
+                return {"booking_id": b["booking_id"], "status": b["status"], "message": "Cita reagendada exitosamente"}
 
-            return fail("unsupported_action")
+            raise RuntimeError("unsupported_action")
 
-        return await with_tenant_context(conn, tenant_id, operation)
+        return cast("dict[str, object]", await with_tenant_context(conn, tenant_id, operation))
 
     except Exception as e:
         log("Web Booking API Internal Error", error=str(e), module=MODULE)
-        return fail(f"error_inesperado: {e}")
+        raise RuntimeError(f"error_inesperado: {e}") from e
     finally:
         await conn.close()  # pyright: ignore[reportUnknownMemberType]
 
 
 def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
     import traceback
-    from typing import cast
 
     from pydantic import BaseModel
 
@@ -194,17 +160,15 @@ def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
         else:
             validated = InputSchema.model_validate(args)
 
-        err, result = asyncio.run(_main_async(validated.model_dump()))
-        if err:
-            raise err
+        result = asyncio.run(_main_async(validated.model_dump()))
 
         if result is None:
             return {}
 
         if isinstance(result, BaseModel):
-            return cast("dict[str, object]", result.model_dump())
+            return result.model_dump()
         elif isinstance(result, dict):
-            return cast("dict[str, object]", result)
+            return result
         else:
             return {"data": result}
 

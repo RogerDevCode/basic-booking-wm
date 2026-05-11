@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 import httpx
 
-from ..internal._result import DBClient, Result, fail, ok, with_tenant_context
+from ..internal._result import DBClient, with_tenant_context
 
 if TYPE_CHECKING:
     from ._gcal_sync_models import BookingDetails
@@ -13,8 +13,8 @@ if TYPE_CHECKING:
 GCAL_BASE = "https://www.googleapis.com/calendar/v3"
 
 
-async def fetch_booking_details(db: DBClient, tenant_id: str, booking_id: str) -> Result[BookingDetails]:
-    async def operation() -> Result[BookingDetails]:
+async def fetch_booking_details(db: DBClient, tenant_id: str, booking_id: str) -> BookingDetails:
+    async def operation() -> BookingDetails:
         rows = await db.fetch(
             """
             SELECT b.booking_id, b.provider_id, b.status, b.start_time, b.end_time,
@@ -37,7 +37,7 @@ async def fetch_booking_details(db: DBClient, tenant_id: str, booking_id: str) -
         )
 
         if not rows:
-            return fail(f"Booking {booking_id} not found")
+            raise RuntimeError(f"Booking {booking_id} not found")
 
         r = rows[0]
         details: BookingDetails = {
@@ -65,14 +65,14 @@ async def fetch_booking_details(db: DBClient, tenant_id: str, booking_id: str) -
             else None,
             "client_calendar_id": str(r["client_calendar_id"]) if r.get("client_calendar_id") else None,
         }
-        return ok(details)
+        return details
 
     return await with_tenant_context(db, tenant_id, operation)
 
 
 async def call_gcal_api(
     method: str, path: str, calendar_id: str, access_token: str, body: dict[str, object] | None = None
-) -> Result[dict[str, Any]]:
+) -> dict[str, Any]:
     import urllib.parse
 
     url = f"{GCAL_BASE}/calendars/{urllib.parse.quote(calendar_id)}/{path}"
@@ -86,16 +86,16 @@ async def call_gcal_api(
             response = await client.request(method, url, headers=headers, json=body)
 
             if response.status_code >= 400:
-                return fail(f"GCal API {response.status_code}: {response.text}")
+                raise RuntimeError(f"GCal API {response.status_code}: {response.text}")
 
             if method == "DELETE":
                 res_del: dict[str, Any] = {}
-                return ok(res_del)
+                return res_del
 
             data = response.json()
             if not isinstance(data, dict):
-                return fail("GCal API returned non-object response")
+                raise RuntimeError("GCal API returned non-object response")
 
-            return ok(cast("dict[str, Any]", data))
+            return cast("dict[str, Any]", data)
     except Exception as e:
-        return fail(f"Network error: {e}")
+        raise RuntimeError(f"Network error: {e}") from e

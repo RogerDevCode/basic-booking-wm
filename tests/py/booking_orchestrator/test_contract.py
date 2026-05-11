@@ -35,7 +35,7 @@ async def test_orchestrator_create_booking_wizard_handoff() -> None:
     }
 
     mock_handler = AsyncMock(
-        return_value=(None, {"action": "crear_cita", "success": False, "nextState": {"name": "selecting_specialty"}})
+        return_value={"action": "crear_cita", "success": False, "nextState": {"name": "selecting_specialty"}}
     )
     original_handler = HANDLER_MAP["crear_cita"]
     HANDLER_MAP["crear_cita"] = mock_handler
@@ -43,9 +43,9 @@ async def test_orchestrator_create_booking_wizard_handoff() -> None:
     try:
         with (
             patch("f.booking_orchestrator.main.create_db_client", return_value=mock_db),
-            patch("f.booking_orchestrator.main.resolve_context", AsyncMock(return_value=(None, ctx))),
+            patch("f.booking_orchestrator.main.resolve_context", AsyncMock(return_value=ctx)),
         ):
-            err, result = await main(
+            result = await main(
                 {
                     "telegram_chat_id": "123456",
                     "intent": "crear_cita",
@@ -53,7 +53,6 @@ async def test_orchestrator_create_booking_wizard_handoff() -> None:
                 },
                 _make_delegates(),
             )
-            assert err is None
             assert result is not None
             assert result["action"] == "crear_cita"
             assert result["success"] is False
@@ -70,20 +69,19 @@ async def test_orchestrator_cancel_booking_no_id_routes_to_list() -> None:
 
     # With no booking_id, _cancel delegates to get_my_bookings which needs tenant context
     # Mock the entire cancel handler to check routing
-    mock_handler = AsyncMock(return_value=(None, {"action": "mis_citas", "success": True, "data": []}))
+    mock_handler = AsyncMock(return_value={"action": "mis_citas", "success": True, "data": []})
     original_handler = HANDLER_MAP["cancelar_cita"]
     HANDLER_MAP["cancelar_cita"] = mock_handler
 
     try:
         with (
             patch("f.booking_orchestrator.main.create_db_client", return_value=mock_db),
-            patch("f.booking_orchestrator.main.resolve_context", AsyncMock(return_value=(None, ctx))),
+            patch("f.booking_orchestrator.main.resolve_context", AsyncMock(return_value=ctx)),
         ):
-            err, result = await main(
+            result = await main(
                 {"telegram_chat_id": "123456", "intent": "cancelar_cita", "entities": {}},
                 _make_delegates(),
             )
-            assert err is None
             assert result is not None
             assert result["action"] == "mis_citas"
     finally:

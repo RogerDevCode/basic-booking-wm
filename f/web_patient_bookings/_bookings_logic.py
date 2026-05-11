@@ -1,19 +1,19 @@
 from datetime import UTC, datetime
 from typing import Any
 
-from ..internal._result import DBClient, Result, fail, ok
+from ..internal._result import DBClient
 from ._bookings_models import BookingInfo, BookingsResult, InputSchema
 
 CANCELLABLE_STATUSES = ["pending", "confirmed"]
 RESCHEDULABLE_STATUSES = ["pending", "confirmed"]
 
 
-async def resolve_client_id(db: DBClient, user_id: str) -> Result[str]:
+async def resolve_client_id(db: DBClient, user_id: str) -> str:
     try:
         # Direct lookup
         rows = await db.fetch("SELECT client_id FROM clients WHERE client_id = $1::uuid LIMIT 1", user_id)
         if rows:
-            return ok(str(rows[0]["client_id"]))
+            return str(rows[0]["client_id"])
 
         # Fallback: email match
         rows = await db.fetch(
@@ -21,14 +21,14 @@ async def resolve_client_id(db: DBClient, user_id: str) -> Result[str]:
             user_id,
         )
         if not rows:
-            return fail(f"client_identity_not_found: userId={user_id}")
+            raise RuntimeError(f"client_identity_not_found: userId={user_id}")
 
-        return ok(str(rows[0]["client_id"]))
+        return str(rows[0]["client_id"])
     except Exception as e:
-        return fail(f"identity_resolution_failed: {e}")
+        raise RuntimeError(f"identity_resolution_failed: {e}") from e
 
 
-async def get_patient_bookings(db: DBClient, client_id: str, input_data: InputSchema) -> Result[BookingsResult]:
+async def get_patient_bookings(db: DBClient, client_id: str, input_data: InputSchema) -> BookingsResult:
     try:
         query = """
             SELECT b.booking_id, b.start_time, b.end_time, b.status,
@@ -97,6 +97,6 @@ async def get_patient_bookings(db: DBClient, client_id: str, input_data: InputSc
             else:
                 past.append(info)
 
-        return ok({"upcoming": upcoming, "past": past, "total": total})
+        return {"upcoming": upcoming, "past": past, "total": total}
     except Exception as e:
-        return fail(f"fetch_bookings_failed: {e}")
+        raise RuntimeError(f"fetch_bookings_failed: {e}") from e

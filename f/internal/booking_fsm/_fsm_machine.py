@@ -12,7 +12,6 @@ from pydantic import TypeAdapter
 
 from .._date_resolver import resolve_date
 from .._nlu_cache import get_nlu_rule
-from .._result import Result, fail, ok
 from ._fsm_models import (
     BackAction,
     BookingAction,
@@ -106,36 +105,34 @@ def apply_transition(
     action: BookingAction | dict[str, Any],
     draft: DraftBooking,
     items: list[Any] | None = None,
-) -> Result[TransitionOutcome]:
+) -> TransitionOutcome:
     # 0. Ensure action is a Pydantic model
     if isinstance(action, dict):
         try:
             action = TypeAdapter(BookingAction).validate_python(action)
         except Exception as e:
-            return fail(f"invalid_action_structure: {e}")
+            raise RuntimeError(f"invalid_action_structure: {e}") from e
 
     # 1. Global Actions
     if action.type == "cancel":
-        return ok(TransitionOutcome(nextState=IdleState(), responseText=get_main_menu_text(), advance=False))
+        return TransitionOutcome(nextState=IdleState(), responseText=get_main_menu_text(), advance=False)
 
     # 2. Step Handlers
     if isinstance(current_state, IdleState):
         if isinstance(action, SelectAction):
             raw_items = items if items is not None else []
             if _is_named_item_list(raw_items):
-                return ok(
-                    TransitionOutcome(
-                        nextState=SelectingSpecialtyState(items=raw_items),
-                        responseText=build_specialty_prompt(raw_items),
-                        advance=True,
-                    )
+                return TransitionOutcome(
+                    nextState=SelectingSpecialtyState(items=raw_items),
+                    responseText=build_specialty_prompt(raw_items),
+                    advance=True,
                 )
-            return fail("no_specialties_available")
-        return fail("invalid_idle_action")
+            raise RuntimeError("no_specialties_available")
+        raise RuntimeError("invalid_idle_action")
 
     elif isinstance(current_state, SelectingSpecialtyState):
         if isinstance(action, BackAction):
-            return ok(TransitionOutcome(nextState=IdleState(), responseText=get_main_menu_text(), advance=False))
+            return TransitionOutcome(nextState=IdleState(), responseText=get_main_menu_text(), advance=False)
 
         if isinstance(action, SelectAction):
             specialty_items = current_state.items
@@ -147,54 +144,44 @@ def apply_transition(
                     specialty = specialty_items[idx]
 
             if not specialty:
-                return ok(
-                    TransitionOutcome(
-                        nextState=SelectingSpecialtyState(items=specialty_items, error="Opción inválida."),
-                        responseText=build_specialty_prompt(specialty_items, "⚠️ Opción inválida."),
-                        advance=False,
-                    )
+                return TransitionOutcome(
+                    nextState=SelectingSpecialtyState(items=specialty_items, error="Opción inválida."),
+                    responseText=build_specialty_prompt(specialty_items, "⚠️ Opción inválida."),
+                    advance=False,
                 )
 
             doctor_items = items if items is not None else []
             if _is_named_item_list(doctor_items) and doctor_items:
-                return ok(
-                    TransitionOutcome(
-                        nextState=SelectingDoctorState(
-                            specialtyId=specialty["id"],
-                            specialtyName=specialty["name"],
-                            items=doctor_items,
-                        ),
-                        responseText=build_doctors_prompt(specialty["name"], doctor_items),
-                        advance=True,
-                    )
-                )
-            return ok(
-                TransitionOutcome(
+                return TransitionOutcome(
                     nextState=SelectingDoctorState(
-                        specialtyId=specialty["id"], specialtyName=specialty["name"], items=[]
+                        specialtyId=specialty["id"],
+                        specialtyName=specialty["name"],
+                        items=doctor_items,
                     ),
-                    responseText=build_loading_doctors_prompt(specialty["name"]),
+                    responseText=build_doctors_prompt(specialty["name"], doctor_items),
                     advance=True,
                 )
+            return TransitionOutcome(
+                nextState=SelectingDoctorState(specialtyId=specialty["id"], specialtyName=specialty["name"], items=[]),
+                responseText=build_loading_doctors_prompt(specialty["name"]),
+                advance=True,
             )
 
     elif isinstance(current_state, SelectingDoctorState):
         if isinstance(action, BackAction):
             raw_items = items if items is not None else []
             if _is_named_item_list(raw_items):
-                return ok(
-                    TransitionOutcome(
-                        nextState=SelectingSpecialtyState(items=raw_items),
-                        responseText=build_specialty_prompt(raw_items),
-                        advance=False,
-                    )
+                return TransitionOutcome(
+                    nextState=SelectingSpecialtyState(items=raw_items),
+                    responseText=build_specialty_prompt(raw_items),
+                    advance=False,
                 )
-            return fail("invalid_state_transition_no_items")
+            raise RuntimeError("invalid_state_transition_no_items")
 
         if isinstance(action, SelectAction):
             doctor_items = current_state.items if current_state.items else (items if items is not None else [])
             if not _is_named_item_list(doctor_items):
-                return fail("invalid_doctor_items")
+                raise RuntimeError("invalid_doctor_items")
 
             doctor = next((i for i in doctor_items if i["id"] == action.value), None)
 
@@ -204,78 +191,66 @@ def apply_transition(
                     doctor = doctor_items[idx]
 
             if not doctor:
-                return ok(
-                    TransitionOutcome(
-                        nextState=SelectingDoctorState(
-                            specialtyId=current_state.specialtyId,
-                            specialtyName=current_state.specialtyName,
-                            items=doctor_items,
-                            error="Opción inválida.",
-                        ),
-                        responseText=build_doctors_prompt(
-                            current_state.specialtyName, doctor_items, "⚠️ Opción inválida."
-                        ),
-                        advance=False,
-                    )
+                return TransitionOutcome(
+                    nextState=SelectingDoctorState(
+                        specialtyId=current_state.specialtyId,
+                        specialtyName=current_state.specialtyName,
+                        items=doctor_items,
+                        error="Opción inválida.",
+                    ),
+                    responseText=build_doctors_prompt(current_state.specialtyName, doctor_items, "⚠️ Opción inválida."),
+                    advance=False,
                 )
 
             time_items = items if items is not None else []
             if _is_time_slot_list(time_items) and time_items:
-                return ok(
-                    TransitionOutcome(
-                        nextState=SelectingTimeState(
-                            specialtyId=current_state.specialtyId,
-                            doctorId=doctor["id"],
-                            doctorName=doctor["name"],
-                            items=time_items,
-                        ),
-                        responseText=build_slots_prompt(doctor["name"], time_items),
-                        advance=True,
-                    )
-                )
-            return ok(
-                TransitionOutcome(
+                return TransitionOutcome(
                     nextState=SelectingTimeState(
                         specialtyId=current_state.specialtyId,
                         doctorId=doctor["id"],
                         doctorName=doctor["name"],
-                        items=[],
+                        items=time_items,
                     ),
-                    responseText=build_loading_slots_prompt(doctor["name"]),
+                    responseText=build_slots_prompt(doctor["name"], time_items),
                     advance=True,
                 )
+            return TransitionOutcome(
+                nextState=SelectingTimeState(
+                    specialtyId=current_state.specialtyId,
+                    doctorId=doctor["id"],
+                    doctorName=doctor["name"],
+                    items=[],
+                ),
+                responseText=build_loading_slots_prompt(doctor["name"]),
+                advance=True,
             )
 
     elif isinstance(current_state, SelectingTimeState):
         if isinstance(action, BackAction):
             raw_items = items if items is not None else []
             if _is_named_item_list(raw_items):
-                return ok(
-                    TransitionOutcome(
-                        nextState=SelectingDoctorState(
-                            specialtyId=current_state.specialtyId,
-                            specialtyName="",  # Will be filled by UI/Service
-                            items=raw_items,
-                        ),
-                        responseText=build_doctors_prompt("", raw_items),
-                        advance=False,
-                    )
+                return TransitionOutcome(
+                    nextState=SelectingDoctorState(
+                        specialtyId=current_state.specialtyId,
+                        specialtyName="",  # Will be filled by UI/Service
+                        items=raw_items,
+                    ),
+                    responseText=build_doctors_prompt("", raw_items),
+                    advance=False,
                 )
-            return fail("invalid_state_transition_no_items")
+            raise RuntimeError("invalid_state_transition_no_items")
 
         if isinstance(action, SelectDateAction):
-            return ok(
-                TransitionOutcome(
-                    nextState=SelectingTimeState(
-                        specialtyId=current_state.specialtyId,
-                        doctorId=current_state.doctorId,
-                        doctorName=current_state.doctorName,
-                        targetDate=action.value,
-                        items=[],
-                    ),
-                    responseText=f"Buscando horarios para el {action.value}...",
-                    advance=True,
-                )
+            return TransitionOutcome(
+                nextState=SelectingTimeState(
+                    specialtyId=current_state.specialtyId,
+                    doctorId=current_state.doctorId,
+                    doctorName=current_state.doctorName,
+                    targetDate=action.value,
+                    items=[],
+                ),
+                responseText=f"Buscando horarios para el {action.value}...",
+                advance=True,
             )
 
         if isinstance(action, SelectAction):
@@ -283,7 +258,7 @@ def apply_transition(
             time_items = current_state.items if current_state.items else raw_items
 
             if not _is_time_slot_list(time_items):
-                return fail("invalid_time_items")
+                raise RuntimeError("invalid_time_items")
 
             slot = next((i for i in time_items if i["id"] == action.value or i["start_time"] == action.value), None)
 
@@ -293,19 +268,17 @@ def apply_transition(
                     slot = time_items[idx]
 
             if not slot:
-                return ok(
-                    TransitionOutcome(
-                        nextState=SelectingTimeState(
-                            specialtyId=current_state.specialtyId,
-                            doctorId=current_state.doctorId,
-                            doctorName=current_state.doctorName,
-                            targetDate=current_state.targetDate,
-                            items=time_items,
-                            error="Opción inválida.",
-                        ),
-                        responseText=build_slots_prompt(current_state.doctorName, time_items, "⚠️ Opción inválida."),
-                        advance=False,
-                    )
+                return TransitionOutcome(
+                    nextState=SelectingTimeState(
+                        specialtyId=current_state.specialtyId,
+                        doctorId=current_state.doctorId,
+                        doctorName=current_state.doctorName,
+                        targetDate=current_state.targetDate,
+                        items=time_items,
+                        error="Opción inválida.",
+                    ),
+                    responseText=build_slots_prompt(current_state.doctorName, time_items, "⚠️ Opción inválida."),
+                    advance=False,
                 )
 
             new_draft = draft.model_copy()
@@ -317,43 +290,61 @@ def apply_transition(
             new_draft.target_date = current_state.targetDate
 
             # Transition to confirming
-            return ok(
-                TransitionOutcome(
-                    nextState=ConfirmingState(
-                        specialtyId=current_state.specialtyId,
-                        doctorId=current_state.doctorId,
-                        doctorName=current_state.doctorName,
-                        timeSlot=slot["label"],
-                        draft=DraftCore(
-                            specialty_id=new_draft.specialty_id,
-                            specialty_name=new_draft.specialty_name,
-                            doctor_id=new_draft.doctor_id,
-                            doctor_name=new_draft.doctor_name,
-                            start_time=new_draft.start_time,
-                            time_label=new_draft.time_label,
-                            client_id=new_draft.client_id,
-                        ),
+            return TransitionOutcome(
+                nextState=ConfirmingState(
+                    specialtyId=current_state.specialtyId,
+                    doctorId=current_state.doctorId,
+                    doctorName=current_state.doctorName,
+                    timeSlot=slot["label"],
+                    draft=DraftCore(
+                        specialty_id=new_draft.specialty_id,
+                        specialty_name=new_draft.specialty_name,
+                        doctor_id=new_draft.doctor_id,
+                        doctor_name=new_draft.doctor_name,
+                        start_time=new_draft.start_time,
+                        time_label=new_draft.time_label,
+                        client_id=new_draft.client_id,
                     ),
-                    responseText=build_confirmation_prompt(slot["label"], current_state.doctorName),
-                    advance=True,
-                )
+                ),
+                responseText=build_confirmation_prompt(slot["label"], current_state.doctorName),
+                advance=True,
             )
 
     elif isinstance(current_state, ConfirmingState):
         if isinstance(action, ConfirmYesAction):
-            return ok(
-                TransitionOutcome(
-                    nextState=IdleState(),
-                    responseText="⏳ Procesando tu reserva...",
-                    advance=True,
-                )
+            return TransitionOutcome(
+                nextState=IdleState(),
+                responseText="⏳ Procesando tu reserva...",
+                advance=True,
             )
 
         if isinstance(action, ConfirmNoAction | BackAction):
             raw_items = items if items is not None else []
             if _is_time_slot_list(raw_items):
-                return ok(
-                    TransitionOutcome(
+                return TransitionOutcome(
+                    nextState=SelectingTimeState(
+                        specialtyId=current_state.specialtyId,
+                        doctorId=current_state.doctorId,
+                        doctorName=current_state.doctorName,
+                        targetDate=draft.target_date,
+                        items=raw_items,
+                    ),
+                    responseText=build_slots_prompt(current_state.doctorName, raw_items),
+                    advance=False,
+                )
+            raise RuntimeError("invalid_state_transition_no_items")
+
+        if isinstance(action, SelectAction):
+            if action.value == "1":
+                return TransitionOutcome(
+                    nextState=IdleState(),
+                    responseText="⏳ Procesando tu reserva...",
+                    advance=True,
+                )
+            if action.value == "2":
+                raw_items = items if items is not None else []
+                if _is_time_slot_list(raw_items):
+                    return TransitionOutcome(
                         nextState=SelectingTimeState(
                             specialtyId=current_state.specialtyId,
                             doctorId=current_state.doctorId,
@@ -364,64 +355,32 @@ def apply_transition(
                         responseText=build_slots_prompt(current_state.doctorName, raw_items),
                         advance=False,
                     )
-                )
-            return fail("invalid_state_transition_no_items")
-
-        if isinstance(action, SelectAction):
-            if action.value == "1":
-                return ok(
-                    TransitionOutcome(
-                        nextState=IdleState(),
-                        responseText="⏳ Procesando tu reserva...",
-                        advance=True,
-                    )
-                )
-            if action.value == "2":
-                raw_items = items if items is not None else []
-                if _is_time_slot_list(raw_items):
-                    return ok(
-                        TransitionOutcome(
-                            nextState=SelectingTimeState(
-                                specialtyId=current_state.specialtyId,
-                                doctorId=current_state.doctorId,
-                                doctorName=current_state.doctorName,
-                                targetDate=draft.target_date,
-                                items=raw_items,
-                            ),
-                            responseText=build_slots_prompt(current_state.doctorName, raw_items),
-                            advance=False,
-                        )
-                    )
             attempts = getattr(current_state, "invalid_attempts", 0) + 1
             if attempts >= 3:
-                return ok(
-                    TransitionOutcome(
-                        nextState=IdleState(),
-                        responseText="❌ Demasiados intentos inválidos. Volviendo al menú principal.\n\n"
-                        + get_main_menu_text(),
-                        advance=False,
-                    )
-                )
-
-            return ok(
-                TransitionOutcome(
-                    nextState=ConfirmingState(
-                        specialtyId=current_state.specialtyId,
-                        doctorId=current_state.doctorId,
-                        doctorName=current_state.doctorName,
-                        timeSlot=current_state.timeSlot,
-                        draft=current_state.draft,
-                        invalid_attempts=attempts,
-                    ),
-                    responseText=build_confirmation_prompt(current_state.timeSlot, current_state.doctorName),
+                return TransitionOutcome(
+                    nextState=IdleState(),
+                    responseText="❌ Demasiados intentos inválidos. Volviendo al menú principal.\n\n"
+                    + get_main_menu_text(),
                     advance=False,
                 )
+
+            return TransitionOutcome(
+                nextState=ConfirmingState(
+                    specialtyId=current_state.specialtyId,
+                    doctorId=current_state.doctorId,
+                    doctorName=current_state.doctorName,
+                    timeSlot=current_state.timeSlot,
+                    draft=current_state.draft,
+                    invalid_attempts=attempts,
+                ),
+                responseText=build_confirmation_prompt(current_state.timeSlot, current_state.doctorName),
+                advance=False,
             )
 
     elif isinstance(current_state, CompletedState):
-        return ok(TransitionOutcome(nextState=IdleState(), responseText=get_main_menu_text(), advance=False))
+        return TransitionOutcome(nextState=IdleState(), responseText=get_main_menu_text(), advance=False)
 
-    return fail(f"unknown_state_or_action: {current_state.name}")
+    raise RuntimeError(f"unknown_state_or_action: {current_state.name}")
 
 
 STEP_TO_FLOW_STEP: Final[dict[str, int]] = {

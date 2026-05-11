@@ -1,6 +1,6 @@
 from typing import Any
 
-from ..internal._result import DBClient, Result, fail, ok
+from ..internal._result import DBClient
 from ._profile_models import InputSchema, ProfileResult
 
 
@@ -16,22 +16,22 @@ def map_to_profile(r: dict[str, Any]) -> ProfileResult:
     }
 
 
-async def find_user(db: DBClient, user_id: str) -> Result[dict[str, Any]]:
+async def find_user(db: DBClient, user_id: str) -> dict[str, Any]:
     try:
         rows = await db.fetch("SELECT * FROM users WHERE user_id = $1::uuid LIMIT 1", user_id)
         if not rows:
-            return fail("User not found")
-        return ok(dict(rows[0]))
+            raise RuntimeError("User not found")
+        return dict(rows[0])
     except Exception as e:
-        return fail(f"DB_FETCH_ERROR (users): {e}")
+        raise RuntimeError(f"DB_FETCH_ERROR (users): {e}") from e
 
 
-async def find_or_create_client(db: DBClient, user_id: str, user: dict[str, Any]) -> Result[dict[str, Any]]:
+async def find_or_create_client(db: DBClient, user_id: str, user: dict[str, Any]) -> dict[str, Any]:
     try:
         email = user.get("email")
         rows = await db.fetch("SELECT * FROM clients WHERE client_id = $1::uuid OR email = $2 LIMIT 1", user_id, email)
         if rows:
-            return ok(dict(rows[0]))
+            return dict(rows[0])
 
         # Auto-create (no default timezone_id provided since it's an int and we don't know America/Santiago id)
         insert_rows = await db.fetch(
@@ -46,18 +46,21 @@ async def find_or_create_client(db: DBClient, user_id: str, user: dict[str, Any]
             user.get("telegram_chat_id"),
         )
         if not insert_rows:
-            return fail("Failed to create client record")
-        return ok(dict(insert_rows[0]))
+            raise RuntimeError("Failed to create client record")
+        return dict(insert_rows[0])
     except Exception as e:
-        return fail(f"DB_WRITE_ERROR (clients): {e}")
+        raise RuntimeError(f"DB_WRITE_ERROR (clients): {e}") from e
 
 
-async def update_profile(db: DBClient, client_id: str, data: InputSchema) -> Result[dict[str, Any]]:
+async def update_profile(db: DBClient, client_id: str, data: InputSchema) -> dict[str, Any]:
     try:
+        _ALLOWED = {"name", "email", "phone", "timezone_id"}
         fields = []
         params = []
         idx = 1
         for field in ["name", "email", "phone", "timezone_id"]:
+            if field not in _ALLOWED:
+                continue
             val = getattr(data, field)
             if val is not None:
                 fields.append(f"{field} = ${idx}")
@@ -67,14 +70,14 @@ async def update_profile(db: DBClient, client_id: str, data: InputSchema) -> Res
         if not fields:
             rows = await db.fetch("SELECT * FROM clients WHERE client_id = $1::uuid LIMIT 1", client_id)
             if not rows:
-                return fail("Client not found")
-            return ok(dict(rows[0]))
+                raise RuntimeError("Client not found")
+            return dict(rows[0])
 
         params.append(client_id)
         query = f"UPDATE clients SET {', '.join(fields)}, updated_at = NOW() WHERE client_id = ${idx}::uuid RETURNING *"
         rows = await db.fetch(query, *params)
         if not rows:
-            return fail("Update failed: client record missing after write")
-        return ok(dict(rows[0]))
+            raise RuntimeError("Update failed: client record missing after write")
+        return dict(rows[0])
     except Exception as e:
-        return fail(f"DB_UPDATE_ERROR (clients): {e}")
+        raise RuntimeError(f"DB_UPDATE_ERROR (clients): {e}") from e

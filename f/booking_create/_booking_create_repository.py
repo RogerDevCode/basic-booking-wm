@@ -8,6 +8,7 @@ if TYPE_CHECKING:
 
     from ..internal._result import DBClient
     from ._booking_create_models import (
+        BookingContext,
         BookingCreated,
         ClientContext,
         InputSchema,
@@ -20,6 +21,7 @@ class BookingCreateRepository(Protocol):
     async def get_client_context(self, client_id: str) -> ClientContext | None: ...
     async def get_provider_context(self, provider_id: str) -> ProviderContext | None: ...
     async def get_service_context(self, service_id: str, provider_id: str) -> ServiceContext | None: ...
+    async def get_booking_context(self, client_id: str, provider_id: str, service_id: str) -> BookingContext | None: ...
     async def is_provider_blocked(self, provider_id: str, target_date: date) -> bool: ...
     async def is_provider_scheduled(self, provider_id: str, day_of_week: int) -> bool: ...
     async def has_overlapping_booking(self, provider_id: str, start_time: datetime, end_time: datetime) -> bool: ...
@@ -84,6 +86,43 @@ class PostgresBookingCreateRepository:
                 "duration": int(cast("Any", row["duration_minutes"])),
             },
         )
+
+    async def get_booking_context(self, client_id: str, provider_id: str, service_id: str) -> BookingContext | None:
+        row = await self._client.fetchrow(
+            """
+            SELECT
+              (SELECT jsonb_build_object('id', client_id, 'name', name)
+               FROM clients WHERE client_id = $1::uuid LIMIT 1) as client,
+              (SELECT jsonb_build_object('id', provider_id, 'name', name)
+               FROM providers WHERE provider_id = $2::uuid AND is_active = true LIMIT 1) as provider,
+              (SELECT jsonb_build_object('id', service_id, 'name', name, 'duration', duration_minutes)
+               FROM services WHERE service_id = $3::uuid AND provider_id = $4::uuid
+                 AND is_active = true LIMIT 1) as service
+            """,
+            client_id,
+            provider_id,
+            service_id,
+            provider_id,
+        )
+        if not row:
+            return None
+        client_raw = row.get("client")
+        provider_raw = row.get("provider")
+        service_raw = row.get("service")
+        if client_raw is None or provider_raw is None or service_raw is None:
+            return None
+        client = cast("dict[str, Any]", client_raw)
+        provider = cast("dict[str, Any]", provider_raw)
+        service = cast("dict[str, Any]", service_raw)
+        return {
+            "client": {"id": str(client["id"]), "name": str(client["name"])},
+            "provider": {"id": str(provider["id"]), "name": str(provider["name"])},
+            "service": {
+                "id": str(service["id"]),
+                "name": str(service["name"]),
+                "duration": int(service["duration"]),
+            },
+        }
 
     async def is_provider_blocked(self, provider_id: str, target_date: date) -> bool:
         row = await self._client.fetchrow(

@@ -28,7 +28,6 @@ import os
 from datetime import datetime
 from typing import Any
 
-from ..internal._result import Result, fail, ok
 from ..internal._wmill_adapter import get_variable, log
 from ._benchmark_logic import MODELS, TASKS, run_benchmark_task
 from ._benchmark_models import BenchmarkReport, ModelSummary, ModelTestResult
@@ -36,12 +35,12 @@ from ._benchmark_models import BenchmarkReport, ModelSummary, ModelTestResult
 MODULE = "openrouter_benchmark"
 
 
-async def _main_async(args: dict[str, Any] | None = None) -> Result[BenchmarkReport]:
+async def _main_async(args: dict[str, Any] | None = None) -> BenchmarkReport:
     if args is None:
         args = {}
     api_key = get_variable("OPENROUTER_API_KEY") or os.getenv("OPENROUTER_API_KEY")
     if not api_key:
-        return fail("OPENROUTER_API_KEY not configured")
+        raise RuntimeError("OPENROUTER_API_KEY not configured")
 
     summaries: list[ModelSummary] = []
 
@@ -49,10 +48,10 @@ async def _main_async(args: dict[str, Any] | None = None) -> Result[BenchmarkRep
         results: list[ModelTestResult] = []
 
         for task in TASKS:
-            err, res = await run_benchmark_task(api_key, model, task)
-            if not err and res:
+            try:
+                res = await run_benchmark_task(api_key, model, task)
                 results.append(res)
-            else:
+            except Exception as err:
                 log(f"Benchmark task {task['name']} failed for model {model['name']}", error=str(err), module=MODULE)
 
         passed = len([r for r in results if r["success"]])
@@ -78,7 +77,7 @@ async def _main_async(args: dict[str, Any] | None = None) -> Result[BenchmarkRep
         "summaries": summaries,
     }
 
-    return ok(report)
+    return report
 
 
 def main(args: dict[str, Any]) -> dict[str, object]:
@@ -88,9 +87,7 @@ def main(args: dict[str, Any]) -> dict[str, object]:
     from pydantic import BaseModel
 
     try:
-        err, result = asyncio.run(_main_async(args))
-        if err:
-            raise err
+        result = asyncio.run(_main_async(args))
 
         if result is None:
             return {}

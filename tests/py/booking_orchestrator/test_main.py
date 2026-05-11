@@ -22,18 +22,15 @@ def _make_delegates(**overrides: object) -> dict[str, AsyncMock]:
 @pytest.mark.asyncio
 async def test_main_async_non_string_intent_returns_error() -> None:
     delegates = _make_delegates()
-    err, result = await main({"intent": 42, "telegram_chat_id": "123"}, delegates)
-
-    assert err is not None
-    assert result is None
+    with pytest.raises(RuntimeError):
+        await main({"intent": 42, "telegram_chat_id": "123"}, delegates)
 
 
 @pytest.mark.asyncio
 async def test_main_async_unknown_intent_returns_none_gracefully() -> None:
     delegates = _make_delegates()
-    err, result = await main({"intent": "duda_general", "telegram_chat_id": "123"}, delegates)
+    result = await main({"intent": "duda_general", "telegram_chat_id": "123"}, delegates)
 
-    assert err is None
     assert result is None
 
 
@@ -52,18 +49,17 @@ async def test_main_async_valid_intent_routes_to_handler() -> None:
 
     with (
         patch("f.booking_orchestrator.main.create_db_client", return_value=mock_db),
-        patch("f.booking_orchestrator.main.resolve_context", AsyncMock(return_value=(None, mock_ctx))),
+        patch("f.booking_orchestrator.main.resolve_context", AsyncMock(return_value=mock_ctx)),
         patch(
             "f.booking_orchestrator.main.HANDLER_MAP",
-            {"mis_citas": AsyncMock(return_value=(None, mock_result))},
+            {"mis_citas": AsyncMock(return_value=mock_result)},
         ),
     ):
-        err, result = await main(
+        result = await main(
             {"intent": "mis_citas", "telegram_chat_id": "123", "entities": {}},
             _make_delegates(),
         )
 
-        assert err is None
         assert result is not None
         assert result["action"] == "mis_citas"
 
@@ -76,13 +72,11 @@ async def test_main_async_context_resolution_failure_returns_error() -> None:
         patch("f.booking_orchestrator.main.create_db_client", return_value=mock_db),
         patch(
             "f.booking_orchestrator.main.resolve_context",
-            AsyncMock(return_value=(Exception("no tenant"), None)),
+            AsyncMock(side_effect=RuntimeError("no tenant")),
         ),
     ):
-        err, result = await main(
-            {"intent": "mis_citas", "telegram_chat_id": "123", "entities": {}},
-            _make_delegates(),
-        )
-
-        assert err is not None
-        assert result is None
+        with pytest.raises(RuntimeError):
+            await main(
+                {"intent": "mis_citas", "telegram_chat_id": "123", "entities": {}},
+                _make_delegates(),
+            )

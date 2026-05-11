@@ -25,7 +25,7 @@ from __future__ import annotations
 # Pydantic Schemas: YES — InputSchema validates all fields
 # ============================================================================
 from ..internal._db_client import create_db_client
-from ..internal._result import Result, fail, with_tenant_context
+from ..internal._result import with_tenant_context
 from ..internal._wmill_adapter import log
 from ._logger_logic import persist_log
 from ._logger_models import InputSchema, LogResult
@@ -33,24 +33,24 @@ from ._logger_models import InputSchema, LogResult
 MODULE = "conversation_logger"
 
 
-async def _main_async(args: dict[str, object]) -> Result[LogResult]:
+async def _main_async(args: dict[str, object]) -> LogResult:
     # 1. Validate Input
     try:
         input_data = InputSchema.model_validate(args)
     except Exception as e:
-        return fail(f"validation_error: {e}")
+        raise RuntimeError(f"validation_error: {e}") from e
 
     conn = await create_db_client()
     try:
         # 2. Execute within Tenant Context
-        async def operation() -> Result[LogResult]:
+        async def operation() -> LogResult:
             return await persist_log(conn, input_data)
 
         return await with_tenant_context(conn, input_data.provider_id, operation)
 
     except Exception as e:
         log("Conversation Logger Internal Error", error=str(e), module=MODULE)
-        return fail(f"orchestration_error: {e}")
+        raise RuntimeError(f"orchestration_error: {e}") from e
     finally:
         await conn.close()
 
@@ -68,9 +68,7 @@ def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
         else:
             validated = InputSchema.model_validate(args)
 
-        err, result = asyncio.run(_main_async(validated.model_dump()))
-        if err:
-            raise err
+        result = asyncio.run(_main_async(validated.model_dump()))
 
         if result is None:
             return {}

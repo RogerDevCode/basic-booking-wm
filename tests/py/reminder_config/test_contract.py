@@ -42,9 +42,8 @@ async def test_reminder_config_show() -> None:
         patch("f.reminder_config.main.with_tenant_context", side_effect=mock_with_tenant),
     ):
         args: dict[str, Any] = {"action": "show", "client_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"}
-        err, result = await main(args)
+        result = await main(args)
 
-        assert err is None
         assert result is not None
         assert "Recordatorios" in result.message
         assert result.preferences.channels.telegram is True

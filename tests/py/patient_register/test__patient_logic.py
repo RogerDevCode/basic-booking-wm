@@ -36,12 +36,8 @@ async def test_upsert_client_insert_success() -> None:
         ],
     ]
 
-    err, res = await upsert_client(db, input_data)
+    res = await upsert_client(db, input_data)
 
-    if err:
-        print(f"DEBUG ERROR: {err}")
-
-    assert err is None
     assert res is not None
     assert res["created"] is True
     assert res["client_id"] == "c1"
@@ -68,9 +64,8 @@ async def test_upsert_client_update_by_telegram() -> None:
 
     input_data = InputSchema(name="Updated Name", telegram_chat_id="tg123")
 
-    err, res = await upsert_client(db, input_data)
+    res = await upsert_client(db, input_data)
 
-    assert err is None
     assert res is not None
     assert res["created"] is False
     assert res["client_id"] == "existing-uuid"
@@ -84,9 +79,6 @@ async def test_upsert_client_db_error_capture() -> None:
     # If name/email provided, it will first check Telegram (if None, skips), then Email.
     input_data = InputSchema(name="Fail", email="f@f.com")
 
-    err, res = await upsert_client(db, input_data)
-
-    assert err is not None
-    # With only email, it calls fetch for email lookup first
-    assert "db_search_email_failed" in str(err)
-    assert res is None
+    with pytest.raises(RuntimeError) as exc_info:
+        await upsert_client(db, input_data)
+    assert "db_search_email_failed" in str(exc_info.value)

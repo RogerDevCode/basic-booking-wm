@@ -24,10 +24,10 @@ import asyncio
 # RLS Tenant ID   : YES — with_admin_context bypasses RLS for user discovery
 # Pydantic Schemas: YES — InputSchema validates email and password
 # ============================================================================
-from typing import Any
+from typing import Any, cast
 
 from ..internal._db_client import create_db_client
-from ..internal._result import Result, fail, ok, with_admin_context
+from ..internal._result import with_admin_context
 from ..internal._wmill_adapter import log
 from ._login_logic import verify_password_sync
 from ._login_models import InputSchema, LoginResult, UserRow
@@ -35,17 +35,17 @@ from ._login_models import InputSchema, LoginResult, UserRow
 MODULE = "web_auth_login"
 
 
-async def _main_async(args: dict[str, Any]) -> Result[LoginResult]:
+async def _main_async(args: dict[str, Any]) -> LoginResult:
     # 1. Validate Input
     try:
         input_data = InputSchema.model_validate(args)
     except Exception as e:
-        return fail(f"Validation error: {e}")
+        raise RuntimeError(f"Validation error: {e}") from e
 
     conn = await create_db_client()
     try:
         # 2. Execute Auth Transaction with Admin Context (bypass RLS)
-        async def operation() -> Result[LoginResult]:
+        async def operation() -> LoginResult:
             # Lookup user by email
             rows = await conn.fetch(
                 """
@@ -60,7 +60,7 @@ async def _main_async(args: dict[str, Any]) -> Result[LoginResult]:
             )
 
             if not rows:
-                return fail("Invalid email or password")
+                raise RuntimeError("Invalid email or password")
 
             r = rows[0]
             user: UserRow = {
@@ -75,42 +75,39 @@ async def _main_async(args: dict[str, Any]) -> Result[LoginResult]:
 
             # Check account status
             if not user["is_active"]:
-                return fail("Account is disabled. Contact support.")
+                raise RuntimeError("Account is disabled. Contact support.")
 
             # Verify password
             if not user["password_hash"] or user["password_hash"] == "null":
-                return fail("Invalid email or password")
+                raise RuntimeError("Invalid email or password")
 
             if not verify_password_sync(input_data.password, user["password_hash"]):
-                return fail("Invalid email or password")
+                raise RuntimeError("Invalid email or password")
 
             # Success: Update last login
             await conn.execute("UPDATE users SET last_login = NOW() WHERE user_id = $1::uuid", user["user_id"])
 
-            return ok(
-                {
-                    "user_id": user["user_id"],
-                    "email": user["email"],
-                    "full_name": user["full_name"],
-                    "role": user["role"],
-                    "profile_complete": user["profile_complete"],
-                }
-            )
+            result: LoginResult = {
+                "user_id": user["user_id"],
+                "email": user["email"],
+                "full_name": user["full_name"],
+                "role": user["role"],
+                "profile_complete": user["profile_complete"],
+            }
+            return result
 
-        return await with_admin_context(conn, operation)
+        result = await with_admin_context(conn, operation)
+        return result
 
     except Exception as e:
         log("Internal error in login", error=str(e), module=MODULE)
-        return fail(f"Internal error: {e}")
+        raise RuntimeError(f"Internal error: {e}") from e
     finally:
         await conn.close()  # pyright: ignore[reportUnknownMemberType]
 
 
 def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
     import traceback
-    from typing import cast
-
-    from pydantic import BaseModel
 
     try:
         if isinstance(args, InputSchema):
@@ -118,19 +115,8 @@ def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
         else:
             validated = InputSchema.model_validate(args)
 
-        err, result = asyncio.run(_main_async(validated.model_dump()))
-        if err:
-            raise err
-
-        if result is None:
-            return {}
-
-        if isinstance(result, BaseModel):
-            return cast("dict[str, object]", result.model_dump())
-        elif isinstance(result, dict):
-            return cast("dict[str, object]", result)
-        else:
-            return {"data": result}
+        result = asyncio.run(_main_async(validated.model_dump()))
+        return cast("dict[str, object]", result)
 
     except Exception as e:
         tb = traceback.format_exc()

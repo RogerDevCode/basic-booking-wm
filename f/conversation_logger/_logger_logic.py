@@ -3,13 +3,12 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING
 
-from ..internal._result import DBClient, Result, fail, ok
-
 if TYPE_CHECKING:
+    from ..internal._result import DBClient
     from ._logger_models import InputSchema, LogResult
 
 
-async def persist_log(db: DBClient, input_data: InputSchema) -> Result[LogResult]:
+async def persist_log(db: DBClient, input_data: InputSchema) -> LogResult:
     try:
         rows = await db.fetch(
             """
@@ -29,9 +28,9 @@ async def persist_log(db: DBClient, input_data: InputSchema) -> Result[LogResult
         )
 
         if not rows:
-            return fail("db_insert_failed: No message_id returned")
+            raise RuntimeError("db_insert_failed: No message_id returned")
 
         res: LogResult = {"message_id": str(rows[0]["message_id"])}
-        return ok(res)
+        return res
     except Exception as e:
-        return fail(f"persistence_error: {e}")
+        raise RuntimeError(f"persistence_error: {e}") from e

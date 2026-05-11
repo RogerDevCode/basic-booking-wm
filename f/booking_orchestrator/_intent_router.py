@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable, Coroutine, Mapping
 from typing import Any, cast
 
-from f.internal._result import DBClient, Result
+from f.internal._result import DBClient
 
 from ._orchestrator_models import CanonicalIntent, OrchestratorInput, OrchestratorResult
 
@@ -47,5 +47,5 @@ def normalize_intent(intent: str) -> CanonicalIntent | None:
 # Type alias for handlers
 OrchestratorHandler = Callable[
     [DBClient, OrchestratorInput, Mapping[str, Callable[..., Coroutine[Any, Any, Any]]]],
-    Awaitable[Result[OrchestratorResult]],
+    Awaitable[OrchestratorResult],
 ]

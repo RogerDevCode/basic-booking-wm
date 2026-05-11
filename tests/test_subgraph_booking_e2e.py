@@ -13,22 +13,19 @@ from f.booking_orchestrator.main import _main_async  # noqa: E402
 
 
 @pytest.fixture
-def mock_context() -> tuple[None, dict[str, Any]]:
-    return (
-        None,
-        {
-            "tenantId": "550e8400-e29b-41d4-a716-446655440000",
-            "clientId": "550e8400-e29b-41d4-a716-446655440000",
-            "providerId": "550e8400-e29b-41d4-a716-446655440000",
-            "serviceId": "550e8400-e29b-41d4-a716-446655440000",
-            "date": "2026-05-10",
-            "time": "10:00",
-        },
-    )
+def mock_context() -> dict[str, Any]:
+    return {
+        "tenantId": "550e8400-e29b-41d4-a716-446655440000",
+        "clientId": "550e8400-e29b-41d4-a716-446655440000",
+        "providerId": "550e8400-e29b-41d4-a716-446655440000",
+        "serviceId": "550e8400-e29b-41d4-a716-446655440000",
+        "date": "2026-05-10",
+        "time": "10:00",
+    }
 
 
 @pytest.mark.asyncio
-async def test_booking_cycle_create(mock_context: tuple[None, dict[str, Any]]) -> None:
+async def test_booking_cycle_create(mock_context: dict[str, Any]) -> None:
     mock_db = AsyncMock()
     mock_db.execute.return_value = "OK"
     mock_db.fetchrow.return_value = {"client_id": "550e8400-e29b-41d4-a716-446655440000"}
@@ -41,7 +38,7 @@ async def test_booking_cycle_create(mock_context: tuple[None, dict[str, Any]]) -
             "service_name": "Consulta",
         }
     ]
-    mock_handler = AsyncMock(return_value=(None, {"action": "crear_cita", "success": True}))
+    mock_handler = AsyncMock(return_value={"action": "crear_cita", "success": True})
     mock_handler_map = {"crear_cita": mock_handler}
     with (
         patch("f.booking_orchestrator.main.create_db_client", return_value=mock_db),
@@ -49,15 +46,14 @@ async def test_booking_cycle_create(mock_context: tuple[None, dict[str, Any]]) -
         patch("f.booking_orchestrator.main.HANDLER_MAP", mock_handler_map),
     ):
         args: dict[str, object] = {"telegram_chat_id": "123", "intent": "crear_cita", "entities": {}}
-        err, result = await _main_async(args)
-        assert err is None
+        result = await _main_async(args)
         assert result is not None
         assert result["action"] == "crear_cita"
         assert result["success"] is True
 
 
 @pytest.mark.asyncio
-async def test_booking_cycle_cancel(mock_context: tuple[None, dict[str, Any]]) -> None:
+async def test_booking_cycle_cancel(mock_context: dict[str, Any]) -> None:
     mock_db = AsyncMock()
     mock_db.execute.return_value = "OK"
     mock_db.fetchrow.return_value = {"client_id": "550e8400-e29b-41d4-a716-446655440000"}
@@ -70,7 +66,7 @@ async def test_booking_cycle_cancel(mock_context: tuple[None, dict[str, Any]]) -
             "service_name": "Consulta",
         }
     ]
-    mock_handler = AsyncMock(return_value=(None, {"action": "cancelar_cita", "success": True}))
+    mock_handler = AsyncMock(return_value={"action": "cancelar_cita", "success": True})
     mock_handler_map = {"cancelar_cita": mock_handler}
     with (
         patch("f.booking_orchestrator.main.create_db_client", return_value=mock_db),
@@ -82,15 +78,14 @@ async def test_booking_cycle_cancel(mock_context: tuple[None, dict[str, Any]]) -
             "intent": "cancelar_cita",
             "entities": {"booking_id": "550e8400-e29b-41d4-a716-446655440000"},
         }
-        err, result = await _main_async(args)
-        assert err is None
+        result = await _main_async(args)
         assert result is not None
         assert result["action"] == "cancelar_cita"
         assert result["success"] is True
 
 
 @pytest.mark.asyncio
-async def test_booking_cycle_reschedule(mock_context: tuple[None, dict[str, Any]]) -> None:
+async def test_booking_cycle_reschedule(mock_context: dict[str, Any]) -> None:
     mock_db = AsyncMock()
     mock_db.execute.return_value = "OK"
     mock_db.fetchrow.return_value = {"client_id": "550e8400-e29b-41d4-a716-446655440000"}
@@ -103,7 +98,7 @@ async def test_booking_cycle_reschedule(mock_context: tuple[None, dict[str, Any]
             "service_name": "Consulta",
         }
     ]
-    mock_handler = AsyncMock(return_value=(None, {"action": "reagendar_cita", "success": True}))
+    mock_handler = AsyncMock(return_value={"action": "reagendar_cita", "success": True})
     mock_handler_map = {"reagendar_cita": mock_handler}
     with (
         patch("f.booking_orchestrator.main.create_db_client", return_value=mock_db),
@@ -115,8 +110,7 @@ async def test_booking_cycle_reschedule(mock_context: tuple[None, dict[str, Any]
             "intent": "reagendar_cita",
             "entities": {"booking_id": "550e8400-e29b-41d4-a716-446655440000"},
         }
-        err, result = await _main_async(args)
-        assert err is None
+        result = await _main_async(args)
         assert result is not None
         assert result["action"] == "reagendar_cita"
         assert result["success"] is True

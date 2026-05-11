@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -28,10 +28,9 @@ async def test_auth_provider_generate_temp() -> None:
     ):
         args: dict[str, Any] = {"action": "admin_generate_temp", "provider_id": VALID_ID, "tenant_id": VALID_ID}
 
-        err, result = await main(args)
+        result = await main(args)
 
-        assert err is None
         assert result is not None
         assert result["provider_id"] == VALID_ID
-        assert len(str(cast("dict[str, object]", result).get("tempPassword"))) == 4
+        assert len(str(result.get("tempPassword"))) == 4
         assert mock_db.execute.called  # Update password_hash

@@ -17,11 +17,15 @@ from __future__ import annotations
 import asyncio
 import os
 import traceback
+from datetime import datetime
 from typing import Any, Final
 
-from ...booking_create.main import main_async as booking_create_async
+from ...booking_create._booking_create_models import InputSchema as BookingCreateInput
+from ...booking_create._booking_create_repository import PostgresBookingCreateRepository
+from ...booking_create._create_booking_logic import execute_create_booking
 from .._db_client import create_db_client
 from .._nlu_cache import ensure_nlu_cache, get_nlu_rule
+from .._result import DBClient, with_tenant_context
 from .._wmill_adapter import log
 
 MODULE: Final[str] = "booking_confirm"
@@ -65,20 +69,13 @@ def _user_message(err: Exception | str) -> str:
     )
 
 
-async def _resolve_service_id(provider_id: str) -> str | None:
+async def _resolve_service_id(db: DBClient, provider_id: str) -> str | None:
     """Look up the active service_id for a given provider."""
-    conn = await create_db_client()
-    try:
-        row = await conn.fetchrow(
-            "SELECT service_id FROM services WHERE provider_id = $1::uuid AND is_active = true LIMIT 1",
-            provider_id,
-        )
-        return str(row["service_id"]) if row else None
-    except Exception as e:
-        log("RESOLVE_SERVICE_ERROR", error=str(e), provider_id=provider_id, module=MODULE)
-        return None
-    finally:
-        await conn.close()
+    row = await db.fetchrow(
+        "SELECT service_id FROM services WHERE provider_id = $1::uuid AND is_active = true LIMIT 1",
+        provider_id,
+    )
+    return str(row["service_id"]) if row else None
 
 
 async def _main_async(
@@ -110,32 +107,55 @@ async def _main_async(
 
     await ensure_nlu_cache()
 
-    # 1. Resolve service_id from provider
-    service_id = await _resolve_service_id(provider_id)
-    if not service_id:
-        log("BOOKING_CONFIRM_NO_SERVICE", provider_id=provider_id, module=MODULE)
-        return {
-            "success": False,
-            "error": "no_service_for_provider",
-            "user_message": _user_message("no_service_for_provider"),
-        }
-
-    # 2. Idempotency key scoped to Telegram chat + slot
-    idempotency_key = f"tg:{chat_id}:{start_time}"
-
+    conn = await create_db_client()
     try:
-        log("CALLING_BOOK_CREATE", idempotency_key=idempotency_key, module=MODULE)
-        err, result = await booking_create_async(
+        # 1. Resolve service_id from provider
+        service_id = await _resolve_service_id(conn, provider_id)
+        if not service_id:
+            log("BOOKING_CONFIRM_NO_SERVICE", provider_id=provider_id, module=MODULE)
+            return {
+                "success": False,
+                "error": "no_service_for_provider",
+                "user_message": _user_message("no_service_for_provider"),
+            }
+
+        # 2. Build core booking input
+        idempotency_key = f"tg:{chat_id}:{start_time}"
+        try:
+            parsed_start = datetime.fromisoformat(start_time.replace("Z", "+00:00"))
+        except ValueError:
+            log("BOOKING_CONFIRM_INVALID_START_TIME", start_time=start_time, module=MODULE)
+            return {
+                "success": False,
+                "error": "invalid_start_time",
+                "user_message": _user_message("generic"),
+            }
+
+        input_data = BookingCreateInput.model_validate(
             {
                 "client_id": client_id,
                 "provider_id": provider_id,
                 "service_id": service_id,
-                "start_time": start_time,
+                "start_time": parsed_start,
                 "idempotency_key": idempotency_key,
                 "channel": "telegram",
                 "actor": "client",
             }
         )
+
+        # 3. Execute creation core logic in-process
+        log("CALLING_BOOK_CREATE", idempotency_key=idempotency_key, module=MODULE)
+        repo = PostgresBookingCreateRepository(conn)
+
+        async def operation() -> tuple[Exception | None, Any | None]:
+            try:
+                result = await execute_create_booking(repo, input_data)
+                return None, result
+            except Exception as e:
+                return e, None
+
+        err, result = await with_tenant_context(conn, provider_id, operation)
+
         if err is not None:
             log("BOOKING_CONFIRM_FAILED", error=str(err), chat_id=chat_id, module=MODULE)
             return {"success": False, "error": str(err), "user_message": _user_message(err)}
@@ -159,10 +179,13 @@ async def _main_async(
             "start_time": str(result.get("start_time", start_time)),
         }
 
-    except Exception as e:
+    except Exception as err:
+        log("BOOKING_CONFIRM_FAILED", error=str(err), chat_id=chat_id, module=MODULE)
         tb = traceback.format_exc()
-        log("BOOKING_CREATE_EXCEPTION", error=str(e), traceback=tb, module=MODULE)
-        return {"success": False, "error": str(e), "user_message": _user_message(e)}
+        log("BOOKING_CREATE_EXCEPTION", error=str(err), traceback=tb, module=MODULE)
+        return {"success": False, "error": str(err), "user_message": _user_message(err)}
+    finally:
+        await conn.close()
 
 
 def main(

@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import zoneinfo
 from datetime import UTC, date, datetime, timedelta
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
-from .._result import DBClient, Result, fail, ok
 from .._wmill_adapter import log
+
+if TYPE_CHECKING:
+    from .._result import DBClient
 from ._scheduling_models import (
     AffectedBooking,
     AvailabilityQuery,
@@ -100,7 +102,7 @@ def generate_slots_for_rule(
     return slots
 
 
-async def get_availability(db: DBClient, query: AvailabilityQuery) -> Result[AvailabilityResult]:
+async def get_availability(db: DBClient, query: AvailabilityQuery) -> AvailabilityResult:
     target_date = query["date"]
 
     try:
@@ -126,17 +128,15 @@ async def get_availability(db: DBClient, query: AvailabilityQuery) -> Result[Ava
         blocking_override = next((o for o in overrides if o["is_blocked"]), None)
 
         if blocking_override:
-            return ok(
-                AvailabilityResult(
-                    provider_id=query["provider_id"],
-                    date=target_date,
-                    timezone="UTC",
-                    slots=[],
-                    total_available=0,
-                    total_booked=0,
-                    is_blocked=True,
-                    block_reason=blocking_override["reason"] or "Día no disponible",
-                )
+            return AvailabilityResult(
+                provider_id=query["provider_id"],
+                date=target_date,
+                timezone="UTC",
+                slots=[],
+                total_available=0,
+                total_booked=0,
+                is_blocked=True,
+                block_reason=blocking_override["reason"] or "Día no disponible",
             )
 
         special_override = next(
@@ -170,17 +170,15 @@ async def get_availability(db: DBClient, query: AvailabilityQuery) -> Result[Ava
             rules = cast("list[ProviderScheduleRow]", rule_rows)
 
         if not rules:
-            return ok(
-                AvailabilityResult(
-                    provider_id=query["provider_id"],
-                    date=target_date,
-                    timezone="UTC",
-                    slots=[],
-                    total_available=0,
-                    total_booked=0,
-                    is_blocked=True,
-                    block_reason="No hay horario para este día de la semana",
-                )
+            return AvailabilityResult(
+                provider_id=query["provider_id"],
+                date=target_date,
+                timezone="UTC",
+                slots=[],
+                total_available=0,
+                total_booked=0,
+                is_blocked=True,
+                block_reason="No hay horario para este día de la semana",
             )
 
         # 3. Layer 3: Bookings
@@ -222,7 +220,7 @@ async def get_availability(db: DBClient, query: AvailabilityQuery) -> Result[Ava
             query["service_id"],
         )
         if not service_rows:
-            return fail(f"Service not found: {query['service_id']}")
+            raise RuntimeError(f"Service not found: {query['service_id']}")
 
         service = cast("ServiceRow", service_rows[0])
         slot_duration = service["duration_minutes"]
@@ -241,29 +239,27 @@ async def get_availability(db: DBClient, query: AvailabilityQuery) -> Result[Ava
         available_count = len([s for s in all_slots if s["available"]])
         booked_count = len(all_slots) - available_count
 
-        return ok(
-            AvailabilityResult(
-                provider_id=query["provider_id"],
-                date=target_date,
-                timezone=provider_tz,
-                slots=all_slots,
-                total_available=available_count,
-                total_booked=booked_count,
-                is_blocked=False,
-                block_reason=None,
-            )
+        return AvailabilityResult(
+            provider_id=query["provider_id"],
+            date=target_date,
+            timezone=provider_tz,
+            slots=all_slots,
+            total_available=available_count,
+            total_booked=booked_count,
+            is_blocked=False,
+            block_reason=None,
         )
 
     except Exception as e:
         import traceback
 
         log("GET_AVAILABILITY_CRITICAL_ERROR", error=str(e), traceback=traceback.format_exc())
-        return fail(e)
+        raise RuntimeError(f"get_availability failed: {e}") from e
 
 
 async def get_availability_range(
     db: DBClient, provider_id: str, service_id: str, date_from: str, date_to: str
-) -> Result[list[AvailabilityResult]]:
+) -> list[AvailabilityResult]:
     results: list[AvailabilityResult] = []
 
     try:
@@ -271,25 +267,20 @@ async def get_availability_range(
         end_dt = date.fromisoformat(date_to)
     except ValueError as e:
         log("GET_AVAILABILITY_RANGE_DATE_ERROR", error=str(e))
-        return fail(f"Invalid date format: {e}")
+        raise RuntimeError(f"Invalid date format: {e}") from e
 
     iter_date = curr_dt
     while iter_date <= end_dt:
         date_str = iter_date.isoformat()
-        err, res = await get_availability(db, {"provider_id": provider_id, "date": date_str, "service_id": service_id})
-        if err:
-            return fail(err)
-        if res:
-            results.append(res)
+        res = await get_availability(db, {"provider_id": provider_id, "date": date_str, "service_id": service_id})
+        results.append(res)
 
         iter_date += timedelta(days=1)
 
-    return ok(results)
+    return results
 
 
-async def validate_override(
-    db: DBClient, provider_id: str, date_start: str, date_end: str
-) -> Result[OverrideValidation]:
+async def validate_override(db: DBClient, provider_id: str, date_start: str, date_end: str) -> OverrideValidation:
     try:
         rows = await db.fetch(
             """
@@ -317,15 +308,13 @@ async def validate_override(
             for r in rows
         ]
 
-        return ok(
-            OverrideValidation(
-                hasBookings=len(affected) > 0,
-                bookingCount=len(affected),
-                affectedBookings=affected,
-            )
+        return OverrideValidation(
+            hasBookings=len(affected) > 0,
+            bookingCount=len(affected),
+            affectedBookings=affected,
         )
     except Exception as e:
         import traceback
 
         log("VALIDATE_OVERRIDE_ERROR", error=str(e), traceback=traceback.format_exc())
-        return fail(e)
+        raise RuntimeError(f"validate_override failed: {e}") from e
