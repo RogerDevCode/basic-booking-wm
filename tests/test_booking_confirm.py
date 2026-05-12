@@ -60,6 +60,7 @@ def _make_db_for_service(service_id: str | None) -> MagicMock:
         db.fetchrow = AsyncMock(return_value={"service_id": service_id})
     else:
         db.fetchrow = AsyncMock(return_value=None)
+    db.execute = AsyncMock()
     db.close = AsyncMock()
     return db
 
@@ -78,7 +79,8 @@ class TestBookingConfirmServiceResolution:
     @pytest.mark.asyncio
     async def test_no_service_for_provider_returns_error(self) -> None:
         """When no active service exists for provider, returns success=False."""
-        with _patch_resolve_service(None):
+        db = _make_db_for_service(None)
+        with _patch_resolve_service(None), _patch_db(db):
             result = await _main_async(
                 client_id=_CLIENT_ID,
                 provider_id=_PROVIDER_ID,
@@ -93,7 +95,8 @@ class TestBookingConfirmServiceResolution:
     async def test_service_resolution_uses_provider_id(self) -> None:
         """_resolve_service_id is called with the correct provider_id."""
         mock_resolve = AsyncMock(return_value=None)
-        with patch("f.internal.booking_confirm.main._resolve_service_id", mock_resolve):
+        db = _make_db_for_service(None)
+        with patch("f.internal.booking_confirm.main._resolve_service_id", mock_resolve), _patch_db(db):
             await _main_async(
                 client_id=_CLIENT_ID,
                 provider_id=_PROVIDER_ID,
@@ -122,7 +125,8 @@ class TestBookingConfirmDelegation:
             "end_time": "2026-06-01T10:30:00+00:00",
             "client_name": "Ana García",
         }
-        with _patch_resolve_service(_SERVICE_ID), _patch_execute_create_booking(result=booking_result):
+        db = _make_db_for_service(_SERVICE_ID)
+        with _patch_resolve_service(_SERVICE_ID), _patch_execute_create_booking(result=booking_result), _patch_db(db):
             result = await _main_async(
                 client_id=_CLIENT_ID,
                 provider_id=_PROVIDER_ID,
@@ -138,7 +142,8 @@ class TestBookingConfirmDelegation:
     @pytest.mark.asyncio
     async def test_booking_create_failure_returns_error(self) -> None:
         """When booking_create raises an error, success=False with error message."""
-        with _patch_resolve_service(_SERVICE_ID), _patch_execute_create_booking(err=Exception("slot_taken")):
+        db = _make_db_for_service(_SERVICE_ID)
+        with _patch_resolve_service(_SERVICE_ID), _patch_execute_create_booking(err=Exception("slot_taken")), _patch_db(db):
             result = await _main_async(
                 client_id=_CLIENT_ID,
                 provider_id=_PROVIDER_ID,
@@ -152,7 +157,8 @@ class TestBookingConfirmDelegation:
     @pytest.mark.asyncio
     async def test_booking_create_returns_none_result(self) -> None:
         """When booking_create returns None, success=False with sentinel error."""
-        with _patch_resolve_service(_SERVICE_ID), _patch_execute_create_booking(err=None, result=None):
+        db = _make_db_for_service(_SERVICE_ID)
+        with _patch_resolve_service(_SERVICE_ID), _patch_execute_create_booking(err=None, result=None), _patch_db(db):
             result = await _main_async(
                 client_id=_CLIENT_ID,
                 provider_id=_PROVIDER_ID,
@@ -180,9 +186,11 @@ class TestBookingConfirmDelegation:
                 "client_name": "C",
             }
 
+        db = _make_db_for_service(_SERVICE_ID)
         with (
             _patch_resolve_service(_SERVICE_ID),
             patch("f.internal.booking_confirm.main.execute_create_booking", side_effect=_capture),
+            _patch_db(db),
         ):
             await _main_async(
                 client_id=_CLIENT_ID,
@@ -213,9 +221,11 @@ class TestBookingConfirmDelegation:
                 "client_name": "C",
             }
 
+        db = _make_db_for_service(_SERVICE_ID)
         with (
             _patch_resolve_service(_SERVICE_ID),
             patch("f.internal.booking_confirm.main.execute_create_booking", side_effect=_capture),
+            _patch_db(db),
         ):
             await _main_async(
                 client_id=_CLIENT_ID,

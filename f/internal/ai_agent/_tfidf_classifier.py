@@ -243,8 +243,11 @@ def classify_intent(text: str) -> TfIdfResult:
     corpus = {}
     for intent in intent_keys:
         rule_key = f"intent_keywords_{intent}"
-        data: dict[str, list[str]] = get_nlu_rule(rule_key, {"keywords": []})
-        corpus[intent] = data.get("keywords", [])
+        data: dict[str, list[str]] | list[str] = get_nlu_rule(rule_key, {"keywords": []})
+        if isinstance(data, list):
+            corpus[intent] = data
+        else:
+            corpus[intent] = data.get("keywords", [])
 
     m = TfIdfModel(cast("dict[str, list[str]]", corpus))
     query_tokens = normalize(text)
