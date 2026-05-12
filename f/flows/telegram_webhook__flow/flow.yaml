@@ -48,195 +48,234 @@ value:
           !results.webhook_trigger.chat_id ||
           results.telegram_deduplicate.duplicate ||
           results.webhook_trigger.event_kind !== "message"
-    - id: get_conversation_state
-      summary: Obtener estado conversacional de Redis
+    - id: parallel_output
+      summary: Salida paralela — debug preprocesador + flujo principal booking
       value:
-        type: script
-        input_transforms:
-          chat_id:
-            type: javascript
-            expr: results.webhook_trigger.chat_id
-          redis_url:
-            type: javascript
-            expr: variable("u/admin/REDIS_URL")
-        path: f/internal/conversation_get/main
-      skip_if:
-        expr: '!results.webhook_trigger.chat_id ||
-          results.telegram_deduplicate.duplicate'
-    - id: telegram_auto_register
-      summary: Registrar/resolver usuario Telegram → user_id en DB
-      value:
-        type: script
-        input_transforms:
-          args:
-            type: javascript
-            expr: |-
-              { "chat_id": results.webhook_trigger.chat_id,
-                "first_name": results.webhook_trigger.first_name,
-                "last_name": results.webhook_trigger.last_name || null,
-                "username": results.webhook_trigger.username || null,
-                "pg_url": variable("u/admin/DATABASE_URL") }
-        path: f/telegram_auto_register/main
-      skip_if:
-        expr: '!results.webhook_trigger.chat_id ||
-          results.telegram_deduplicate.duplicate'
-    - id: booking_prefetch
-      summary: Pre-fetch especialidades/doctores segun estado FSM actual
-      value:
-        type: script
-        input_transforms:
-          booking_draft:
-            type: javascript
-            expr: results.get_conversation_state.data?.booking_draft || null
-          booking_state:
-            type: javascript
-            expr: results.get_conversation_state.data?.booking_state || null
-          pg_url:
-            type: javascript
-            expr: variable("u/admin/DATABASE_URL")
-          user_input:
-            type: javascript
-            expr: results.message_preprocessor?.cleaned_text || results.webhook_trigger.canonical_text || null
-          client_id:
-            type: javascript
-            expr: results.telegram_auto_register.client_id || null
-        path: f/internal/booking_prefetch/main
-      skip_if:
-        expr: '!results.webhook_trigger.chat_id ||
-          results.telegram_deduplicate.duplicate'
-    - id: router
-      summary: Enrutar via FSM de booking
-      value:
-        type: script
-        input_transforms:
-          args:
-            type: javascript
-            expr: '{ "chat_id": results.webhook_trigger.chat_id, "user_input":
-              results.message_preprocessor?.cleaned_text || results.webhook_trigger.canonical_text, "state":
-              results.get_conversation_state.data || {}, "items":
-              results.booking_prefetch.items || [], "phone":
-              results.telegram_auto_register?.phone ?? null, "client_name":
-              results.telegram_auto_register?.name ?? null,
-              "prefetch_block_reason": results.booking_prefetch.block_reason || null,
-              "client_id": results.telegram_auto_register?.client_id ?? null,
-              "callback_message_id": results.webhook_trigger.callback_message_id ?? null,
-              "pg_url": variable("u/admin/DATABASE_URL") }'
-        path: f/internal/telegram_router/main
-      skip_if:
-        expr: '!results.webhook_trigger.chat_id ||
-          results.telegram_deduplicate.duplicate'
-    - id: client_register
-      summary: Actualizar datos del cliente tras registro
-      value:
-        type: script
-        input_transforms:
-          name:
-            type: javascript
-            expr: results.router?.data?.registration_data?.name ?? null
-          client_id:
-            type: javascript
-            expr: results.telegram_auto_register.client_id
-          email:
-            type: javascript
-            expr: results.router?.data?.registration_data?.email ?? null
-          pg_url:
-            type: javascript
-            expr: variable("u/admin/DATABASE_URL")
-          phone:
-            type: javascript
-            expr: results.router?.data?.registration_data?.phone ?? null
-        path: f/internal/client_register/main
-      skip_if:
-        expr: '!results.router?.data?.registration_data'
-    - id: update_conversation_state
-      summary: Persistir nuevo estado en Redis
-      value:
-        type: script
-        input_transforms:
-          args:
-            type: javascript
-            expr: '{ "chat_id": results.webhook_trigger.chat_id, "booking_state":
-              results.router?.data?.nextState, "active_flow":
-              results.router?.data?.active_flow || null, "booking_draft":
-              results.router?.data?.nextDraft ?? null, "pending_data": {
-              "router_handled": results.router?.data?.handled, "text_kind":
-              results.webhook_trigger.text_kind, "user_id":
-              results.telegram_auto_register?.user_id || null, "client_id":
-              results.telegram_auto_register?.client_id || null } }'
-          redis_url:
-            type: javascript
-            expr: variable("u/admin/REDIS_URL")
-        path: f/internal/conversation_update/main
-      skip_if:
-        expr: '!results.webhook_trigger.chat_id ||
-          results.telegram_deduplicate.duplicate'
-    - id: booking_commit
-      summary: Crear cita real en DB cuando usuario confirma desde estado confirming
-      value:
-        type: script
-        input_transforms:
-          chat_id:
-            type: javascript
-            expr: results.webhook_trigger.chat_id
-          client_id:
-            type: javascript
-            expr: results.telegram_auto_register.client_id
-          pg_url:
-            type: javascript
-            expr: variable("u/admin/DATABASE_URL")
-          provider_id:
-            type: javascript
-            expr: results.get_conversation_state.data?.booking_state?.doctorId
-          start_time:
-            type: javascript
-            expr: results.get_conversation_state.data?.booking_state?.draft?.start_time
-        path: f/internal/booking_confirm/main
-      skip_if:
-        expr: |-
-          !(results.get_conversation_state?.data?.booking_state?.name === "confirming" && 
-            results.router?.data?.nextState?.name === "idle" &&
-            !results.telegram_deduplicate?.duplicate)
-    - id: send_telegram_response
-      summary: Enviar respuesta a Telegram
-      value:
-        type: script
-        input_transforms:
-          bot_token:
-            type: javascript
-            expr: variable("u/admin/TELEGRAM_BOT_TOKEN")
-          chat_id:
-            type: javascript
-            expr: results.webhook_trigger.chat_id
-          mode:
-            type: javascript
-            expr: >-
-              results.router?.data?.edit_message ? "edit_message" : "send_message"
-          inline_buttons_json:
-            type: javascript
-            expr: >-
-              results.router?.data?.inline_buttons ?
-              JSON.stringify(results.router.data.inline_buttons) : null
-          message_id:
-            type: javascript
-            expr: >-
-              results.router?.data?.edit_message ? results.webhook_trigger.callback_message_id : null
-          text:
-            type: javascript
-            expr: >-
-              (results.booking_commit?.success) ? ("✅ *Reserva Confirmada*\n\n"
-              +
-                 "📋 " + results.booking_commit.service_name + " con " + results.booking_commit.provider_name + "\n" +
-                 "🆔 Ref: `" + results.booking_commit.booking_short_id + "`\n\n" +
-                 "Recibirás un recordatorio antes de tu cita.\n\n" +
-                 "📱 *Menú Principal*\n\n1️⃣ Agendar cita\n2️⃣ Mis citas\n3️⃣ Recordatorios\n4️⃣ Información\n5️⃣ Mis datos")
-              : (results.booking_commit?.error) ? ("❌ No se pudo confirmar la
-              cita.\n\n" +
-                 (results.booking_commit.user_message || "Por favor intenta de nuevo en unos minutos."))
-              : (results.router?.data?.handled &&
-              results.router?.data?.response_text) ?
-              results.router?.data?.response_text : "Lo siento, no entendí tu
-              mensaje. 😊\n\nEscribe /start para ver el menú principal."
-        path: f/telegram_send/main
-      skip_if:
-        expr: '!results.webhook_trigger.chat_id ||
-          results.telegram_deduplicate.duplicate'
+        type: branchall
+        parallel: true
+        branches:
+          - summary: "Debug — salida preprocesador"
+            modules:
+              - id: debug_preprocessor_send
+                summary: Enviar JSON preprocesador al chat de debug
+                value:
+                  type: script
+                  input_transforms:
+                    mode:
+                      type: static
+                      value: send_message
+                    chat_id:
+                      type: javascript
+                      expr: variable("u/admin/PREPROCESSOR_DEBUG_CHAT_ID")
+                    text:
+                      type: javascript
+                      expr: >-
+                        "🔬 *Preprocessor Debug*\n\n" +
+                        "📥 *Raw:* `" + (results.webhook_trigger.canonical_text || "") + "`\n" +
+                        "✅ *Cleaned:* `" + (results.message_preprocessor?.cleaned_text || results.webhook_trigger.canonical_text || "") + "`\n" +
+                        "🔄 *Applied:* " + (results.message_preprocessor?.normalization_applied ? "Sí" : "No") + " | 📊 *Conf:* " + (results.message_preprocessor?.confidence ?? 1.0) + "\n\n" +
+                        "📌 *Modisms:* " + ((results.message_preprocessor?.modism_matches || []).length === 0 ? "ninguno" : (results.message_preprocessor?.modism_matches || []).map(function(m){ return m.phrase + " → " + (m.canonical || "∅"); }).join(", ")) + "\n" +
+                        "✍️ *Corrections:* " + ((results.message_preprocessor?.spell_corrections || []).length === 0 ? "ninguna" : (results.message_preprocessor?.spell_corrections || []).map(function(c){ return c.original + " → " + c.corrected; }).join(", "))
+                    bot_token:
+                      type: javascript
+                      expr: variable("u/admin/TELEGRAM_BOT_TOKEN")
+                  path: f/telegram_send/main
+                skip_if:
+                  expr: >-
+                    !results.webhook_trigger.chat_id ||
+                    results.telegram_deduplicate.duplicate ||
+                    results.webhook_trigger.event_kind !== "message"
+          - summary: "Main flow — booking pipeline"
+            modules:
+              - id: get_conversation_state
+                summary: Obtener estado conversacional de Redis
+                value:
+                  type: script
+                  input_transforms:
+                    chat_id:
+                      type: javascript
+                      expr: results.webhook_trigger.chat_id
+                    redis_url:
+                      type: javascript
+                      expr: variable("u/admin/REDIS_URL")
+                  path: f/internal/conversation_get/main
+                skip_if:
+                  expr: '!results.webhook_trigger.chat_id ||
+                    results.telegram_deduplicate.duplicate'
+              - id: telegram_auto_register
+                summary: Registrar/resolver usuario Telegram → user_id en DB
+                value:
+                  type: script
+                  input_transforms:
+                    args:
+                      type: javascript
+                      expr: |-
+                        { "chat_id": results.webhook_trigger.chat_id,
+                          "first_name": results.webhook_trigger.first_name,
+                          "last_name": results.webhook_trigger.last_name || null,
+                          "username": results.webhook_trigger.username || null,
+                          "pg_url": variable("u/admin/DATABASE_URL") }
+                  path: f/telegram_auto_register/main
+                skip_if:
+                  expr: '!results.webhook_trigger.chat_id ||
+                    results.telegram_deduplicate.duplicate'
+              - id: booking_prefetch
+                summary: Pre-fetch especialidades/doctores segun estado FSM actual
+                value:
+                  type: script
+                  input_transforms:
+                    booking_draft:
+                      type: javascript
+                      expr: results.get_conversation_state.data?.booking_draft || null
+                    booking_state:
+                      type: javascript
+                      expr: results.get_conversation_state.data?.booking_state || null
+                    pg_url:
+                      type: javascript
+                      expr: variable("u/admin/DATABASE_URL")
+                    user_input:
+                      type: javascript
+                      expr: results.message_preprocessor?.cleaned_text || results.webhook_trigger.canonical_text || null
+                    client_id:
+                      type: javascript
+                      expr: results.telegram_auto_register.client_id || null
+                  path: f/internal/booking_prefetch/main
+                skip_if:
+                  expr: '!results.webhook_trigger.chat_id ||
+                    results.telegram_deduplicate.duplicate'
+              - id: router
+                summary: Enrutar via FSM de booking
+                value:
+                  type: script
+                  input_transforms:
+                    args:
+                      type: javascript
+                      expr: '{ "chat_id": results.webhook_trigger.chat_id, "user_input":
+                        results.message_preprocessor?.cleaned_text || results.webhook_trigger.canonical_text, "state":
+                        results.get_conversation_state.data || {}, "items":
+                        results.booking_prefetch.items || [], "phone":
+                        results.telegram_auto_register?.phone ?? null, "client_name":
+                        results.telegram_auto_register?.name ?? null,
+                        "prefetch_block_reason": results.booking_prefetch.block_reason || null,
+                        "client_id": results.telegram_auto_register?.client_id ?? null,
+                        "callback_message_id": results.webhook_trigger.callback_message_id ?? null,
+                        "pg_url": variable("u/admin/DATABASE_URL") }'
+                  path: f/internal/telegram_router/main
+                skip_if:
+                  expr: '!results.webhook_trigger.chat_id ||
+                    results.telegram_deduplicate.duplicate'
+              - id: client_register
+                summary: Actualizar datos del cliente tras registro
+                value:
+                  type: script
+                  input_transforms:
+                    name:
+                      type: javascript
+                      expr: results.router?.data?.registration_data?.name ?? null
+                    client_id:
+                      type: javascript
+                      expr: results.telegram_auto_register.client_id
+                    email:
+                      type: javascript
+                      expr: results.router?.data?.registration_data?.email ?? null
+                    pg_url:
+                      type: javascript
+                      expr: variable("u/admin/DATABASE_URL")
+                    phone:
+                      type: javascript
+                      expr: results.router?.data?.registration_data?.phone ?? null
+                  path: f/internal/client_register/main
+                skip_if:
+                  expr: '!results.router?.data?.registration_data'
+              - id: update_conversation_state
+                summary: Persistir nuevo estado en Redis
+                value:
+                  type: script
+                  input_transforms:
+                    args:
+                      type: javascript
+                      expr: '{ "chat_id": results.webhook_trigger.chat_id, "booking_state":
+                        results.router?.data?.nextState, "active_flow":
+                        results.router?.data?.active_flow || null, "booking_draft":
+                        results.router?.data?.nextDraft ?? null, "pending_data": {
+                        "router_handled": results.router?.data?.handled, "text_kind":
+                        results.webhook_trigger.text_kind, "user_id":
+                        results.telegram_auto_register?.user_id || null, "client_id":
+                        results.telegram_auto_register?.client_id || null } }'
+                    redis_url:
+                      type: javascript
+                      expr: variable("u/admin/REDIS_URL")
+                  path: f/internal/conversation_update/main
+                skip_if:
+                  expr: '!results.webhook_trigger.chat_id ||
+                    results.telegram_deduplicate.duplicate'
+              - id: booking_commit
+                summary: Crear cita real en DB cuando usuario confirma desde estado confirming
+                value:
+                  type: script
+                  input_transforms:
+                    chat_id:
+                      type: javascript
+                      expr: results.webhook_trigger.chat_id
+                    client_id:
+                      type: javascript
+                      expr: results.telegram_auto_register.client_id
+                    pg_url:
+                      type: javascript
+                      expr: variable("u/admin/DATABASE_URL")
+                    provider_id:
+                      type: javascript
+                      expr: results.get_conversation_state.data?.booking_state?.doctorId
+                    start_time:
+                      type: javascript
+                      expr: results.get_conversation_state.data?.booking_state?.draft?.start_time
+                  path: f/internal/booking_confirm/main
+                skip_if:
+                  expr: |-
+                    !(results.get_conversation_state?.data?.booking_state?.name === "confirming" && 
+                      results.router?.data?.nextState?.name === "idle" &&
+                      !results.telegram_deduplicate?.duplicate)
+              - id: send_telegram_response
+                summary: Enviar respuesta a Telegram
+                value:
+                  type: script
+                  input_transforms:
+                    bot_token:
+                      type: javascript
+                      expr: variable("u/admin/TELEGRAM_BOT_TOKEN")
+                    chat_id:
+                      type: javascript
+                      expr: results.webhook_trigger.chat_id
+                    mode:
+                      type: javascript
+                      expr: >-
+                        results.router?.data?.edit_message ? "edit_message" : "send_message"
+                    inline_buttons_json:
+                      type: javascript
+                      expr: >-
+                        results.router?.data?.inline_buttons ?
+                        JSON.stringify(results.router.data.inline_buttons) : null
+                    message_id:
+                      type: javascript
+                      expr: >-
+                        results.router?.data?.edit_message ? results.webhook_trigger.callback_message_id : null
+                    text:
+                      type: javascript
+                      expr: >-
+                        (results.booking_commit?.success) ? ("✅ *Reserva Confirmada*\n\n"
+                        +
+                           "📋 " + results.booking_commit.service_name + " con " + results.booking_commit.provider_name + "\n" +
+                           "🆔 Ref: `" + results.booking_commit.booking_short_id + "`\n\n" +
+                           "Recibirás un recordatorio antes de tu cita.\n\n" +
+                           "📱 *Menú Principal*\n\n1️⃣ Agendar cita\n2️⃣ Mis citas\n3️⃣ Recordatorios\n4️⃣ Información\n5️⃣ Mis datos")
+                        : (results.booking_commit?.error) ? ("❌ No se pudo confirmar la
+                        cita.\n\n" +
+                           (results.booking_commit.user_message || "Por favor intenta de nuevo en unos minutos."))
+                        : (results.router?.data?.handled &&
+                        results.router?.data?.response_text) ?
+                        results.router?.data?.response_text : "Lo siento, no entendí tu
+                        mensaje. 😊\n\nEscribe /start para ver el menú principal."
+                  path: f/telegram_send/main
+                skip_if:
+                  expr: '!results.webhook_trigger.chat_id ||
+                    results.telegram_deduplicate.duplicate'
