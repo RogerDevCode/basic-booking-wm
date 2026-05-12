@@ -676,6 +676,24 @@
 ### `f/internal/telegram_router/main.py`
 - 🔧 `fn` `main` (L490)
 
+### `f/message_preprocessor/_modism_mapper.py`
+- 🔧 `fn` `apply_modism_map` (L48)
+
+### `f/message_preprocessor/_preprocessor_models.py`
+- 📦 `class` `SpellCorrection` (L6)
+- 📦 `class` `ModismMatch` (L13)
+- 📦 `class` `PreprocessorInput` (L20)
+- 📦 `class` `PreprocessorOutput` (L26)
+
+### `f/message_preprocessor/_spell_normalizer.py`
+- 🔧 `fn` `apply_spell_correction` (L100)
+
+### `f/message_preprocessor/_text_cleaner.py`
+- 🔧 `fn` `clean_text` (L18)
+
+### `f/message_preprocessor/main.py`
+- 🔧 `fn` `main` (L54)
+
 ### `f/nlu/_tfidf_classifier.py`
 - 📦 `class` `ModelData` (L234)
 - 📦 `class` `ScoreEntry` (L263)

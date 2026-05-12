@@ -15,6 +15,7 @@ dependencies = [
     "redis>=7.4.0",
     "typing-extensions>=4.15.0",
     "wmill>=1.693.3",
+    "pyspellchecker>=0.8.0",
 ]
 
 [dependency-groups]
@@ -43,6 +44,10 @@ exclude = ["^reset_nlu\\.py$", "^fix_nlu\\.py$", "^scripts/", "^conftest\\.py$",
 
 [[tool.mypy.overrides]]
 module = "wmill.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "spellchecker.*"
 ignore_missing_imports = true
 
 
