@@ -34,6 +34,20 @@ value:
         path: f/internal/telegram_deduplicate/main
       skip_if:
         expr: '!results.webhook_trigger.chat_id'
+    - id: message_preprocessor
+      summary: Normalizar texto — modismos chilenos + corrección ortográfica
+      value:
+        type: script
+        input_transforms:
+          data:
+            type: javascript
+            expr: '{"raw_text": results.webhook_trigger.canonical_text}'
+        path: f/message_preprocessor/main
+      skip_if:
+        expr: >-
+          !results.webhook_trigger.chat_id ||
+          results.telegram_deduplicate.duplicate ||
+          results.webhook_trigger.event_kind !== "message"
     - id: get_conversation_state
       summary: Obtener estado conversacional de Redis
       value:
@@ -82,7 +96,7 @@ value:
             expr: variable("u/admin/DATABASE_URL")
           user_input:
             type: javascript
-            expr: results.webhook_trigger.canonical_text || null
+            expr: results.message_preprocessor?.cleaned_text || results.webhook_trigger.canonical_text || null
           client_id:
             type: javascript
             expr: results.telegram_auto_register.client_id || null
@@ -98,7 +112,7 @@ value:
           args:
             type: javascript
             expr: '{ "chat_id": results.webhook_trigger.chat_id, "user_input":
-              results.webhook_trigger.canonical_text, "state":
+              results.message_preprocessor?.cleaned_text || results.webhook_trigger.canonical_text, "state":
               results.get_conversation_state.data || {}, "items":
               results.booking_prefetch.items || [], "phone":
               results.telegram_auto_register?.phone ?? null, "client_name":

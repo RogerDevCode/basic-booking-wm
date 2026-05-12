@@ -4,27 +4,27 @@ from pydantic import BaseModel, ConfigDict
 
 
 class SpellCorrection(BaseModel):
-    model_config = ConfigDict(strict=True)
+    model_config = ConfigDict(strict=True, extra="forbid")
 
     original: str
     corrected: str
 
 
 class ModismMatch(BaseModel):
-    model_config = ConfigDict(strict=True)
+    model_config = ConfigDict(strict=True, extra="forbid")
 
     phrase: str
     canonical: str
 
 
 class PreprocessorInput(BaseModel):
-    model_config = ConfigDict(strict=True)
+    model_config = ConfigDict(strict=True, extra="forbid")
 
     raw_text: str
 
 
 class PreprocessorOutput(BaseModel):
-    model_config = ConfigDict(strict=True)
+    model_config = ConfigDict(strict=True, extra="forbid")
 
     raw_text: str
     cleaned_text: str
