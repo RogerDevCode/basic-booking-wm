@@ -4,9 +4,7 @@
 > - 🟩 **Verde** — Bloque funcional activo en producción, probado
 > - ⬜ **Gris** — Infraestructura base (DB, Redis, externos)
 > - 🟦 **Azul claro** — Salidas / Notificaciones
-> - 🟥 **Rojo** — Refactorización Dispatcher Pattern (implementada)
-> - 🔴 **Rojo brillante** — Últimos cambios: nextDraft fix + NLU unification
-> - ⚠️ **Rosa punteado** — Dead code (preprocesador no se consume)
+> - 🔴 **Rojo** — Últimos cambios: nextDraft fix + NLU unification + Dispatcher
 
 Flujo principal que opera hoy en producción, representado como bloques funcionales agrupados por capa.
 
@@ -20,20 +18,12 @@ flowchart TB
         GW["Canal Telegram\n(gateway + auto-register + send)"]
     end
 
-    subgraph PREPRO["⚠️ Pre-procesamiento (DEAD CODE)"]
-        MPP["Message Preprocessor\n(text_cleaner + modism_mapper + spell_normalizer)"]
-        NRM["Normalización\n(normalize + classify)"]
+    subgraph PREPRO["Pre-procesamiento"]
+        MPP["Message Preprocessor\n(modismos chilenos + spell check)"]
         DED["Deduplicación\n(deduplicate + skip_patterns)"]
     end
 
-    subgraph DISPATCHER["🔴 Dispatcher O(1) — Router Refactorizado"]
-        DISP["Dispatch Table\n(dict estado → handler)"]
-        MH["MenuHandler\n(menú, info, mis datos, mis citas)"]
-        RH["RegistrationHandler\n(FSM registro 5 estados)"]
-        RMH["ReminderHandler\n(FSM recordatorios)"]
-        BH["BookingHandler\n(FSM booking + NLU lazy fallback)"]
-        NLU["🔴 NLU Lazy Unificado\n(solo si FSM no resuelve)"]
-    end
+    DISPATCHER["🔴 Router Dispatcher O(1)\n(dispatch table → 4 handlers + NLU lazy)"]
 
     subgraph ORCH["Orquestación de Booking"]
         ORC["Orquestador Inteligente\n(orchestrator + context_resolver + intent_router)"]
@@ -67,33 +57,32 @@ flowchart TB
     %% Flujo principal de mensajes de texto
     TG -->|webhook| GW
     GW -->|mensaje texto| MPP
-    MPP -.->|⚠️ cleaned_text NO se usa| NRM
-    GW -->|raw text directo| DED
-    DED -->|user_input + state| DISP
+    MPP -->|cleaned_text| DED
+    DED -->|user_input + state| DISPATCHER
 
-    %% Dispatch O(1) por estado
-    DISP -->|state=idle| MH
-    DISP -->|state=registration| RH
-    DISP -->|state=reminders_config| RMH
-    DISP -->|state=booking FSM| BH
+    %% Dispatch O(1) → handlers internos
+    DISPATCHER -->|state=idle| MH_LABEL["MenuHandler"]
+    DISPATCHER -->|state=registration| RH_LABEL["RegistrationHandler"]
+    DISPATCHER -->|state=reminders| RMH_LABEL["ReminderHandler"]
+    DISPATCHER -->|state=booking FSM| BH_LABEL["BookingHandler + NLU lazy"]
 
     %% MenuHandler → puede delegar a ReminderHandler
-    MH -->|keyword=recordatorios| RMH
+    MH_LABEL -->|keyword=recordatorios| RMH_LABEL
 
-    %% BookingHandler → NLU solo si FSM no resuelve
-    BH -->|action=None| NLU
-    NLU -->|intent reconocido| BH
-    NLU -->|intent=no match| TGS
-
-    %% 🔴 nextDraft Fix: Estado + Draft se preservan
-    BH -->|🔴 nextState + nextDraft| RD
-    BH -->|FSM avanzó| ORC
-    BH -->|respuesta directa| TGS
+    %% NLU Lazy interno al BookingHandler
+    BH_LABEL -->|action=None| NLU_LABEL["NLU TF-IDF"]
+    NLU_LABEL -->|intent reconocido| BH_LABEL
+    NLU_LABEL -->|intent=no match| TGS
 
     %% Salidas de handlers
-    MH -->|respuesta| TGS
-    RH -->|respuesta| TGS
-    RMH -->|respuesta| TGS
+    MH_LABEL -->|respuesta| TGS
+    RH_LABEL -->|respuesta| TGS
+    RMH_LABEL -->|respuesta| TGS
+    BH_LABEL -->|FSM avanzó| ORC
+    BH_LABEL -->|respuesta directa| TGS
+
+    %% 🔴 nextDraft Fix: Estado + Draft se preservan
+    DISPATCHER -->|🔴 nextState + nextDraft| RD
 
     %% Orquestador → Core
     ORC -->|crear| HCR
@@ -122,23 +111,17 @@ flowchart TB
 
     %% Persistencia
     GW -->|auto-register| DB
-    MH -->|guardar estado| RD
-    RH -->|guardar estado| RD
-    RMH -->|guardar estado| RD
-    BH -->|guardar estado + draft| RD
 
     classDef active fill:#90EE90,stroke:#006400,stroke-width:2px,color:#000
     classDef infra fill:#E0E0E0,stroke:#424242,stroke-width:1px,color:#000
     classDef out fill:#B3E5FC,stroke:#0277BD,stroke-width:1px,color:#000
     classDef critical fill:#FF6B6B,stroke:#8B0000,stroke-width:3px,color:#000
-    classDef dead fill:#FFCCCB,stroke:#DC143C,stroke-width:2px,color:#000,stroke-dasharray: 5 5
 
-    class GW,NRM,DED,ORC,HCR,HCA,HRE,HAV,CR,CA,RE,SE,CBR active
+    class GW,MPP,DED,ORC,HCR,HCA,HRE,HAV,CR,CA,RE,SE,CBR active
     class DB,RD infra
     class TGS,GS out
     class TG,EXT infra
-    class DISP,MH,RH,RMH,BH,NLU critical
-    class MPP dead
+    class DISPATCHER critical
 ```
 
 ---
@@ -148,13 +131,12 @@ flowchart TB
 ### Ruta 1: Mensaje de texto (usuario escribe)
 
 ```
-Telegram → Gateway → ⚠️ Preprocessor (DEAD CODE — cleaned_text no se usa)
-  → Deduplicate → Dispatch Table (O(1) lookup por estado en Redis)
+Telegram → Gateway → Preprocessor (modismos + spell check) → Deduplicate
+  → Router Dispatcher O(1) (lookup por estado en Redis)
     → state=idle          → MenuHandler (keywords: 1-5, "mis citas", "info")
     → state=registration  → RegistrationHandler (sí/no/nombre/teléfono/email)
     → state=reminders     → ReminderHandler (rem:ch:, rem:w:, rem:off)
-    → state=booking FSM   → BookingHandler (FSM transition)
-      → si FSM no resuelve → NLU Lazy Unificado (TF-IDF, ~20% de mensajes)
+    → state=booking FSM   → BookingHandler (FSM transition + NLU lazy fallback)
     → 🔴 nextState + nextDraft → Redis (draft preservado entre transiciones)
     → respuesta → Telegram Send
 ```
@@ -172,9 +154,10 @@ Telegram → Gateway → Callback Router (directo, sin preprocessor ni dispatche
 | Cambio | Archivos | Impacto |
 |--------|----------|---------|
 | **nextDraft Fix** | `_booking_handler.py`, `_fsm_machine.py` | Draft se preserva entre transiciones FSM (specialty → doctor → time → confirm) |
-| **NLU Unification** | `nlu/_tfidf_classifier.py`, `ai_agent/_tfidf_classifier.py` | Clasificadores unificados, entities extraídas, confidence floor fijo |
+| **NLU Unification** | `nlu/_tfidf_classifier.py`, `ai_agent/_tfidf_classifier.py` | Clasificadores unificados, entities type corregido a `dict[str, str]` |
 | **Lazy NLU Loading** | `_booking_handler.py` | NLU solo corre si FSM no resuelve (~80% ahorro CPU) |
-| **⚠️ Preprocessor Dead Code** | `message_preprocessor/` | `cleaned_text` nunca se consume; webhook usa raw text directo |
+| **Dispatcher O(1)** | `telegram_router/` (4 handlers) | Router de 567 → 22 líneas, lookup O(1) por estado |
+| **Archive telegram_normalize** | `f/_archived/telegram_normalize/` | Lógica inlined en webhook trigger; módulo preservado como referencia |
 
 ### NLU Lazy — cuándo se ejecuta
 
@@ -210,15 +193,10 @@ RouterResult { nextState: ..., nextDraft: {...} }
 | Bloque | Archivos |
 |--------|----------|
 | Canal Telegram | `telegram_gateway`, `telegram_send`, `telegram_auto_register` |
-| ⚠️ Message Preprocessor | `message_preprocessor/main`, `_text_cleaner`, `_modism_mapper`, `_spell_normalizer` |
-| Normalización | `telegram_normalize`, `telegram_classify` |
+| Message Preprocessor | `message_preprocessor/main`, `_modism_mapper`, `_spell_normalizer` |
 | Deduplicación | `telegram_deduplicate` (con `_SKIP_PATTERNS` regex) |
-| **🔴 Dispatch Table** | `telegram_router/main` (22 líneas), `telegram_router/_dispatch_table` |
-| **🔴 MenuHandler** | `telegram_router/handlers/_menu_handler` |
-| **🔴 RegistrationHandler** | `telegram_router/handlers/_registration_handler` |
-| **🔴 ReminderHandler** | `telegram_router/handlers/_reminder_handler` |
-| **🔴 BookingHandler** | `telegram_router/handlers/_booking_handler` |
-| **🔴 NLU Lazy Unificado** | `nlu/_tfidf_classifier` (llamado solo desde BookingHandler) |
+| **🔴 Router Dispatcher O(1)** | `telegram_router/main` (22 líneas), `telegram_router/_dispatch_table`, `telegram_router/handlers/_*` |
+| **🔴 NLU Lazy** | `nlu/_tfidf_classifier` (llamado solo desde BookingHandler) |
 | **🔴 extract_draft_from_state** | `booking_fsm/_fsm_machine.py` (nueva función) |
 | Callback Router | `telegram_callback`, `_callback_logic`, `_callback_router` |
 | Orquestador Inteligente | `booking_orchestrator`, `_context_resolver`, `_intent_router`, `handlers/_*` |
@@ -228,3 +206,4 @@ RouterResult { nextState: ..., nextDraft: {...} }
 | Motor de Scheduling | `scheduling_engine`, `availability_check` |
 | Notificaciones Telegram | `telegram_send` |
 | Sync Google Calendar | `gcal_sync` |
+| ~~Normalización~~ | ~~`telegram_normalize`~~ → **archivado** (lógica inlined en webhook trigger) |
