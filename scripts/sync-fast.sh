@@ -115,7 +115,7 @@ for yaml in "${TARGETS[@]}"; do
       [[ -z "$ref" ]] && continue
       [[ -f "$ref" ]] && continue
       echo -e "${Y}  ⚠ Lock roto reparado: $ref en $yaml${NC}"
-      sed -i "/lock: '!inline ${ref}'/d" "$yaml"
+      sed -i "\|lock: '!inline ${ref}'|d" "$yaml"
     done < <(grep "lock: '!inline " "$yaml")
   fi
 done
