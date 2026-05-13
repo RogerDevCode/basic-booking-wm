@@ -23,7 +23,6 @@ async def _main_async(args: dict[str, Any]) -> dict[str, bool]:
     message_id = args.get("message_id")
     inline_buttons = args.get("inline_buttons")
     handled = args.get("handled")
-    response_text = args.get("response_text", "")
 
     # Truncate long messages for readability
     text_preview = str(text)[:300] + ("..." if len(str(text)) > 300 else "")
