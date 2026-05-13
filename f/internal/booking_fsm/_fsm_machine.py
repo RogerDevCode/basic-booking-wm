@@ -393,5 +393,34 @@ STEP_TO_FLOW_STEP: Final[dict[str, int]] = {
 }
 
 
+def extract_draft_from_state(state: BookingState) -> DraftBooking:
+    """Extract accumulated draft data from a booking state."""
+    if isinstance(state, ConfirmingState):
+        return DraftBooking(
+            specialty_id=state.draft.specialty_id,
+            specialty_name=state.draft.specialty_name,
+            doctor_id=state.draft.doctor_id,
+            doctor_name=state.draft.doctor_name,
+            start_time=state.draft.start_time,
+            time_label=state.draft.time_label,
+            client_id=state.draft.client_id,
+        )
+    if isinstance(state, SelectingTimeState):
+        return DraftBooking(
+            specialty_id=state.specialtyId,
+            doctor_id=state.doctorId,
+            doctor_name=state.doctorName,
+            target_date=state.targetDate,
+        )
+    if isinstance(state, SelectingDoctorState):
+        return DraftBooking(
+            specialty_id=state.specialtyId,
+            specialty_name=state.specialtyName,
+        )
+    if isinstance(state, CompletedState):
+        return DraftBooking(last_state_name="completed")
+    return DraftBooking()
+
+
 def flow_step_from_state(state: BookingState) -> int:
     return STEP_TO_FLOW_STEP.get(state.name, 0)
