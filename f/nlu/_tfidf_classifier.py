@@ -5,7 +5,7 @@ import re
 import unicodedata
 from typing import Final, TypedDict
 
-from ._constants import INTENT
+from ._constants import DAY_NAMES, INTENT, INTENT_KEYWORDS, RELATIVE_DATES, RULE_CONFIDENCE_VALUES
 
 """
 PRE-FLIGHT
@@ -18,61 +18,76 @@ RLS Tenant ID   : NO
 Zod Schemas      : NO
 """
 
-# REFERENCE CORPUS — Real-world examples per intent
+# REFERENCE CORPUS — Real-world examples per intent.
+# All examples represent post-preprocessor text (modisms, typos, and slang
+# already normalized by f/message_preprocessor before reaching NLU).
 CORPUS: Final[dict[str, list[str]]] = {
     INTENT["CREAR_CITA"]: [
         "quiero agendar una cita para mañana",
         "necesito hora con el doctor el lunes",
-        "kiero una ora pal viernes a las diez",
+        "quiero una hora para el viernes a las diez",
         "reservar turno con especialista",
         "agendar consulta medica urgente",
         "necesito cita urgente",
-        "pedir hora para control",
-        "kiero una ora",
-        "weon kiero orita al tiro una sita po",
-        "hola quiero agendar para manana a las 10",
+        "solicitar cita para control",
+        "quiero una hora",
+        "quiero ahora de inmediato una cita",
+        "hola quiero agendar para mañana a las 10",
+        "necesito agendar una cita lo antes posible",
+        "quiero hacer una cita para esta semana",
+        "puedo hacer una cita para el jueves",
     ],
     INTENT["CANCELAR_CITA"]: [
         "quiero cancelar mi cita del martes",
-        "no podre ir kanselame la hora",
-        "anular turno programado para manana",
+        "no podre ir cancélame la hora",
+        "anular turno programado para mañana",
         "eliminar cita agendada",
         "borrar mi reserva del jueves",
-        "no podre ir kanselame",
-        "cancelar la hora que tengo",
+        "no podre ir cancélame",
+        "cancelar cita que tengo",
+        "necesito cancelar mi cita de mañana",
+        "cancelar cita del lunes por favor",
     ],
     INTENT["REAGENDAR_CITA"]: [
         "necesito cambiar mi cita del viernes al jueves",
         "reprogramar turno para la otra semana",
-        "mejor para el miercoles a las once",
-        "mover mi hora de manana para pasado",
-        "kiero kambiar la cita pa otro dia",
+        "mejor para el miércoles a las once",
+        "mover mi hora de mañana para pasado",
+        "quiero cambiar la cita para otro dia",
+        "reagendar cita para la próxima semana",
+        "cambiar cita para el lunes",
+        "necesito reagendar mi consulta",
     ],
     INTENT["VER_DISPONIBILIDAD"]: [
         "tienen disponibilidad para el lunes",
-        "esta libre el doctor el martes por la manana",
+        "esta libre el doctor el martes por la mañana",
         "hay hueco para hoy a las tres",
-        "tiene ora disponible esta semana",
-        "puedo agendar para manana",
-        "tiene libre el lune",
-        "hay hora para esta semana",
+        "tiene hora disponible esta semana",
+        "puedo agendar para mañana",
+        "tiene libre el lunes",
+        "hay disponibilidad para esta semana",
+        "cuando tienen hora disponible",
+        "que horas tienen para el viernes",
     ],
     INTENT["VER_MIS_CITAS"]: [
         "tengo alguna cita agendada",
         "cuando es mi hora",
-        "mis citas proximas",
+        "mis citas próximas",
         "confirmame el turno que reserve",
         "quiero saber si tengo hora",
-        "tengo cita para manana",
+        "tengo cita para mañana",
         "revisar mis reservas",
+        "ver mis citas",
+        "que citas tengo",
     ],
     INTENT["SALUDO"]: [
         "hola buenos dias",
         "buenas tardes doctor",
-        "ola como esta",
+        "hola como esta",
         "saludos necesito ayuda",
         "buenas noches",
-        "ola",
+        "hola",
+        "buenas",
     ],
     INTENT["DESPEDIDA"]: [
         "chau gracias",
@@ -80,13 +95,26 @@ CORPUS: Final[dict[str, list[str]]] = {
         "hasta luego",
         "nos vemos gracias por todo",
         "chao",
+        "hasta pronto",
     ],
     INTENT["AGRADECIMIENTO"]: [
         "muchas gracias",
-        "gracias po",
+        "gracias por favor",
         "te agradezco mucho",
         "gracias doctor",
         "mil gracias",
+        "muy amable gracias",
+    ],
+    INTENT["URGENCIA"]: [
+        "necesito atención urgente",
+        "es una emergencia",
+        "urgente por favor inmediatamente",
+        "necesito ayuda urgente de inmediato",
+        "tengo urgencia médica",
+        "es urgente necesito doctor",
+        "inmediatamente necesito atención",
+        "mi hijo tiene fiebre muy alta urgente",
+        "dolor muy fuerte necesito médico ya",
     ],
 }
 
@@ -139,37 +167,48 @@ STOP_WORDS: Final[set[str]] = {
     "menos",
     "bien",
     "asi",
-    "necesito",
-    "quiero",
-    "puedo",
-    "debo",
 }
 
+# Solo entradas que el preprocessor NO cubre (residuales post-pipeline).
+# Las entradas idempotentes y las que ya maneja el preprocessor fueron eliminadas.
 TYPO_MAP: Final[dict[str, str]] = {
-    "kiero": "quiero",
-    "ora": "hora",
-    "lune": "lunes",
-    "vierne": "viernes",
-    "kansela": "cancela",
-    "kanselame": "cancelame",
-    "reprograma": "reprograma",
-    "kambiar": "cambiar",
-    "sita": "cita",
-    "truno": "turno",
-    "konsulta": "consulta",
-    "agendar": "agendar",
-    "manana": "mañana",
-    "atencion": "atencion",
-    "configuro": "configurar",
-    "agendada": "agendada",
-    "reservada": "reservada",
-    "bieres": "viernes",
-    "pal": "para el",
-    "orita": "ahora",
-    "po": "",
-    "weon": "",
     "libre": "disponible",
+    "configuro": "configurar",
 }
+
+
+def _keyword_match(tokens: list[str]) -> tuple[str, float] | None:
+    """Pre-TF-IDF: retorna intent si hay match exacto de keyword en tokens.
+
+    Usa INTENT_KEYWORDS de _constants. Solo activa para keywords de 1 token
+    (las multi-palabra son menos confiables sin contexto).
+    Retorna None si no hay match — se delega a TF-IDF.
+    """
+    token_set = set(tokens)
+    priority_order = [
+        INTENT["URGENCIA"],
+        INTENT["SALUDO"],
+        INTENT["DESPEDIDA"],
+        INTENT["AGRADECIMIENTO"],
+        INTENT["CREAR_CITA"],
+        INTENT["CANCELAR_CITA"],
+        INTENT["REAGENDAR_CITA"],
+        INTENT["VER_MIS_CITAS"],
+        INTENT["VER_DISPONIBILIDAD"],
+    ]
+    kw_map: dict[str, list[str]] = INTENT_KEYWORDS
+    for intent in priority_order:
+        keywords = kw_map.get(intent, [])
+        for kw in keywords:
+            kw_tokens = kw.lower().split()
+            if all(t in token_set for t in kw_tokens):
+                confidence_key = f"{intent}_exact" if len(kw_tokens) == 1 else f"{intent}_phrase"
+                confidence = RULE_CONFIDENCE_VALUES.get(
+                    confidence_key,
+                    RULE_CONFIDENCE_VALUES.get("greeting_exact", 0.9),
+                )
+                return intent, confidence
+    return None
 
 
 def _normalize(text: str) -> list[str]:
@@ -238,12 +277,12 @@ class ModelData(TypedDict):
 
 
 # Model singleton
-_MODEL: ModelData | None = None
+_model_cache: ModelData | None = None
 
 
 def _get_model() -> ModelData:
-    global _MODEL
-    if _MODEL is None:
+    global _model_cache
+    if _model_cache is None:
         intents = list(CORPUS.keys())
         intent_docs_arr = []
         for intent in intents:
@@ -252,12 +291,12 @@ def _get_model() -> ModelData:
                 intent_docs_arr.append(_normalize(doc))
 
         idf = _compute_idf(intent_docs_arr)
-        _MODEL = {
+        _model_cache = {
             "idf": idf,
             "intents": intents,
             "corpus": {intent: [_normalize(d) for d in docs] for intent, docs in CORPUS.items()},
         }
-    return _MODEL
+    return _model_cache
 
 
 class ScoreEntry(TypedDict):
@@ -271,14 +310,59 @@ class TfIdfResult(TypedDict):
     scores: list[ScoreEntry]
 
 
+def extract_entities(text: str) -> dict[str, str]:
+    """Extract date/time entities from normalized text.
+
+    Returns dict with any subset of: day, relative_date, time.
+    All values are strings — compatible with OrchestratorInput.entities.
+    Does NOT query DB — only pattern/keyword matching on text.
+    """
+    entities: dict[str, str] = {}
+    text_lower = text.lower()
+    tokens = set(text_lower.split())
+
+    # Day of week (uses stripped/unaccented form for matching)
+    for day_key, day_display in DAY_NAMES.items():
+        if day_key in tokens:
+            entities["day"] = day_display
+            break
+
+    # Relative date (hoy, mañana, manana)
+    for rel in RELATIVE_DATES:
+        rel_norm = rel.replace("ñ", "n")
+        if rel in tokens or rel_norm in tokens:
+            entities["relative_date"] = rel
+            break
+
+    # Time: "a las HH" or "a las HH:MM"
+    time_match = re.search(r"a las (\d{1,2})(?::(\d{2}))?", text_lower)
+    if time_match:
+        hour = time_match.group(1).zfill(2)
+        minute = time_match.group(2) or "00"
+        entities["time"] = f"{hour}:{minute}"
+
+    return entities
+
+
 def classify_intent(text: str) -> TfIdfResult:
-    """Classifies the user intent using TF-IDF and Cosine Similarity."""
+    """Classifies intent. Keyword match first, TF-IDF as fallback."""
     model = _get_model()
     query_tokens = _normalize(text)
 
     if not query_tokens:
         return {"intent": INTENT["DESCONOCIDO"], "confidence": 0.0, "scores": []}
 
+    # Layer 1: keyword match (fast, deterministic)
+    kw_result = _keyword_match(query_tokens)
+    if kw_result is not None:
+        kw_intent, kw_confidence = kw_result
+        return {
+            "intent": kw_intent,
+            "confidence": kw_confidence,
+            "scores": [{"intent": kw_intent, "score": kw_confidence}],
+        }
+
+    # Layer 2: TF-IDF cosine similarity
     query_tf = _compute_tf(query_tokens)
     scores: list[ScoreEntry] = []
 
@@ -300,7 +384,10 @@ def classify_intent(text: str) -> TfIdfResult:
     top_score = scores[0]["score"] if scores else 0.0
     second_score = scores[1]["score"] if len(scores) > 1 else 0.0
     gap = top_score - second_score
-    confidence = min(0.5 + gap * 3.0 + top_score * 2.0, 0.95)
+    if top_score == 0.0:
+        confidence = 0.0
+    else:
+        confidence = min(0.5 + gap * 3.0 + top_score * 2.0, 0.95)
 
     return {
         "intent": scores[0]["intent"] if scores else INTENT["DESCONOCIDO"],

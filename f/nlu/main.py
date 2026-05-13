@@ -16,8 +16,8 @@ from __future__ import annotations
 
 from typing import TypedDict
 
-from ._constants import INTENT
-from ._tfidf_classifier import classify_intent
+from ._constants import ESCALATION_THRESHOLDS, INTENT
+from ._tfidf_classifier import classify_intent, extract_entities
 
 """
 PRE-FLIGHT
@@ -34,7 +34,7 @@ Zod Schemas      : NO — manual dict validation for wmill compatibility
 class ExtractedIntent(TypedDict):
     intent: str
     confidence: float
-    entities: dict[str, object]
+    entities: dict[str, str]
     requires_human: bool
 
 
@@ -49,38 +49,31 @@ async def _main_async(args: dict[str, object]) -> ExtractedIntent:
 
     # 1. Intent Classification
     result = classify_intent(text)
+    entities = extract_entities(text)
 
     # 2. Determine if human escalation is required
-    requires_human = result["intent"] == INTENT["URGENCIA"] or result["confidence"] < 0.4
+    requires_human = (
+        result["intent"] == INTENT["URGENCIA"]
+        or result["confidence"] < ESCALATION_THRESHOLDS["tfidf_minimum"]
+        or result["confidence"] == 0.0
+    )
 
     return {
         "intent": result["intent"],
         "confidence": result["confidence"],
-        "entities": {},
+        "entities": entities,
         "requires_human": requires_human,
     }
 
 
-def main(args: dict[str, object]) -> dict[str, object]:
+def main(args: dict[str, object]) -> ExtractedIntent:
     import asyncio
-    import traceback
-    from typing import cast
-
-    from pydantic import BaseModel
 
     try:
-        result = asyncio.run(_main_async(args))
-        if result is None:
-            return {}
-
-        if isinstance(result, BaseModel):
-            return cast("dict[str, object]", result.model_dump())
-        elif isinstance(result, dict):
-            return cast("dict[str, object]", result)
-        else:
-            return {"data": result}
-
+        return asyncio.run(_main_async(args))
     except Exception as e:
+        import traceback
+
         tb = traceback.format_exc()
         try:
             from ..internal._wmill_adapter import log
