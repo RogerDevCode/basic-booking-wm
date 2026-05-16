@@ -96,7 +96,7 @@ async def test_handle_create_booking_all_fields_present_calls_create_module() ->
 
 
 @pytest.mark.asyncio
-async def test_handle_create_booking_create_failure_sets_success_false() -> None:
+async def test_handle_create_booking_create_failure_raises_runtime_error() -> None:
     conn = AsyncMock()
     input_data = _make_input(provider_id="prov-1", service_id="svc-1", date="2026-05-10", time="09:00")
 
@@ -109,9 +109,6 @@ async def test_handle_create_booking_create_failure_sets_success_false() -> None
             "f.booking_create.main.run_create_booking",
             AsyncMock(side_effect=RuntimeError("Slot already taken")),
         ),
+        pytest.raises(RuntimeError, match="Create booking failed: Slot already taken"),
     ):
-        result = await handle_create_booking(conn, input_data, _make_delegates())
-
-    assert result is not None
-    assert result["success"] is False
-    assert "❌" in result["message"]
+        await handle_create_booking(conn, input_data, _make_delegates())

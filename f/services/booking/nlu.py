@@ -150,7 +150,7 @@ def _normalize(text: str) -> list[str]:
     text = text.lower().strip()
     text = "".join(c for c in unicodedata.normalize("NFD", text) if unicodedata.category(c) != "Mn")
     text = re.sub(r"[?¿!¡.,;:()]", " ", text)
-    result = []
+    result: list[str] = []
     for w in text.split():
         mapped = TYPO_MAP.get(w, w)
         if len(mapped) > 1 and mapped not in STOP_WORDS:
@@ -221,7 +221,7 @@ def classify_intent(text: str) -> TfIdfResult:
         return {"intent": INTENT_DESCONOCIDO, "confidence": 0.0}
 
     q_tf = _compute_tf(q_tokens)
-    scores = []
+    scores: list[tuple[float, str]] = []
     for intent in model["intents"]:
         max_s = max([_cosine_similarity(q_tf, _compute_tf(d), model["idf"]) for d in model["corpus"][intent]] or [0.0])
         scores.append((max_s, intent))

@@ -39,4 +39,10 @@ if [ -z "${MCP_TOKEN:-}" ]; then
   exit 1
 fi
 
-exec codex "$@"
+WM_BASE_URL_NORMALIZED="${WM_BASE_URL%/}"
+MCP_URL="${WM_BASE_URL_NORMALIZED}/api/mcp/w/${WORKSPACE_ID}/mcp"
+
+exec codex \
+  -c "mcp_servers.windmill.url=\"${MCP_URL}\"" \
+  -c 'mcp_servers.windmill.bearer_token_env_var="MCP_TOKEN"' \
+  "$@"

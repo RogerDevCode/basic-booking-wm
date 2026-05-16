@@ -9,7 +9,8 @@
 #   "beartype>=0.19.0",
 #   "returns>=0.24.0",
 #   "redis>=7.4.0",
-#   "typing-extensions>=4.12.0"
+#   "typing-extensions>=4.12.0",
+#   "pyjwt>=2.8.0"
 # ]
 # ///
 from __future__ import annotations
@@ -37,10 +38,7 @@ MODULE = "auth_provider"
 
 async def _main_async(args: dict[str, object]) -> dict[str, object]:
     # 1. Validate Input
-    try:
-        input_data = InputSchema.model_validate(args)
-    except Exception as e:
-        raise RuntimeError(f"Validation error: {e}") from e
+    input_data = InputSchema.model_validate(args)
 
     conn = await create_db_client()
     try:
@@ -56,8 +54,6 @@ async def _main_async(args: dict[str, object]) -> dict[str, object]:
             raise RuntimeError(f"unsupported_action: {input_data.action}")
 
         result = await with_tenant_context(conn, input_data.tenant_id, operation)
-        if result is None:
-            raise RuntimeError("Auth provider returned no result")
         return result
 
     except Exception as e:

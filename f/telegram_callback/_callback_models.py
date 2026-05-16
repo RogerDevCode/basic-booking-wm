@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Protocol, TypedDict
+from typing import Protocol, Required, TypedDict
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -17,12 +17,12 @@ class InputSchema(BaseModel):
 
 
 class ActionContext(TypedDict, total=False):
-    botToken: str
-    tenantId: str
-    booking_id: str
-    client_id: str | None
-    chat_id: str
-    callback_query_id: str
+    botToken: Required[str]
+    tenantId: Required[str]
+    booking_id: Required[str]
+    client_id: Required[str | None]
+    chat_id: Required[str]
+    callback_query_id: Required[str]
     date: str | None
     time: str | None
 

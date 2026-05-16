@@ -23,13 +23,14 @@ LAW-10  NO SIDE-EFFECTS @ TOP LEVEL
 LAW-11  ZERO REMOTE OVERHEAD → NO internal task_script  
 LAW-12  TOP-LEVEL IMPORTS ONLY → NO lazy imports  
 LAW-13  ONE EVENT LOOP → NO asyncio.run inside main_async  
+LAW-14  EXCEPT = LOG + RAISE → NO silent swallow, NO error dict return  
 
 ---
 
 ## STACK
 
 PYTHON: 3.13 (MANDATORY EXCLUSIVITY)  
-- Absolutely NO Python 3.12 references allowed.
+- Absolutely NO Python references below 3.13 allowed.
 - All libraries, packages, scripts, locks, and environment logic MUST assume and require Python 3.13.
 PKG   : uv  
 LINT  : ruff  
@@ -161,6 +162,8 @@ WM-07 task() y workflow() PARA ORQUESTACIÓN Y PARALELISMO
 WM-08 PARTIAL FAIL → EXPLICIT  
 WM-09 PEP 723 INLINE METADATA MANDATORY
 WM-10 LOCK FILES MUST USE `# py: 3.13` (OVERRIDES PEP 723)
+WM-11 get_variable/get_resource → silent fallback (return None + log).
+      get_variable_strict/get_resource_strict → raise on error. Migrate gradually.
 
 ---
 
@@ -381,11 +384,146 @@ SEC-03 NO PLAINTEXT
 
 ---
 
+## EXCEPTION BUBBLING (FAIL-FAST MANDATORY)
+
+PRINCIPLE: Every `except` block MUST log AND re-raise. Errors propagate to the entrypoint. No silent swallowing. No error dict returns.
+
+PATTERN — CORRECT:
+```python
+try:
+    data = await do_something()
+except Exception as e:
+    log("OPERATION_FAILED", error=str(e), traceback=traceback.format_exc(), module=MODULE)
+    raise RuntimeError(f"Operation failed: {e}") from e
+```
+
+RULES:
+
+EB-01  EXCEPT = LOG + RAISE → Every `except` block logs the error, then raises. No exceptions.
+EB-02  ALWAYS USE `from e` → Preserves full stack trace. Never `raise RuntimeError(msg)` without `from e`.
+EB-03  NO ERROR DICT RETURN → Never `return {"success": False, "error": str(e)}`. Windmill sees success=True. Violates LAW-09.
+EB-04  NO `except: pass` → Silent swallow is forbidden. Only allowed in cleanup/finalizer code where failure must not mask the primary error.
+EB-05  NO `err = str(e)` TRAP → Do not capture error as string and continue execution. Raise immediately after logging.
+EB-06  FALLBACKS MUST BE EXPLICIT → If graceful degradation is intentional (e.g., `get_variable` returning None), log the fallback and document why. Use `_strict` variants where fail-fast is required.
+EB-07  ENTRYPOINT WRAPPER PATTERN → Inner `_main_async` has NO try/except. Outer `main()` sync wrapper catches, logs, and raises `RuntimeError`.
+
+FORBIDDEN PATTERNS:
+```python
+# WRONG: Swallows exception, Windmill sees success=True
+except Exception as e:
+    return {"success": False, "error": str(e)}
+
+# WRONG: Silent swallow — error disappears
+except Exception:
+    pass
+
+# WRONG: Captures error but continues execution
+except Exception as e:
+    log("FAILED", error=str(e))
+    err = str(e)
+    data = None
+# ... code continues with err/data ...
+
+# WRONG: Loses stack trace
+except Exception as e:
+    raise RuntimeError(f"Failed: {e}")  # Missing: from e
+```
+
+ENTRYPOINT TEMPLATE:
+```python
+async def _main_async(args: dict[str, Any]) -> dict[str, Any]:
+    # NO try/except here — let exceptions bubble to main()
+    result = await do_work()
+    return {"data": result}
+
+def main(args: dict[str, Any]) -> dict[str, Any]:
+    import asyncio
+    import traceback
+    try:
+        return asyncio.run(_main_async(args))
+    except Exception as e:
+        tb = traceback.format_exc()
+        try:
+            log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=MODULE)
+        except Exception:
+            pass  # Logging failure must not mask the real error
+        raise RuntimeError(f"Execution failed: {e}") from e
+```
+
+---
+
 ## PERFORMANCE
 
 - BATCH OPS  
 - MIN I/O  
 - CACHE WHEN SAFE  
+
+---
+
+## PROMPT ENGINE
+
+> **HEART OF THE LAWS:** every law exists to collapse ambiguity *before* runtime. Fewer reachable states → fewer error states. Strict types + validated boundaries + fail-fast make the syntax/logic error *unrepresentable*, not caught late. Determinism is error-prevention.
+
+### MODE: DEV (default)
+
+Solve the GOAL, not the symptom. Logic first: model the situation → resolve the conflict → pick the deterministic path.  
+Flow: SPEC→MODEL→LOGIC→ENTRY→TEST→GATES→COMMIT. Stop on first gate fail.  
+Conflict priority: correctness > legibility > performance. Ambiguous? Ask once, execute once.  
+Every ABSOLUTE LAW applies. A choice that adds a reachable error state is wrong by default.
+
+---
+
+### MODE: RED TEAM (trigger: `red team` | `audit` | `adversarial`)
+
+Purpose: DESTROY arguments, EXPOSE hidden assumptions, FIND what everyone ignores. 4 lenses, simultaneous:
+
+```
+[SKEPTIC]  Claim=false until proven. Contradictions, missing data, confirmation bias, skipped logic steps.
+[PARANOID] Who benefits? What incentive hides info? Was the "bug" intentional? Trace veiled fail vectors.
+[CHAOTIC]  Inject ignored variables. Destroy base assumptions. What if the real problem is another one?
+[SYSTEMIC] Whole system: hidden deps, SPOF, 2nd/3rd-order effects, dangerous feedback loops.
+```
+
+Protocol (sequential, no skips):
+
+1. **DECONSTRUCT** — list every implicit assumption explicitly. Challenge each separately.  
+2. **ATTACK SURFACE** — every breakpoint, ranked probability × impact. Include the "remote" ones.  
+3. **NON-LINEAR FAILURES** — ≥3 counterintuitive collapses: cascades, points of no return.  
+4. **WHAT'S ABSENT** — what info is missing and why that absence is suspicious/dangerous.  
+5. **BRUTAL VERDICT** — zero euphemisms. Name THE critical vulnerability and why the system collapses catastrophically.
+
+Rules: No solutions unless explicitly asked. Never validate existing work — it distorts the analysis. When something looks solid, dig deeper — superficial solidity is the most dangerous vulnerability. Each euphemism = lost information.
+
+---
+
+### MODE: TEST (trigger: `tests` | `unit tests` | `coverage`)
+
+CPU cap: `pytest -n 2` (max 2 cores). Truth source: **REQUIREMENTS. Code is a suspect, candidate-wrong.**  
+**Independence rule: P1–P4 are CODE-BLIND. Contrast code only at P5.** If code shapes a test's form → contaminated; discard, restart from the requirement.
+
+```
+[P1] SPEC ONLY    — close the code. Cases from contract. Ask: "what GUARANTEES hold regardless of impl?"
+[P2] HOSTILE PART. — zones: happy | exact-boundary | expected-invalid | silent-invalid
+                     | abuse(null, empty, broken-unicode, max-size, negative-where-positive). ≥2/zone.
+[P3] INVARIANTS   — idempotence, symmetry(inverse cancels), monotonicity, conservation. 1 test/property.
+[P4] ANTICIPATED  — race/shared-state, numeric overflow, float-precision loss,
+                     silent corruption (no exception), empty≠null, side-effects in "pure" fns.
+[P5] CONTRACT     — "still valid if impl fully changed?" No → coupled to mechanism, rewrite.
+                     Only now contrast code, for coverage gaps.
+```
+
+Per-test:
+
+```
+NAME             | behavior guaranteed
+ORIGIN           | exact requirement/contract it derives from
+PREMISE          | system state before
+ACTION           | input/event executed
+GUARANTEE        | what the system MUST produce
+FAILURE REVEALED | the specific bug a failure exposes
+```
+
+Rules: test⊥code conflict → **test wins, code is the suspect**. Always-passing test = suspect (zero info). Line coverage is weak; BEHAVIOR coverage is the goal. Every test must kill ≥1 mutant (a deliberate minimal code change).
 
 ---
 
@@ -417,76 +555,77 @@ Validar end-to-end el flujo en Telegram. El flujo debería poder saludar, manten
 <claude-mem-context>
 # Memory Context
 
-# [booking-titanium-wm] recent context, 2026-05-07 1:17pm GMT-4
+# [booking-titanium-wm] recent context, 2026-05-14 12:58pm GMT-4
 
 Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision 🚨security_alert 🔐security_note
 Format: ID TIME TYPE TITLE
 Fetch details: get_observations([IDs]) | Search: mem-search skill
 
-Stats: 50 obs (16,478t read) | 201,982t work | 92% savings
+Stats: 50 obs (15,244t read) | 182,717t work | 92% savings
 
-### May 6, 2026
-S88 Add client overlap validation to prevent double-booking with multiple providers at same time (May 6, 5:55 PM)
-S89 Store frontend role-based permission matrix (client, provider, admin, superuser) in persistent memory to preserve scope (May 6, 6:05 PM)
-S90 Fix booking system validation: verify existing appointments before showing available doctor slots (May 6, 6:25 PM)
-458 7:01p 🔵 Missing Appointment Query Feature Blocks Conflict Validation
-459 " 🟣 Active Booking Detection Query Added to Prefetch Service
-460 7:02p 🔴 Business Rule Validation: Block Doctor Selection if Client Has Active Booking
-461 " ✅ Windmill Entrypoint Updated to Accept and Forward client_id
-462 " ✅ RouterInput Model Extended with prefetch_block_reason Field
-463 " 🟣 Router Implements User-Facing Error Handling for Active Booking Conflicts
-464 " ✅ Flow Configured to Pass client_id to Booking Prefetch Service
-465 " ✅ Router Input Updated to Receive prefetch_block_reason from Flow
-466 7:03p ✅ Changes Validated and Deployed to Production
-S91 Fix booking system that adds 40-minute wait time to first slot; reservations should start at 9:00 AM instead of 9:40 AM. Delete current reservations and reset for tomorrow. (May 6, 7:03 PM)
-467 7:22p 🔵 Buffer time added to service duration causing 40-minute booking offset
-468 7:23p 🔵 Python 3.12 import compatibility error in internal adapter module
-469 " 🔵 TypeIs type guard used across multiple internal modules
-470 " 🔴 Add typing_extensions fallback for TypeIs import compatibility
-471 " 🔴 Apply TypeIs import fallback to FSM state machine module
-473 " 🔴 Type checking passes successfully after removing unnecessary ignore comments
-474 7:24p ✅ TypeIs compatibility fix deployed to Windmill workspace
-475 " 🔵 Deployed TypeIs fix not reflected in Windmill worker execution
-476 7:25p 🔵 Services table shows 10-minute buffer, not 40-minute delay reported by user
-478 " ✅ Old test booking and audit record deleted from database
-479 7:26p 🔴 Remove buffer addition from slot duration calculation in scheduling logic
-480 " ✅ Scheduling buffer fix deployed to Windmill workspace
-S92 Diagnose and fix why booking system won't offer appointments for today despite available hours remaining; implement proper buffer time spacing in slot generation. (May 6, 7:26 PM)
-481 7:30p 🔵 Booking system has no test providers or configured schedules
-482 " 🔵 Roger Gallegos provider is configured with working schedule but only for Thursday
-483 7:32p 🔴 Slot generation now respects buffer time between appointments
-484 " ✅ Availability engine now calculates and passes buffer spacing to slot generation
-485 " 🔵 Slot generation correctly produces 13 appointments for Thursday with 40-minute spacing
-486 " ✅ Buffer spacing fix deployed to production Windmill workspace
-S93 Fix booking confirmation flow - system wasn't allowing appointment confirmation for same-day bookings with remaining hours (May 6, 7:33 PM)
-487 7:38p 🔵 Booking system database state and FSM confirmation flow verified
-488 7:40p 🔴 FSM ConfirmingState now handles numeric button inputs for booking confirmation
-489 " ✅ FSM confirmation state fix deployed to Windmill
-S94 Implement "mis citas" (my appointments) feature for Telegram bot to show clients their active appointments with doctor, date/time, and reference ID. Web frontend enhancements (like appointment history) noted as separate work. (May 6, 7:40 PM)
-490 8:58p 🔵 Mis Citas (My Appointments) Module Currently Stubbed
-491 " 🔵 Booking System Data Structure for Mis Citas Implementation
-492 " 🟣 Added Database Access Parameters to Telegram Router
-493 8:59p 🟣 Implemented Mis Citas (My Appointments) Feature in Telegram Router
-494 " ✅ Activated Mis Citas Feature Handler
-495 " ✅ Wired Client ID and Database URL Through Telegram Webhook Flow
-496 " 🔵 Telegram Router Type Safety Verified
-497 " ✅ Mis Citas Feature Deployed to Windmill
-S95 Format booking reference IDs with dash grouping (F13E0DEF → F1-3E0-DEF) for improved readability across all user-facing messages (May 6, 9:00 PM)
-498 9:04p 🔵 Short ID reference generation mapped across booking system
-499 9:05p 🔵 Telegram webhook flow references booking short ID in display template
-500 " 🟣 Booking reference formatting with grouped display
-501 " 🟣 Booking confirmation reference formatting applied
-502 " 🟣 Reminder cron reference formatting applied
-503 9:06p ✅ Reference formatting changes deployed to Windmill
-S96 Create and save a detailed implementation plan for improving the Reminder Module menu in booking-titanium-wm, optimized for LLM readability and continuation in future sessions. (May 6, 9:06 PM)
-504 9:18p 🔵 Existing Reminder System Architecture and Preferences Storage
-505 " 🔵 Reminder Configuration UI and Message Handler Pattern
-506 9:19p 🔵 Hardcoded Reminder Windows and Current Notification Dispatch Pattern
-507 9:21p ⚖️ Comprehensive Reminder System Refactoring Plan: Expandable Windows, Channel Abstraction, Telegram UI Integration
-508 9:31p ⚖️ Reminder Module Expansion Plan — 7-Window Architecture with Quiet Hours
-S97 User initiated primary session with greeting "hi" (May 6, 10:03 PM)
-### May 7, 2026
-509 11:27a ⚖️ Critical review and architectural revision of reminder menu improvement plan
+### May 12, 2026
+S148 Execute NLU refactor plan and integrate NLU classification into telegram router as fallback for unrecognized idle messages (May 12, 11:52 PM)
+### May 13, 2026
+S150 Red team security and correctness audit of booking-titanium-wm active Telegram subgraph; two-front inspection of code and message flow to identify bugs, silent failures, and gaps (May 13, 12:02 AM)
+### May 14, 2026
+S151 Red team security and correctness audit of booking-titanium-wm Telegram subgraph; identification and fix of critical bugs preventing message flow and state corruption (May 14, 8:43 AM)
+S152 Continue red team security audit of booking-titanium-wm Telegram system from previous session. Session 1 completed 4 CRITICAL fixes. Session 2 focused on HIGH-severity issues preventing proper message flow and causing state corruption. Goal: identify and fix bugs, ensure all errors are logged and handled (no silent failures). (May 14, 8:56 AM)
+S153 Remove mock Redis fixtures from test configuration to use real data instead of simulations (May 14, 9:10 AM)
+S154 Critical review of CPU inefficiency claim: duplicate webhook handling and deduplication ordering in Telegram webhook flow (May 14, 9:17 AM)
+S155 Move deduplication logic and address network coupling in transaction (calendar.sync blocking user on Telegram); assess architectural debt in booking confirmation flow. (May 14, 9:30 AM)
+984 9:37a 🔄 Telegram webhook flow reordered to filter duplicates before full processing
+985 9:41a ✅ Telegram webhook flow deployed with early deduplication optimization
+S156 Investigate and clarify what `calendar.sync()` does in the booking service architecture (May 14, 9:41 AM)
+986 9:47a 🔵 Calendar synchronization integration in booking service
+987 " 🔵 CalendarPort protocol and GCalClient stub implementation
+S157 Root cause analysis of telegram webhook flow latency and design of solution to collapse 14 sequential steps into 3 optimized steps for project relaunch (May 14, 9:47 AM)
+988 9:50a 🔵 Telegram webhook flow structure analysis
+989 9:51a 🔵 Missing telegram_auto_register module implementation
+990 9:54a 🔵 Hot-path module entry point signatures and location discovery
+991 " 🔵 Hot-path module parameter contracts and operational patterns
+992 " 🔵 Router and conversation state management module signatures
+993 " 🔵 PEP 723 dependency declarations for message_preprocessor and telegram_auto_register
+994 9:55a 🔵 Consolidated dependency footprint for database-intensive modules
+995 " 🟣 First mega-step: consolidated intake.py combining parser, deduplication, preprocessing
+996 9:56a 🟣 Second mega-step: consolidated process.py orchestrating 7 business logic operations
+997 9:57a ✅ Updated telegram_webhook__flow.yaml to Phase 5 architecture with 3-step collapse
+998 9:59a 🟣 Deployed Phase 5 collapsed flow to Windmill production
+S158 Refactor telegram webhook flow to reduce latency by collapsing 14 sequential Windmill steps into 3-step architecture (intake → process → respond), then deploy Phase 5 to production (May 14, 9:59 AM)
+999 10:25a 🔵 Synchronous Coupling Risk in Booking Core Service
+1000 " ⚖️ Transactional Outbox Pattern for Eventual Consistency
+1001 " 🔵 Confirmed Synchronous Notifier Coupling in Three Core Operations
+1002 " 🔵 Booking Repository Already Includes gcal_sync_status Column
+1003 10:26a 🔴 Removed Synchronous Coupling in Booking Core Service
+1004 10:27a 🔵 Breaking Change: Booking Confirm Entry Point Still Passes Removed Parameters
+1005 " ✅ Removed Unused Adapter Imports from Booking Confirm Entry Point
+1006 " 🔴 Fixed Booking Confirm Call Site to Match Refactored Signature
+1007 " 🔵 Incomplete Refactoring: Multiple Call Sites Still Pass Removed Adapter Parameters
+1008 10:28a ✅ Removed Unused Adapter Imports from Booking Orchestrator
+1009 " 🔴 Fixed Create Booking Call in Orchestrator Handler
+1010 " 🔴 Fixed Cancel Booking Call in Orchestrator Handler
+1011 10:29a 🔴 Fixed Reschedule Booking Call in Orchestrator Handler
+1012 " ✅ Removed Unused Adapter Imports from Telegram Callback Router
+1013 " 🔴 Fixed Cancel Booking Call in Telegram Callback Router
+1014 " 🔴 Fixed Reschedule Booking Call in Telegram Callback Router
+1015 10:30a 🔵 Refactoring Complete: No Remaining Synchronous Adapter Calls
+1016 " 🔵 Test Suite Breaks Due to Refactored Function Signatures
+1017 10:31a 🔴 Fixed Test Suite Call Sites to Match Refactored Function Signatures
+1018 " 🔵 Obsolete Tests: Verifying Removed Synchronous Behavior
+1019 " 🔵 Test Assertions Will Fail: Unused Mock Calls Not Verified
+1020 10:32a 🔴 Refactored Test to Verify New Eventual Consistency Behavior
+1021 " 🔴 Refactored Cancel Booking Test to Verify New Behavior
+1022 " 🔴 Refactored Reschedule Booking Test to Verify New Behavior
+1023 " 🔄 Removed Unused Mock Helpers from Test Suite
+1024 10:33a ✅ Removed Unnecessary Type Ignore Comment from Intake Module
+1025 " ✅ Simplified Type Casting in Process Module with Type Ignore Comment
+1026 " 🔵 Syntax Error Introduced: Invalid Unpacking Operator in Function Call
+1027 10:34a 🔴 Fixed Syntax Error: Removed Invalid Unpacking Operator
+1028 " 🔵 Remaining Type Check Error: Returning Any from dict[str, Any] Return Type
+1029 " 🔴 Restored Type Ignore Comment to Suppress Valid But Unprovable Warning
+1030 " 🔵 Conflicting Mypy Errors: Unused Type Ignore Comment and Unignored Warning
+1031 10:35a ✅ Added cast Import to Support Type-Safe Return Value Handling
+1032 " 🔴 Replaced Type Ignore with Explicit cast() for Type Safety
+1033 10:36a 🔵 Refactoring Complete: Type Checking Passes and Full Test Suite Succeeds
 
-Access 202k tokens of past work via get_observations([IDs]) or mem-search skill.
+Access 183k tokens of past work via get_observations([IDs]) or mem-search skill.
 </claude-mem-context>

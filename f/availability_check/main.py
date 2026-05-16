@@ -82,8 +82,8 @@ async def run_availability_check(conn: DBClient, args: dict[str, Any]) -> dict[s
         return res
 
     result = await with_tenant_context(conn, input_data.tenant_id, operation)
-    if result is None:
-        raise RuntimeError("availability_check returned no result")
+    #     if result is None:
+    #         raise RuntimeError("availability_check returned no result")
     return cast("dict[str, Any]", result)
 
 
@@ -111,8 +111,8 @@ def main(args: InputSchema | dict[str, Any]) -> dict[str, Any]:
 
         result = asyncio.run(main_async(validated.model_dump()))
 
-        if result is None:
-            return {}
+        #         if result is None:
+        #             return {}
 
         return result
 

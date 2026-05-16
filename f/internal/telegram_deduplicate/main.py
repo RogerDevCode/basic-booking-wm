@@ -30,10 +30,13 @@ async def _main_async(
     chat_id: str,
     redis_url: str | None = None,
 ) -> dict[str, object]:
+    # DECISION (Fail-Open on Missing ID):
+    # If a payload lacks an update_id (e.g., synthetic triggers or malformed webhooks),
+    # we cannot deduplicate it. We allow it to proceed to avoid dropping valid internal events.
     if not update_id:
         return {"duplicate": False, "update_id": update_id}
 
-    redis = await create_redis_client()
+    redis = await create_redis_client(redis_url)
     try:
         key = f"dedup:upd:{update_id}"
         # SET NX — atomically sets only if key doesn't exist
@@ -45,8 +48,10 @@ async def _main_async(
 
         return {"duplicate": is_duplicate, "update_id": update_id}
     except Exception as e:
-        # FAIL CLOSED: Redis failure means we CANNOT verify deduplication.
-        # Windmill will retry the webhook automatically.
+        # DECISION (Fail-Closed on Redis Down):
+        # Redis is a hard dependency. If Redis is down, we cannot verify deduplication.
+        # Failing closed (raising an error) forces Windmill to pause/retry the webhook,
+        # preventing race conditions and duplicate bookings downstream.
         log("DEDUP_REDIS_ERROR", error=str(e), update_id=update_id, module=MODULE)
         raise RuntimeError(f"Redis deduplication unavailable: {e}") from e
     finally:

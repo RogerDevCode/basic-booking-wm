@@ -183,11 +183,10 @@ class TagRepository:
                     fields.append(f"{field} = ${idx}")
                     params.append(val)
                     idx += 1
-            if input_data.category_id:
-                if "category_id" in _ALLOWED:
-                    fields.append(f"category_id = ${idx}::uuid")
-                    params.append(input_data.category_id)
-                    idx += 1
+            if input_data.category_id and "category_id" in _ALLOWED:
+                fields.append(f"category_id = ${idx}::uuid")
+                params.append(input_data.category_id)
+                idx += 1
 
             if not fields:
                 raise RuntimeError("update_failed: no fields")

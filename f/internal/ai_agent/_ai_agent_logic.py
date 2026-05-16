@@ -11,8 +11,41 @@ from ._constants import (
     GREETING_PHRASES,
     GREETINGS,
     INTENT,
+    THANK_YOU_WORDS,
     URGENCY_WORDS,
 )
+
+# ============================================================================
+# FSM ROUTING DECISION
+# ============================================================================
+
+_FSM_INTENTS: frozenset[str] = frozenset({"crear_cita", "cancelar_cita", "reagendar_cita", "ver_disponibilidad"})
+
+_FSM_ACTIVE_STATES: frozenset[str] = frozenset(
+    {
+        "selecting_specialty",
+        "selecting_doctor",
+        "selecting_time",
+        "confirming",
+        "needs_registration",
+        "reg_confirming_name",
+        "reg_entering_name",
+        "reg_collecting_phone",
+        "reg_collecting_email",
+        # reminders_config is handled by fsm_router delegating to _router_reminders.py.
+        # We keep it here to ensure that free-text inputs while in this state
+        # are routed through the FSM protector.
+        "reminders_config",
+    }
+)
+
+
+def compute_requires_fsm_routing(intent: str, booking_state_name: str) -> bool:
+    """Returns True if this message must go through the FSM router."""
+    if booking_state_name in _FSM_ACTIVE_STATES:
+        return True
+    return intent in _FSM_INTENTS and booking_state_name == "idle"
+
 
 # ============================================================================
 # CONTEXT-AWARE INTENT ADJUSTMENT
@@ -239,4 +272,7 @@ def detect_social(text: str) -> tuple[str, float] | None:
         return cast("tuple[str, float]", (INTENT["DESPEDIDA"], 0.95))
     if any(p in lower for p in farewell_phrases):
         return cast("tuple[str, float]", (INTENT["DESPEDIDA"], 0.9))
+    thank_you_words: list[str] = get_nlu_rule("thank_you_words", []) or THANK_YOU_WORDS
+    if lower in thank_you_words or any(p in lower for p in thank_you_words):
+        return cast("tuple[str, float]", (INTENT["AGRADECIMIENTO"], 0.95))
     return None

@@ -75,7 +75,7 @@ async def retry_dlq(db: DBClient, dlq_id: int | None) -> dict[str, Any]:
             FOR UPDATE SKIP LOCKED
             """
         )
-        retried_ids = []
+        retried_ids: list[int] = []
         for r in rows:
             await db.execute("UPDATE booking_dlq SET updated_at = NOW() WHERE dlq_id = $1", r["dlq_id"])
             retried_ids.append(int(cast("Any", r["dlq_id"])))

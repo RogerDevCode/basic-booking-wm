@@ -74,9 +74,9 @@ async def test_main_async_context_resolution_failure_returns_error() -> None:
             "f.booking_orchestrator.main.resolve_context",
             AsyncMock(side_effect=RuntimeError("no tenant")),
         ),
+        pytest.raises(RuntimeError),
     ):
-        with pytest.raises(RuntimeError):
-            await main(
-                {"intent": "mis_citas", "telegram_chat_id": "123", "entities": {}},
-                _make_delegates(),
-            )
+        await main(
+            {"intent": "mis_citas", "telegram_chat_id": "123", "entities": {}},
+            _make_delegates(),
+        )

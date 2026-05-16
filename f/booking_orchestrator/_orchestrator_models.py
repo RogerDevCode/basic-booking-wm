@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Literal, TypedDict
+from typing import Literal, Required, TypedDict
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -55,10 +55,10 @@ class OrchestratorInput(BaseModel):
 
 
 class OrchestratorResult(TypedDict, total=False):
-    action: str
-    success: bool
+    action: Required[str]
+    success: Required[bool]
+    message: Required[str]
     data: object
-    message: str
     follow_up: str | None
     inline_buttons: list[list[dict[str, str]]] | None
     nextState: object | None

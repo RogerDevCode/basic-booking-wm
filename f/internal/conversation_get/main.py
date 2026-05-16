@@ -29,7 +29,7 @@ MODULE: Final[str] = "conversation_get"
 
 @beartype
 async def _get_conversation(chat_id: str, redis_url: str | None = None) -> ConversationGetResult:
-    redis = await create_redis_client()
+    redis = await create_redis_client(redis_url)
     try:
         key = f"conv:{chat_id}"
         raw = await redis.get(key)
@@ -53,7 +53,7 @@ async def _get_conversation(chat_id: str, redis_url: str | None = None) -> Conve
             return ConversationGetResult(data=state)
         except Exception as e:
             log("CONVERSATION_PARSE_ERROR", error=str(e), chat_id=chat_id, module=MODULE)
-            return ConversationGetResult(data=None)
+            raise RuntimeError(f"Conversation parse error: {e}") from e
 
     except Exception as e:
         log("REDIS_GET_ERROR", error=str(e), chat_id=chat_id, module=MODULE)

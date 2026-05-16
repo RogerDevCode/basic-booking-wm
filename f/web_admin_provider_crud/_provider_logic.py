@@ -160,14 +160,14 @@ async def update_provider(db: DBClient, input_data: InputSchema) -> ProviderRow:
 
 
 async def reset_provider_password(db: DBClient, provider_id: str) -> ProviderRow:
-    import random
+    import secrets
     import string
 
     from ..internal._crypto import hash_password
 
     try:
         chars = string.ascii_letters + string.digits
-        temp_pwd = "".join(random.choice(chars) for _ in range(8))
+        temp_pwd = "".join(secrets.choice(chars) for _ in range(8))
         pwd_hash = hash_password(temp_pwd)
 
         rows = await db.fetch(

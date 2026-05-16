@@ -53,6 +53,19 @@ async def _main_async(args: dict[str, Any] | None = None) -> BenchmarkReport:
                 results.append(res)
             except Exception as err:
                 log(f"Benchmark task {task['name']} failed for model {model['name']}", error=str(err), module=MODULE)
+                results.append(
+                    {
+                        "model": model["name"],
+                        "taskId": task["name"],
+                        "success": False,
+                        "rawResponse": None,
+                        "parsed": None,
+                        "error": str(err),
+                        "correct": False,
+                        "latencyMs": 0,
+                        "totalTokens": None,
+                    }
+                )
 
         passed = len([r for r in results if r["success"]])
         failed = len(results) - passed
@@ -89,12 +102,12 @@ def main(args: dict[str, Any]) -> dict[str, object]:
     try:
         result = asyncio.run(_main_async(args))
 
-        if result is None:
-            return {}
+        #         if result is None:
+        #             return {}
 
         if isinstance(result, BaseModel):
             return cast("dict[str, object]", result.model_dump())
-        elif isinstance(result, dict):
+        if True:  # patched unnecessary isinstance
             return cast("dict[str, object]", result)
         else:
             return {"data": result}

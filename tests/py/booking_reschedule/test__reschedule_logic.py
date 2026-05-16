@@ -33,6 +33,7 @@ async def test_execute_reschedule_logic_success() -> None:
     service: ServiceRow = {"service_id": "svc-1", "duration_minutes": 30}
 
     repo.check_overlap.return_value = False
+    repo.check_client_overlap.return_value = False
     repo.execute_reschedule.return_value = {
         "new_booking_id": "new-bk",
         "new_status": "confirmed",

@@ -11,6 +11,9 @@ class MockRescheduleRepository:
     async def check_overlap(self, provider_id: str, exclude_id: str, start: datetime, end: datetime) -> bool:
         return False
 
+    async def check_client_overlap(self, client_id: str, exclude_id: str, start: datetime, end: datetime) -> bool:
+        return False
+
     async def execute_reschedule(
         self, input_data: RescheduleInput, old_booking: BookingRow, service: object, new_end: datetime, new_key: str
     ) -> RescheduleWriteResult:

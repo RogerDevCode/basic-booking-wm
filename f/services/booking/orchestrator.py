@@ -8,18 +8,15 @@ from f.availability_check._availability_models import InputSchema as Availabilit
 from f.internal._db_client import create_db_client
 from f.internal.scheduling_engine import get_availability
 from f.services.booking._booking_errors import (
-    BookingAlreadyCancelledError,
-    BookingAlreadyRescheduledError,
+    BookingMissingParamsError,
+    BookingNoServiceError,
     BookingNotFoundError,
-    BookingPermissionError,
-    BookingSlotUnavailableError,
 )
 from f.services.booking._booking_models import (
     BookingCancelRequest,
     BookingCreateRequest,
     BookingRescheduleRequest,
 )
-from f.services.booking.adapters import GCalClient, TelegramClient
 from f.services.booking.core import cancel_booking, create_booking, reschedule_booking
 from f.services.booking.repo import PgBookingRepo
 
@@ -83,10 +80,17 @@ async def _handle_crear_cita(intent: dict[str, Any], conn: DBClient, repo: PgBoo
     start_time_str = f"{date_str}T{time_str}:00"
     try:
         start_dt = datetime.fromisoformat(start_time_str.replace("Z", "+00:00"))
-    except ValueError:
-        msg = f"❌ Formato de fecha/hora inválido: {date_str} {time_str}"
-        return {"action": "crear_cita", "success": False, "message": msg}
-    end_dt = start_dt + timedelta(minutes=30)
+    except ValueError as exc:
+        raise BookingMissingParamsError(f"invalid_datetime:{date_str}T{time_str}") from exc
+
+    duration_row = await repo.db.fetchrow(
+        "SELECT duration_minutes FROM services WHERE service_id = $1::uuid LIMIT 1",
+        str(service_id),
+    )
+    duration_minutes = (
+        int(str(duration_row["duration_minutes"])) if duration_row and duration_row.get("duration_minutes") else 30
+    )
+    end_dt = start_dt + timedelta(minutes=duration_minutes)
 
     req = BookingCreateRequest(
         client_id=str(client_id),
@@ -97,10 +101,7 @@ async def _handle_crear_cita(intent: dict[str, Any], conn: DBClient, repo: PgBoo
         idempotency_key=f"orch-{client_id}-{provider_id}-{date_str}-{time_str}",
         notes=intent.get("notes"),
     )
-    try:
-        res = await create_booking(req, repo, GCalClient(), TelegramClient())
-    except BookingSlotUnavailableError:
-        return {"action": "crear_cita", "success": False, "message": "❌ Ese horario ya no está disponible."}
+    res = await create_booking(req, repo)
     return {
         "action": "crear_cita",
         "success": True,
@@ -124,7 +125,7 @@ async def _handle_cancelar_cita(intent: dict[str, Any], conn: DBClient, repo: Pg
     entities: dict[str, Any] = intent.get("entities") or {}
     booking_id = intent.get("booking_id") or entities.get("booking_id")
     if not booking_id:
-        return {"action": "cancelar_cita", "success": False, "message": "❌ Necesito el ID de tu cita para cancelarla."}
+        raise BookingMissingParamsError("booking_id required")
 
     client_id = await _resolve_client_id(intent, conn)
     actor_raw = "client" if client_id else intent.get("actor", "system")
@@ -136,12 +137,7 @@ async def _handle_cancelar_cita(intent: dict[str, Any], conn: DBClient, repo: Pg
         actor_id=str(actor_id_raw) if actor_id_raw is not None else None,
         reason=str(intent.get("reason") or "Cancelled by user"),
     )
-    try:
-        res = await cancel_booking(req_cancel, repo, GCalClient(), TelegramClient())
-    except BookingPermissionError:
-        return {"action": "cancelar_cita", "success": False, "message": "❌ No tienes permiso para cancelar esa cita."}
-    except (BookingNotFoundError, BookingAlreadyCancelledError) as exc:
-        return {"action": "cancelar_cita", "success": False, "message": f"❌ No se pudo cancelar: {exc}"}
+    res = await cancel_booking(req_cancel, repo)
     return {
         "action": "cancelar_cita",
         "success": True,
@@ -157,19 +153,24 @@ async def _handle_reagendar_cita(intent: dict[str, Any], conn: DBClient, repo: P
     time_str = intent.get("time") or entities.get("time")
 
     if not booking_id or not (date_str and time_str):
-        return {
-            "action": "reagendar_cita",
-            "success": False,
-            "message": "❌ Necesito el ID de tu cita y el nuevo horario.",
-        }
+        raise BookingMissingParamsError("booking_id, date, time required")
 
     new_start_time_str = f"{date_str}T{time_str}:00"
     try:
         new_start_dt = datetime.fromisoformat(new_start_time_str.replace("Z", "+00:00"))
-    except ValueError:
-        msg = f"❌ Formato de fecha/hora inválido: {date_str} {time_str}"
-        return {"action": "reagendar_cita", "success": False, "message": msg}
-    new_end_dt = new_start_dt + timedelta(minutes=30)
+    except ValueError as exc:
+        raise BookingMissingParamsError(f"invalid_datetime:{date_str}T{time_str}") from exc
+
+    duration_row = await repo.db.fetchrow(
+        "SELECT s.duration_minutes FROM services s "
+        "JOIN bookings b ON b.service_id = s.service_id "
+        "WHERE b.booking_id = $1::uuid LIMIT 1",
+        booking_id,
+    )
+    duration_minutes = (
+        int(str(duration_row["duration_minutes"])) if duration_row and duration_row.get("duration_minutes") else 30
+    )
+    new_end_dt = new_start_dt + timedelta(minutes=duration_minutes)
 
     client_id = await _resolve_client_id(intent, conn)
     actor_raw = "client" if client_id else intent.get("actor", "system")
@@ -182,16 +183,7 @@ async def _handle_reagendar_cita(intent: dict[str, Any], conn: DBClient, repo: P
         actor=actor,  # type: ignore[arg-type]
         actor_id=str(actor_id_raw) if actor_id_raw is not None else None,
     )
-    try:
-        res = await reschedule_booking(req_reschedule, repo, GCalClient(), TelegramClient())
-    except (
-        BookingNotFoundError,
-        BookingAlreadyCancelledError,
-        BookingAlreadyRescheduledError,
-        BookingSlotUnavailableError,
-        BookingPermissionError,
-    ) as exc:
-        return {"action": "reagendar_cita", "success": False, "message": f"❌ No se pudo reagendar: {exc}"}
+    res = await reschedule_booking(req_reschedule, repo)
     return {
         "action": "reagendar_cita",
         "success": True,
@@ -206,11 +198,7 @@ async def _handle_ver_disponibilidad(intent: dict[str, Any], conn: DBClient, rep
     date_str = intent.get("date") or entities.get("date")
 
     if not provider_id or not date_str:
-        return {
-            "action": "ver_disponibilidad",
-            "success": False,
-            "message": "❌ Necesito el proveedor y la fecha para consultar disponibilidad.",
-        }
+        raise BookingMissingParamsError("provider_id, date required")
 
     validated = AvailabilityInputSchema.model_validate(
         {
@@ -221,26 +209,18 @@ async def _handle_ver_disponibilidad(intent: dict[str, Any], conn: DBClient, rep
     )
     provider = await get_provider(conn, validated.provider_id)
     if not provider:
-        return {"action": "ver_disponibilidad", "success": False, "message": "❌ Proveedor no encontrado."}
+        raise BookingNotFoundError(f"provider_not_found:{validated.provider_id}")
 
     service_id = validated.service_id or await get_provider_service_id(conn, validated.provider_id)
     if not service_id:
-        return {
-            "action": "ver_disponibilidad",
-            "success": False,
-            "message": "❌ No hay servicios disponibles para este proveedor.",
-        }
+        raise BookingNoServiceError(f"no_service_for_provider:{validated.provider_id}")
 
     result = await get_availability(
         conn,
         {"provider_id": validated.provider_id, "date": validated.date, "service_id": service_id},
     )
     if not result:
-        return {
-            "action": "ver_disponibilidad",
-            "success": False,
-            "message": "❌ No se pudo obtener disponibilidad.",
-        }
+        raise RuntimeError(f"availability_check_failed:{validated.provider_id}:{validated.date}")
     return {"action": "ver_disponibilidad", "success": True, "data": result}
 
 
@@ -361,11 +341,7 @@ async def route_intent(intent: dict[str, Any]) -> dict[str, Any]:
         "mis_citas",
         "consultar_cita",
     ):
-        return {
-            "action": "desconocido",
-            "success": False,
-            "message": "No entendí tu solicitud. ¿Podrías ser más específico (ej: 'agendar cita', 'cancelar turno')?",
-        }
+        raise ValueError(f"unknown_intent:{intent_type}")
 
     conn = await create_db_client()
     try:

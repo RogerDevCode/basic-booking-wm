@@ -7,7 +7,6 @@ from ._user_models import InputSchema, UserInfo, UsersListResult
 
 def map_row(r: dict[str, Any]) -> UserInfo:
     return {
-        "user_id": str(r["user_id"]),
         "full_name": str(r["full_name"]),
         "email": str(r["email"]) if r.get("email") else None,
         "rut": str(r["rut"]) if r.get("rut") else None,

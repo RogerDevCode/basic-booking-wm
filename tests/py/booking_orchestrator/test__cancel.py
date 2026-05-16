@@ -71,16 +71,15 @@ async def test_handle_cancel_booking_with_id_calls_cancel_module_successfully() 
 
 
 @pytest.mark.asyncio
-async def test_handle_cancel_booking_cancel_failure_sets_success_false() -> None:
+async def test_handle_cancel_booking_cancel_failure_raises_runtime_error() -> None:
     conn = AsyncMock()
     input_data = _make_input(booking_id="booking-xyz")
 
-    with patch(
-        "f.booking_cancel.main.run_cancel_booking",
-        AsyncMock(side_effect=Exception("Booking not found")),
+    with (
+        patch(
+            "f.booking_cancel.main.run_cancel_booking",
+            AsyncMock(side_effect=Exception("Booking not found")),
+        ),
+        pytest.raises(RuntimeError, match="Cancel booking failed: Booking not found"),
     ):
-        result = await handle_cancel_booking(conn, input_data, _make_delegates())
-
-    assert result is not None
-    assert result["success"] is False
-    assert "❌" in result["message"]
+        await handle_cancel_booking(conn, input_data, _make_delegates())

@@ -4,7 +4,6 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class UserInfo(TypedDict):
-    user_id: str
     full_name: str
     email: str | None
     rut: str | None
@@ -24,7 +23,7 @@ class UsersListResult(TypedDict):
 class InputSchema(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
 
-    admin_user_id: str
+    access_token: str
     action: Literal["list", "get", "update", "deactivate", "activate"]
     target_user_id: str | None = None
     full_name: str | None = Field(None, max_length=200)

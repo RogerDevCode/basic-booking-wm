@@ -25,12 +25,17 @@ async def test_auth_provider_generate_temp() -> None:
     with (
         patch("f.auth_provider.main.create_db_client", return_value=mock_db),
         patch("f.auth_provider.main.with_tenant_context", side_effect=mock_with_tenant),
+        patch("f.auth_provider._auth_logic.verify_access_token", return_value={"sub": VALID_ID, "role": "admin"}),
     ):
-        args: dict[str, Any] = {"action": "admin_generate_temp", "provider_id": VALID_ID, "tenant_id": VALID_ID}
+        args: dict[str, Any] = {
+            "action": "admin_generate_temp",
+            "provider_id": VALID_ID,
+            "tenant_id": VALID_ID,
+            "access_token": "valid.token.here",
+        }
 
         result = await main(args)
-
         assert result is not None
         assert result["provider_id"] == VALID_ID
-        assert len(str(result.get("tempPassword"))) == 4
+        assert len(str(result.get("tempPassword"))) == 12
         assert mock_db.execute.called  # Update password_hash

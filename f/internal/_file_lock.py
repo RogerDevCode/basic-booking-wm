@@ -6,7 +6,7 @@ Prevents multiple processes from modifying the same file simultaneously.
 import os
 import sys
 from collections.abc import Generator
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 
 if sys.platform == "win32":
     import msvcrt
@@ -69,25 +69,19 @@ def exclusive_file_lock(file_path: str, timeout_seconds: int = 30) -> Generator[
 
         finally:
             if sys.platform == "win32":
-                try:
+                with suppress(Exception):
                     msvcrt.locking(lock_fd, msvcrt.LK_UNLCK, 1)
-                except Exception:
-                    pass
             else:
-                try:
+                with suppress(Exception):
                     fcntl.flock(lock_fd, fcntl.LOCK_UN)
-                except Exception:
-                    pass
             os.close(lock_fd)
 
     except FileExistsError:
         raise FileLockError(f"File is locked (another process is using {file_path})")  # noqa: B904
 
     finally:
-        try:
+        with suppress(Exception):
             os.unlink(lock_file)
-        except Exception:
-            pass
 
 
 @contextmanager
@@ -114,10 +108,8 @@ def shared_file_lock(file_path: str) -> Generator[None]:
             fcntl.flock(lock_fd, fcntl.LOCK_SH)
             yield
         finally:
-            try:
+            with suppress(Exception):
                 fcntl.flock(lock_fd, fcntl.LOCK_UN)
-            except Exception:
-                pass
             os.close(lock_fd)
     except Exception:
         # Lock not critical for reads, fail gracefully

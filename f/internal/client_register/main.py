@@ -10,7 +10,6 @@
 from __future__ import annotations
 
 import logging
-import os
 from typing import Final
 
 from .._db_client import create_db_client
@@ -33,9 +32,6 @@ async def _main_async(
     Only the provided (non-None) fields are written. Returns updated=False when
     there is nothing to update, so the caller can skip downstream work.
     """
-    if pg_url is not None:
-        os.environ["DATABASE_URL"] = pg_url
-
     # Build the SET clause from provided fields
     _ALLOWED_COLS = {"name", "phone", "email"}
     fields: dict[str, str] = {}
@@ -55,7 +51,7 @@ async def _main_async(
         log("client_register.skip", client_id=client_id, reason="no_fields_provided")
         return {"success": True, "updated": False}
 
-    db = await create_db_client()
+    db = await create_db_client(pg_url)
     try:
         # Build parameterised SET clause: name=$1, phone=$2, …
         set_parts = [f"{col}=${i}" for i, col in enumerate(fields, start=1)]

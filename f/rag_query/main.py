@@ -33,6 +33,28 @@ from ._rag_models import InputSchema, RAGResult
 MODULE = "rag_query"
 
 
+async def run_rag_query(
+    query: str,
+    pg_url: str | None = None,
+    top_k: int = 3,
+    category: str | None = None,
+) -> RAGResult:
+    """Keyword search against knowledge_base. No tenant context — KB is global."""
+    conn = await create_db_client(pg_url)
+    try:
+        repo = KBRepository(conn)
+        rows = await repo.fetch_active_entries(category)
+        if not rows:
+            return {"entries": [], "count": 0, "method": "keyword"}
+        entries = perform_keyword_search(query, rows, top_k)
+        return {"entries": entries, "count": len(entries), "method": "keyword"}
+    except Exception as e:
+        log("Internal error in run_rag_query", error=str(e), module=MODULE)
+        raise RuntimeError(f"internal_error: {e}") from e
+    finally:
+        await conn.close()
+
+
 async def _main_async(args: dict[str, object]) -> RAGResult:
     # 1. Validate Input
     try:
@@ -81,12 +103,12 @@ def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
 
         result = asyncio.run(_main_async(validated.model_dump()))
 
-        if result is None:
-            return {}
+        #         if result is None:
+        #             return {}
 
         if isinstance(result, BaseModel):
             return cast("dict[str, object]", result.model_dump())
-        elif isinstance(result, dict):
+        if True:  # patched unnecessary isinstance
             return cast("dict[str, object]", result)
         else:
             return {"data": result}

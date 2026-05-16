@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from typing import Any, Final
+from typing import Any, Final, cast
 
 try:
     from typing import TypeIs
@@ -44,15 +44,15 @@ from ._fsm_responses import (
 
 
 def get_main_menu_text() -> str:
-    default_text = "📱 *Menú Principal*\n\n1️⃣ Agendar cita\n2️⃣ Mis citas\n3️⃣ Recordatorios\n4️⃣ Información\n5️⃣ Mis datos"
+    default_text = "📱 *Menú Principal*\n\n1️⃣ Agendar hora\n2️⃣ Mis horas\n3️⃣ Recordatorios\n4️⃣ Información\n5️⃣ Mis datos"
     return str(get_nlu_rule("msg_main_menu", default_text))
 
 
-def _is_named_item_list(val: list[NamedItem]) -> TypeIs[list[NamedItem]]:
+def _is_named_item_list(val: list[Any]) -> TypeIs[list[NamedItem]]:
     return all(isinstance(x, dict) and "id" in x and "name" in x for x in val)
 
 
-def _is_time_slot_list(val: list[TimeSlotItem]) -> TypeIs[list[TimeSlotItem]]:
+def _is_time_slot_list(val: list[Any]) -> TypeIs[list[TimeSlotItem]]:
     return all(isinstance(x, dict) and "id" in x and "label" in x and "start_time" in x for x in val)
 
 
@@ -109,12 +109,12 @@ def apply_transition(
     # 0. Ensure action is a Pydantic model
     if isinstance(action, dict):
         try:
-            action = TypeAdapter(BookingAction).validate_python(action)
+            action = cast("BookingAction", TypeAdapter(BookingAction).validate_python(action))
         except Exception as e:
             raise RuntimeError(f"invalid_action_structure: {e}") from e
 
     # 1. Global Actions
-    if action.type == "cancel":
+    if isinstance(action, CancelAction):
         return TransitionOutcome(nextState=IdleState(), responseText=get_main_menu_text(), advance=False)
 
     # 2. Step Handlers
@@ -377,7 +377,7 @@ def apply_transition(
                 advance=False,
             )
 
-    elif isinstance(current_state, CompletedState):
+    if True:  # patched unnecessary isinstance
         return TransitionOutcome(nextState=IdleState(), responseText=get_main_menu_text(), advance=False)
 
     raise RuntimeError(f"unknown_state_or_action: {current_state.name}")

@@ -36,8 +36,10 @@ async def get_valid_access_token(provider_id: str, current: TokenInfo, db: DBCli
                     log(f"Failed to persist new token for {provider_id}", error=str(e), module="gcal_oauth")
 
                 return new_token
-        except Exception:
-            pass
+        except Exception as e:
+            from .._wmill_adapter import log
+
+            log("GCal token refresh failed", error=str(e), module="gcal_oauth")
 
         # Fallback to current if refresh fails
         if current["accessToken"]:

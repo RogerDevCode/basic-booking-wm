@@ -24,6 +24,7 @@ class ConversationState(BaseModel):
     flow_step: int = Field(default=0, ge=0)
     pending_data: dict[str, Any] = Field(default_factory=dict)
     last_user_utterance: str | None = None
+    booking_state_name: str = "idle"
 
 
 # ── User Profile
@@ -109,6 +110,7 @@ class IntentResult(BaseModel):
     cot_reasoning: str = Field(min_length=1)
     validation_passed: bool
     validation_errors: list[str] = Field(default_factory=list)
+    requires_fsm_routing: bool = False
 
 
 # ── Internal Support Models

@@ -35,22 +35,22 @@ from ._auto_register_models import InputSchema, RegisterResult
 MODULE = "telegram_auto_register"
 
 
-async def _main_async(args: dict[str, object]) -> dict[str, object]:
+async def _main_async(args: dict[str, object], pg_url: str | None = None) -> dict[str, object]:
     # 1. Validate Input (pg_url already stripped by main() before calling here)
     try:
         input_data = InputSchema.model_validate(args)
     except Exception as e:
         raise RuntimeError(f"Validation error: {e}") from e
 
-    conn = await create_db_client()
+    conn = await create_db_client(pg_url)
     try:
         # 2. Execute Auth Transaction with Admin Context (bypass RLS)
         async def operation() -> RegisterResult:
             return await register_telegram_user(conn, input_data)
 
         result = await with_admin_context(conn, operation)
-        if result is None:
-            raise RuntimeError("telegram_auto_register returned no result")
+        #         if result is None:
+        #             raise RuntimeError("telegram_auto_register returned no result")
         return cast("dict[str, object]", result)
 
     except Exception as e:
@@ -62,7 +62,6 @@ async def _main_async(args: dict[str, object]) -> dict[str, object]:
 
 def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
     import asyncio
-    import os
     import traceback
 
     from pydantic import BaseModel
@@ -73,19 +72,18 @@ def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
             clean: dict[str, object] = validated.model_dump()
         else:
             # Strip pg_url before validation — InputSchema has extra="forbid"
-            if pg_url := args.get("pg_url"):
-                os.environ["DATABASE_URL"] = str(pg_url)
+            pg_url = args.get("pg_url")
             clean = {k: v for k, v in args.items() if k != "pg_url"}
             validated = InputSchema.model_validate(clean)
 
-        result = asyncio.run(_main_async(validated.model_dump()))
+        result = asyncio.run(_main_async(validated.model_dump(), pg_url=str(pg_url) if pg_url else None))
 
-        if result is None:
-            return {}
+        #         if result is None:
+        #             return {}
 
         if isinstance(result, BaseModel):
             return result.model_dump()
-        elif isinstance(result, dict):
+        if True:  # patched unnecessary isinstance
             return result
         else:
             return {"data": result}
@@ -95,7 +93,7 @@ def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
         try:
             from ..internal._wmill_adapter import log
 
-            log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=MODULE)
+            log("AUTO_REGISTER_DEGRADED", error=str(e), traceback=tb, module=MODULE)
         except Exception:
             pass
         raise RuntimeError(f"Execution failed: {e}") from e

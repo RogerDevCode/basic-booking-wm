@@ -6,6 +6,7 @@ import pytest
 
 from f.services.booking._booking_errors import (
     BookingAlreadyRescheduledError,
+    BookingMissingParamsError,
     BookingNotFoundError,
     BookingPermissionError,
     BookingSlotUnavailableError,
@@ -37,6 +38,8 @@ def _make_conn() -> AsyncMock:
 
 def _make_repo() -> MagicMock:
     repo = MagicMock()
+    repo.db = MagicMock()
+    repo.db.fetchrow = AsyncMock(return_value={"duration_minutes": 30})
     repo.resolve_context = AsyncMock(return_value={})
     repo.get_specialties_for_booking = AsyncMock(return_value=[])
     repo.get_active_booking_for_client = AsyncMock(return_value=None)
@@ -62,17 +65,16 @@ def _make_full_ctx_repo() -> MagicMock:
 
 class TestRouteIntentUnknown:
     @pytest.mark.asyncio
-    async def test_unknown_type_returns_desconocido_without_db(self) -> None:
-        """Unknown intent type must return 'desconocido' before touching the DB."""
-        result = await route_intent({"type": "foo_unknown"})
-        assert result["action"] == "desconocido"
-        assert result["success"] is False
+    async def test_unknown_type_raises_value_error(self) -> None:
+        """Unknown intent type raises ValueError before touching the DB."""
+        with pytest.raises(ValueError, match="unknown_intent"):
+            await route_intent({"type": "foo_unknown"})
 
     @pytest.mark.asyncio
-    async def test_missing_type_defaults_to_desconocido(self) -> None:
-        """An intent with no 'type' key is treated as desconocido."""
-        result = await route_intent({})
-        assert result["action"] == "desconocido"
+    async def test_missing_type_raises_value_error(self) -> None:
+        """An intent with no 'type' key is treated as unknown and raises."""
+        with pytest.raises(ValueError, match="unknown_intent"):
+            await route_intent({})
 
 
 # ── _handle_cancelar_cita ──────────────────────────────────────────────────────
@@ -80,48 +82,45 @@ class TestRouteIntentUnknown:
 
 class TestHandleCancelarCita:
     @pytest.mark.asyncio
-    async def test_missing_booking_id_returns_error(self) -> None:
-        """No booking_id in intent or entities → error, no DB call."""
-        result = await _handle_cancelar_cita({"entities": {}}, _make_conn(), _make_repo())
-        assert result["success"] is False
-        assert "ID" in result["message"] or "id" in result["message"].lower()
+    async def test_missing_booking_id_raises(self) -> None:
+        """No booking_id in intent or entities → BookingMissingParamsError."""
+        with pytest.raises(BookingMissingParamsError):
+            await _handle_cancelar_cita({"entities": {}}, _make_conn(), _make_repo())
 
     @pytest.mark.asyncio
     @patch(
         "f.services.booking.orchestrator.cancel_booking",
         side_effect=BookingNotFoundError("not found"),
     )
-    async def test_booking_not_found_returns_error(self, _: object) -> None:
-        """BookingNotFoundError from core → failure message."""
-        result = await _handle_cancelar_cita(
-            {"booking_id": BOOKING_ID, "entities": {}},
-            _make_conn(),
-            _make_repo(),
-        )
-        assert result["success"] is False
-        assert "cancelar" in result["message"].lower()
+    async def test_booking_not_found_propagates(self, _: object) -> None:
+        """BookingNotFoundError from core propagates without being caught."""
+        with pytest.raises(BookingNotFoundError):
+            await _handle_cancelar_cita(
+                {"booking_id": BOOKING_ID, "entities": {}},
+                _make_conn(),
+                _make_repo(),
+            )
 
     @pytest.mark.asyncio
     @patch(
         "f.services.booking.orchestrator.cancel_booking",
         side_effect=BookingPermissionError("unauthorized"),
     )
-    async def test_unauthorized_returns_permission_message(self, _: object) -> None:
-        """BookingPermissionError → explicit 'no tienes permiso' message."""
-        result = await _handle_cancelar_cita(
-            {"booking_id": BOOKING_ID, "entities": {}},
-            _make_conn(),
-            _make_repo(),
-        )
-        assert result["success"] is False
-        assert "permiso" in result["message"].lower()
+    async def test_unauthorized_propagates(self, _: object) -> None:
+        """BookingPermissionError from core propagates without being caught."""
+        with pytest.raises(BookingPermissionError):
+            await _handle_cancelar_cita(
+                {"booking_id": BOOKING_ID, "entities": {}},
+                _make_conn(),
+                _make_repo(),
+            )
 
     @pytest.mark.asyncio
     @patch(
         "f.services.booking.orchestrator.cancel_booking",
         return_value=_CANCELLED_RESULT,
     )
-    async def test_success_returns_success_message(self, _: object) -> None:
+    async def test_success_returns_confirmation_message(self, _: object) -> None:
         """Successful cancellation → success=True with confirmation message."""
         result = await _handle_cancelar_cita(
             {"booking_id": BOOKING_ID, "entities": {}},
@@ -149,11 +148,10 @@ class TestHandleCrearCita:
         "f.services.booking.orchestrator.create_booking",
         side_effect=BookingSlotUnavailableError("slot taken"),
     )
-    async def test_slot_unavailable_returns_error(self, _: object) -> None:
-        """BookingSlotUnavailableError from core → slot unavailable message."""
-        result = await _handle_crear_cita({"entities": {}}, _make_conn(), _make_full_ctx_repo())
-        assert result["success"] is False
-        assert "disponible" in result["message"].lower()
+    async def test_slot_unavailable_propagates(self, _: object) -> None:
+        """BookingSlotUnavailableError from core propagates without being caught."""
+        with pytest.raises(BookingSlotUnavailableError):
+            await _handle_crear_cita({"entities": {}}, _make_conn(), _make_full_ctx_repo())
 
     @pytest.mark.asyncio
     @patch(
@@ -172,39 +170,38 @@ class TestHandleCrearCita:
 
 class TestHandleReagendarCita:
     @pytest.mark.asyncio
-    async def test_missing_booking_id_returns_error(self) -> None:
-        """No booking_id → error without touching core layer."""
-        result = await _handle_reagendar_cita(
-            {"entities": {}, "date": "2026-06-01", "time": "11:00"},
-            _make_conn(),
-            _make_repo(),
-        )
-        assert result["success"] is False
+    async def test_missing_booking_id_raises(self) -> None:
+        """No booking_id → BookingMissingParamsError without touching core layer."""
+        with pytest.raises(BookingMissingParamsError):
+            await _handle_reagendar_cita(
+                {"entities": {}, "date": "2026-06-01", "time": "11:00"},
+                _make_conn(),
+                _make_repo(),
+            )
 
     @pytest.mark.asyncio
-    async def test_missing_date_time_returns_error(self) -> None:
-        """booking_id present but date/time missing → error."""
-        result = await _handle_reagendar_cita(
-            {"booking_id": BOOKING_ID, "entities": {}},
-            _make_conn(),
-            _make_repo(),
-        )
-        assert result["success"] is False
+    async def test_missing_date_time_raises(self) -> None:
+        """booking_id present but date/time missing → BookingMissingParamsError."""
+        with pytest.raises(BookingMissingParamsError):
+            await _handle_reagendar_cita(
+                {"booking_id": BOOKING_ID, "entities": {}},
+                _make_conn(),
+                _make_repo(),
+            )
 
     @pytest.mark.asyncio
     @patch(
         "f.services.booking.orchestrator.reschedule_booking",
         side_effect=BookingAlreadyRescheduledError("already rescheduled"),
     )
-    async def test_already_rescheduled_returns_error(self, _: object) -> None:
-        """BookingAlreadyRescheduledError → failure with message."""
-        result = await _handle_reagendar_cita(
-            {"booking_id": BOOKING_ID, "entities": {}, "date": "2026-06-02", "time": "11:00"},
-            _make_conn(),
-            _make_repo(),
-        )
-        assert result["success"] is False
-        assert "reagendar" in result["message"].lower()
+    async def test_already_rescheduled_propagates(self, _: object) -> None:
+        """BookingAlreadyRescheduledError from core propagates without being caught."""
+        with pytest.raises(BookingAlreadyRescheduledError):
+            await _handle_reagendar_cita(
+                {"booking_id": BOOKING_ID, "entities": {}, "date": "2026-06-02", "time": "11:00"},
+                _make_conn(),
+                _make_repo(),
+            )
 
     @pytest.mark.asyncio
     @patch(

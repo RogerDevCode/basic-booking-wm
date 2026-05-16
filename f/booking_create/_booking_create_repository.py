@@ -25,7 +25,7 @@ class BookingCreateRepository(Protocol):
     async def is_provider_blocked(self, provider_id: str, target_date: date) -> bool: ...
     async def is_provider_scheduled(self, provider_id: str, day_of_week: int) -> bool: ...
     async def has_overlapping_booking(self, provider_id: str, start_time: datetime, end_time: datetime) -> bool: ...
-    async def has_active_booking_for_client(self, client_id: str) -> bool: ...
+    async def has_active_booking_for_client_provider(self, client_id: str, provider_id: str) -> bool: ...
     async def has_client_overlap(self, client_id: str, start_time: datetime, end_time: datetime) -> bool: ...
     async def insert_booking(
         self,
@@ -167,16 +167,19 @@ class PostgresBookingCreateRepository:
         )
         return row is not None
 
-    async def has_active_booking_for_client(self, client_id: str) -> bool:
+    async def has_active_booking_for_client_provider(self, client_id: str, provider_id: str) -> bool:
+        """BE-02: check if client already has an active booking with this specific provider."""
         row = await self._client.fetchrow(
             """
             SELECT booking_id FROM bookings
             WHERE client_id = $1::uuid
-              AND status NOT IN ('cancelled', 'no_show', 'rescheduled', 'completed')
+              AND provider_id = $2::uuid
+              AND status NOT IN ('cancelled', 'no_show', 'rescheduled')
               AND start_time > NOW()
             LIMIT 1
             """,
             client_id,
+            provider_id,
         )
         return row is not None
 

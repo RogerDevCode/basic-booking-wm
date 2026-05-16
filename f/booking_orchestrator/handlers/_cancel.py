@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import traceback
 from typing import TYPE_CHECKING, Any
 
 from f.booking_orchestrator._get_entity import get_entity
@@ -44,18 +45,18 @@ async def handle_cancel_booking(
     }
 
     from ...booking_cancel.main import run_cancel_booking
+    from ...internal._wmill_adapter import log
 
     try:
         data = await run_cancel_booking(conn, args)
-        err = None
     except Exception as e:
-        err = str(e)
-        data = None
+        log("CANCEL_BOOKING_FAILED", error=str(e), traceback=traceback.format_exc(), module="booking_orchestrator")
+        raise RuntimeError(f"Cancel booking failed: {e}") from e
 
     res: OrchestratorResult = {
         "action": "cancelar_cita",
-        "success": err is None,
+        "success": True,
         "data": data,
-        "message": f"❌ No se pudo cancelar: {err}" if err else "✅ Tu cita ha sido cancelada exitosamente.",
+        "message": "✅ Tu cita ha sido cancelada exitosamente.",
     }
     return res

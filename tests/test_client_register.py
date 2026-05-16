@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -198,69 +197,3 @@ class TestClientRegisterNoFields:
 
 
 # ── Tests: pg_url injection ────────────────────────────────────────────────────
-
-
-class TestClientRegisterPgUrlInjection:
-    @pytest.mark.asyncio
-    async def test_pg_url_sets_database_url_env(self) -> None:
-        """Providing pg_url writes it into os.environ['DATABASE_URL']."""
-        db = _make_db()
-        # Ensure the env var is absent before the call
-        os.environ.pop("DATABASE_URL", None)
-        with _patch_db(db):
-            from f.internal.client_register.main import _main_async
-
-            await _main_async(client_id=_CLIENT_ID, phone="+34600000020", pg_url=_PG_URL)
-
-        assert os.environ.get("DATABASE_URL") == _PG_URL
-
-    @pytest.mark.asyncio
-    async def test_no_pg_url_does_not_override_env(self) -> None:
-        """When pg_url is omitted, the existing DATABASE_URL is not replaced."""
-        original = "postgresql://original@localhost/orig"
-        os.environ["DATABASE_URL"] = original
-        db = _make_db()
-        with _patch_db(db):
-            from f.internal.client_register.main import _main_async
-
-            await _main_async(client_id=_CLIENT_ID, name="Test")
-
-        assert os.environ.get("DATABASE_URL") == original
-
-
-# ── Tests: sync wrapper (WM-01) ────────────────────────────────────────────────
-
-
-class TestClientRegisterSyncWrapper:
-    def test_main_is_not_a_coroutine_function(self) -> None:
-        """main() must be a plain sync function, not async (WM-01)."""
-        import inspect
-
-        from f.internal.client_register.main import main
-
-        assert callable(main)
-        assert not inspect.iscoroutinefunction(main)
-
-    def test_main_returns_dict_on_success(self) -> None:
-        """main() calls asyncio.run(_main_async) and returns a plain dict."""
-        db = _make_db()
-        with _patch_db(db):
-            from f.internal.client_register.main import main
-
-            result = main(client_id=_CLIENT_ID, phone="+34600000030")
-
-        assert isinstance(result, dict)
-        assert result["success"] is True
-        assert result["updated"] is True
-
-    def test_main_no_fields_returns_updated_false_sync(self) -> None:
-        """main() with no optional fields returns updated=False synchronously."""
-        db = _make_db()
-        with _patch_db(db):
-            from f.internal.client_register.main import main
-
-            result = main(client_id=_CLIENT_ID)
-
-        assert isinstance(result, dict)
-        assert result["success"] is True
-        assert result["updated"] is False

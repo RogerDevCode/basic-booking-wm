@@ -23,30 +23,40 @@ Zod Schemas      : NO
 # already normalized by f/message_preprocessor before reaching NLU).
 CORPUS: Final[dict[str, list[str]]] = {
     INTENT["CREAR_CITA"]: [
-        "quiero agendar una cita para mañana",
+        "quiero agendar una hora para mañana",
         "necesito hora con el doctor el lunes",
         "quiero una hora para el viernes a las diez",
         "reservar turno con especialista",
         "agendar consulta medica urgente",
-        "necesito cita urgente",
-        "solicitar cita para control",
+        "necesito hora urgente",
+        "solicitar hora para control",
         "quiero una hora",
-        "quiero ahora de inmediato una cita",
+        "quiero de inmediato una hora",
         "hola quiero agendar para mañana a las 10",
-        "necesito agendar una cita lo antes posible",
+        "necesito agendar una hora lo antes posible",
+        "quiero hacer una hora para esta semana",
+        "puedo hacer una hora para el jueves",
+        "quiero agendar una cita para mañana",
+        "necesito cita urgente",
         "quiero hacer una cita para esta semana",
-        "puedo hacer una cita para el jueves",
     ],
     INTENT["CANCELAR_CITA"]: [
-        "quiero cancelar mi cita del martes",
+        "quiero cancelar mi hora del martes",
         "no podre ir cancélame la hora",
         "anular turno programado para mañana",
-        "eliminar cita agendada",
+        "eliminar hora agendada",
         "borrar mi reserva del jueves",
         "no podre ir cancélame",
+        "cancelar hora que tengo",
+        "necesito cancelar mi hora de mañana",
+        "cancelar hora del lunes por favor",
+        "necesito cancelar mi hora",
+        "quiero cancelar mi hora",
+        "cancela mi hora",
+        "quiero anular mi hora",
+        "quiero cancelar mi cita del martes",
+        "necesito cancelar mi cita",
         "cancelar cita que tengo",
-        "necesito cancelar mi cita de mañana",
-        "cancelar cita del lunes por favor",
     ],
     INTENT["REAGENDAR_CITA"]: [
         "necesito cambiar mi cita del viernes al jueves",
@@ -70,15 +80,18 @@ CORPUS: Final[dict[str, list[str]]] = {
         "que horas tienen para el viernes",
     ],
     INTENT["VER_MIS_CITAS"]: [
-        "tengo alguna cita agendada",
+        "tengo alguna hora agendada",
         "cuando es mi hora",
-        "mis citas próximas",
+        "mis horas próximas",
         "confirmame el turno que reserve",
         "quiero saber si tengo hora",
-        "tengo cita para mañana",
+        "tengo hora para mañana",
         "revisar mis reservas",
+        "ver mis horas",
+        "que horas tengo",
+        "mis citas próximas",
+        "tengo alguna cita agendada",
         "ver mis citas",
-        "que citas tengo",
     ],
     INTENT["SALUDO"]: [
         "hola buenos dias",
@@ -174,6 +187,9 @@ STOP_WORDS: Final[set[str]] = {
 TYPO_MAP: Final[dict[str, str]] = {
     "libre": "disponible",
     "configuro": "configurar",
+    # Sinónimos médicos chilenos
+    "hora": "cita",
+    "horas": "citas",
 }
 
 
@@ -194,6 +210,7 @@ def _keyword_match(tokens: list[str]) -> tuple[str, float] | None:
         INTENT["CANCELAR_CITA"],
         INTENT["REAGENDAR_CITA"],
         INTENT["VER_MIS_CITAS"],
+        INTENT["VER_MIS_DATOS"],
         INTENT["VER_DISPONIBILIDAD"],
     ]
     kw_map: dict[str, list[str]] = INTENT_KEYWORDS
@@ -220,7 +237,7 @@ def _normalize(text: str) -> list[str]:
     text = re.sub(r"[?¿!¡.,;:()]", " ", text)
     tokens = text.split()
 
-    result = []
+    result: list[str] = []
     for w in tokens:
         mapped = TYPO_MAP.get(w, w)
         if len(mapped) > 1 and mapped not in STOP_WORDS:
@@ -284,11 +301,7 @@ def _get_model() -> ModelData:
     global _model_cache
     if _model_cache is None:
         intents = list(CORPUS.keys())
-        intent_docs_arr = []
-        for intent in intents:
-            docs = CORPUS[intent]
-            for doc in docs:
-                intent_docs_arr.append(_normalize(doc))
+        intent_docs_arr = [_normalize(doc) for intent in intents for doc in CORPUS[intent]]
 
         idf = _compute_idf(intent_docs_arr)
         _model_cache = {

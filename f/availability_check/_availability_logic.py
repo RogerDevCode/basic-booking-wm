@@ -31,8 +31,10 @@ async def get_provider(db: DBClient, provider_id: str) -> ProviderRow | None:
     """
     rows = await db.fetch(
         """
-        SELECT provider_id, name, timezone FROM providers
-        WHERE provider_id = $1::uuid AND is_active = true
+        SELECT p.provider_id, p.name, t.name AS timezone
+        FROM providers p
+        LEFT JOIN timezones t ON t.id = p.timezone_id
+        WHERE p.provider_id = $1::uuid AND p.is_active = true
         LIMIT 1
         """,
         provider_id,

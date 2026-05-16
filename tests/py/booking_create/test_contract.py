@@ -42,7 +42,7 @@ class MockBookingRepository:
     async def has_overlapping_booking(self, provider_id: str, start_time: datetime, end_time: datetime) -> bool:
         return False
 
-    async def has_active_booking_for_client(self, client_id: str) -> bool:
+    async def has_active_booking_for_client_provider(self, client_id: str, provider_id: str) -> bool:
         return False
 
     async def has_client_overlap(self, client_id: str, start_time: datetime, end_time: datetime) -> bool:
@@ -88,3 +88,131 @@ async def test_booking_create_success() -> None:
     assert result["status"] == "confirmed"
     assert result["provider_name"] == "Dr. Test"
     assert result["client_name"] == "Test Client"
+
+
+class MockRepoActiveBookingForProvider:
+    """Mock that simulates client already has active booking with same provider."""
+
+    async def get_client_context(self, client_id: str) -> ClientContext | None:
+        return {"id": client_id, "name": "Test Client"}
+
+    async def get_provider_context(self, provider_id: str) -> ProviderContext | None:
+        return cast("ProviderContext", {"id": provider_id, "name": "Dr. Test", "timezone": "UTC"})
+
+    async def get_service_context(self, service_id: str, provider_id: str) -> ServiceContext | None:
+        return {"id": service_id, "name": "General Checkup", "duration": 30}
+
+    async def get_booking_context(self, client_id: str, provider_id: str, service_id: str) -> BookingContext | None:
+        return {
+            "client": {"id": client_id, "name": "Test Client"},
+            "provider": cast("ProviderContext", {"id": provider_id, "name": "Dr. Test", "timezone": "UTC"}),
+            "service": {"id": service_id, "name": "General Checkup", "duration": 30},
+        }
+
+    async def is_provider_blocked(self, provider_id: str, target_date: object) -> bool:
+        return False
+
+    async def is_provider_scheduled(self, provider_id: str, day_of_week: int) -> bool:
+        return True
+
+    async def has_overlapping_booking(self, provider_id: str, start_time: datetime, end_time: datetime) -> bool:
+        return False
+
+    async def has_active_booking_for_client_provider(self, client_id: str, provider_id: str) -> bool:
+        return True
+
+    async def has_client_overlap(self, client_id: str, start_time: datetime, end_time: datetime) -> bool:
+        return False
+
+    async def insert_booking(
+        self,
+        input_data: InputSchema,
+        end_time: datetime,
+        target_status: str,
+        provider_name: str,
+        service_name: str,
+        client_name: str,
+    ) -> BookingCreated:
+        raise AssertionError("insert_booking should not be called when active booking exists")
+
+
+class MockRepoClientTimeOverlap:
+    """Mock that simulates client already has booking at same time with different provider."""
+
+    async def get_client_context(self, client_id: str) -> ClientContext | None:
+        return {"id": client_id, "name": "Test Client"}
+
+    async def get_provider_context(self, provider_id: str) -> ProviderContext | None:
+        return cast("ProviderContext", {"id": provider_id, "name": "Dr. Test", "timezone": "UTC"})
+
+    async def get_service_context(self, service_id: str, provider_id: str) -> ServiceContext | None:
+        return {"id": service_id, "name": "General Checkup", "duration": 30}
+
+    async def get_booking_context(self, client_id: str, provider_id: str, service_id: str) -> BookingContext | None:
+        return {
+            "client": {"id": client_id, "name": "Test Client"},
+            "provider": cast("ProviderContext", {"id": provider_id, "name": "Dr. Test", "timezone": "UTC"}),
+            "service": {"id": service_id, "name": "General Checkup", "duration": 30},
+        }
+
+    async def is_provider_blocked(self, provider_id: str, target_date: object) -> bool:
+        return False
+
+    async def is_provider_scheduled(self, provider_id: str, day_of_week: int) -> bool:
+        return True
+
+    async def has_overlapping_booking(self, provider_id: str, start_time: datetime, end_time: datetime) -> bool:
+        return False
+
+    async def has_active_booking_for_client_provider(self, client_id: str, provider_id: str) -> bool:
+        return False
+
+    async def has_client_overlap(self, client_id: str, start_time: datetime, end_time: datetime) -> bool:
+        return True
+
+    async def insert_booking(
+        self,
+        input_data: InputSchema,
+        end_time: datetime,
+        target_status: str,
+        provider_name: str,
+        service_name: str,
+        client_name: str,
+    ) -> BookingCreated:
+        raise AssertionError("insert_booking should not be called when time overlap exists")
+
+
+@pytest.mark.asyncio
+async def test_booking_create_blocked_when_active_with_same_provider() -> None:
+    """RULE 1: client cannot book with same provider if already has active booking."""
+    repo = MockRepoActiveBookingForProvider()
+    input_data = InputSchema.model_validate(
+        {
+            "client_id": "11111111-1111-1111-1111-111111111111",
+            "provider_id": "22222222-2222-2222-2222-222222222222",
+            "service_id": "33333333-3333-3333-3333-333333333333",
+            "start_time": datetime.now(UTC).isoformat(),
+            "idempotency_key": "test_idem_key",
+        }
+    )
+
+    with pytest.raises(RuntimeError, match="client_already_has_active_booking_with_provider"):
+        await execute_create_booking(repo, input_data)
+
+
+@pytest.mark.asyncio
+async def test_booking_create_blocked_when_client_has_time_overlap() -> None:
+    """RULE 2: client cannot book at same time slot with any provider."""
+    repo = MockRepoClientTimeOverlap()
+    input_data = InputSchema.model_validate(
+        {
+            "client_id": "11111111-1111-1111-1111-111111111111",
+            "provider_id": "22222222-2222-2222-2222-222222222222",
+            "service_id": "33333333-3333-3333-3333-333333333333",
+            "start_time": datetime.now(UTC).isoformat(),
+            "idempotency_key": "test_idem_key",
+        }
+    )
+
+    with pytest.raises(RuntimeError, match="client_already_has_booking_at_this_time"):
+        await execute_create_booking(repo, input_data)

@@ -41,7 +41,6 @@ async def load_nlu_rules_to_redis() -> None:
 
 async def ensure_nlu_cache() -> None:
     """Ensures the global memory cache is populated."""
-    global _NLU_CACHE
     if _NLU_CACHE:
         return
 
@@ -74,27 +73,32 @@ async def ensure_nlu_cache() -> None:
                     _NLU_CACHE[key_name] = v
     except Exception:
         # Fallback for tests when DB/Redis is not available
-        _NLU_CACHE = {
-            "msg_main_menu": (
-                "📱 *Menú Principal*\n\n1️⃣ Agendar cita\n2️⃣ Mis citas\n3️⃣ Recordatorios\n4️⃣ Información\n5️⃣ Mis datos"
-            ),
-            "msg_slot_taken": "Ese horario ya fue reservado.",
-            "msg_no_service": "No hay servicios.",
-            "msg_generic": "No pudimos confirmar tu cita en este momento. Por favor intenta de nuevo en unos minutos.",
-            "intent_keywords_saludo": ["hola", "buenas"],
-            "intent_keywords_urgencia": ["urgencia", "emergencia"],
-            "urgencia": ["urgencia"],
-            "urgency_words": ["urgencia", "emergencia", "rapido"],
-            "greetings": ["hola", "buenas", "saludos"],
-            "greeting_phrases": ["buenos dias", "buen dia"],
-            "farewells": ["adios", "chao"],
-            "farewell_phrases": ["hasta luego", "nos vemos"],
-            "confidence_bound_high_min": 0.85,
-            "escalation_medical_emergency_min": 0.8,
-            "escalation_priority_queue_max": 0.6,
-            "escalation_human_handoff_max": 0.4,
-            "escalation_tfidf_minimum": 0.4,
-        }
+        _NLU_CACHE.clear()
+        _NLU_CACHE.update(
+            {
+                "msg_main_menu": (
+                    "📱 *Menú Principal*\n\n1️⃣ Agendar hora\n2️⃣ Mis horas\n3️⃣ Recordatorios\n4️⃣ Información\n5️⃣ Mis datos"
+                ),
+                "msg_slot_taken": "Ese horario ya fue reservado.",
+                "msg_no_service": "No hay servicios.",
+                "msg_generic": (
+                    "No pudimos confirmar tu hora en este momento. Por favor intenta de nuevo en unos minutos."
+                ),
+                "intent_keywords_saludo": ["hola", "buenas"],
+                "intent_keywords_urgencia": ["urgencia", "emergencia"],
+                "urgencia": ["urgencia"],
+                "urgency_words": ["urgencia", "emergencia", "rapido"],
+                "greetings": ["hola", "buenas", "saludos"],
+                "greeting_phrases": ["buenos dias", "buen dia"],
+                "farewells": ["adios", "chao"],
+                "farewell_phrases": ["hasta luego", "nos vemos"],
+                "confidence_bound_high_min": 0.85,
+                "escalation_medical_emergency_min": 0.8,
+                "escalation_priority_queue_max": 0.6,
+                "escalation_human_handoff_max": 0.4,
+                "escalation_tfidf_minimum": 0.4,
+            }
+        )
 
 
 def get_nlu_rule[T](rule_key: str, default: T) -> T:

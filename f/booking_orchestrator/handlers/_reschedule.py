@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import traceback
 from typing import TYPE_CHECKING, Any
 
 from f.booking_orchestrator._get_entity import get_entity
@@ -77,18 +78,18 @@ async def handle_reschedule(
     }
 
     from ...booking_reschedule.main import run_reschedule_booking
+    from ...internal._wmill_adapter import log
 
     try:
         data = await run_reschedule_booking(conn, args)
-        err = None
     except Exception as e:
-        err = str(e)
-        data = None
+        log("RESCHEDULE_BOOKING_FAILED", error=str(e), traceback=traceback.format_exc(), module="booking_orchestrator")
+        raise RuntimeError(f"Reschedule booking failed: {e}") from e
 
     res_final: OrchestratorResult = {
         "action": "reagendar_cita",
-        "success": err is None,
+        "success": True,
         "data": data,
-        "message": f"❌ No se pudo reagendar: {err}" if err else f"✅ Reagendada para el {date} a las {time}.",
+        "message": f"✅ Reagendada para el {date} a las {time}.",
     }
     return res_final

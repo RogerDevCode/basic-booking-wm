@@ -27,7 +27,7 @@ services:
   db:
     image: postgres:17-alpine
     restart: unless-stopped
-    
+
     command: postgres -c fsync=off -c synchronous_commit=off -c full_page_writes=off -c random_page_cost=1.1
     deploy:
       resources:
@@ -96,6 +96,7 @@ services:
       - WM_GIT_REPO=${WM_GIT_REPO:-}
       - WM_GIT_BRANCH=${WM_GIT_BRANCH:-main}
       - WM_GIT_SYNC_INTERVAL=${WM_GIT_SYNC_INTERVAL:-60}
+      - DEFAULT_PYTHON_VERSION=3.13.11
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/version"]
       interval: 30s
@@ -137,7 +138,7 @@ services:
 
   windmill_worker:
     image: ${WM_IMAGE:-ghcr.io/windmill-labs/windmill:1.693.3}
-    
+
     deploy:
       replicas: 2
       resources:
@@ -156,7 +157,50 @@ services:
       - FAVOR_UNSHARE_PID=false
       - DOCKER_HOST=tcp://dind:2375
       - WORKER_TAGS=bun,python3,bash
-      - SLEEP_QUEUE=2000
+      - SLEEP_QUEUE=100
+      - DEFAULT_PYTHON_VERSION=3.13.11
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      dind:
+        condition: service_healthy
+      windmill_server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://windmill_server:8000/api/version"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+    volumes:
+      - worker_dependency_cache:/tmp/windmill/cache
+      - worker_logs:/tmp/windmill/logs
+    logging: *default-logging
+
+  windmill_worker_interactive:
+    image: ${WM_IMAGE:-ghcr.io/windmill-labs/windmill:1.693.3}
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          memory: 2048M
+        reservations:
+          memory: 1024M
+    restart: unless-stopped
+    privileged: true
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://windmill:windmill@db:5432/windmill?sslmode=disable&application_name=windmill&statement_cache_size=0
+      - MODE=worker
+      - WORKER_GROUP=interactive
+      - FAVOR_UNSHARE_PID=false
+      - DOCKER_HOST=tcp://dind:2375
+      - WORKER_TAGS=interactive
+      - SLEEP_QUEUE=50
+      - DEFAULT_PYTHON_VERSION=3.13.11
     depends_on:
       db:
         condition: service_healthy
@@ -199,6 +243,7 @@ services:
       - FAVOR_UNSHARE_PID=false
       - SLEEP_QUEUE=200
       - NUM_WORKERS=${NUM_WORKERS:-2}
+      - DEFAULT_PYTHON_VERSION=3.13.11
     depends_on:
       db:
         condition: service_healthy
@@ -218,7 +263,7 @@ services:
 
   windmill_indexer:
     image: ${WM_IMAGE:-ghcr.io/windmill-labs/windmill:1.693.3}
-    
+
     deploy:
       replicas: 0
     restart: unless-stopped
@@ -228,6 +273,7 @@ services:
       - PORT=8002
       - DATABASE_URL=postgresql://windmill:windmill@db:5432/windmill?sslmode=disable&application_name=windmill&statement_cache_size=0
       - MODE=indexer
+      - DEFAULT_PYTHON_VERSION=3.13.11
     volumes:
       - windmill_index:/tmp/windmill/search
       - worker_logs:/tmp/windmill/logs
@@ -235,7 +281,7 @@ services:
 
   windmill_extra:
     image: ghcr.io/windmill-labs/windmill-extra:latest
-    
+
     restart: unless-stopped
     deploy:
       resources:
@@ -256,6 +302,7 @@ services:
       - ENABLE_NSJAIL=false
       - REQUIRE_SIGNED_DEBUG_REQUESTS=false
       - WINDMILL_BASE_URL=http://windmill_server:8000
+      - DEFAULT_PYTHON_VERSION=3.13.11
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:3001/ | grep -q ok"]
       interval: 30s
@@ -284,7 +331,15 @@ services:
     environment:
       - BASE_URL=":80"
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/api/version"]
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:80/api/version",
+        ]
       interval: 30s
       timeout: 10s
       retries: 3

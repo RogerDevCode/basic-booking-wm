@@ -63,8 +63,8 @@ async def main_async(args: dict[str, Any]) -> dict[str, Any]:
             return await upsert_client(conn, input_data)
 
         result = await with_tenant_context(conn, tenant_id, operation)
-        if result is None:
-            raise RuntimeError("patient_register returned no result")
+        #         if result is None:
+        #             raise RuntimeError("patient_register returned no result")
         return cast("dict[str, Any]", result)
 
     except Exception as e:
@@ -91,8 +91,8 @@ def main(args: InputSchema | dict[str, Any]) -> dict[str, Any]:
 
         result = asyncio.run(main_async(validated.model_dump()))
 
-        if result is None:
-            return {}
+        #         if result is None:
+        #             return {}
 
         if isinstance(result, BaseModel):
             return result.model_dump()

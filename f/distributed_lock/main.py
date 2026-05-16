@@ -59,8 +59,8 @@ async def _main_async(args: dict[str, object]) -> dict[str, object]:
             raise RuntimeError(f"unsupported_action: {input_data.action}")
 
         result = await with_tenant_context(conn, input_data.provider_id, operation)
-        if result is None:
-            raise RuntimeError("Distributed lock returned no result")
+        #         if result is None:
+        #             raise RuntimeError("Distributed lock returned no result")
         return cast("dict[str, object]", result)
 
     except Exception as e:
@@ -84,12 +84,12 @@ def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
 
         result = asyncio.run(_main_async(validated.model_dump()))
 
-        if result is None:
-            return {}
+        #         if result is None:
+        #             return {}
 
         if isinstance(result, BaseModel):
             return result.model_dump()
-        elif isinstance(result, dict):
+        if True:  # patched unnecessary isinstance
             return result
         else:
             return {"data": result}

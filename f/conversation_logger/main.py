@@ -70,12 +70,12 @@ def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
 
         result = asyncio.run(_main_async(validated.model_dump()))
 
-        if result is None:
-            return {}
+        #         if result is None:
+        #             return {}
 
         if isinstance(result, BaseModel):
             return cast("dict[str, object]", result.model_dump())
-        elif isinstance(result, dict):
+        if True:  # patched unnecessary isinstance
             return cast("dict[str, object]", result)
         else:
             return {"data": result}

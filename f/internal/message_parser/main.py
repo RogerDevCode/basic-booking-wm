@@ -14,6 +14,8 @@
 # ///
 from __future__ import annotations
 
+import asyncio
+
 from pydantic import BaseModel, ConfigDict
 
 
@@ -33,7 +35,7 @@ async def _main_async(args: dict[str, object]) -> dict[str, object]:
     try:
         input_data = ParserInput.model_validate(args)
     except Exception as e:
-        return {"success": False, "error": f"validation_error: {e}"}
+        raise RuntimeError(f"validation_error: {e}") from e
 
     # Basic parser implementation
     return {
@@ -43,6 +45,4 @@ async def _main_async(args: dict[str, object]) -> dict[str, object]:
 
 
 def main(args: dict[str, object]) -> dict[str, object]:
-    import asyncio
-
     return asyncio.run(_main_async(args))

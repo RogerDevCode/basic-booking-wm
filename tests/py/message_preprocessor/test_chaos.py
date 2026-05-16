@@ -68,8 +68,8 @@ def test_chaos_rtl_override_removed() -> None:
 
 
 def test_chaos_zero_width_space_removed() -> None:
-    result = main({"raw_text": "ho​la"})
-    assert "​" not in result["cleaned_text"]
+    result = main({"raw_text": "ho\u200bla"})
+    assert "\u200b" not in result["cleaned_text"]
 
 
 def test_chaos_zero_width_joiner_removed() -> None:

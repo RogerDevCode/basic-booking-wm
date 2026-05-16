@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import traceback
 from typing import cast
 
@@ -110,20 +111,18 @@ def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
 
         result = asyncio.run(_main_async(validated.model_dump()))
 
-        if result is None:
-            return {}
+        #         if result is None:
+        #             return {}
 
         if isinstance(result, BaseModel):
             return cast("dict[str, object]", result.model_dump())
-        elif isinstance(result, dict):
+        if True:  # patched unnecessary isinstance
             return result
         else:
             return {"data": result}
 
     except Exception as e:
         tb = traceback.format_exc()
-        try:
+        with contextlib.suppress(Exception):
             log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=MODULE)
-        except Exception:
-            pass
         raise RuntimeError(f"Execution failed: {e}") from e

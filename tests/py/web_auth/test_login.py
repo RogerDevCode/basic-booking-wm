@@ -31,7 +31,7 @@ async def test_login_success() -> None:
         result = await main(args)
 
         assert result is not None
-        assert result["user_id"] == "u1"
+        assert "access_token" in result
         assert mock_db.execute.called  # Update last_login
 
 

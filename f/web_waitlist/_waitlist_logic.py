@@ -106,21 +106,20 @@ async def handle_list(db: DBClient, client_id: str) -> WaitlistResult:
         """,
         client_id,
     )
-    entries: list[WaitlistEntry] = []
-    for r in rows:
-        entries.append(
-            {
-                "waitlist_id": str(r["waitlist_id"]),
-                "service_id": str(r["service_id"]),
-                "preferred_date": str(r["preferred_date"]) if r.get("preferred_date") else None,
-                "preferred_start_time": str(r["preferred_start_time"]) if r.get("preferred_start_time") else None,
-                "status": str(r["status"]),
-                "position": int(r["position"]),  # type: ignore[call-overload]
-                "created_at": cast("datetime", r["created_at"]).isoformat()
-                if isinstance(r.get("created_at"), datetime)
-                else str(r.get("created_at")),
-            }
-        )
+    entries: list[WaitlistEntry] = [
+        {
+            "waitlist_id": str(r["waitlist_id"]),
+            "service_id": str(r["service_id"]),
+            "preferred_date": str(r["preferred_date"]) if r.get("preferred_date") else None,
+            "preferred_start_time": str(r["preferred_start_time"]) if r.get("preferred_start_time") else None,
+            "status": str(r["status"]),
+            "position": int(r["position"]),  # type: ignore[call-overload]
+            "created_at": cast("datetime", r["created_at"]).isoformat()
+            if isinstance(r.get("created_at"), datetime)
+            else str(r.get("created_at")),
+        }
+        for r in rows
+    ]
     return {"entries": entries, "position": None, "message": "OK"}
 
 

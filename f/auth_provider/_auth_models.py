@@ -30,3 +30,4 @@ class InputSchema(BaseModel):
     provider_id: str
     current_password: str | None = None
     new_password: str | None = None
+    access_token: str | None = None

@@ -17,6 +17,9 @@ class RescheduleRepository(Protocol):
     async def check_overlap(
         self, provider_id: str, exclude_booking_id: str, new_start: datetime, new_end: datetime
     ) -> bool: ...
+    async def check_client_overlap(
+        self, client_id: str, exclude_booking_id: str, new_start: datetime, new_end: datetime
+    ) -> bool: ...
     async def execute_reschedule(
         self, input_data: RescheduleInput, old_booking: BookingRow, service: ServiceRow, new_end: datetime, new_key: str
     ) -> RescheduleWriteResult | None: ...
@@ -80,6 +83,26 @@ class PostgresRescheduleRepository:
             LIMIT 1
             """,
             provider_id,
+            exclude_booking_id,
+            new_end.isoformat(),
+            new_start.isoformat(),
+        )
+        return row is not None
+
+    async def check_client_overlap(
+        self, client_id: str, exclude_booking_id: str, new_start: datetime, new_end: datetime
+    ) -> bool:
+        row = await self._client.fetchrow(
+            """
+            SELECT booking_id FROM bookings
+            WHERE client_id = $1::uuid
+              AND status NOT IN ('cancelled', 'no_show', 'rescheduled')
+              AND booking_id != $2::uuid
+              AND start_time < $3::timestamptz
+              AND end_time > $4::timestamptz
+            LIMIT 1
+            """,
+            client_id,
             exclude_booking_id,
             new_end.isoformat(),
             new_start.isoformat(),

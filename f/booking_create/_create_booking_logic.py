@@ -38,10 +38,15 @@ async def execute_create_booking(repo: BookingCreateRepository, input_data: Inpu
     duration_minutes = context["service"]["duration"]
     end_time = input_data.start_time + timedelta(minutes=duration_minutes)
 
-    # BE-02: one active booking per client (not enforced by DB GIST)
-    has_active = await repo.has_active_booking_for_client(input_data.client_id)
+    # BE-02: one active booking per (client, provider) pair
+    has_active = await repo.has_active_booking_for_client_provider(input_data.client_id, input_data.provider_id)
     if has_active:
-        raise RuntimeError("client_already_has_active_booking")
+        raise RuntimeError("client_already_has_active_booking_with_provider")
 
-    # Slot overlap is enforced atomically by the DB GIST exclusion constraint
+    # RULE 2: no booking at same time slot with any provider
+    has_overlap = await repo.has_client_overlap(input_data.client_id, input_data.start_time, end_time)
+    if has_overlap:
+        raise RuntimeError("client_already_has_booking_at_this_time")
+
+    # Slot overlap for same provider is enforced atomically by the DB GIST exclusion constraint
     return await persist_booking(repo, input_data, context, end_time)

@@ -54,21 +54,10 @@ def generate_slots_for_rule(
         return []
 
     # Prepare booking ranges as (start_ts, end_ts) for faster lookup
-    booking_ranges = []
+    booking_ranges: list[tuple[float, float]] = []
     for b in bookings:
-        b_start = b["start_time"]
-        b_end = b["end_time"]
-
-        if isinstance(b_start, str):
-            b_start_dt = datetime.fromisoformat(b_start.replace("Z", "+00:00"))
-        else:
-            b_start_dt = cast("datetime", b_start)
-
-        if isinstance(b_end, str):
-            b_end_dt = datetime.fromisoformat(b_end.replace("Z", "+00:00"))
-        else:
-            b_end_dt = cast("datetime", b_end)
-
+        b_start_dt = datetime.fromisoformat(b["start_time"].replace("Z", "+00:00"))
+        b_end_dt = datetime.fromisoformat(b["end_time"].replace("Z", "+00:00"))
         booking_ranges.append((b_start_dt.timestamp(), b_end_dt.timestamp()))
 
     tz = zoneinfo.ZoneInfo(timezone_name)
@@ -184,7 +173,7 @@ async def get_availability(db: DBClient, query: AvailabilityQuery) -> Availabili
         # 3. Layer 3: Bookings
         booking_rows = await db.fetch(
             """
-            SELECT start_time, end_time FROM bookings
+            SELECT start_time::text, end_time::text FROM bookings
             WHERE provider_id = $1::uuid
               AND start_time >= $2
               AND start_time < ($2 + INTERVAL '1 day')
@@ -212,7 +201,8 @@ async def get_availability(db: DBClient, query: AvailabilityQuery) -> Availabili
         if tz_rows and tz_rows[0].get("ui_preferences"):
             prefs = tz_rows[0]["ui_preferences"]
             if isinstance(prefs, dict):
-                advance_notice_minutes = int(prefs.get("advance_notice_minutes", 0))
+                d = cast("dict[str, object]", prefs)
+                advance_notice_minutes = int(str(d.get("advance_notice_minutes", 0)))
 
         # 5. Service details
         service_rows = await db.fetch(

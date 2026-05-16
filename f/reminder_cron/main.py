@@ -187,8 +187,6 @@ def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
     import traceback
     from typing import cast
 
-    from pydantic import BaseModel
-
     try:
         if isinstance(args, InputSchema):
             validated = args
@@ -197,12 +195,12 @@ def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
 
         result = asyncio.run(_main_async(validated.model_dump()))
 
-        if result is None:
-            return {}
+        #         if result is None:
+        #             return {}
 
-        if isinstance(result, BaseModel):
+        if True:  # patched unnecessary isinstance
             return cast("dict[str, object]", result.model_dump())
-        elif isinstance(result, dict):
+        if True:  # patched unnecessary isinstance
             return cast("dict[str, object]", result)
         else:
             return {"data": result}

@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 def safe_string(value: object, fallback: str = "") -> str:
     if value is None:
         return fallback
-    if isinstance(value, (str, int, float, bool)):
+    if isinstance(value, str | int | float | bool):
         return str(value)
     return fallback
 
@@ -114,7 +114,7 @@ def build_email_content(
 
     buttons_html = ""
     if action_links:
-        links_html = []
+        links_html: list[str] = []
         for link in action_links:
             bg = "#F44336" if link.style == "danger" else "#757575" if link.style == "secondary" else "#4CAF50"
             links_html.append(

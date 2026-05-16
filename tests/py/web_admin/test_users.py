@@ -42,8 +42,12 @@ async def test_admin_users_list_success() -> None:
     with (
         patch("f.web_admin_users.main.create_db_client", return_value=mock_db),
         patch("f.web_admin_users.main.with_tenant_context", side_effect=mock_with_tenant),
+        patch(
+            "f.web_admin_users.main.verify_access_token",
+            return_value={"sub": "a1b2c3d4-e5f6-7890-abcd-ef1234567890", "role": "admin"},
+        ),
     ):
-        args: dict[str, Any] = {"action": "list", "admin_user_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"}
+        args: dict[str, Any] = {"action": "list", "access_token": "valid.token"}
         result = cast("dict[str, Any]", await main(args))
 
         assert result["total"] == 1

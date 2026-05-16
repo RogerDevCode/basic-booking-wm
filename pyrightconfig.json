@@ -5,13 +5,11 @@
   "venv": ".venv",
   "stubPath": "stubs",
   "reportPrivateUsage": false,
-  "reportUnknownMemberType": false,
-  "reportUnknownVariableType": false,
-  "reportUnknownArgumentType": false,
-  "reportTypedDictNotRequiredAccess": false,
   "exclude": [
     "**/__pycache__",
     ".git",
-    ".venv"
+    ".venv",
+    "patch_auth.py",
+    "scripts"
   ]
 }

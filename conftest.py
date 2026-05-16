@@ -26,4 +26,7 @@ def mock_redis(monkeypatch: pytest.MonkeyPatch) -> None:
         def flushall(self) -> None:
             return None
 
-    monkeypatch.setattr(redis, "from_url", lambda *args, **kwargs: DummyRedis())
+    def dummy_from_url(*args: object, **kwargs: object) -> DummyRedis:
+        return DummyRedis()
+
+    monkeypatch.setattr(redis, "from_url", dummy_from_url)

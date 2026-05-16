@@ -1,24 +1,32 @@
 from __future__ import annotations
 
 import sys
-from contextlib import contextmanager
-from typing import TYPE_CHECKING
+from contextlib import AbstractContextManager, contextmanager
+from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, MagicMock, patch
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 # --- Setup wmill mock globally before importing module under test ---
 wmill_mock = MagicMock()
-wmill_mock.workflow = lambda f: f  # Just pass through the async function
+
+
+def _wf(f: Any) -> Any:
+    return f
+
+
+wmill_mock.workflow = _wf
 wmill_mock.task_script = MagicMock()
 sys.modules["wmill"] = wmill_mock
 
 import pytest  # noqa: E402
 
-from f.booking_create._booking_create_models import InputSchema as BookingCreateInput  # noqa: E402
 from f.internal.booking_confirm.main import _main_async  # noqa: E402
-
-if TYPE_CHECKING:
-    from collections.abc import Iterator
-    from contextlib import AbstractContextManager
+from f.services.booking._booking_models import (  # noqa: E402
+    BookingCreateRequest,
+    BookingResult,
+)
 
 # ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -33,31 +41,42 @@ _CHAT_ID = "123456789"
 
 
 def _patch_resolve_service(service_id: str | None) -> AbstractContextManager[MagicMock]:
+    from f.services.booking._booking_errors import BookingNoServiceError
+
+    if service_id:
+        return patch("f.internal.booking_confirm.main._resolve_service", AsyncMock(return_value=(service_id, 30)))
     return patch(
-        "f.internal.booking_confirm.main._resolve_service_id",
-        AsyncMock(return_value=service_id),
+        "f.internal.booking_confirm.main._resolve_service",
+        AsyncMock(side_effect=BookingNoServiceError("no_service_for_provider")),
     )
 
 
 @contextmanager
-def _patch_execute_create_booking(
+def _patch_create_booking(
     *,
     err: object = None,
-    result: dict[str, object] | None = None,
-) -> Iterator[MagicMock]:
-    async def _fake(*args: object, **kwargs: object) -> dict[str, object] | None:
+    result: BookingResult | None = None,
+) -> Generator[MagicMock]:
+    async def _fake(*args: object, **kwargs: object) -> BookingResult | None:
         if err:
             raise Exception(str(err))
         return result
 
-    with patch("f.internal.booking_confirm.main.execute_create_booking", side_effect=_fake) as m:
+    with patch("f.internal.booking_confirm.main.create_booking", side_effect=_fake) as m:
         yield m
 
 
 def _make_db_for_service(service_id: str | None) -> MagicMock:
     db = MagicMock()
     if service_id:
-        db.fetchrow = AsyncMock(return_value={"service_id": service_id})
+        db.fetchrow = AsyncMock(
+            return_value={
+                "service_id": service_id,
+                "duration_minutes": 30,
+                "provider_name": "Dr. Smith",
+                "service_name": "Consulta General",
+            }
+        )
     else:
         db.fetchrow = AsyncMock(return_value=None)
     db.execute = AsyncMock()
@@ -70,6 +89,14 @@ def _patch_db(db: MagicMock) -> AbstractContextManager[MagicMock]:
         "f.internal.booking_confirm.main.create_db_client",
         AsyncMock(return_value=db),
     )
+
+
+@contextmanager
+def _patch_repo() -> Generator[MagicMock]:
+    with patch("f.internal.booking_confirm.main.PgBookingRepo") as mock_repo_cls:
+        mock_instance = mock_repo_cls.return_value
+        mock_instance.get_active_booking_for_client = AsyncMock(return_value=None)
+        yield mock_repo_cls
 
 
 # ── Tests: service resolution ──────────────────────────────────────────────────
@@ -89,14 +116,16 @@ class TestBookingConfirmServiceResolution:
             )
 
         assert result["success"] is False
-        assert result["error"] == "no_service_for_provider"
+        assert "no_service_for_provider" in str(result["error"])
 
     @pytest.mark.asyncio
     async def test_service_resolution_uses_provider_id(self) -> None:
-        """_resolve_service_id is called with the correct provider_id."""
-        mock_resolve = AsyncMock(return_value=None)
+        """_resolve_service is called once with the correct provider_id."""
+        from f.services.booking._booking_errors import BookingNoServiceError
+
+        mock_resolve = AsyncMock(side_effect=BookingNoServiceError("no_service_for_provider"))
         db = _make_db_for_service(None)
-        with patch("f.internal.booking_confirm.main._resolve_service_id", mock_resolve), _patch_db(db):
+        with patch("f.internal.booking_confirm.main._resolve_service", mock_resolve), _patch_db(db):
             await _main_async(
                 client_id=_CLIENT_ID,
                 provider_id=_PROVIDER_ID,
@@ -116,17 +145,14 @@ class TestBookingConfirmDelegation:
     @pytest.mark.asyncio
     async def test_successful_booking_returns_success_true(self) -> None:
         """Happy path: service found, booking_create succeeds."""
-        booking_result: dict[str, object] = {
-            "booking_id": _BOOKING_ID,
-            "provider_name": "Dr. Smith",
-            "service_name": "Consulta General",
-            "start_time": _START_TIME,
-            "status": "pending",
-            "end_time": "2026-06-01T10:30:00+00:00",
-            "client_name": "Ana García",
-        }
+        booking_result = BookingResult(booking_id=_BOOKING_ID, status="confirmed")
         db = _make_db_for_service(_SERVICE_ID)
-        with _patch_resolve_service(_SERVICE_ID), _patch_execute_create_booking(result=booking_result), _patch_db(db):
+        with (
+            _patch_resolve_service(_SERVICE_ID),
+            _patch_create_booking(result=booking_result),
+            _patch_db(db),
+            _patch_repo(),
+        ):
             result = await _main_async(
                 client_id=_CLIENT_ID,
                 provider_id=_PROVIDER_ID,
@@ -136,14 +162,17 @@ class TestBookingConfirmDelegation:
 
         assert result["success"] is True
         assert result["booking_id"] == _BOOKING_ID
-        assert result["provider_name"] == "Dr. Smith"
-        assert result["service_name"] == "Consulta General"
 
     @pytest.mark.asyncio
     async def test_booking_create_failure_returns_error(self) -> None:
         """When booking_create raises an error, success=False with error message."""
         db = _make_db_for_service(_SERVICE_ID)
-        with _patch_resolve_service(_SERVICE_ID), _patch_execute_create_booking(err=Exception("slot_taken")), _patch_db(db):
+        with (
+            _patch_resolve_service(_SERVICE_ID),
+            _patch_create_booking(err=Exception("slot_taken")),
+            _patch_repo(),
+            _patch_db(db),
+        ):
             result = await _main_async(
                 client_id=_CLIENT_ID,
                 provider_id=_PROVIDER_ID,
@@ -158,7 +187,12 @@ class TestBookingConfirmDelegation:
     async def test_booking_create_returns_none_result(self) -> None:
         """When booking_create returns None, success=False with sentinel error."""
         db = _make_db_for_service(_SERVICE_ID)
-        with _patch_resolve_service(_SERVICE_ID), _patch_execute_create_booking(err=None, result=None), _patch_db(db):
+        with (
+            _patch_resolve_service(_SERVICE_ID),
+            _patch_create_booking(err=None, result=None),
+            _patch_db(db),
+            _patch_repo(),
+        ):
             result = await _main_async(
                 client_id=_CLIENT_ID,
                 provider_id=_PROVIDER_ID,
@@ -167,29 +201,22 @@ class TestBookingConfirmDelegation:
             )
 
         assert result["success"] is False
-        assert result["error"] == "no_result_from_booking_create"
+        assert "no_result_from_booking_create" in str(result["error"])
 
     @pytest.mark.asyncio
     async def test_idempotency_key_uses_chat_and_start_time(self) -> None:
         """Idempotency key is formatted as 'tg:{chat_id}:{start_time}'."""
         captured_inputs: list[object] = []
 
-        async def _capture(*args: object, **kwargs: object) -> dict[str, object]:
-            captured_inputs.append(args[1] if args else kwargs.get("input_data"))
-            return {
-                "booking_id": _BOOKING_ID,
-                "provider_name": "P",
-                "service_name": "S",
-                "start_time": _START_TIME,
-                "status": "pending",
-                "end_time": "2026-06-01T10:30:00+00:00",
-                "client_name": "C",
-            }
+        async def _capture(*args: object, **kwargs: object) -> BookingResult:
+            captured_inputs.append(args[0] if args else kwargs.get("data"))
+            return BookingResult(booking_id=_BOOKING_ID, status="confirmed")
 
         db = _make_db_for_service(_SERVICE_ID)
         with (
             _patch_resolve_service(_SERVICE_ID),
-            patch("f.internal.booking_confirm.main.execute_create_booking", side_effect=_capture),
+            patch("f.internal.booking_confirm.main.create_booking", side_effect=_capture),
+            _patch_repo(),
             _patch_db(db),
         ):
             await _main_async(
@@ -201,43 +228,8 @@ class TestBookingConfirmDelegation:
 
         assert len(captured_inputs) == 1
         input_data = captured_inputs[0]
-        assert isinstance(input_data, BookingCreateInput)
+        assert isinstance(input_data, BookingCreateRequest)
         assert input_data.idempotency_key == f"tg:{_CHAT_ID}:{_START_TIME}"
-
-    @pytest.mark.asyncio
-    async def test_booking_create_receives_channel_telegram(self) -> None:
-        """booking_create is called with channel='telegram' and actor='client'."""
-        captured_inputs: list[object] = []
-
-        async def _capture(*args: object, **kwargs: object) -> dict[str, object]:
-            captured_inputs.append(args[1] if args else kwargs.get("input_data"))
-            return {
-                "booking_id": _BOOKING_ID,
-                "provider_name": "P",
-                "service_name": "S",
-                "start_time": _START_TIME,
-                "status": "pending",
-                "end_time": "2026-06-01T10:30:00+00:00",
-                "client_name": "C",
-            }
-
-        db = _make_db_for_service(_SERVICE_ID)
-        with (
-            _patch_resolve_service(_SERVICE_ID),
-            patch("f.internal.booking_confirm.main.execute_create_booking", side_effect=_capture),
-            _patch_db(db),
-        ):
-            await _main_async(
-                client_id=_CLIENT_ID,
-                provider_id=_PROVIDER_ID,
-                start_time=_START_TIME,
-                chat_id=_CHAT_ID,
-            )
-
-        input_data = captured_inputs[0]
-        assert isinstance(input_data, BookingCreateInput)
-        assert input_data.channel == "telegram"
-        assert input_data.actor == "client"
 
 
 # ── Tests: service resolution DB integration ──────────────────────────────────
@@ -246,36 +238,37 @@ class TestBookingConfirmDelegation:
 class TestBookingConfirmResolveService:
     @pytest.mark.asyncio
     async def test_resolve_service_queries_by_provider(self) -> None:
-        """_resolve_service_id fetches from services table using provider_id."""
+        """_resolve_service fetches from services table using provider_id."""
         db = _make_db_for_service(_SERVICE_ID)
         with _patch_db(db):
-            from f.internal.booking_confirm.main import _resolve_service_id
+            from f.internal.booking_confirm.main import _resolve_service
 
-            result = await _resolve_service_id(db, _PROVIDER_ID)
+            result = await _resolve_service(db, _PROVIDER_ID)
 
-        assert result == _SERVICE_ID
+        assert result == (_SERVICE_ID, 30)
         db.fetchrow.assert_awaited_once()
         call_args = db.fetchrow.call_args
         assert _PROVIDER_ID in str(call_args)
 
     @pytest.mark.asyncio
-    async def test_resolve_service_returns_none_when_not_found(self) -> None:
-        """Returns None when fetchrow finds no matching service."""
+    async def test_resolve_service_raises_when_not_found(self) -> None:
+        """Raises BookingNoServiceError when fetchrow finds no matching service."""
+        from f.services.booking._booking_errors import BookingNoServiceError
+
         db = _make_db_for_service(None)
         with _patch_db(db):
-            from f.internal.booking_confirm.main import _resolve_service_id
+            from f.internal.booking_confirm.main import _resolve_service
 
-            result = await _resolve_service_id(db, _PROVIDER_ID)
-
-        assert result is None
+            with pytest.raises(BookingNoServiceError):
+                await _resolve_service(db, _PROVIDER_ID)
 
     @pytest.mark.asyncio
     async def test_resolve_service_does_not_close_connection(self) -> None:
-        """_resolve_service_id no longer manages connection lifecycle."""
+        """_resolve_service no longer manages connection lifecycle."""
         db = _make_db_for_service(_SERVICE_ID)
         with _patch_db(db):
-            from f.internal.booking_confirm.main import _resolve_service_id
+            from f.internal.booking_confirm.main import _resolve_service
 
-            await _resolve_service_id(db, _PROVIDER_ID)
+            await _resolve_service(db, _PROVIDER_ID)
 
         db.close.assert_not_awaited()

@@ -51,23 +51,20 @@ async def fetch_provider_dashboard(db: DBClient, input_data: InputSchema) -> Das
             target_date,
         )
 
-        agenda: list[AgendaItem] = []
-        for r in agenda_rows:
-            agenda.append(
-                {
-                    "booking_id": str(r["booking_id"]),
-                    "client_name": str(r["client_name"]),
-                    "client_email": None,
-                    "service_name": str(r["service_name"]),
-                    "start_time": r["start_time"].isoformat()
-                    if isinstance(r["start_time"], datetime)
-                    else str(r["start_time"]),
-                    "end_time": r["end_time"].isoformat()
-                    if isinstance(r["end_time"], datetime)
-                    else str(r["end_time"]),
-                    "status": str(r["status"]),
-                }
-            )
+        agenda: list[AgendaItem] = [
+            {
+                "booking_id": str(r["booking_id"]),
+                "client_name": str(r["client_name"]),
+                "client_email": None,
+                "service_name": str(r["service_name"]),
+                "start_time": r["start_time"].isoformat()
+                if isinstance(r["start_time"], datetime)
+                else str(r["start_time"]),
+                "end_time": r["end_time"].isoformat() if isinstance(r["end_time"], datetime) else str(r["end_time"]),
+                "status": str(r["status"]),
+            }
+            for r in agenda_rows
+        ]
 
         # 3. Monthly Stats
         stats_rows = await db.fetch(

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import zoneinfo
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, cast
@@ -41,10 +42,8 @@ async def handle_get_my_bookings(
         )
         limit = 20
         if prefs_row and prefs_row["max_b"]:
-            try:
+            with contextlib.suppress(ValueError):
                 limit = int(str(prefs_row["max_b"]))
-            except ValueError:
-                pass
 
         rows = await conn.fetch(
             """

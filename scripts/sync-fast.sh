@@ -69,7 +69,17 @@ _add() {
 if [[ $# -gt 0 ]]; then
   # Archivos explícitos pasados como argumentos
   for arg in "$@"; do
-    _is_wm_path "$arg" && _add "$arg" || echo -e "${Y}⚠ Ignorado (no es ruta Windmill): $arg${NC}"
+    if ! _is_wm_path "$arg"; then
+      echo -e "${Y}⚠ Ignorado (no es ruta Windmill): $arg${NC}"
+      continue
+    fi
+    _add "$arg"
+    # Incluir siempre .script.yaml/.script.lock asociados al .py (igual que auto-detección)
+    if [[ "$arg" == *.py ]]; then
+      local_base="${arg%.py}"
+      [[ -f "${local_base}.script.yaml" ]] && _add "${local_base}.script.yaml"
+      [[ -f "${local_base}.script.lock" ]] && _add "${local_base}.script.lock"
+    fi
   done
 else
   # Auto-detección: diff no commiteado + untracked
@@ -97,7 +107,7 @@ if [[ ${#TARGETS[@]} -eq 0 ]]; then
   exit 0
 fi
 
-INCLUDES=$(printf '%s,' "${TARGETS[@]}" | sed 's/,$//')
+INCLUDES=$(printf '%s,' "${TARGETS[@]}" | perl -pe 's/,$//s')
 
 echo -e "${B}⚡ sync-fast → workspace: ${WORKSPACE}${NC}"
 echo -e "${B}🎯 Archivos (${#TARGETS[@]}):${NC}"
@@ -111,11 +121,11 @@ for yaml in "${TARGETS[@]}"; do
   # Elimina líneas con 'lock: !inline path' cuyo archivo no existe
   if grep -qE "lock: '!inline " "$yaml" 2>/dev/null; then
     while IFS= read -r line; do
-      ref=$(echo "$line" | sed -n "s/.*lock: '!inline \([^']*\)'.*/\1/p")
+      ref=$(echo "$line" | perl -ne "s/.*lock: '!inline ([^']+)'.*/\$1/p")
       [[ -z "$ref" ]] && continue
       [[ -f "$ref" ]] && continue
       echo -e "${Y}  ⚠ Lock roto reparado: $ref en $yaml${NC}"
-      sed -i "\|lock: '!inline ${ref}'|d" "$yaml"
+      perl -i -ne "print unless /lock: '!inline \Q${ref}\E'/" "$yaml"
     done < <(grep "lock: '!inline " "$yaml")
   fi
 done
@@ -124,6 +134,17 @@ done
 echo -e "${B}🔄 Regenerando metadatos...${NC}"
 "$WMILL" generate-metadata --workspace "$WORKSPACE" --yes --includes "$INCLUDES" 2>&1 \
   | grep -v "^$\|metadata up-to-date\|Using workspace" || true
+
+# ── Forzar Python 3.13 en todos los lock files ───────────────────────────────
+_fixed_locks=0
+while IFS= read -r lockfile; do
+  if grep -q '^# py: 3\.12$' "$lockfile"; then
+    perl -i -pe 's/^# py: 3\.12$/# py: 3.13/' "$lockfile"
+    echo -e "${Y}  🔧 Lock normalizado a 3.13: $lockfile${NC}"
+    (( _fixed_locks++ )) || true
+  fi
+done < <(find f/ \( -name "*.lock" -o -name "*.script.lock" \) 2>/dev/null)
+[[ $_fixed_locks -gt 0 ]] && echo -e "${Y}  ⚠ $_fixed_locks lock(s) corregidos a py: 3.13${NC}"
 
 # ── Push ──────────────────────────────────────────────────────────────────────
 echo -e "${B}🚀 Subiendo a Windmill...${NC}"

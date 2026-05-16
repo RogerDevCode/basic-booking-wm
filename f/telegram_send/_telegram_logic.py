@@ -120,7 +120,8 @@ class TelegramService:
             row: list[dict[str, str]] = []
             for b_obj in flat_list[i : i + 2]:
                 if hasattr(b_obj, "text") and hasattr(b_obj, "callback_data"):
-                    row.append({"text": str(b_obj.text), "callback_data": str(b_obj.callback_data)})
+                    b = cast("dict[str, str]", b_obj)
+                    row.append({"text": str(b["text"]), "callback_data": str(b["callback_data"])})
                 elif isinstance(b_obj, dict):
                     b_dict = cast("dict[str, object]", b_obj)
                     row.append(

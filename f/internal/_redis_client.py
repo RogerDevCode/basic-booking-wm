@@ -13,6 +13,8 @@ from ._wmill_adapter import get_variable
 
 REDIS_TTL: Final[int] = 1800  # 30 minutes
 
+_VALID_SCHEMES: Final[tuple[str, ...]] = ("redis://", "rediss://", "unix://")
+
 
 def _resolve_redis_url() -> str | None:
     # 1. Local environment
@@ -30,15 +32,21 @@ def _resolve_redis_url() -> str | None:
     return None
 
 
-async def create_redis_client() -> Redis:
-    """
-    Factory for Redis client.
-    """
-    redis_url = _resolve_redis_url()
-    if not redis_url:
-        # Default for local docker-compose
-        redis_url = "redis://redis:6379"
+def _ensure_scheme(url: str) -> str:
+    """Inject redis:// scheme if the URL is a bare hostname or missing a valid scheme."""
+    if any(url.startswith(s) for s in _VALID_SCHEMES):
+        return url
+    return f"redis://{url}"
 
-    # Use Redis.from_url. We suppress type-arg because redis-py async types
-    # are problematic in some environments/stubs.
-    return Redis.from_url(redis_url, decode_responses=True)
+
+async def create_redis_client(redis_url: str | None = None) -> Redis:
+    """
+    Factory for Redis client. Accepts an explicit URL (preferred — callers should
+    pass the value received from flow input) and falls back to environment/variable
+    resolution. Scheme injection handles bare hostnames like 'redis:6379'.
+    """
+    if not redis_url:
+        redis_url = _resolve_redis_url()
+    if not redis_url:
+        redis_url = "redis://redis:6379"
+    return Redis.from_url(_ensure_scheme(redis_url), decode_responses=True)

@@ -31,7 +31,7 @@ MODULE: Final[str] = "conversation_update"
 async def _update_conversation(
     input_data: ConversationUpdateInput, redis_url: str | None = None
 ) -> ConversationUpdateResult:
-    redis = await create_redis_client()
+    redis = await create_redis_client(redis_url)
     try:
         key = f"conv:{input_data.chat_id}"
 
@@ -39,29 +39,55 @@ async def _update_conversation(
             await redis.delete(key)
             return ConversationUpdateResult(success=True, chat_id=input_data.chat_id)
 
-        # Atomic update
-        async with redis.pipeline(transaction=True):
-            raw = await redis.get(key)
-            existing = cast("dict[str, object]", json.loads(str(raw)) if raw else {})
+        # Atomic update via Lua script to prevent race conditions
+        lua_script = """
+        local key = KEYS[1]
+        local ttl = ARGV[1]
+        local updates = cjson.decode(ARGV[2])
 
-            updated = {**existing}
-            if input_data.active_flow is not None:
-                updated["active_flow"] = input_data.active_flow
-            if input_data.flow_step is not None:
-                updated["flow_step"] = input_data.flow_step
-            if input_data.pending_data is not None:
-                existing_pending = cast("dict[str, object]", existing.get("pending_data", {}))
-                updated["pending_data"] = {**existing_pending, **input_data.pending_data}
-            if input_data.booking_state is not None:
-                updated["booking_state"] = input_data.booking_state
-            if input_data.booking_draft is not None:
-                updated["booking_draft"] = input_data.booking_draft
-            if input_data.message_id is not None:
-                updated["message_id"] = input_data.message_id
+        local raw = redis.call('GET', key)
+        local existing = {}
+        if raw and raw ~= false then
+            existing = cjson.decode(raw)
+        end
 
-            updated["updated_at"] = datetime.now(UTC).isoformat()
+        for k, v in pairs(updates) do
+            if k == 'pending_data' and type(v) == 'table' then
+                local pending = existing['pending_data']
+                if type(pending) ~= 'table' then
+                    pending = {}
+                end
+                for pk, pv in pairs(v) do
+                    pending[pk] = pv
+                end
+                existing['pending_data'] = pending
+            else
+                existing[k] = v
+            end
+        end
 
-            await redis.set(key, json.dumps(updated), ex=REDIS_TTL)
+        local result = cjson.encode(existing)
+        redis.call('SET', key, result, 'EX', ttl)
+        return 1
+        """
+
+        updates: dict[str, object] = {}
+        if input_data.active_flow is not None:
+            updates["active_flow"] = input_data.active_flow
+        if input_data.flow_step is not None:
+            updates["flow_step"] = input_data.flow_step
+        if input_data.pending_data is not None:
+            updates["pending_data"] = input_data.pending_data
+        if input_data.booking_state is not None:
+            updates["booking_state"] = input_data.booking_state
+        if input_data.booking_draft is not None:
+            updates["booking_draft"] = input_data.booking_draft
+        if input_data.message_id is not None:
+            updates["message_id"] = input_data.message_id
+
+        updates["updated_at"] = datetime.now(UTC).isoformat()
+
+        await redis.eval(lua_script, 1, key, REDIS_TTL, json.dumps(updates))  # type: ignore[misc]
 
         return ConversationUpdateResult(success=True, chat_id=input_data.chat_id)
 
@@ -75,14 +101,12 @@ async def _update_conversation(
 async def _main_async(args: object, redis_url: str | None = None) -> dict[str, object]:
     """Windmill entrypoint."""
     if not isinstance(args, dict):
-        log("conversation_update skipped: args is not a dict", module=MODULE)
-        return {"data": {"success": False, "chat_id": "", "skipped": True, "reason": "invalid_args_type"}}
+        raise RuntimeError("conversation_update failed: args is not a dict")
 
     try:
         input_data = ConversationUpdateInput.model_validate(args)
     except Exception as e:
-        log("conversation_update validation error", error=str(e), module=MODULE)
-        return {"data": {"success": False, "chat_id": "", "skipped": True, "reason": "validation_error"}}
+        raise RuntimeError(f"conversation_update validation error: {e}") from e
 
     result = await _update_conversation(input_data, redis_url)  # type: ignore[call-arg]
     return {"data": cast("dict[str, object]", result.model_dump())}

@@ -25,7 +25,7 @@ def test_clean_text_removes_null_byte() -> None:
 
 def test_clean_text_removes_zero_width_space() -> None:
     # U+200B: category Cf
-    assert "​" not in clean_text("ho​la")
+    assert "\u200b" not in clean_text("ho\u200bla")
 
 
 def test_clean_text_removes_zero_width_joiner() -> None:

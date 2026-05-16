@@ -104,6 +104,11 @@ def apply_spell_correction(text: str) -> tuple[str, list[SpellCorrection]]:
     Only corrects words flagged as unknown by the Spanish dictionary.
     Skips words shorter than _MIN_WORD_LEN to avoid false positives.
     """
+    # Telegram commands (/start, /help, etc.) must pass through unchanged.
+    # The Spanish dictionary would mangle English words like "start" → "estar".
+    if text.startswith("/"):
+        return text, []
+
     checker = _get_checker()
     # Split into word tokens and non-word tokens (punctuation, spaces) to preserve structure.
     tokens = re.findall(r"\w+|\W+", text)

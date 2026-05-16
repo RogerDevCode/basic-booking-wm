@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import traceback
+from datetime import datetime
 from typing import TYPE_CHECKING, Any, cast
 
 from f.booking_orchestrator._get_entity import get_entity
@@ -97,7 +99,7 @@ async def handle_create_booking(
     active_booking = await get_active_booking_for_provider(conn, client_id, provider_id)
     if active_booking:
         st = active_booking["start_time"]
-        fmt_time = st.strftime("%d/%m %H:%M") if hasattr(st, "strftime") else str(st)
+        fmt_time = st.strftime("%d/%m %H:%M") if isinstance(st, datetime) else str(st)
 
         message = (
             f"\u2139\ufe0f *Ya tienes una cita activa*\n\n"
@@ -135,19 +137,19 @@ async def handle_create_booking(
     }
 
     from ...booking_create.main import run_create_booking
+    from ...internal._wmill_adapter import log
 
     try:
         data = await run_create_booking(conn, args)
-        err = None
     except Exception as e:
-        err = str(e)
-        data = None
+        log("CREATE_BOOKING_FAILED", error=str(e), traceback=traceback.format_exc(), module="booking_orchestrator")
+        raise RuntimeError(f"Create booking failed: {e}") from e
 
     res_final: OrchestratorResult = {
         "action": "crear_cita",
-        "success": err is None,
+        "success": True,
         "data": data,
-        "message": f"❌ No se pudo agendar: {err}" if err else f"✅ Cita agendada para el {date} a las {time}.",
-        "follow_up": "¿Quieres intentar otro horario?" if err else None,
+        "message": f"✅ Cita agendada para el {date} a las {time}.",
+        "follow_up": None,
     }
     return res_final

@@ -14,6 +14,11 @@
 # ///
 from __future__ import annotations
 
+import asyncio
+import traceback
+
+from pydantic import BaseModel
+
 from ..internal._db_client import _resolve_db_url
 from ..internal._wmill_adapter import get_variable
 from ._gateway_logic import ClientRepository, TelegramClient
@@ -64,7 +69,7 @@ async def _main_async(args: dict[str, object]) -> dict[str, object]:
     try:
         update = TelegramUpdate.model_validate(args)
     except Exception as e:
-        return {"success": False, "error": f"validation_error: {e}"}
+        raise RuntimeError(f"validation_error: {e}") from e
 
     token = str(get_variable("u/admin/TELEGRAM_BOT_TOKEN") or get_variable("TELEGRAM_BOT_TOKEN") or "")
     db_url = _resolve_db_url() or ""
@@ -108,11 +113,6 @@ async def _main_async(args: dict[str, object]) -> dict[str, object]:
 
 
 def main(args: TelegramUpdate | dict[str, object]) -> dict[str, object]:
-    import asyncio
-    import traceback
-
-    from pydantic import BaseModel
-
     try:
         if isinstance(args, TelegramUpdate):
             validated = args
@@ -121,15 +121,9 @@ def main(args: TelegramUpdate | dict[str, object]) -> dict[str, object]:
 
         result = asyncio.run(_main_async(validated.model_dump()))
 
-        if result is None:
-            return {}
-
         if isinstance(result, BaseModel):
             return result.model_dump()
-        elif isinstance(result, dict):
-            return result
-        else:
-            return {"data": result}
+        return result
 
     except Exception as e:
         tb = traceback.format_exc()

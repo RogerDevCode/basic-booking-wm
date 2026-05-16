@@ -1,0 +1,7 @@
+# Crear si no existe para acelerar el inicio
+.venv/
+__pycache__/
+.git/
+.ruff_cache/
+.pytest_cache/
+node_modules/

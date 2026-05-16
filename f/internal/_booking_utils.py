@@ -24,8 +24,8 @@ async def get_active_booking_for_provider(conn: DBClient, client_id: str, provid
         JOIN services s ON s.service_id = b.service_id
         WHERE b.client_id = $1::uuid
           AND b.provider_id = $2::uuid
-          AND b.status IN ('confirmed', 'pending')
-          AND b.start_time >= NOW()
+          AND b.status NOT IN ('cancelled', 'no_show', 'rescheduled')
+          AND b.start_time > NOW()
         ORDER BY b.start_time ASC
         LIMIT 1
     """

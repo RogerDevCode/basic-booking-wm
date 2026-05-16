@@ -32,7 +32,7 @@ def build_doctors_prompt(specialty_name: str, items: list[NamedItem], error: str
     if not items:
         return f"{header}No hay doctores disponibles en este momento para esa especialidad. 🛠️"
     lines = "\n".join(f"{i + 1}. {it['name']}" for i, it in enumerate(items))
-    return f"{header}¿Con qué doctor deseas tu cita?\n\n{lines}"
+    return f"{header}¿Con qué doctor deseas tu hora?\n\n{lines}"
 
 
 def build_slots_prompt(doctor_name: str, items: list[TimeSlotItem], error: str | None = None) -> str:
@@ -44,8 +44,8 @@ def build_slots_prompt(doctor_name: str, items: list[TimeSlotItem], error: str |
 
 
 def build_confirmation_prompt(time_label: str, doctor_name: str, extra: str | None = None) -> str:
-    prompt = extra or '¿Confirmas esta cita? Responde "sí" o "no".'
-    return f"📋 *Confirmar Cita*\n\nDoctor: {doctor_name}\nHorario: {time_label}\n\n{prompt}"
+    prompt = extra or '¿Confirmas esta hora? Responde "sí" o "no".'
+    return f"📋 *Confirmar Hora*\n\nDoctor: {doctor_name}\nHorario: {time_label}\n\n{prompt}"
 
 
 def build_loading_doctors_prompt(specialty_name: str) -> str:

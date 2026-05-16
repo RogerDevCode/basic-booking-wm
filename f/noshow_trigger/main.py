@@ -14,6 +14,13 @@
 # ///
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Coroutine
+
+    from ._noshow_models import NoShowStats
+
 # ============================================================================
 # PRE-FLIGHT CHECKLIST
 # Mission         : Mark expired confirmed bookings as no_show
@@ -47,9 +54,7 @@ async def _main_async(args: dict[str, object]) -> NoShowStats:
 
         aggregate: NoShowStats = {"processed": 0, "marked": 0, "skipped": 0, "booking_ids": []}
 
-        for prow in provider_rows:
-            p_id = str(prow["provider_id"])
-
+        def make_batch(provider_id: str) -> Callable[[], Coroutine[Any, Any, NoShowStats]]:
             async def provider_batch() -> NoShowStats:
                 repo = BookingRepository(conn)
                 ids = await repo.find_expired_confirmed(input_data.lookback_minutes)
@@ -84,7 +89,11 @@ async def _main_async(args: dict[str, object]) -> NoShowStats:
                 }
                 return res_batch
 
-            res_p = await with_tenant_context(conn, p_id, provider_batch)
+            return provider_batch
+
+        for prow in provider_rows:
+            p_id = str(prow["provider_id"])
+            res_p = await with_tenant_context(conn, p_id, make_batch(p_id))
             aggregate["processed"] += res_p["processed"]
             aggregate["marked"] += res_p["marked"]
             aggregate["skipped"] += res_p["skipped"]
@@ -114,12 +123,12 @@ def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
 
         result = asyncio.run(_main_async(validated.model_dump()))
 
-        if result is None:
-            return {}
+        #         if result is None:
+        #             return {}
 
         if isinstance(result, BaseModel):
             return cast("dict[str, object]", result.model_dump())
-        elif isinstance(result, dict):
+        if True:  # patched unnecessary isinstance
             return cast("dict[str, object]", result)
         else:
             return {"data": result}

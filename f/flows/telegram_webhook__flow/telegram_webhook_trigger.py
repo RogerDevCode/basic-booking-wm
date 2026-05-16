@@ -1,21 +1,58 @@
 from __future__ import annotations
 
+import contextlib
 import json
 import urllib.request
 from typing import Any, Literal
 
+from pydantic import BaseModel, ConfigDict, Field
+
 type EventKind = Literal["message", "callback", "empty"]
 type TextKind = Literal["plain_text", "command_start", "command_other", "callback", "empty"]
+
+
+class TelegramChat(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: int
+
+
+class TelegramFrom(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: int
+    first_name: str | None = None
+    last_name: str | None = None
+    username: str | None = None
+
+
+class TelegramMessage(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    message_id: int
+    chat: TelegramChat | None = None
+    from_: TelegramFrom | None = Field(None, alias="from")
+    text: str | None = None
+
+
+class TelegramCallbackQuery(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str
+    from_: TelegramFrom | None = Field(None, alias="from")
+    message: TelegramMessage | None = None
+    data: str | None = None
+
+
+class TelegramUpdate(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    update_id: int | None = None
+    message: TelegramMessage | None = None
+    callback_query: TelegramCallbackQuery | None = None
 
 
 def _answer_callback_query(callback_query_id: str, bot_token: str) -> None:
     url = f"https://api.telegram.org/bot{bot_token}/answerCallbackQuery"
     data = json.dumps({"callback_query_id": callback_query_id}).encode()
     req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
-    try:
-        urllib.request.urlopen(req, timeout=2)
-    except Exception:
-        pass  # Non-fatal — best-effort answer
+    with contextlib.suppress(Exception):
+        urllib.request.urlopen(req, timeout=2)  # Non-fatal — best-effort answer
 
 
 async def _main_async(webhook_payload: dict[str, Any]) -> dict[str, Any]:
@@ -29,11 +66,15 @@ async def _main_async(webhook_payload: dict[str, Any]) -> dict[str, Any]:
                 payload = webhook_payload[key]
                 break
 
-    update_id_raw = payload.get("update_id")
-    update_id = int(update_id_raw) if isinstance(update_id_raw, int) else None
+    # Pydantic validation at the boundary (LAW-07)
+    try:
+        update = TelegramUpdate.model_validate(payload)
+    except Exception as e:
+        return {"skipped": True, "reason": f"invalid_payload: {e}", "payload": payload}
 
-    message = payload.get("message", {})
-    callback_query = payload.get("callback_query", {})
+    update_id = update.update_id
+    message = update.message
+    callback_query = update.callback_query
 
     chat_id = ""
     text = ""
@@ -45,22 +86,28 @@ async def _main_async(webhook_payload: dict[str, Any]) -> dict[str, Any]:
     last_name: str | None = None
 
     if message:
-        from_data = message.get("from", {})
-        chat_id = str(message.get("chat", {}).get("id", ""))
-        text = message.get("text", "")
-        username = from_data.get("username", "unknown")
-        first_name = from_data.get("first_name", "Usuario") or "Usuario"
-        last_name = from_data.get("last_name") or None
+        from_data = message.from_
+        if message.chat:
+            chat_id = str(message.chat.id)
+        if message.text:
+            text = message.text
+        if from_data:
+            username = from_data.username or "unknown"
+            first_name = from_data.first_name or "Usuario"
+            last_name = from_data.last_name
     elif callback_query:
-        from_data = callback_query.get("from", {})
-        msg = callback_query.get("message", {})
-        chat_id = str(msg.get("chat", {}).get("id", ""))
-        callback_data = callback_query.get("data")
-        callback_query_id = callback_query.get("id")
-        callback_message_id = msg.get("message_id")
-        username = from_data.get("username", "unknown")
-        first_name = from_data.get("first_name", "Usuario") or "Usuario"
-        last_name = from_data.get("last_name") or None
+        from_data = callback_query.from_
+        msg = callback_query.message
+        if msg and msg.chat:
+            chat_id = str(msg.chat.id)
+        callback_data = callback_query.data
+        callback_query_id = callback_query.id
+        if msg:
+            callback_message_id = msg.message_id
+        if from_data:
+            username = from_data.username or "unknown"
+            first_name = from_data.first_name or "Usuario"
+            last_name = from_data.last_name
 
     # Answer callback query immediately to dismiss Telegram inline button spinner
     if callback_query_id:

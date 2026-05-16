@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import re
+from datetime import datetime
 
 from ..internal._booking_utils import get_active_booking_for_provider
 
@@ -115,7 +116,7 @@ async def _main_async(args: dict[str, object]) -> dict[str, object]:
                 active_booking = await get_active_booking_for_provider(conn, state.client_id, input_data.provider_id)
                 if active_booking:
                     st = active_booking["start_time"]
-                    fmt_time = st.strftime("%d/%m %H:%M") if hasattr(st, "strftime") else str(st)
+                    fmt_time = st.strftime("%d/%m %H:%M") if isinstance(st, datetime) else str(st)
 
                     target_date = state.selected_date
                     target_time = state.selected_time
@@ -214,12 +215,12 @@ def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
 
         result = asyncio.run(_main_async(validated.model_dump()))
 
-        if result is None:
-            return {}
+        #         if result is None:
+        #             return {}
 
         if isinstance(result, BaseModel):
             return cast("dict[str, object]", result.model_dump())
-        elif isinstance(result, dict):
+        if True:  # patched unnecessary isinstance
             return result
         else:
             return {"data": result}

@@ -56,15 +56,8 @@ class PgBookingRepo:
         self.db = db
 
     async def _run_in_transaction(self, operation: Callable[[], Awaitable[_T]]) -> _T:
-        """Wraps multi-table mutations in BEGIN/COMMIT/ROLLBACK."""
-        await self.db.execute("BEGIN")
-        try:
-            result = await operation()
-            await self.db.execute("COMMIT")
-            return result
-        except Exception:
-            await self.db.execute("ROLLBACK")
-            raise
+        """Transaction management is delegated to the caller context (e.g., with_tenant_context)."""
+        return await operation()
 
     async def resolve_context(self, intent: dict[str, Any]) -> dict[str, Any]:
         entities = intent.get("entities", {})
@@ -118,7 +111,12 @@ class PgBookingRepo:
         timezone = "America/Santiago"
         if not client_id and telegram_chat_id:
             rows = await self.db.fetch(
-                ("SELECT client_id, timezone FROM clients WHERE telegram_chat_id = $1 LIMIT 1"),
+                (
+                    "SELECT c.client_id, t.name as timezone "
+                    "FROM clients c "
+                    "LEFT JOIN timezones t ON c.timezone_id = t.id "
+                    "WHERE c.telegram_chat_id = $1 LIMIT 1"
+                ),
                 str(telegram_chat_id),
             )
             if rows:
@@ -128,10 +126,12 @@ class PgBookingRepo:
             else:
                 name = intent.get("telegram_name") or "Usuario"
                 rows = await self.db.fetch(
-                    ("INSERT INTO clients (name, telegram_chat_id, timezone) VALUES ($1, $2, $3) RETURNING client_id"),
+                    (
+                        "INSERT INTO clients (name, telegram_chat_id, timezone_id) "
+                        "VALUES ($1, $2, 2) RETURNING client_id"
+                    ),
                     name,
                     str(telegram_chat_id),
-                    timezone,
                 )
                 if rows:
                     client_id = str(rows[0]["client_id"])
@@ -179,7 +179,7 @@ class PgBookingRepo:
             SELECT b.booking_id, b.start_time, p.name as provider_name 
             FROM bookings b JOIN providers p ON b.provider_id = p.provider_id 
             WHERE b.client_id = $1::uuid AND b.provider_id = $2::uuid 
-            AND b.status NOT IN ('cancelled', 'no_show', 'rescheduled', 'completed') 
+            AND b.status NOT IN ('cancelled', 'no_show', 'rescheduled') 
             AND b.start_time > NOW() LIMIT 1
             """,
             client_id,
@@ -246,7 +246,7 @@ class PgBookingRepo:
                 data.get("notes"),
             )
         except Exception as exc:
-            if "no_overlapping_active_bookings" in str(exc):
+            if "booking_no_overlap_gist" in str(exc):
                 raise BookingSlotUnavailableError(
                     "Slot unavailable — concurrent booking detected by DB constraint."
                 ) from exc
@@ -309,7 +309,8 @@ class PgBookingRepo:
                 cancellation_reason = $2,
                 cancelled_by      = CASE WHEN $1 = 'cancelled' THEN $4 ELSE cancelled_by END,
                 started_at        = CASE WHEN $1 = 'in_service' THEN NOW() ELSE started_at END,
-                completed_at      = CASE WHEN $1 = 'completed'  THEN NOW() ELSE completed_at END
+                completed_at      = CASE WHEN $1 = 'completed'  THEN NOW() ELSE completed_at END,
+                gcal_sync_status  = 'pending'
             WHERE booking_id = $3::uuid
             RETURNING booking_id, status, client_id, start_time
             """,
@@ -387,7 +388,7 @@ class PgBookingRepo:
                 old_booking_id,
             )
         except Exception as exc:
-            if "no_overlapping_active_bookings" in str(exc):
+            if "booking_no_overlap_gist" in str(exc):
                 raise BookingSlotUnavailableError(
                     "New slot unavailable — concurrent booking detected by DB constraint."
                 ) from exc

@@ -110,8 +110,8 @@ async def _main_async(args: dict[str, object]) -> dict[str, object]:
             raise RuntimeError(f"Unsupported action: {input_data.action}")
 
         result = await with_admin_context(conn, operation)
-        if result is None:
-            raise RuntimeError("Circuit breaker returned no result")
+        #         if result is None:
+        #             raise RuntimeError("Circuit breaker returned no result")
         return result
 
     except Exception as e:

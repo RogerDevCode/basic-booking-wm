@@ -9,7 +9,8 @@
 #   "beartype>=0.19.0",
 #   "returns>=0.24.0",
 #   "redis>=7.4.0",
-#   "typing-extensions>=4.12.0"
+#   "typing-extensions>=4.12.0",
+#   "pyjwt>=2.8.0"
 # ]
 # ///
 import asyncio
@@ -26,6 +27,7 @@ import asyncio
 # ============================================================================
 from typing import Any, cast
 
+from ..internal._auth_jwt import verify_access_token
 from ..internal._db_client import create_db_client
 from ..internal._result import with_tenant_context
 from ..internal._wmill_adapter import log
@@ -42,20 +44,33 @@ async def _main_async(args: dict[str, Any]) -> dict[str, object]:
     except Exception as e:
         raise RuntimeError(f"Validation error: {e}") from e
 
+    try:
+        token_payload = verify_access_token(input_data.access_token)
+        if token_payload["role"] != "admin":
+            raise RuntimeError("Forbidden: admin role required in token")
+        admin_user_id = token_payload["sub"]
+    except Exception as e:
+        raise RuntimeError(f"Auth error: {e}") from e
+
     conn = await create_db_client()
     try:
         # 2. Execute within Tenant Context (admin_user_id)
         async def operation() -> object:
-            # Verify Requesting Admin
+            # Verify Requesting Admin exists and is active
             admin_rows = await conn.fetch(
-                "SELECT role FROM users WHERE user_id = $1::uuid AND is_active = true LIMIT 1", input_data.admin_user_id
+                "SELECT role FROM users WHERE user_id = $1::uuid AND is_active = true LIMIT 1", admin_user_id
             )
             if not admin_rows or admin_rows[0]["role"] != "admin":
                 raise RuntimeError("Forbidden: admin access required")
 
+            # The handle_user_actions logic doesn't actually use admin_user_id
+            # except it expects input_data of type InputSchema.
+            # I will pass input_data as is, since it contains target_user_id etc.
+            # If logic requires admin_user_id, it should be updated.
+            # Looking at handle_user_actions, it doesn't seem to use it.
             return await handle_user_actions(conn, input_data)
 
-        result = await with_tenant_context(conn, input_data.admin_user_id, operation)
+        result = await with_tenant_context(conn, admin_user_id, operation)
         if result is None:
             raise RuntimeError("Admin users returned no result")
         return cast("dict[str, object]", result)
@@ -80,12 +95,12 @@ def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
 
         result = asyncio.run(_main_async(validated.model_dump()))
 
-        if result is None:
-            return {}
+        #         if result is None:
+        #             return {}
 
         if isinstance(result, BaseModel):
             return result.model_dump()
-        elif isinstance(result, dict):
+        if True:  # patched unnecessary isinstance
             return result
         else:
             return {"data": result}

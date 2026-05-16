@@ -20,6 +20,7 @@ IntentType = Literal[
     "mostrar_menu_principal",
     "paso_wizard",
     "ver_mis_citas",
+    "ver_mis_datos",
     "desconocido",
 ]
 
@@ -40,6 +41,7 @@ class IntentsStruct(TypedDict):
     MOSTRAR_MENU_PRINCIPAL: Literal["mostrar_menu_principal"]
     PASO_WIZARD: Literal["paso_wizard"]
     VER_MIS_CITAS: Literal["ver_mis_citas"]
+    VER_MIS_DATOS: Literal["ver_mis_datos"]
     DESCONOCIDO: Literal["desconocido"]
 
 
@@ -59,6 +61,7 @@ INTENT: Final[IntentsStruct] = {
     "MOSTRAR_MENU_PRINCIPAL": "mostrar_menu_principal",
     "PASO_WIZARD": "paso_wizard",
     "VER_MIS_CITAS": "ver_mis_citas",
+    "VER_MIS_DATOS": "ver_mis_datos",
     "DESCONOCIDO": "desconocido",
 }
 
@@ -118,10 +121,13 @@ SOCIAL_CONFIDENCE_VALUES: Final[dict[str, float]] = {
 INTENT_KEYWORDS: Final[dict[str, list[str]]] = {
     "saludo": ["hola", "buenas", "buenos dias", "buen dia", "saludos"],
     "urgencia": ["urgencia", "emergencia", "ayuda", "socorro", "rapido"],
-    "crear_cita": ["agendar", "cita", "reservar", "programar"],
+    "crear_cita": ["agendar", "reservar", "programar", "1"],
+    "ver_mis_citas": ["mis citas", "ver citas", "mis reservas", "2"],
+    "activar_recordatorios": ["3", "recordatorios"],
+    "pregunta_general": ["4", "informacion", "info"],
+    "ver_mis_datos": ["mis datos", "datos", "mi perfil", "perfil", "5"],
     "despedida": ["adios", "bye", "hasta luego", "chao"],
     "agradecimiento": ["gracias", "muchas gracias"],
-    "ver_mis_citas": ["mis citas", "ver citas", "mis reservas"],
     "mostrar_menu_principal": ["menu", "inicio", "volver"],
 }
 NORMALIZATION_MAP: Final[dict[str, str]] = {

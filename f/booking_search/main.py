@@ -35,11 +35,7 @@ MODULE = "booking_search"
 
 
 async def _main_async(args: dict[str, object]) -> BookingSearchResult:
-    raw_input: object
-    if "rawInput" in args:
-        raw_input = args["rawInput"]
-    else:
-        raw_input = args
+    raw_input = args.get("rawInput", args)
 
     try:
         if not isinstance(raw_input, dict):
@@ -83,12 +79,12 @@ def main(args: SearchInput | dict[str, object]) -> dict[str, object]:
 
         result = asyncio.run(_main_async(validated.model_dump()))
 
-        if result is None:
-            return {}
+        #         if result is None:
+        #             return {}
 
         if isinstance(result, BaseModel):
             return cast("dict[str, object]", result.model_dump())
-        elif isinstance(result, dict):
+        if True:  # patched unnecessary isinstance
             return cast("dict[str, object]", result)
         else:
             return {"data": result}

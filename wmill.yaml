@@ -8,6 +8,9 @@ excludes:
   - "**/__pycache__/**"
   - "f/types.ts"
 defaultTs: bun
+# NOTE: Windmill CLI no soporta defaultPy. Todo lock en este repo debe quedar
+# en `# py: 3.13`, y `sync-fast.sh` valida/corrige cualquier desvío.
+# Mantén también el default del servidor en Windmill UI → Settings → Default Python version → 3.13.x
 codebases: []
 skipVariables: false
 skipResources: false

@@ -32,7 +32,7 @@
                 "summary": "Obtener estado conversacional de Redis"
             },
             {
-                "id": "telegram_router",
+                "id": "fsm_router",
                 "value": {
                     "type": "script",
                     "input_transforms": {
@@ -69,7 +69,7 @@
                             "expr": "results.get_conversation_state.data?.message_id || results.webhook_trigger.callback_message_id || null"
                         }
                     },
-                    "path": "f/internal/telegram_router/main"
+                    "path": "f/internal/fsm_router/main"
                 },
                 "summary": "Router con InlineKeyboard + FSM wizard"
             },
@@ -113,11 +113,11 @@
                     "input_transforms": {
                         "message_id": {
                             "type": "javascript",
-                            "expr": "const router = results.telegram_router.data; if (router && router.should_edit) {\n  return (\n    router.message_id ||\n    results.get_conversation_state.data?.message_id ||\n    results.webhook_trigger.callback_message_id ||\n    null\n  );\n} return null;\n"
+                            "expr": "const router = results.fsm_router.data; if (router && router.should_edit) {\n  return (\n    router.message_id ||\n    results.get_conversation_state.data?.message_id ||\n    results.webhook_trigger.callback_message_id ||\n    null\n  );\n} return null;\n"
                         },
                         "mode": {
                             "type": "javascript",
-                            "expr": "const router = results.telegram_router.data; if (router && router.should_edit && router.message_id) {\n  'edit_message';\n} else {\n  'send_message';\n}\n"
+                            "expr": "const router = results.fsm_router.data; if (router && router.should_edit && router.message_id) {\n  'edit_message';\n} else {\n  'send_message';\n}\n"
                         },
                         "chat_id": {
                             "type": "javascript",
@@ -129,11 +129,11 @@
                         },
                         "text": {
                             "type": "javascript",
-                            "expr": "const router = results.telegram_router.data; if (router && router.response_text && router.response_text.length > 0) {\n  return router.response_text;\n} const orch = results.execute_action?.data; if (orch) {\n  if (orch.message) {\n    return orch.message + (orch.follow_up ? `\\n\\n${orch.follow_up}` : '');\n  }\n} return results.ai_agent?.data?.ai_response || 'Procesado';\n"
+                            "expr": "const router = results.fsm_router.data; if (router && router.response_text && router.response_text.length > 0) {\n  return router.response_text;\n} const orch = results.execute_action?.data; if (orch) {\n  if (orch.message) {\n    return orch.message + (orch.follow_up ? `\\n\\n${orch.follow_up}` : '');\n  }\n} return results.ai_agent?.data?.ai_response || 'Procesado';\n"
                         },
                         "inline_buttons": {
                             "type": "javascript",
-                            "expr": "const router = results.telegram_router.data; if (router && router.inline_keyboard && router.inline_keyboard.length > 0) {\n  return router.inline_keyboard.flat();\n} return [];\n"
+                            "expr": "const router = results.fsm_router.data; if (router && router.inline_keyboard && router.inline_keyboard.length > 0) {\n  return router.inline_keyboard.flat();\n} return [];\n"
                         }
                     },
                     "path": "f/telegram_send/main"
@@ -151,7 +151,7 @@
                 },
                 "summary": "Gate — si el router manejó, saltar AI Agent y orchestrator",
                 "skip_if": {
-                    "expr": "!results.telegram_router.data?.forward_to_ai\n"
+                    "expr": "!results.fsm_router.data?.forward_to_ai\n"
                 }
             },
             {
@@ -219,7 +219,7 @@
                 },
                 "summary": "Gate — solo ejecuta orchestrator si vino del AI Agent",
                 "skip_if": {
-                    "expr": "results.telegram_router.data?.forward_to_ai !== true\n"
+                    "expr": "results.fsm_router.data?.forward_to_ai !== true\n"
                 }
             },
             {
@@ -259,15 +259,15 @@
                         },
                         "booking_draft": {
                             "type": "javascript",
-                            "expr": "results.telegram_router.data?.nextDraft || results.execute_action.data?.nextDraft || null\n"
+                            "expr": "results.fsm_router.data?.nextDraft || results.execute_action.data?.nextDraft || null\n"
                         },
                         "flow_step": {
                             "type": "javascript",
-                            "expr": "results.telegram_router.data?.nextFlowStep || 0"
+                            "expr": "results.fsm_router.data?.nextFlowStep || 0"
                         },
                         "booking_state": {
                             "type": "javascript",
-                            "expr": "results.telegram_router.data?.nextState || results.execute_action.data?.nextState || null\n"
+                            "expr": "results.fsm_router.data?.nextState || results.execute_action.data?.nextState || null\n"
                         },
                         "chat_id": {
                             "type": "javascript",
@@ -275,7 +275,7 @@
                         },
                         "intent": {
                             "type": "javascript",
-                            "expr": "results.telegram_router.data?.route || results.ai_agent.data?.intent || 'desconocido'"
+                            "expr": "results.fsm_router.data?.route || results.ai_agent.data?.intent || 'desconocido'"
                         },
                         "message_id": {
                             "type": "javascript",

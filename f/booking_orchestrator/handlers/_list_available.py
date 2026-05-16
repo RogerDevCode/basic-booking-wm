@@ -60,8 +60,8 @@ async def handle_list_available(
         log("LIST_AVAILABLE_CRASH", error=str(e), traceback=traceback.format_exc(), module="booking_orchestrator")
         raise RuntimeError(f"Failed to call availability_check: {e}") from e
 
-    if data is None:
-        from f.internal._wmill_adapter import log
+        #     if data is None:
+        #         from f.internal._wmill_adapter import log
 
         log("LIST_AVAILABLE_API_ERROR", module="booking_orchestrator")
         return cast(
@@ -98,8 +98,8 @@ async def handle_list_available(
             )
             if prefs_row and prefs_row["max_s"]:
                 limit = int(str(prefs_row["max_s"]))
-    except Exception:
-        pass
+    except (ValueError, TypeError):
+        pass  # Non-critical: fallback to default limit
 
     all_slots = avail.get("slots", [])
     slots = [s for s in all_slots if s.get("available")]

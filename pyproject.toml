@@ -38,9 +38,17 @@ managed = true
 python_version = "3.13"
 strict = true
 mypy_path = "stubs"
+# golang-style: all generics parametrized, no untyped returns, no redundant casts
+# disallow_any_explicit intentionally omitted — Windmill entrypoints need dict[str,Any];
+# ANN401 in ruff enforces no-Any in public annotations instead.
 warn_return_any = true
+warn_redundant_casts = true
 warn_unused_ignores = true
-exclude = ["^reset_nlu\\.py$", "^fix_nlu\\.py$", "^scripts/", "^conftest\\.py$", "^tests/conftest\\.py$"]
+disallow_any_generics = true
+disallow_subclassing_any = true
+strict_equality = true
+extra_checks = true
+exclude = ["^reset_nlu\\.py$", "^fix_nlu\\.py$", "^scripts/", "^patch_auth\\.py$", "^conftest\\.py$", "^tests/conftest\\.py$"]
 
 [[tool.mypy.overrides]]
 module = "wmill.*"
@@ -56,7 +64,18 @@ line-length = 120
 target-version = "py313"
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "ANN", "B", "RUF", "TCH"]
+# golang-style: explicit, strict, zero dead code, no Any in annotations
+select = ["E", "F", "I", "UP", "ANN", "B", "RUF", "TCH", "SIM", "PERF", "PLE", "PLW"]
+ignore = [
+    "SIM108",   # ternary-over-if — readability wins over brevity
+    "PLW0603",  # global-statement — used in Windmill adapters
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["ANN", "PERF", "PLE", "SIM117"]  # PLE: chaos tests need raw control chars; SIM117: nested patch() with blocks are intentional
+"scripts/**" = ["ANN", "T20", "SIM", "PLW", "PERF"]
+"stubs/**" = ["ANN401"]               # **kwargs: Any is idiomatic in stub files
+"patch_auth.py" = ["ANN", "T20", "E501", "I"]
 
 [tool.ruff.format]
 quote-style = "double"

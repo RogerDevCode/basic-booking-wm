@@ -1,4 +1,5 @@
 {
+  "$schema": "https://raw.githubusercontent.com/google-gemini/gemini-cli/main/schemas/settings.schema.json",
   "mcpServers": {
     "codebase-index": {
       "command": "uv",
@@ -13,9 +14,9 @@
       }
     },
     "windmill-booking": {
-      "url": "http://localhost:8080/api/mcp/w/booking-titanium/mcp",
+      "url": "https://titanium.stax.ink/api/mcp/w/booking-titanium/mcp",
       "headers": {
-        "Authorization": "Bearer LJipaz08ZSYDSoQtB4IGJiOxLFR86GBz"
+        "Authorization": "Bearer $WINDMILL_MCP_TOKEN"
       }
     },
     "redis": {
@@ -35,10 +36,67 @@
       ]
     },
     "github": {
-      "command": "true"
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-github"
+      ],
+      "env": {
+        "GITHUB_TOKEN": "$GITHUB_TOKEN"
+      }
+    }
+  },
+  "general": {
+    "preferredEditor": "code",
+    "vimMode": false,
+    "checkpointing": {
+      "enabled": true
+    }
+  },
+  "ui": {
+    "theme": "default",
+    "hideBanner": false,
+    "hideTips": false,
+    "footer": {
+      "hideCWD": false,
+      "hideSandboxStatus": false
+    }
+  },
+  "model": {
+    "name": "gemini-2.5-pro",
+    "maxSessionTurns": -1,
+    "chatCompression": {
+      "compressionThreshold": 0.3
     }
   },
   "context": {
-    "fileName": "AGENTS.md"
+    "fileName": [
+      "AGENTS.md"
+    ],
+    "fileFiltering": {
+      "respectGitIgnore": true,
+      "respectGeminiIgnore": true
+    }
+  },
+  "tools": {
+    "sandbox": {
+      "enabled": false
+    },
+    "shell": {
+      "enableInteractiveShell": true
+    },
+    "exclude": []
+  },
+  "privacy": {
+    "usageStatisticsEnabled": true
+  },
+  "telemetry": {
+    "enabled": false
+  },
+  "advanced": {
+    "excludedEnvVars": [
+      "WINDMILL_MCP_TOKEN",
+      "GITHUB_TOKEN"
+    ]
   }
 }

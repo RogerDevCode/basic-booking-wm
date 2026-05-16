@@ -15,14 +15,21 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import time
+import traceback
 from typing import Any, Final, Literal, cast
+
+from pydantic import BaseModel
+
+from f.nlu._tfidf_classifier import classify_intent
 
 from .._nlu_cache import ensure_nlu_cache, get_nlu_rule
 from .._wmill_adapter import log
 from ._ai_agent_logic import (
     adjust_intent_with_context,
+    compute_requires_fsm_routing,
     detect_context,
     detect_social,
     determine_escalation_level,
@@ -35,7 +42,6 @@ from ._guardrails import sanitize_json_response, validate_input, verify_urgency
 from ._llm_client import call_llm
 from ._prompt_builder import build_system_prompt, build_user_message
 from ._rag_context import build_rag_context
-from ._tfidf_classifier import classify_intent
 
 MODULE: Final[str] = "ai_agent"
 
@@ -47,17 +53,13 @@ async def _main_async(args: dict[str, Any]) -> dict[str, Any]:
     await ensure_nlu_cache()
 
     # 1. Validate Input
-    try:
-        input_data = AIAgentInput.model_validate(args)
-    except Exception as e:
-        return {"success": False, "data": None, "error_code": "VALIDATION_ERROR", "error_message": str(e)}
-
+    input_data = AIAgentInput.model_validate(args)
     text = input_data.text
 
-    # 1. Guardrails
+    # 2. Guardrails
     guard = validate_input(text)
     if guard["kind"] == "blocked":
-        return {"success": False, "data": None, "error_code": "GUARDRAIL_BLOCKED", "error_message": guard["reason"]}
+        raise RuntimeError(f"guardrail_blocked: {guard['reason']}")
 
     # 2. Intent Detection
     intent: str = INTENT["DESCONOCIDO"]
@@ -80,28 +82,29 @@ async def _main_async(args: dict[str, Any]) -> dict[str, Any]:
             confidence = float(tfidf["confidence"])
             cot_reasoning = f"TF-IDF semantic match ({intent})"
 
-        # 2.3 LLM Path (if enabled)
+        # 2.3 LLM Path (only if TF-IDF confidence is low or unknown)
         rag_context = None
-        if intent in [INTENT["PREGUNTA_GENERAL"], INTENT["DESCONOCIDO"]]:
-            if input_data.provider_id:
+        tfidf_confident = confidence >= 0.9
+        if not tfidf_confident and input_data.provider_id:
+            if intent in [INTENT["PREGUNTA_GENERAL"], INTENT["DESCONOCIDO"]]:
                 rag_res = await build_rag_context(input_data.provider_id, text)
                 rag_context = rag_res["context"]
 
-        sys_prompt = build_system_prompt(rag_context)
-        user_msg = build_user_message(text)
+            sys_prompt = build_system_prompt(rag_context)
+            user_msg = build_user_message(text)
 
-        err_llm, llm_res = await call_llm(sys_prompt, user_msg)
-        if not err_llm and llm_res:
-            try:
-                cleaned = sanitize_json_response(llm_res.content)
-                raw_json = json.loads(cleaned)
-                llm_out = LLMOutput.model_validate(raw_json)
-                intent = llm_out.intent
-                confidence = llm_out.confidence
-                provider = llm_res.provider
-                cot_reasoning = "LLM classification"
-            except Exception as e:
-                log("LLM response parse failed", error=str(e), content=llm_res.content)
+            err_llm, llm_res = await call_llm(sys_prompt, user_msg)
+            if not err_llm and llm_res:
+                try:
+                    cleaned = sanitize_json_response(llm_res.content)
+                    raw_json = json.loads(cleaned)
+                    llm_out = LLMOutput.model_validate(raw_json)
+                    intent = llm_out.intent
+                    confidence = llm_out.confidence
+                    provider = llm_res.provider
+                    cot_reasoning = "LLM classification"
+                except Exception as e:
+                    log("LLM response parse failed", error=str(e), content=llm_res.content)
 
     # 2.5 Context Adjustment
     adj = adjust_intent_with_context(text, intent, confidence, input_data.conversation_state)
@@ -135,25 +138,30 @@ async def _main_async(args: dict[str, Any]) -> dict[str, Any]:
 
     verified = verify_urgency(result, text)
 
+    # Compute requires_fsm_routing based on intent and booking state
+    booking_state_name = "idle"
+    if input_data.conversation_state:
+        booking_state_name = input_data.conversation_state.booking_state_name
+
+    requires_fsm = compute_requires_fsm_routing(verified.intent, booking_state_name)
+
+    final_result = IntentResult.model_validate({**verified.model_dump(), "requires_fsm_routing": requires_fsm})
+
     # Log/Trace performance (simplified)
     log(
         "AI Agent execution complete",
-        intent=verified.intent,
-        confidence=verified.confidence,
+        intent=final_result.intent,
+        confidence=final_result.confidence,
         provider=provider,
         latency_ms=int(time.time() * 1000) - start_ms,
     )
 
-    return {"success": True, "data": verified.model_dump(), "error_message": None}
+    return {"success": True, "data": final_result.model_dump(), "error_message": None}
 
 
 def main(
     chat_id: str, text: str, provider_id: str | None = None, conversation_state: dict[str, Any] | None = None
 ) -> dict[str, object]:
-    import traceback
-
-    from pydantic import BaseModel
-
     args: dict[str, Any] = {
         "chat_id": chat_id,
         "text": text,
@@ -163,23 +171,14 @@ def main(
 
     try:
         result = asyncio.run(_main_async(args))
-        if result is None:
-            return {}
 
         if isinstance(result, BaseModel):
             return cast("dict[str, object]", result.model_dump())
-        elif isinstance(result, dict):
-            return cast("dict[str, object]", result)
-        else:
-            return {"data": result}
+        return cast("dict[str, object]", result)
 
     except Exception as e:
         tb = traceback.format_exc()
-        try:
-            from .._wmill_adapter import log
-
+        with contextlib.suppress(Exception):
             log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=MODULE)
-        except Exception:
-            print(f"CRITICAL ERROR in {__file__}: {e}\n{tb}")
 
         raise RuntimeError(f"Execution failed: {e}") from e

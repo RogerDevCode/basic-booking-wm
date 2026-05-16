@@ -14,10 +14,16 @@
 # ///
 from __future__ import annotations
 
-from datetime import UTC, datetime
+import asyncio
+import traceback
+import zoneinfo
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Final, cast
 
+from ...services.booking._booking_errors import BookingPrefetchBlockedError
+from .._db_client import create_db_client as _create_db_client
 from .._wmill_adapter import log
+from ..scheduling_engine._scheduling_logic import get_availability_range
 
 if TYPE_CHECKING:
     from .._result import DBClient
@@ -26,12 +32,7 @@ MODULE: Final[str] = "booking_prefetch"
 
 
 async def _connect(pg_url: str) -> DBClient:
-    import os
-
-    from .._db_client import create_db_client as _factory
-
-    os.environ["DATABASE_URL"] = pg_url
-    return await _factory()
+    return await _create_db_client(pg_url)
 
 
 async def _fetch_specialties(db: DBClient) -> list[dict[str, object]]:
@@ -52,8 +53,6 @@ _MONTHS_ES: Final[list[str]] = ["", "Ene", "Feb", "Mar", "Abr", "May", "Jun", "J
 
 
 def _slot_label(start_iso: str, provider_tz: str = "UTC") -> str:
-    import zoneinfo
-
     dt_utc = datetime.fromisoformat(start_iso.replace("Z", "+00:00"))
     tz = zoneinfo.ZoneInfo(provider_tz)
     dt = dt_utc.astimezone(tz)
@@ -62,11 +61,6 @@ def _slot_label(start_iso: str, provider_tz: str = "UTC") -> str:
 
 
 async def _fetch_slots_for_doctor(db: DBClient, doctor_id: str) -> list[dict[str, object]]:
-    import zoneinfo
-    from datetime import timedelta
-
-    from ..scheduling_engine._scheduling_logic import get_availability_range
-
     row = await db.fetchrow(
         "SELECT service_id FROM services WHERE provider_id = $1::uuid LIMIT 1",
         doctor_id,
@@ -125,11 +119,13 @@ def _resolve_doctor_from_selection(
     user_input: str | None,
     state_items: list[dict[str, object]],
 ) -> str | None:
-    if not user_input or not state_items:
+    if not user_input:
         return None
     stripped = user_input.strip()
     if stripped.startswith("doc:"):
         return stripped[4:]
+    if not state_items:
+        return None
     if stripped.isdigit():
         idx = int(stripped) - 1
         if 0 <= idx < len(state_items):
@@ -154,13 +150,14 @@ def _resolve_specialty_from_selection(
     user_input: str | None,
     state_items: list[dict[str, object]],
 ) -> str | None:
-    """If user typed a 1-based index, return the specialty_id at that position."""
-    if not user_input or not state_items:
+    """Return specialty_id from user input: direct UUID via 'spec:UUID' or 1-based index."""
+    if not user_input:
         return None
     stripped = user_input.strip()
-    # Support numeric text ("1") and callback_data ("spec:UUID")
     if stripped.startswith("spec:"):
         return stripped[5:]
+    if not state_items:
+        return None
     if stripped.isdigit():
         idx = int(stripped) - 1
         if 0 <= idx < len(state_items):
@@ -168,16 +165,19 @@ def _resolve_specialty_from_selection(
     return None
 
 
-async def _has_active_booking(db: DBClient, client_id: str) -> bool:
+async def _has_active_booking_for_provider(db: DBClient, client_id: str, provider_id: str) -> bool:
+    """BE-02: check if client already has an active booking with this specific provider."""
     row = await db.fetchrow(
         """
         SELECT booking_id FROM bookings
         WHERE client_id = $1::uuid
-          AND status NOT IN ('cancelled', 'no_show', 'rescheduled', 'completed')
+          AND provider_id = $2::uuid
+          AND status NOT IN ('cancelled', 'no_show', 'rescheduled')
           AND start_time > NOW()
         LIMIT 1
         """,
         client_id,
+        provider_id,
     )
     return row is not None
 
@@ -190,9 +190,9 @@ async def _main_async(
     client_id: str | None = None,
 ) -> dict[str, object]:
     state_name = cast("str", (booking_state or {}).get("name", "idle"))
-
-    db: DBClient = await _connect(pg_url)
+    db: DBClient | None = None
     try:
+        db = await _connect(pg_url)
         if state_name == "idle":
             items = await _fetch_specialties(db)
             log("PREFETCH_SPECIALTIES", count=len(items), module=MODULE)
@@ -213,9 +213,9 @@ async def _main_async(
             # Pre-fetch slots when user is picking a doctor
             doctor_id = _resolve_doctor_from_selection(user_input, state_items)
             if doctor_id:
-                if client_id and await _has_active_booking(db, client_id):
-                    log("PREFETCH_BLOCKED_ACTIVE_BOOKING", client_id=client_id, module=MODULE)
-                    return {"items": [], "prefetch_type": "blocked", "block_reason": "already_booked"}
+                if client_id and await _has_active_booking_for_provider(db, client_id, doctor_id):
+                    log("PREFETCH_BLOCKED_ACTIVE_BOOKING", client_id=client_id, provider_id=doctor_id, module=MODULE)
+                    raise BookingPrefetchBlockedError("already_booked")
                 slots = await _fetch_slots_for_doctor(db, doctor_id)
                 log("PREFETCH_SLOTS_AHEAD", count=len(slots), doctor_id=doctor_id, module=MODULE)
                 return {"items": slots, "prefetch_type": "time_slots", "resolved_doctor_id": doctor_id}
@@ -243,13 +243,14 @@ async def _main_async(
         log("PREFETCH_NO_MATCH", state_name=state_name, module=MODULE)
         return {"items": [], "prefetch_type": None}
 
+    except BookingPrefetchBlockedError as e:
+        return {"items": [], "prefetch_type": "blocked", "block_reason": e.reason}
     except Exception as e:
-        import traceback
-
         log("PREFETCH_ERROR", error=str(e), traceback=traceback.format_exc(), state_name=state_name, module=MODULE)
-        return {"items": [], "prefetch_type": None, "error": str(e)}
+        raise RuntimeError(f"Prefetch failed: {e}") from e
     finally:
-        await db.close()
+        if db is not None:
+            await db.close()
 
 
 def main(
@@ -259,6 +260,4 @@ def main(
     user_input: str | None = None,
     client_id: str | None = None,
 ) -> dict[str, object]:
-    import asyncio
-
     return asyncio.run(_main_async(booking_state, booking_draft, pg_url, user_input, client_id))

@@ -9,10 +9,12 @@
 #   "beartype>=0.19.0",
 #   "returns>=0.24.0",
 #   "redis>=7.4.0",
-#   "typing-extensions>=4.12.0"
+#   "typing-extensions>=4.12.0",
+#   "pyjwt>=2.8.0"
 # ]
 # ///
 import asyncio
+from datetime import UTC, datetime, timedelta
 
 # ============================================================================
 # PRE-FLIGHT CHECKLIST
@@ -25,6 +27,8 @@ import asyncio
 # Pydantic Schemas: YES — InputSchema validates email and password
 # ============================================================================
 from typing import Any, cast
+
+import jwt
 
 from ..internal._db_client import create_db_client
 from ..internal._result import with_admin_context
@@ -87,12 +91,24 @@ async def _main_async(args: dict[str, Any]) -> LoginResult:
             # Success: Update last login
             await conn.execute("UPDATE users SET last_login = NOW() WHERE user_id = $1::uuid", user["user_id"])
 
+            # Generate JWT
+            import wmill as _wmill
+
+            secret = str(_wmill.get_variable("u/admin/ENCRYPTION_KEY"))
+            payload = {
+                "sub": user["user_id"],
+                "role": user["role"],
+                "exp": datetime.now(UTC) + timedelta(days=7),
+                "iat": datetime.now(UTC),
+            }
+            token = jwt.encode(payload, secret, algorithm="HS256")
+
             result: LoginResult = {
-                "user_id": user["user_id"],
                 "email": user["email"],
                 "full_name": user["full_name"],
                 "role": user["role"],
                 "profile_complete": user["profile_complete"],
+                "access_token": token,
             }
             return result
 

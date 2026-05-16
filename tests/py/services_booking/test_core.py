@@ -51,18 +51,6 @@ def _make_repo() -> MagicMock:
     return repo
 
 
-def _make_calendar() -> MagicMock:
-    cal = MagicMock()
-    cal.sync = AsyncMock()
-    return cal
-
-
-def _make_notifier() -> MagicMock:
-    notif = MagicMock()
-    notif.send = AsyncMock()
-    return notif
-
-
 def _create_req(**overrides: object) -> BookingCreateRequest:
     base: dict[str, object] = dict(
         client_id=CLIENT_ID,
@@ -102,7 +90,7 @@ class TestCreateBooking:
         repo = _make_repo()
         repo.exists = AsyncMock(return_value=True)
 
-        result = await create_booking(_create_req(), repo, _make_calendar(), _make_notifier())
+        result = await create_booking(_create_req(), repo)
 
         assert isinstance(result, BookingResult)
         assert result.booking_id == BOOKING_ID
@@ -115,25 +103,21 @@ class TestCreateBooking:
         repo.insert = AsyncMock(side_effect=BookingSlotUnavailableError("Slot taken"))
 
         with pytest.raises(BookingSlotUnavailableError):
-            await create_booking(_create_req(), repo, _make_calendar(), _make_notifier())
+            await create_booking(_create_req(), repo)
 
     @pytest.mark.asyncio
-    async def test_success_calls_calendar_and_notifier(self) -> None:
-        """Happy path: insert, calendar.sync, and notifier.send are all called."""
+    async def test_success_inserts_booking(self) -> None:
+        """Happy path: insert is called."""
         repo = _make_repo()
-        calendar = _make_calendar()
-        notifier = _make_notifier()
 
-        await create_booking(_create_req(), repo, calendar, notifier)
+        await create_booking(_create_req(), repo)
 
         repo.insert.assert_awaited_once()
-        calendar.sync.assert_awaited_once()
-        notifier.send.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_success_returns_booking_result(self) -> None:
         """Return value is a typed BookingResult."""
-        result = await create_booking(_create_req(), _make_repo(), _make_calendar(), _make_notifier())
+        result = await create_booking(_create_req(), _make_repo())
         assert isinstance(result, BookingResult)
         assert result.status == "confirmed"
 
@@ -149,7 +133,7 @@ class TestCancelBooking:
         repo.get_booking = AsyncMock(return_value=None)
 
         with pytest.raises(BookingNotFoundError):
-            await cancel_booking(_cancel_req(), repo, _make_calendar(), _make_notifier())
+            await cancel_booking(_cancel_req(), repo)
 
     @pytest.mark.asyncio
     async def test_already_cancelled_raises(self) -> None:
@@ -160,7 +144,7 @@ class TestCancelBooking:
         )
 
         with pytest.raises(BookingAlreadyCancelledError):
-            await cancel_booking(_cancel_req(), repo, _make_calendar(), _make_notifier())
+            await cancel_booking(_cancel_req(), repo)
 
     @pytest.mark.asyncio
     async def test_wrong_actor_raises_permission_error(self) -> None:
@@ -169,25 +153,21 @@ class TestCancelBooking:
         req = _cancel_req(actor="client", actor_id=OTHER_CLIENT_ID)
 
         with pytest.raises(BookingPermissionError):
-            await cancel_booking(req, repo, _make_calendar(), _make_notifier())
+            await cancel_booking(req, repo)
 
     @pytest.mark.asyncio
-    async def test_success_calls_calendar_and_notifier(self) -> None:
-        """Happy path: update_status, calendar.sync, notifier.send all called."""
+    async def test_success_updates_status(self) -> None:
+        """Happy path: update_status is called."""
         repo = _make_repo()
-        calendar = _make_calendar()
-        notifier = _make_notifier()
 
-        await cancel_booking(_cancel_req(), repo, calendar, notifier)
+        await cancel_booking(_cancel_req(), repo)
 
         repo.update_status.assert_awaited_once_with(BOOKING_ID, "cancelled", None, "Cancelled by user", "system")
-        calendar.sync.assert_awaited_once()
-        notifier.send.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_success_returns_booking_result(self) -> None:
         """Return value is a typed BookingResult."""
-        result = await cancel_booking(_cancel_req(), _make_repo(), _make_calendar(), _make_notifier())
+        result = await cancel_booking(_cancel_req(), _make_repo())
         assert isinstance(result, BookingResult)
         assert result.status == "cancelled"
 
@@ -203,7 +183,7 @@ class TestRescheduleBooking:
         repo.get_booking = AsyncMock(return_value=None)
 
         with pytest.raises(BookingNotFoundError):
-            await reschedule_booking(_reschedule_req(), repo, _make_calendar(), _make_notifier())
+            await reschedule_booking(_reschedule_req(), repo)
 
     @pytest.mark.asyncio
     async def test_already_rescheduled_raises(self) -> None:
@@ -214,7 +194,7 @@ class TestRescheduleBooking:
         )
 
         with pytest.raises(BookingAlreadyRescheduledError):
-            await reschedule_booking(_reschedule_req(), repo, _make_calendar(), _make_notifier())
+            await reschedule_booking(_reschedule_req(), repo)
 
     @pytest.mark.asyncio
     async def test_new_slot_occupied_raises_slot_error(self) -> None:
@@ -223,17 +203,13 @@ class TestRescheduleBooking:
         repo.reschedule = AsyncMock(side_effect=BookingSlotUnavailableError("New slot taken"))
 
         with pytest.raises(BookingSlotUnavailableError):
-            await reschedule_booking(_reschedule_req(), repo, _make_calendar(), _make_notifier())
+            await reschedule_booking(_reschedule_req(), repo)
 
     @pytest.mark.asyncio
-    async def test_success_calls_calendar_and_notifier(self) -> None:
-        """Happy path: repo.reschedule, calendar.sync, notifier.send all called."""
+    async def test_success_reschedules_booking(self) -> None:
+        """Happy path: repo.reschedule is called."""
         repo = _make_repo()
-        calendar = _make_calendar()
-        notifier = _make_notifier()
 
-        await reschedule_booking(_reschedule_req(), repo, calendar, notifier)
+        await reschedule_booking(_reschedule_req(), repo)
 
         repo.reschedule.assert_awaited_once()
-        calendar.sync.assert_awaited_once()
-        notifier.send.assert_awaited_once()

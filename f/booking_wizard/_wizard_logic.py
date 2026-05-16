@@ -39,7 +39,7 @@ class DateUtils:
     @staticmethod
     def get_week_dates(offset: int, tz_name: str = "UTC") -> list[dict[str, str]]:
         tz = zoneinfo.ZoneInfo(tz_name)
-        dates = []
+        dates: list[dict[str, str]] = []
         today = datetime.now(tz).date() + timedelta(days=offset)
         days_es = ["lun", "mar", "mié", "jue", "vie", "sáb", "dom"]
         months_es = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"]
@@ -53,11 +53,7 @@ class DateUtils:
 
     @staticmethod
     def generate_time_slots(start_h: int, end_h: int, duration_min: int) -> list[str]:
-        slots = []
-        for h in range(start_h, end_h):
-            for m in range(0, 60, duration_min):
-                slots.append(f"{h:02d}:{m:02d}")
-        return slots
+        return [f"{h:02d}:{m:02d}" for h in range(start_h, end_h) for m in range(0, 60, duration_min)]
 
 
 class WizardUI:
@@ -85,9 +81,7 @@ class WizardUI:
 
     @staticmethod
     def build_time_selection(state: WizardState, slots: list[str]) -> StepView:
-        keyboard: list[list[str]] = []
-        for i in range(0, len(slots), 3):
-            keyboard.append(slots[i : i + 3])
+        keyboard: list[list[str]] = [slots[i : i + 3] for i in range(0, len(slots), 3)]
         keyboard.append(["« Volver a fechas", "❌ Cancelar"])
 
         date_label = DateUtils.format_es(state.selected_date) if state.selected_date else "fecha"

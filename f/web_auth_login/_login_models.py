@@ -4,11 +4,11 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class LoginResult(TypedDict):
-    user_id: str
     email: str
     full_name: str
     role: str
     profile_complete: bool
+    access_token: str
 
 
 class UserRow(TypedDict):

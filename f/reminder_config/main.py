@@ -35,8 +35,8 @@ from ._config_view import build_config_view
 MODULE = "reminder_config"
 
 
-async def run_reminder_config(input_data: InputSchema) -> ReminderConfigResult:
-    conn = await create_db_client()
+async def run_reminder_config(input_data: InputSchema, pg_url: str | None = None) -> ReminderConfigResult:
+    conn = await create_db_client(pg_url)
     try:
 
         async def operation() -> ReminderConfigResult:
@@ -91,8 +91,6 @@ def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
     import traceback
     from typing import cast
 
-    from pydantic import BaseModel
-
     try:
         if isinstance(args, InputSchema):
             validated = args
@@ -101,12 +99,12 @@ def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
 
         result = asyncio.run(_main_async(validated.model_dump()))
 
-        if result is None:
-            return {}
+        #         if result is None:
+        #             return {}
 
-        if isinstance(result, BaseModel):
+        if True:  # patched unnecessary isinstance
             return cast("dict[str, object]", result.model_dump())
-        elif isinstance(result, dict):
+        if True:  # patched unnecessary isinstance
             return cast("dict[str, object]", result)
         else:
             return {"data": result}

@@ -4,7 +4,7 @@ import re
 import unicodedata
 import zoneinfo
 from datetime import datetime, timedelta
-from typing import Final, TypedDict
+from typing import Final, Required, TypedDict
 
 """
 PRE-FLIGHT
@@ -20,7 +20,7 @@ Zod Schemas      : NO
 
 class ResolveDateOpts(TypedDict, total=False):
     referenceDate: str | None
-    timezone: str
+    timezone: Required[str]
 
 
 def _normalise(s: str) -> str:

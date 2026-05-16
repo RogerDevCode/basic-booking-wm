@@ -32,6 +32,12 @@ async def execute_reschedule_logic(
     if overlap:
         raise RescheduleBookingError("new_time_slot_already_booked")
 
+    client_overlap = await repo.check_client_overlap(
+        old_booking["client_id"], old_booking["booking_id"], new_start, new_end
+    )
+    if client_overlap:
+        raise RescheduleBookingError("client_already_has_booking_at_this_time")
+
     write_result = await repo.execute_reschedule(input_data, old_booking, service, new_end, new_key)
     if not write_result:
         raise RescheduleBookingError("failed_to_execute_reschedule_transaction")

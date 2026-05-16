@@ -45,8 +45,8 @@ async def build_rag_context(provider_id: str | None, text: str, limit: int = 3) 
     except Exception as e:
         from .._wmill_adapter import log
 
-        log("SILENT_ERROR_CAUGHT", error=str(e), file="_rag_context.py")
-        return {"context": "", "count": 0, "hasProviderSpecific": False}
+        log("RAG_CONTEXT_DB_ERROR", error=str(e), file="_rag_context.py")
+        raise RuntimeError(f"RAG context retrieval failed: {e}") from e
     finally:
         await conn.close()
 

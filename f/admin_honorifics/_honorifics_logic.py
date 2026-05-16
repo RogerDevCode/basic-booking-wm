@@ -75,31 +75,26 @@ async def update_honorific(
         params: list[object] = []
         idx = 1
 
-        if code is not None:
-            if "code" in _ALLOWED:
-                fields.append(f"code = ${idx}")
-                params.append(code)
-                idx += 1
-        if label is not None:
-            if "label" in _ALLOWED:
-                fields.append(f"label = ${idx}")
-                params.append(label)
-                idx += 1
-        if gender is not None:
-            if "gender" in _ALLOWED:
-                fields.append(f"gender = ${idx}")
-                params.append(gender)
-                idx += 1
-        if sort_order is not None:
-            if "sort_order" in _ALLOWED:
-                fields.append(f"sort_order = ${idx}")
-                params.append(sort_order)
-                idx += 1
-        if is_active is not None:
-            if "is_active" in _ALLOWED:
-                fields.append(f"is_active = ${idx}")
-                params.append(is_active)
-                idx += 1
+        if code is not None and "code" in _ALLOWED:
+            fields.append(f"code = ${idx}")
+            params.append(code)
+            idx += 1
+        if label is not None and "label" in _ALLOWED:
+            fields.append(f"label = ${idx}")
+            params.append(label)
+            idx += 1
+        if gender is not None and "gender" in _ALLOWED:
+            fields.append(f"gender = ${idx}")
+            params.append(gender)
+            idx += 1
+        if sort_order is not None and "sort_order" in _ALLOWED:
+            fields.append(f"sort_order = ${idx}")
+            params.append(sort_order)
+            idx += 1
+        if is_active is not None and "is_active" in _ALLOWED:
+            fields.append(f"is_active = ${idx}")
+            params.append(is_active)
+            idx += 1
 
         if not fields:
             raise RuntimeError("update_failed: no fields provided")

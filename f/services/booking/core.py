@@ -16,33 +16,27 @@ from ._booking_models import (
 )
 
 if TYPE_CHECKING:
-    from .adapters import CalendarPort, NotifierPort
     from .repo import BookingRepo
 
 
 async def create_booking(
     req: BookingCreateRequest,
     repo: BookingRepo,
-    calendar: CalendarPort,
-    notifier: NotifierPort,
 ) -> BookingResult:
     if await repo.exists(req.idempotency_key):
         existing = await repo.get_by_key(req.idempotency_key)
         return BookingResult(booking_id=existing["booking_id"], status=existing["status"])
 
     data = req.model_dump()
-    # GIST exclusion constraint in repo handles slot conflicts atomically
+    # GIST exclusion constraint in repo handles slot conflicts atomically.
+    # calendar.sync / notifier.send are enqueued via outbox (gcal_sync_status column).
     booking = await repo.insert(data)
-    await calendar.sync(booking)
-    await notifier.send(booking)
     return BookingResult(booking_id=booking["booking_id"], status=booking["status"])
 
 
 async def cancel_booking(
     req: BookingCancelRequest,
     repo: BookingRepo,
-    calendar: CalendarPort,
-    notifier: NotifierPort,
 ) -> BookingResult:
     booking = await repo.get_booking(req.booking_id)
     if not booking:
@@ -55,16 +49,13 @@ async def cancel_booking(
         raise BookingPermissionError(f"Client {req.actor_id} cannot cancel another client's booking")
 
     updated = await repo.update_status(req.booking_id, "cancelled", req.actor_id, req.reason, str(req.actor))
-    await calendar.sync(updated)
-    await notifier.send(updated)
+    # calendar.sync / notifier.send enqueued via outbox.
     return BookingResult(booking_id=updated["booking_id"], status=updated["status"])
 
 
 async def reschedule_booking(
     req: BookingRescheduleRequest,
     repo: BookingRepo,
-    calendar: CalendarPort,
-    notifier: NotifierPort,
 ) -> BookingResult:
     old_booking = await repo.get_booking(req.booking_id)
     if not old_booking:
@@ -89,8 +80,7 @@ async def reschedule_booking(
         "actor_type": str(req.actor),
     }
 
-    # GIST exclusion constraint in repo handles slot conflicts atomically
+    # GIST exclusion constraint in repo handles slot conflicts atomically.
+    # calendar.sync / notifier.send enqueued via outbox.
     result = await repo.reschedule(req.booking_id, new_data)
-    await calendar.sync(result)
-    await notifier.send(result)
     return BookingResult(booking_id=result["booking_id"], status=result["status"])

@@ -8,12 +8,14 @@ from f.internal.ai_agent.main import _main_async as main
 
 
 @pytest.mark.asyncio
-async def test_ai_agent_llm_success() -> None:
+async def test_ai_agent_tfidf_high_confidence_skips_llm() -> None:
+    """TF-IDF confidence >= 0.9 must skip LLM and preserve the result."""
     mock_llm_res = MagicMock()
-    mock_llm_res.content = '{"intent": "crear_cita", "confidence": 0.9, "entities": {"date": "mañana"}, "needs_more": false, "follow_up": null}'  # noqa: E501
+    mock_llm_res.content = (
+        '{"intent": "pregunta_general", "confidence": 0.7, "entities": {}, "needs_more": false, "follow_up": null}'
+    )
     mock_llm_res.provider = "openai"
 
-    # Patch in the right place
     with (
         patch("f.internal.ai_agent._llm_client.get_variable", return_value="openai"),
         patch("f.internal.ai_agent.main.call_llm", AsyncMock(return_value=(None, mock_llm_res))),
@@ -27,10 +29,11 @@ async def test_ai_agent_llm_success() -> None:
         res = await main({"chat_id": str(args["chat_id"]), "text": str(args["text"])})
 
         assert res is not None
-
         assert res["success"] is True
-        assert cast("dict[str, Any]", res["data"])["intent"] == INTENT["CREAR_CITA"]
-        assert cast("dict[str, Any]", res["data"])["confidence"] == 0.9
+        data = cast("dict[str, Any]", res["data"])
+        assert data["intent"] == INTENT["CREAR_CITA"]
+        # TF-IDF keyword match returns 0.95; LLM must NOT override it
+        assert data["confidence"] == 0.95
 
 
 @pytest.mark.asyncio
@@ -50,3 +53,81 @@ async def test_ai_agent_social_fast_path() -> None:
     assert cast("dict[str, Any]", res["data"])["confidence"] > 0.8
     # Simplified logic in Python version currently doesn't add "bienvenido"
     assert "ayudarte" in cast("dict[str, Any]", res["data"])["ai_response"].lower()
+
+
+@pytest.mark.asyncio
+async def test_crear_cita_from_idle_requires_fsm() -> None:
+    """INVARIANTE 1: booking intent desde idle → requires_fsm_routing = True."""
+    args: dict[str, Any] = {
+        "chat_id": "1",
+        "text": "quiero agendar una cita",
+        "conversation_state": {
+            "active_flow": "none",
+            "flow_step": 0,
+            "pending_data": {},
+            "booking_state_name": "idle",
+        },
+    }
+    res = await main(args)
+    assert res["success"] is True
+    data = cast("dict[str, Any]", res["data"])
+    assert data["requires_fsm_routing"] is True
+    assert data["intent"] == INTENT["CREAR_CITA"]
+
+
+@pytest.mark.asyncio
+async def test_mid_fsm_always_requires_fsm() -> None:
+    """INVARIANTE 2: FSM en curso → requires_fsm_routing = True siempre."""
+    args: dict[str, Any] = {
+        "chat_id": "1",
+        "text": "hola",
+        "conversation_state": {
+            "active_flow": "none",
+            "flow_step": 0,
+            "pending_data": {},
+            "booking_state_name": "selecting_doctor",
+        },
+    }
+    res = await main(args)
+    assert res["success"] is True
+    data = cast("dict[str, Any]", res["data"])
+    assert data["requires_fsm_routing"] is True
+
+
+@pytest.mark.asyncio
+async def test_greeting_from_idle_no_fsm() -> None:
+    """INVARIANTE 3: saludo desde idle → requires_fsm_routing = False."""
+    args: dict[str, Any] = {
+        "chat_id": "1",
+        "text": "hola",
+        "conversation_state": {
+            "active_flow": "none",
+            "flow_step": 0,
+            "pending_data": {},
+            "booking_state_name": "idle",
+        },
+    }
+    res = await main(args)
+    assert res["success"] is True
+    data = cast("dict[str, Any]", res["data"])
+    assert data["requires_fsm_routing"] is False
+    assert data["intent"] == INTENT["SALUDO"]
+
+
+@pytest.mark.asyncio
+async def test_desconocido_from_idle_no_fsm() -> None:
+    """INVARIANTE: desconocido desde idle → requires_fsm_routing = False."""
+    args: dict[str, Any] = {
+        "chat_id": "1",
+        "text": "asdfghjklqwerty",
+        "conversation_state": {
+            "active_flow": "none",
+            "flow_step": 0,
+            "pending_data": {},
+            "booking_state_name": "idle",
+        },
+    }
+    res = await main(args)
+    assert res["success"] is True
+    data = cast("dict[str, Any]", res["data"])
+    assert data["requires_fsm_routing"] is False

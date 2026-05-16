@@ -49,9 +49,10 @@ async def resolve_context(db: DBClient, input_data: OrchestratorInput) -> Resolv
         if not service_id and specialty_name:
             rows = await db.fetch(
                 """
-                SELECT s.service_id 
+                SELECT s.service_id
                 FROM services s
-                JOIN specialties sp ON s.specialty_id = sp.specialty_id
+                JOIN providers p ON s.provider_id = p.provider_id
+                JOIN specialties sp ON sp.specialty_id = p.specialty_id
                 WHERE sp.name ILIKE $1
                 LIMIT 1
                 """,
@@ -63,14 +64,21 @@ async def resolve_context(db: DBClient, input_data: OrchestratorInput) -> Resolv
         # 3. Resolve Timezone (Fail-Fast if not found)
         timezone: str | None = None
         if provider_id:
-            rows = await db.fetch("SELECT timezone FROM providers WHERE provider_id = $1::uuid LIMIT 1", provider_id)
+            rows = await db.fetch(
+                "SELECT t.name AS timezone FROM providers p "
+                "LEFT JOIN timezones t ON t.id = p.timezone_id "
+                "WHERE p.provider_id = $1::uuid LIMIT 1",
+                provider_id,
+            )
             if rows and rows[0]["timezone"]:
                 timezone = str(rows[0]["timezone"])
 
         # 4. Client Resolution by Telegram Chat ID
         if not client_id and input_data.telegram_chat_id:
             rows = await db.fetch(
-                "SELECT client_id, timezone FROM clients WHERE telegram_chat_id = $1 LIMIT 1",
+                "SELECT c.client_id, t.name AS timezone FROM clients c "
+                "LEFT JOIN timezones t ON t.id = c.timezone_id "
+                "WHERE c.telegram_chat_id = $1 LIMIT 1",
                 input_data.telegram_chat_id,
             )
             if rows:
@@ -83,7 +91,9 @@ async def resolve_context(db: DBClient, input_data: OrchestratorInput) -> Resolv
                 # Use provider timezone as default for new client if available, else it will fail later
                 client_tz = timezone or "UTC"
                 rows = await db.fetch(
-                    "INSERT INTO clients (name, telegram_chat_id, timezone) VALUES ($1, $2, $3) RETURNING client_id",
+                    "INSERT INTO clients (name, telegram_chat_id, timezone_id) "
+                    "VALUES ($1, $2, (SELECT id FROM timezones WHERE name = $3 LIMIT 1)) "
+                    "RETURNING client_id",
                     name,
                     input_data.telegram_chat_id,
                     client_tz,
@@ -92,7 +102,12 @@ async def resolve_context(db: DBClient, input_data: OrchestratorInput) -> Resolv
                     client_id = str(rows[0]["client_id"])
 
         if not timezone and client_id:
-            rows = await db.fetch("SELECT timezone FROM clients WHERE client_id = $1::uuid LIMIT 1", client_id)
+            rows = await db.fetch(
+                "SELECT t.name AS timezone FROM clients c "
+                "LEFT JOIN timezones t ON t.id = c.timezone_id "
+                "WHERE c.client_id = $1::uuid LIMIT 1",
+                client_id,
+            )
             if rows and rows[0]["timezone"]:
                 timezone = str(rows[0]["timezone"])
 

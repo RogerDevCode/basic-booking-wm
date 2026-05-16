@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
-try:
-    from typing import TypeIs
-except ImportError:
-    from typing import TypeIs
+if TYPE_CHECKING:
+    try:
+        from typing import TypeIs
+    except ImportError:
+        from typing import TypeIs
 
 try:
     import wmill
@@ -19,7 +21,23 @@ except ImportError:
 
 
 def is_dict_str_obj(val: object) -> TypeIs[dict[str, object]]:
-    return isinstance(val, dict) and all(isinstance(k, str) for k in val.keys())
+    return isinstance(val, dict) and all(isinstance(k, str) for k in val)
+
+
+def get_variable_strict(path: str) -> str:
+    """Get variable; raises on any error. For gradual migration from get_variable."""
+    val = wmill.get_variable(path)
+    if val is None:
+        raise ValueError(f"Variable not found: {path}")
+    return str(val)
+
+
+def get_resource_strict(path: str) -> dict[str, object]:
+    """Get resource; raises on any error. For gradual migration from get_resource."""
+    raw: object = wmill.get_resource(path)
+    if not is_dict_str_obj(raw):
+        raise ValueError(f"Resource invalid or not found: {path}")
+    return raw
 
 
 def get_variable(path: str) -> str | None:
@@ -29,7 +47,8 @@ def get_variable(path: str) -> str | None:
         if val is None:
             return None
         return str(val)
-    except Exception:
+    except Exception as e:
+        _init_logging().warning("get_variable failed for %s: %s", path, e)
         return None
 
 
@@ -40,7 +59,8 @@ def get_resource(path: str) -> dict[str, object] | None:
         if not is_dict_str_obj(raw):
             return None
         return raw
-    except Exception:
+    except Exception as e:
+        _init_logging().warning("get_resource failed for %s: %s", path, e)
         return None
 
 

@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import os
 import traceback
+from typing import cast
 
 from ..internal._wmill_adapter import log
 from ._telegram_logic import TelegramService
@@ -117,8 +118,8 @@ def main(
 
     try:
         result = asyncio.run(_main_async(args))
-        if result is None:
-            return {"sent": False, "mode": mode, "message_id": None, "chat_id": None}
+        #         if result is None:
+        #             return {"sent": False, "mode": mode, "message_id": None, "chat_id": None}
         return cast("dict[str, object]", result.model_dump())
     except Exception as e:
         tb = traceback.format_exc()
@@ -127,8 +128,7 @@ def main(
 
             log("CRITICAL_SEND_ERROR", error=str(e), traceback=tb, module=MODULE)
         except Exception:
-            print(f"CRITICAL ERROR: {e}\n{tb}")
-        raise RuntimeError(f"Send failed: {e}")  # noqa: B904
+            import logging
 
-
-from typing import cast  # noqa: E402
+            logging.error(f"CRITICAL ERROR: {e}\n{tb}")
+        raise RuntimeError(f"Send failed: {e}") from e
