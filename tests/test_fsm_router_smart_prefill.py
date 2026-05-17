@@ -134,8 +134,8 @@ async def test_smart_prefill_ambiguous_shows_list() -> None:
 
 
 @pytest.mark.asyncio
-async def test_smart_prefill_no_match_falls_back_to_specialty() -> None:
-    """Doctor no encontrado → fallback a selecting_specialty normal."""
+async def test_smart_prefill_no_match_returns_informative_message() -> None:
+    """Doctor no encontrado → handled=True con mensaje informativo, estado idle."""
     args: dict[str, Any] = {
         "chat_id": "1",
         "user_input": "quiero hora con el Dr. Inexistente",
@@ -161,8 +161,11 @@ async def test_smart_prefill_no_match_falls_back_to_specialty() -> None:
         res = await _main_async(args)
 
     data = cast("dict[str, Any]", res["data"])
+    # Must be handled=True so flow doesn't fall through to "no entendí tu mensaje"
     assert data["handled"] is True
-    assert data["nextState"]["name"] == "selecting_specialty"
+    assert data["nextState"]["name"] == "idle"
+    # Inform user the doctor wasn't found
+    assert "No encontré" in data["response_text"] or "no encontr" in data["response_text"].lower()
 
 
 # ============================================================================

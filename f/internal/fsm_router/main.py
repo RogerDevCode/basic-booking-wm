@@ -142,7 +142,15 @@ async def _handle_smart_prefill(
         return RouterResult(handled=False)
 
     if not matches:
-        return RouterResult(handled=False)
+        display = provider_name.strip().title()
+        return RouterResult(
+            handled=True,
+            nextState={"name": "idle"},
+            response_text=(
+                f"No encontré a *{display}* en nuestro sistema. 🔍\n\n"
+                "¿Deseas buscar por especialidad médica?\n\n" + get_main_menu_text()
+            ),
+        )
 
     if len(matches) > 1:
         items_list = [{"id": str(m["provider_id"]), "name": str(m["name"])} for m in matches]
