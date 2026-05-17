@@ -31,6 +31,29 @@ def test_spell_fonasa_not_corrupted_to_fogata() -> None:
     assert not any(c.corrected == "fogata" for c in corrections)
 
 
+def test_spell_surname_after_dr_title_not_corrupted() -> None:
+    # Regression: "que horas tiene el dr gallegos" — surname after a title is a
+    # dynamic provider name (providers table), must pass through untouched.
+    text, corrections = apply_spell_correction("que horas tiene el dr gallegos")
+    assert "gallegos" in text
+    assert not any(c.original == "gallegos" for c in corrections)
+
+
+def test_spell_surname_after_doctora_title_not_corrupted() -> None:
+    # "muñoz" alone would be mangled to "muro"; after "doctora" it is protected.
+    text, corrections = apply_spell_correction("la doctora muñoz tiene hora")
+    assert "muñoz" in text
+    assert "muro" not in text
+    assert not any(c.original == "muñoz" for c in corrections)
+
+
+def test_spell_title_word_itself_not_corrupted() -> None:
+    text, corrections = apply_spell_correction("hablar con la dra soto")
+    assert "dra" in text
+    assert "soto" in text
+    assert corrections == []
+
+
 def test_spell_chilean_health_domain_terms_not_flagged() -> None:
     # Domain proper nouns / terms must pass through untouched (would otherwise
     # become: isapre→sabre, masvida→malvada, copago→copado, samu→sama,

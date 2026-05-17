@@ -118,6 +118,15 @@ _CUSTOM_WORDS: Final[tuple[str, ...]] = (
 # Minimum word length for correction attempts; short words have high false-positive rate.
 _MIN_WORD_LEN: Final[int] = 3
 
+# Courtesy/medical titles. Provider surnames are dynamic (providers table) so a
+# static allowlist can't cover them; instead we treat the word right after a
+# title as a proper noun and never spell-correct it. pyspellchecker otherwise
+# destroys real Chilean surnames (muñoz→muro, vergara→verga, araya→raya,
+# gallegos→gallego). Covers the dominant phrasing: "dr. X", "la doctora Y".
+_TITLES: Final[frozenset[str]] = frozenset(
+    {"dr", "dra", "doctor", "doctora", "don", "doña", "dona", "sr", "sra", "srta", "sta"}
+)
+
 # Module-level singleton — lazy-initialised on first call to avoid side-effects at import.
 _checker: SpellChecker | None = None
 
@@ -149,6 +158,7 @@ def apply_spell_correction(text: str) -> tuple[str, list[SpellCorrection]]:
     tokens = re.findall(r"\w+|\W+", text)
     corrections: list[SpellCorrection] = []
     result_parts: list[str] = []
+    prev_word_lower: str | None = None
 
     for token in tokens:
         if not re.match(r"^\w+$", token):
@@ -156,6 +166,15 @@ def apply_spell_correction(text: str) -> tuple[str, list[SpellCorrection]]:
             continue
 
         word_lower = token.lower()
+        prev = prev_word_lower
+        prev_word_lower = word_lower
+
+        # Proper-noun guard: a title (dr, doctora, …) and the word immediately
+        # after it (the surname) are never spell-corrected. Tracking uses the
+        # original token, so it holds even if the title would itself be flagged.
+        if word_lower in _TITLES or prev in _TITLES:
+            result_parts.append(token)
+            continue
 
         if len(word_lower) < _MIN_WORD_LEN:
             result_parts.append(token)

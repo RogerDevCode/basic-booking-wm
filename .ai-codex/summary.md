@@ -700,7 +700,7 @@
 - 📦 `class` `PreprocessorOutput` (L26)
 
 ### `f/message_preprocessor/_spell_normalizer.py`
-- 🔧 `fn` `apply_spell_correction` (L135)
+- 🔧 `fn` `apply_spell_correction` (L144)
 
 ### `f/message_preprocessor/_text_cleaner.py`
 - 🔧 `fn` `clean_text` (L18)
