@@ -22,6 +22,25 @@ def test_spell_accented_words_not_flagged() -> None:
     assert corrections == []
 
 
+def test_spell_fonasa_not_corrupted_to_fogata() -> None:
+    # Regression: pyspellchecker ES mangled "fonasa" → "fogata" (campfire),
+    # silently corrupting a national health-institution name in user queries.
+    text, corrections = apply_spell_correction("aceptan fonasa")
+    assert "fonasa" in text
+    assert "fogata" not in text
+    assert not any(c.corrected == "fogata" for c in corrections)
+
+
+def test_spell_chilean_health_domain_terms_not_flagged() -> None:
+    # Domain proper nouns / terms must pass through untouched (would otherwise
+    # become: isapre→sabre, masvida→malvada, copago→copado, samu→sama,
+    # redbanc→rebanco, webpay→espay, hemograma→heliograma, glicemia→glucemia).
+    phrase = "isapre masvida copago samu redbanc webpay hemograma glicemia teleconsulta"
+    text, corrections = apply_spell_correction(phrase)
+    assert text == phrase
+    assert corrections == []
+
+
 # --- Short words skipped ---
 
 
