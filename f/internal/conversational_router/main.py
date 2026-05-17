@@ -183,14 +183,18 @@ async def _handle(inp: ConversationalInput) -> ConversationalResult:
                     response_text="\n\n---\n\n".join(parts) + "\n\n_Escribe *menú* para volver._",
                 )
         except Exception as e:
-            log("RAG_ERROR", error=str(e), module=MODULE)
+            # EB-06 intentional graceful degradation: a RAG/DB failure must not
+            # abort a purely conversational reply. We log it and fall through to
+            # the static info message below so the user still gets a response.
+            log("RAG_FALLBACK", error=str(e), module=MODULE)
 
     return ConversationalResult(
         handled=True,
         nextState={"name": "información"},
         response_text=(
-            "No estoy seguro de cómo ayudarte con eso. 🤔\n\n"
-            "Puedes agendar una cita, ver tus horas o preguntar sobre horarios y servicios.\n\n" + get_main_menu_text()
+            "\U00002139️ *Información*\n\n"
+            "Soy tu asistente de reservas médicas. Puedes agendar una hora, "
+            "ver tus horas, configurar recordatorios o preguntar por horarios y servicios.\n\n" + get_main_menu_text()
         ),
     )
 

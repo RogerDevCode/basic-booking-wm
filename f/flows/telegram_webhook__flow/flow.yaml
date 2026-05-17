@@ -44,7 +44,8 @@ value:
       skip_if:
         expr: '!results.webhook_trigger.chat_id ||
           results.telegram_deduplicate.duplicate ||
-          results.webhook_trigger.event_kind !== "message"'
+          results.webhook_trigger.event_kind !== "message" ||
+          results.webhook_trigger.text_kind !== "plain_text"'
     - id: get_conversation_state
       summary: Obtener estado conversacional de Redis
       value:
@@ -103,7 +104,8 @@ value:
         expr: >-
           !results.webhook_trigger.chat_id ||
           results.telegram_deduplicate.duplicate ||
-          results.webhook_trigger.event_kind !== "message"
+          results.webhook_trigger.event_kind !== "message" ||
+          results.webhook_trigger.text_kind !== "plain_text"
     - id: booking_prefetch
       summary: Pre-fetch especialidades/doctores segun estado FSM actual
       value:
@@ -148,6 +150,8 @@ value:
                 "client_id": results.telegram_auto_register?.client_id ?? null,
                 "callback_message_id": results.webhook_trigger.callback_message_id ?? null,
                 "pg_url": variable("u/admin/DATABASE_URL"),
+                "ai_intent": results.ai_agent?.data?.intent ?? null,
+                "ai_confidence": results.ai_agent?.data?.confidence ?? null,
                 "requires_fsm_routing": results.ai_agent?.data?.requires_fsm_routing ?? true }
         path: f/internal/fsm_router/main
       skip_if:

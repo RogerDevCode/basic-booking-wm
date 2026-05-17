@@ -276,3 +276,54 @@ def detect_social(text: str) -> tuple[str, float] | None:
     if lower in thank_you_words or any(p in lower for p in thank_you_words):
         return cast("tuple[str, float]", (INTENT["AGRADECIMIENTO"], 0.95))
     return None
+
+
+# ============================================================================
+# MENU FAST-PATH (deterministic numbered/keyword main-menu selection)
+# ============================================================================
+#
+# The main menu is presented as text ("1️⃣ Agendar … 5️⃣ Mis datos"), so users
+# reply with bare digits. TF-IDF cannot classify single tokens (it needs >=2
+# words), so without this deterministic fast-path the numbered menu is dead.
+# Caller MUST gate this on booking_state_name == "idle": mid-FSM a digit means
+# slot/specialty selection and must reach the FSM untouched.
+
+_MENU_AGENDAR: frozenset[str] = frozenset(
+    {"1", "agendar", "agendar cita", "agendar hora", "nueva cita", "nueva hora", "pedir hora", "tomar hora"}
+)
+_MENU_MIS_CITAS: frozenset[str] = frozenset(
+    {
+        "2",
+        "mis citas",
+        "mis horas",
+        "consultar",
+        "consultar citas",
+        "consultar horas",
+        "ver citas",
+        "ver horas",
+        "ver mis citas",
+        "ver mis horas",
+    }
+)
+_MENU_RECORDATORIOS: frozenset[str] = frozenset({"3", "recordatorios", "recordatorio"})
+_MENU_INFO: frozenset[str] = frozenset({"4", "informacion", "información", "info"})
+_MENU_MIS_DATOS: frozenset[str] = frozenset({"5", "mis datos", "datos", "mi perfil", "perfil", "ver mis datos"})
+
+
+def detect_menu_command(text: str) -> tuple[str, float] | None:
+    """Map an exact main-menu selection (digit or alias) to a canonical intent.
+
+    Only valid from the idle state — the caller is responsible for that gate.
+    """
+    lower = text.strip().lower()
+    if lower in _MENU_AGENDAR:
+        return cast("tuple[str, float]", (INTENT["CREAR_CITA"], 0.97))
+    if lower in _MENU_MIS_CITAS:
+        return cast("tuple[str, float]", (INTENT["VER_MIS_CITAS"], 0.97))
+    if lower in _MENU_RECORDATORIOS:
+        return cast("tuple[str, float]", (INTENT["ACTIVAR_RECORDATORIOS"], 0.97))
+    if lower in _MENU_INFO:
+        return cast("tuple[str, float]", (INTENT["PREGUNTA_GENERAL"], 0.97))
+    if lower in _MENU_MIS_DATOS:
+        return cast("tuple[str, float]", (INTENT["VER_MIS_DATOS"], 0.97))
+    return None

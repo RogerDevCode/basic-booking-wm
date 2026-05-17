@@ -472,6 +472,7 @@
 - 🔧 `fn` `determine_escalation_level` (L217)
 - 🔧 `fn` `generate_ai_response` (L242)
 - 🔧 `fn` `detect_social` (L259)
+- 🔧 `fn` `detect_menu_command` (L313)
 
 ### `f/internal/ai_agent/_ai_agent_models.py`
 - 📦 `class` `ConversationState` (L11)
@@ -511,7 +512,7 @@
 - ⚡ `async_fn` `get_rag_context` (L54)
 
 ### `f/internal/ai_agent/main.py`
-- 🔧 `fn` `main` (L162)
+- 🔧 `fn` `main` (L169)
 
 ### `f/internal/apply_fix_migration.py`
 - 🔧 `fn` `main` (L24)
@@ -596,7 +597,7 @@
 ### `f/internal/conversational_router/main.py`
 - 📦 `class` `ConversationalInput` (L29)
 - 📦 `class` `ConversationalResult` (L43)
-- 🔧 `fn` `main` (L204)
+- 🔧 `fn` `main` (L208)
 
 ### `f/internal/debug_db.py`
 - 🔧 `fn` `main` (L22)
@@ -621,7 +622,7 @@
 - ⚡ `async_fn` `handle` (L20)
 
 ### `f/internal/fsm_router/main.py`
-- 🔧 `fn` `main` (L348)
+- 🔧 `fn` `main` (L346)
 
 ### `f/internal/gcal_utils/_gcal_logic.py`
 - 🔧 `fn` `build_gcal_event` (L6)

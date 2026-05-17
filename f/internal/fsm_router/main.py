@@ -21,11 +21,14 @@ from beartype import beartype
 if TYPE_CHECKING:
     from ...reminder_config._config_models import InlineButton
 
+from ...nlu._tfidf_classifier import classify_intent
 from .._booking_shared import get_mis_citas_text
+from .._nlu_cache import ensure_nlu_cache
 from .._wmill_adapter import log
 from ..booking_fsm._fsm_machine import apply_transition, get_main_menu_text, parse_action, parse_callback_data
 from ..booking_fsm._fsm_models import BookingStateRoot, DraftBooking
 from ._router_models import RouterInput, RouterResult
+from ._router_reminders import handle_reminders_config
 from .handlers._registration_handler import REG_STATES
 
 MODULE: Final[str] = "fsm_router"
@@ -255,12 +258,7 @@ async def _route(input_data: RouterInput) -> RouterResult:
         return _handle_registration_state(input_data, current_state_name, current_state_raw, draft_raw)
 
     if current_state_name == "reminders_config" or user_input.startswith("rem:"):
-        from ._router_reminders import handle_reminders_config
-
         return await handle_reminders_config(input_data, current_state_raw)
-
-    from ...nlu._tfidf_classifier import classify_intent
-    from .._nlu_cache import ensure_nlu_cache
 
     await ensure_nlu_cache()
 

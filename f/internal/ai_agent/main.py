@@ -31,6 +31,7 @@ from ._ai_agent_logic import (
     adjust_intent_with_context,
     compute_requires_fsm_routing,
     detect_context,
+    detect_menu_command,
     detect_social,
     determine_escalation_level,
     extract_entities,
@@ -56,6 +57,10 @@ async def _main_async(args: dict[str, Any]) -> dict[str, Any]:
     input_data = AIAgentInput.model_validate(args)
     text = input_data.text
 
+    booking_state_name = "idle"
+    if input_data.conversation_state:
+        booking_state_name = input_data.conversation_state.booking_state_name
+
     # 2. Guardrails
     guard = validate_input(text)
     if guard["kind"] == "blocked":
@@ -69,10 +74,16 @@ async def _main_async(args: dict[str, Any]) -> dict[str, Any]:
 
     # 2.1 Social Fast-Path
     social = detect_social(text)
+    # 2.1b Menu Fast-Path — only from idle (mid-FSM a digit is a slot/specialty pick)
+    menu = detect_menu_command(text) if booking_state_name == "idle" else None
     if social:
         intent, confidence = social
         provider = "fast-path"
         cot_reasoning = "Social fast-path matched"
+    elif menu:
+        intent, confidence = menu
+        provider = "fast-path"
+        cot_reasoning = "Menu fast-path matched"
     else:
         # 2.2 TF-IDF
         tfidf = classify_intent(text)
@@ -139,10 +150,6 @@ async def _main_async(args: dict[str, Any]) -> dict[str, Any]:
     verified = verify_urgency(result, text)
 
     # Compute requires_fsm_routing based on intent and booking state
-    booking_state_name = "idle"
-    if input_data.conversation_state:
-        booking_state_name = input_data.conversation_state.booking_state_name
-
     requires_fsm = compute_requires_fsm_routing(verified.intent, booking_state_name)
 
     final_result = IntentResult.model_validate({**verified.model_dump(), "requires_fsm_routing": requires_fsm})

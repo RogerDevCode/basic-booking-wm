@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from f.internal.ai_agent._ai_agent_logic import (
     adjust_intent_with_context,
+    compute_requires_fsm_routing,
     detect_context,
+    detect_menu_command,
     detect_social,
     extract_entities,
 )
@@ -56,3 +58,89 @@ class TestAIAgentLogic:
         ctx = detect_context(text, entities)
         # Assert
         assert ctx.is_urgent is True
+
+    def test_detect_menu_command_agendar_digit_returns_crear_cita(self) -> None:
+        # Arrange
+        text = "1"
+        # Act
+        res = detect_menu_command(text)
+        # Assert
+        assert res is not None
+        assert res[0] == INTENT["CREAR_CITA"]
+
+    def test_detect_menu_command_mis_citas_digit_returns_ver_mis_citas(self) -> None:
+        # Arrange
+        text = "2"
+        # Act
+        res = detect_menu_command(text)
+        # Assert
+        assert res is not None
+        assert res[0] == INTENT["VER_MIS_CITAS"]
+
+    def test_detect_menu_command_recordatorios_digit_returns_activar(self) -> None:
+        # Arrange
+        text = "3"
+        # Act
+        res = detect_menu_command(text)
+        # Assert
+        assert res is not None
+        assert res[0] == INTENT["ACTIVAR_RECORDATORIOS"]
+
+    def test_detect_menu_command_info_digit_returns_pregunta_general(self) -> None:
+        # Arrange
+        text = "4"
+        # Act
+        res = detect_menu_command(text)
+        # Assert
+        assert res is not None
+        assert res[0] == INTENT["PREGUNTA_GENERAL"]
+
+    def test_detect_menu_command_mis_datos_digit_returns_ver_mis_datos(self) -> None:
+        # Arrange
+        text = "5"
+        # Act
+        res = detect_menu_command(text)
+        # Assert
+        assert res is not None
+        assert res[0] == INTENT["VER_MIS_DATOS"]
+
+    def test_detect_menu_command_keyword_alias_returns_crear_cita(self) -> None:
+        # Arrange
+        text = "Agendar Hora"
+        # Act
+        res = detect_menu_command(text)
+        # Assert
+        assert res is not None
+        assert res[0] == INTENT["CREAR_CITA"]
+
+    def test_detect_menu_command_freeform_returns_none(self) -> None:
+        # Arrange
+        text = "quiero saber cuánto cuesta una consulta"
+        # Act
+        res = detect_menu_command(text)
+        # Assert
+        assert res is None
+
+    def test_compute_requires_fsm_routing_booking_from_idle_true(self) -> None:
+        # Act
+        result = compute_requires_fsm_routing(str(INTENT["CREAR_CITA"]), "idle")
+        # Assert
+        assert result is True
+
+    def test_compute_requires_fsm_routing_social_from_idle_false(self) -> None:
+        # Act
+        result = compute_requires_fsm_routing(str(INTENT["SALUDO"]), "idle")
+        # Assert
+        assert result is False
+
+    def test_compute_requires_fsm_routing_mid_fsm_always_true(self) -> None:
+        # Act — non-FSM intent but mid-flow must never leave the FSM
+        result = compute_requires_fsm_routing(str(INTENT["SALUDO"]), "selecting_doctor")
+        # Assert
+        assert result is True
+
+    def test_compute_requires_fsm_routing_ver_mis_citas_from_idle_false(self) -> None:
+        # Act — menu option 2 is conversational, not FSM
+        result = compute_requires_fsm_routing(str(INTENT["VER_MIS_CITAS"]), "idle")
+        # Assert
+        assert result is False
