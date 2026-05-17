@@ -1,87 +1,56 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, TypedDict
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..internal._result import DBClient
-    from ._rag_models import KBEntry, KBRow
+    from ._rag_models import KBEntry
+
+# FTS español sobre knowledge_base.search_vector (columna generada, índice GIN).
+#
+# AND→OR: plainto_tsquery produce lexemas unidos por ' & ' (exige TODOS los
+# términos). Para retrieval de FAQ queremos rankear por cuántos términos
+# coinciden, no exigir la intersección completa → reemplazamos ' & ' por ' | '.
+# Castear plainto_tsquery::text de vuelta a ::tsquery es seguro: plainto_tsquery
+# sanitiza la entrada del usuario (no admite inyección de sintaxis tsquery).
+# Query vacía / solo stopwords → tsquery vacío → 0 filas (degradación limpia).
+_FTS_SQL = """
+WITH q AS (
+    SELECT replace(
+        plainto_tsquery('spanish', immutable_unaccent($1))::text,
+        ' & ', ' | '
+    )::tsquery AS query
+)
+SELECT kb_id, category, title, content,
+       ts_rank(search_vector, q.query) AS rank
+FROM knowledge_base, q
+WHERE is_active = true
+  AND ($2::text IS NULL OR category = $2)
+  AND q.query @@ search_vector
+ORDER BY rank DESC
+LIMIT $3
+"""
 
 
 class KBRepository:
     def __init__(self, db: DBClient) -> None:
         self.db = db
 
-    async def fetch_active_entries(self, category: str | None = None) -> list[KBRow]:
+    async def search(self, query: str, top_k: int, category: str | None = None) -> list[KBEntry]:
+        """FTS español (stemming + stopwords + unaccent simétrico) rankeado por ts_rank."""
         try:
-            if category:
-                rows = await self.db.fetch(
-                    """
-                    SELECT kb_id, category, title, content
-                    FROM knowledge_base
-                    WHERE category = $1 AND is_active = true
-                    """,
-                    category,
-                )
-            else:
-                rows = await self.db.fetch(
-                    """
-                    SELECT kb_id, category, title, content
-                    FROM knowledge_base
-                    WHERE is_active = true
-                    """
-                )
-
-            # Map asyncpg rows to TypedDict
-            result: list[KBRow] = [
-                {
-                    "kb_id": str(r["kb_id"]),
-                    "category": str(r["category"]),
-                    "title": str(r["title"]),
-                    "content": str(r["content"]),
-                }
-                for r in rows
-            ]
-            return result
+            rows = await self.db.fetch(_FTS_SQL, query, category, top_k)
         except Exception as e:
-            raise RuntimeError(f"kb_fetch_failed: {e}") from e
+            raise RuntimeError(f"kb_fts_failed: {e}") from e
 
-
-class ScoredEntry(TypedDict):
-    entry: KBEntry
-    score: int
-
-
-def perform_keyword_search(query: str, entries: list[KBRow], top_k: int) -> list[KBEntry]:
-    terms = [t for t in query.lower().split() if len(t) > 2]
-    if not terms:
-        return []
-
-    scored_entries: list[ScoredEntry] = []
-    for row in entries:
-        title = row["title"].lower()
-        content = row["content"].lower()
-        category = row["category"].lower()
-
-        score = 0
-        for term in terms:
-            if term in title:
-                score += 3
-            if term in content:
-                score += 1
-            if term in category:
-                score += 2
-
-        if score > 0:
-            similarity = float(min(score / (len(terms) * 3), 1.0))
-            entry: KBEntry = {
-                "kb_id": row["kb_id"],
-                "category": row["category"],
-                "title": row["title"],
-                "content": row["content"],
-                "similarity": similarity,
+        result: list[KBEntry] = [
+            {
+                "kb_id": str(r["kb_id"]),
+                "category": str(r["category"]),
+                "title": str(r["title"]),
+                "content": str(r["content"]),
+                "similarity": float(str(r["rank"])),
             }
-            scored_entries.append({"entry": entry, "score": score})
-
-    # Sort and slice
-    scored_entries.sort(key=lambda x: x["score"], reverse=True)
-    return [s["entry"] for s in scored_entries[:top_k]]
+            for r in rows
+        ]
+        return result

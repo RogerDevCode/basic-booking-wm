@@ -15,19 +15,22 @@ if TYPE_CHECKING:
 async def test_rag_query_success() -> None:
     mock_db = AsyncMock()
 
-    # 1. fetch_active_entries
+    # KBRepository.search() ejecuta el FTS en DB; el mock devuelve filas ya
+    # rankeadas (incluyen `rank`, que el código mapea a `similarity`).
     mock_db.fetch.return_value = [
         {
             "kb_id": "1",
             "category": "General",
             "title": "Horarios de Atención",
             "content": "Atendemos de Lunes a Viernes de 9 a 18 hrs.",
+            "rank": 0.91,
         },
         {
             "kb_id": "2",
             "category": "Ubicación",
             "title": "Dirección",
             "content": "Estamos en Av. Providencia 1234, Santiago.",
+            "rank": 0.42,
         },
     ]
 

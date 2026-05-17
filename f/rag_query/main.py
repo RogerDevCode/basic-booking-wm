@@ -27,7 +27,7 @@ from __future__ import annotations
 from ..internal._db_client import create_db_client
 from ..internal._result import with_tenant_context
 from ..internal._wmill_adapter import log
-from ._rag_logic import KBRepository, perform_keyword_search
+from ._rag_logic import KBRepository
 from ._rag_models import InputSchema, RAGResult
 
 MODULE = "rag_query"
@@ -43,11 +43,8 @@ async def run_rag_query(
     conn = await create_db_client(pg_url)
     try:
         repo = KBRepository(conn)
-        rows = await repo.fetch_active_entries(category)
-        if not rows:
-            return {"entries": [], "count": 0, "method": "keyword"}
-        entries = perform_keyword_search(query, rows, top_k)
-        return {"entries": entries, "count": len(entries), "method": "keyword"}
+        entries = await repo.search(query, top_k, category)
+        return {"entries": entries, "count": len(entries), "method": "fts"}
     except Exception as e:
         log("Internal error in run_rag_query", error=str(e), module=MODULE)
         raise RuntimeError(f"internal_error: {e}") from e
@@ -67,17 +64,9 @@ async def _main_async(args: dict[str, object]) -> RAGResult:
         # 2. Execute within Tenant Context
         async def operation() -> RAGResult:
             repo = KBRepository(conn)
-
-            rows = await repo.fetch_active_entries(input_data.category)
-
-            if not rows:
-                res_empty: RAGResult = {"entries": [], "count": 0, "method": "keyword"}
-                return res_empty
-
-            entries = perform_keyword_search(input_data.query, rows, input_data.top_k)
-
-            res_full: RAGResult = {"entries": entries, "count": len(entries), "method": "keyword"}
-            return res_full
+            entries = await repo.search(input_data.query, input_data.top_k, input_data.category)
+            res: RAGResult = {"entries": entries, "count": len(entries), "method": "fts"}
+            return res
 
         return await with_tenant_context(conn, input_data.provider_id, operation)
 

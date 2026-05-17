@@ -14,14 +14,7 @@ class KBEntry(TypedDict):
 class RAGResult(TypedDict):
     entries: list[KBEntry]
     count: int
-    method: Literal["keyword", "vector"]
-
-
-class KBRow(TypedDict):
-    kb_id: str
-    category: str
-    title: str
-    content: str
+    method: Literal["keyword", "vector", "fts"]
 
 
 class InputSchema(BaseModel):

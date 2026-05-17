@@ -794,21 +794,18 @@
 - 🔧 `fn` `main` (L79)
 
 ### `f/rag_query/_rag_logic.py`
-- 📦 `class` `KBRepository` (L10)
-- ⚡ `async_fn` `fetch_active_entries` (L14)
-- 📦 `class` `ScoredEntry` (L49)
-- 🔧 `fn` `perform_keyword_search` (L54)
+- 📦 `class` `KBRepository` (L35)
+- ⚡ `async_fn` `search` (L39)
 
 ### `f/rag_query/_rag_models.py`
 - 📦 `class` `KBEntry` (L6)
 - 📦 `class` `RAGResult` (L14)
-- 📦 `class` `KBRow` (L20)
-- 📦 `class` `InputSchema` (L27)
+- 📦 `class` `InputSchema` (L20)
 
 ### `f/rag_query/main.py`
 - ⚡ `async_fn` `run_rag_query` (L36)
-- ⚡ `async_fn` `operation` (L68)
-- 🔧 `fn` `main` (L91)
+- ⚡ `async_fn` `operation` (L65)
+- 🔧 `fn` `main` (L80)
 
 ### `f/reminder_config/_config_models.py`
 - 📦 `class` `InlineButton` (L8)
