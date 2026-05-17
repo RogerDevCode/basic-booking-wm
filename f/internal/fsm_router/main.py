@@ -22,16 +22,41 @@ if TYPE_CHECKING:
     from ...reminder_config._config_models import InlineButton
 
 from ...nlu._tfidf_classifier import classify_intent
-from .._booking_shared import get_mis_citas_text
+from .._booking_shared import get_mis_citas_text, resolve_provider_by_name
+from .._db_client import create_db_client as _create_db_client
 from .._nlu_cache import ensure_nlu_cache
 from .._wmill_adapter import log
 from ..booking_fsm._fsm_machine import apply_transition, get_main_menu_text, parse_action, parse_callback_data
 from ..booking_fsm._fsm_models import BookingStateRoot, DraftBooking
+from ..booking_prefetch.main import (
+    _fetch_slots_for_doctor as _prefetch_slots,
+)
+from ..booking_prefetch.main import (
+    _has_active_booking_for_provider as _prefetch_active_booking,
+)
 from ._router_models import RouterInput, RouterResult
 from ._router_reminders import handle_reminders_config
 from .handlers._registration_handler import REG_STATES
 
 MODULE: Final[str] = "fsm_router"
+
+
+async def _has_active_booking_for_provider(client_id: str, provider_id: str, pg_url: str) -> bool:
+    """Wrapper around prefetch's _has_active_booking_for_provider with own DB conn."""
+    db = await _create_db_client(pg_url)
+    try:
+        return await _prefetch_active_booking(db, client_id, provider_id)
+    finally:
+        await db.close()
+
+
+async def _fetch_slots_for_doctor(pg_url: str, doctor_id: str) -> list[dict[str, object]]:
+    """Wrapper around prefetch's _fetch_slots_for_doctor with own DB conn."""
+    db = await _create_db_client(pg_url)
+    try:
+        return await _prefetch_slots(db, doctor_id)
+    finally:
+        await db.close()
 
 
 def _get_start_text() -> str:
@@ -93,6 +118,103 @@ async def _handle_mis_citas(
         handled=True,
         nextState=current_state_raw,
         response_text=text + "\n\n" + get_main_menu_text(),
+    )
+
+
+async def _handle_smart_prefill(
+    input_data: RouterInput,
+    draft_raw: dict[str, object],
+) -> RouterResult:
+    """Smart pre-fill: resolve provider from AI entities and skip steps."""
+    entities = input_data.ai_entities
+    provider_name_raw = entities.get("provider_name")
+    if not provider_name_raw or not input_data.pg_url:
+        return RouterResult(handled=False)
+
+    provider_name = str(provider_name_raw)
+    if not input_data.pg_url:
+        return RouterResult(handled=False)
+
+    try:
+        matches = await resolve_provider_by_name(provider_name, input_data.pg_url)
+    except Exception:
+        log("SMART_PREFILL_RESOLVE_FAILED", chat_id=input_data.chat_id, module=MODULE)
+        return RouterResult(handled=False)
+
+    if not matches:
+        return RouterResult(handled=False)
+
+    if len(matches) > 1:
+        items_list = [{"id": str(m["provider_id"]), "name": str(m["name"])} for m in matches]
+        names = ", ".join(str(m["name"]) for m in matches)
+        return RouterResult(
+            handled=True,
+            nextState={
+                "name": "selecting_doctor",
+                "specialtyId": "",
+                "specialtyName": "Selecciona un doctor",
+                "items": items_list,
+            },
+            response_text=(f"Encontré varios doctores con ese nombre: {names}.\n\n¿Con cuál deseas agendar?"),
+        )
+
+    provider = matches[0]
+    provider_id = str(provider["provider_id"])
+    specialty_id = str(provider["specialty_id"])
+    specialty_name = str(provider["specialty_name"])
+    doctor_name = str(provider["name"])
+
+    if input_data.client_id:
+        try:
+            has_active = await _has_active_booking_for_provider(input_data.client_id, provider_id, input_data.pg_url)
+        except Exception:
+            has_active = False
+        if has_active:
+            return RouterResult(
+                handled=True,
+                nextState={"name": "idle"},
+                response_text=(
+                    "⚠️ Ya tienes una cita agendada con este doctor.\n\n"
+                    "Debes cancelar tu cita actual antes de reservar una nueva.\n\n" + get_main_menu_text()
+                ),
+            )
+
+    try:
+        slots = await _fetch_slots_for_doctor(input_data.pg_url, provider_id)
+    except Exception:
+        log("SMART_PREFETCH_SLOTS_FAILED", chat_id=input_data.chat_id, module=MODULE)
+        slots = []
+
+    draft = DraftBooking(
+        specialty_id=specialty_id,
+        specialty_name=specialty_name,
+        doctor_id=provider_id,
+        doctor_name=doctor_name,
+        target_date=str(entities.get("date")) if entities.get("date") else None,
+    )
+
+    if slots:
+        return RouterResult(
+            handled=True,
+            nextState={
+                "name": "selecting_time",
+                "specialtyId": specialty_id,
+                "doctorId": provider_id,
+                "doctorName": doctor_name,
+                "items": slots,
+            },
+            nextDraft=cast("dict[str, object]", draft.model_dump()),
+            response_text=(f"Encontré al *{doctor_name}* ({specialty_name}). Horarios disponibles:"),
+        )
+
+    return RouterResult(
+        handled=True,
+        nextState={"name": "selecting_specialty"},
+        nextDraft=cast("dict[str, object]", draft.model_dump()),
+        response_text=(
+            f"El *{doctor_name}* no tiene horarios disponibles esta semana.\n\n"
+            "¿Te gustaría ver otras especialidades o elegir otro doctor?"
+        ),
     )
 
 
@@ -276,6 +398,11 @@ async def _route(input_data: RouterInput) -> RouterResult:
             if intent in ("crear_cita", "ver_disponibilidad"):
                 if not input_data.phone:
                     return _start_registration(input_data, source="agendar", draft_raw=draft_raw)
+
+                smart_result = await _handle_smart_prefill(input_data, draft_raw)
+                if smart_result.handled:
+                    return smart_result
+
                 current_state_name = "selecting_specialty"
                 current_state_raw = {"name": "selecting_specialty"}
             elif intent in ("mis_citas", "ver_mis_citas") or intent in ("cancelar_cita", "reagendar_cita"):

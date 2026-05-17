@@ -152,13 +152,17 @@ def extract_entities(text: str) -> EntityMap:
             break
 
     provider_patterns = [
-        r"(?:dr|doctor|doctora)\.?\s+([A-Z][a-z]+)",
-        r"(?:con|para)\s+el\s+(?:dr|doctor)\.?\s+([A-Z][a-z]+)",
+        # "el/la dr/dra/doctor/doctora X" — most common: "tiene el dr gallegos"
+        r"(?:el|la)\s+(?:dr|dra|doctor|doctora)\.?\s+([A-Za-záéíóúüñÁÉÍÓÚÜÑ]+)",
+        # "con/para [el/la] dr X"
+        r"(?:con|para)\s+(?:el|la\s+)?(?:dr|dra|doctor|doctora)\.?\s+([A-Za-záéíóúüñÁÉÍÓÚÜÑ]+)",
+        # bare "dr X" anywhere
+        r"(?:dr|dra|doctor|doctora)\.?\s+([A-Za-záéíóúüñÁÉÍÓÚÜÑ]+)",
     ]
     for p in provider_patterns:
-        m = re.search(p, text)
+        m = re.search(p, text, re.IGNORECASE)
         if m:
-            data["provider_name"] = f"Dr. {m.group(1)}"
+            data["provider_name"] = m.group(1)
             break
 
     service_types: list[str] = get_nlu_rule("service_types", [])

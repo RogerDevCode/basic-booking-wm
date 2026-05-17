@@ -388,7 +388,8 @@
 
 ### `f/internal/_booking_shared.py`
 - ⚡ `async_fn` `query_my_bookings` (L65)
-- ⚡ `async_fn` `get_mis_citas_text` (L96)
+- ⚡ `async_fn` `resolve_provider_by_name` (L96)
+- ⚡ `async_fn` `get_mis_citas_text` (L128)
 
 ### `f/internal/_booking_utils.py`
 - 📦 `class` `ActiveBookingInfo` (L9)
@@ -468,11 +469,11 @@
 - 🔧 `fn` `compute_requires_fsm_routing` (L43)
 - 🔧 `fn` `adjust_intent_with_context` (L55)
 - 🔧 `fn` `extract_entities` (L104)
-- 🔧 `fn` `detect_context` (L180)
-- 🔧 `fn` `determine_escalation_level` (L217)
-- 🔧 `fn` `generate_ai_response` (L242)
-- 🔧 `fn` `detect_social` (L259)
-- 🔧 `fn` `detect_menu_command` (L313)
+- 🔧 `fn` `detect_context` (L184)
+- 🔧 `fn` `determine_escalation_level` (L221)
+- 🔧 `fn` `generate_ai_response` (L246)
+- 🔧 `fn` `detect_social` (L263)
+- 🔧 `fn` `detect_menu_command` (L317)
 
 ### `f/internal/ai_agent/_ai_agent_models.py`
 - 📦 `class` `ConversationState` (L11)
@@ -607,7 +608,7 @@
 
 ### `f/internal/fsm_router/_router_models.py`
 - 📦 `class` `RouterInput` (L8)
-- 📦 `class` `RouterResult` (L26)
+- 📦 `class` `RouterResult` (L27)
 
 ### `f/internal/fsm_router/_router_reminders.py`
 - ⚡ `async_fn` `handle_reminders_config` (L27)
@@ -622,7 +623,7 @@
 - ⚡ `async_fn` `handle` (L20)
 
 ### `f/internal/fsm_router/main.py`
-- 🔧 `fn` `main` (L346)
+- 🔧 `fn` `main` (L473)
 
 ### `f/internal/gcal_utils/_gcal_logic.py`
 - 🔧 `fn` `build_gcal_event` (L6)

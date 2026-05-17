@@ -140,19 +140,20 @@ value:
           args:
             type: javascript
             expr: >-
-              { "chat_id": results.webhook_trigger.chat_id,
-                "user_input": results.message_preprocessor?.cleaned_text || results.webhook_trigger.canonical_text,
-                "state": results.get_conversation_state.data || {},
-                "items": results.booking_prefetch?.items || [],
-                "phone": results.telegram_auto_register?.phone ?? null,
-                "client_name": results.telegram_auto_register?.name ?? null,
-                "prefetch_block_reason": results.booking_prefetch?.block_reason || null,
-                "client_id": results.telegram_auto_register?.client_id ?? null,
-                "callback_message_id": results.webhook_trigger.callback_message_id ?? null,
-                "pg_url": variable("u/admin/DATABASE_URL"),
-                "ai_intent": results.ai_agent?.data?.intent ?? null,
-                "ai_confidence": results.ai_agent?.data?.confidence ?? null,
-                "requires_fsm_routing": results.ai_agent?.data?.requires_fsm_routing ?? true }
+               { "chat_id": results.webhook_trigger.chat_id,
+                 "user_input": results.message_preprocessor?.cleaned_text || results.webhook_trigger.canonical_text,
+                 "state": results.get_conversation_state.data || {},
+                 "items": results.booking_prefetch?.items || [],
+                 "phone": results.telegram_auto_register?.phone ?? null,
+                 "client_name": results.telegram_auto_register?.name ?? null,
+                 "prefetch_block_reason": results.booking_prefetch?.block_reason || null,
+                 "client_id": results.telegram_auto_register?.client_id ?? null,
+                 "callback_message_id": results.webhook_trigger.callback_message_id ?? null,
+                 "pg_url": variable("u/admin/DATABASE_URL"),
+                 "ai_intent": results.ai_agent?.data?.intent ?? null,
+                 "ai_confidence": results.ai_agent?.data?.confidence ?? null,
+                 "ai_entities": results.ai_agent?.data?.entities || {},
+                 "requires_fsm_routing": results.ai_agent?.data?.requires_fsm_routing ?? true }
         path: f/internal/fsm_router/main
       skip_if:
         expr: >-

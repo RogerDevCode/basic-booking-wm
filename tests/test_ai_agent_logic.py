@@ -29,7 +29,25 @@ class TestAIAgentLogic:
         # Act
         entities = extract_entities(text)
         # Assert
-        assert entities.provider_name == "Dr. Garcia"
+        assert entities.provider_name == "Garcia"
+
+    def test_extract_entities_provider_lowercase_surname(self) -> None:
+        # Regression: "[A-Z][a-z]+" required uppercase start — failed for "el dr gallegos"
+        text = "que horas tiene el dr gallegos"
+        entities = extract_entities(text)
+        assert entities.provider_name == "gallegos"
+
+    def test_extract_entities_provider_dra_title(self) -> None:
+        # "dra" title was not in original pattern list
+        text = "la doctora muñoz tiene hora mañana"
+        entities = extract_entities(text)
+        assert entities.provider_name == "muñoz"
+
+    def test_extract_entities_provider_bare_dr_lowercase(self) -> None:
+        # Bare "dr X" without preceding article, lowercase surname
+        text = "quiero hora con dr soto"
+        entities = extract_entities(text)
+        assert entities.provider_name == "soto"
 
     def test_detect_social_greeting(self) -> None:
         # Arrange

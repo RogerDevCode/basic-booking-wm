@@ -93,6 +93,38 @@ async def query_my_bookings(client_id: str, pg_url: str) -> list[dict[str, objec
         await db.close()
 
 
+async def resolve_provider_by_name(
+    name_fragment: str,
+    pg_url: str,
+) -> list[dict[str, object]]:
+    """Fuzzy match provider by name. Returns list of matches with specialty info."""
+    from ._db_client import create_db_client as _factory
+
+    db = await _factory(pg_url)
+    try:
+        rows = await db.fetch(
+            """
+            SELECT
+                p.provider_id,
+                p.name,
+                p.specialty_id,
+                sp.name AS specialty_name
+            FROM providers p
+            JOIN specialties sp ON sp.specialty_id = p.specialty_id
+            WHERE p.is_active = true
+              AND p.name ILIKE $1
+            ORDER BY p.name ASC
+            """,
+            f"%{name_fragment}%",
+        )
+        return [dict(r) for r in rows]
+    except Exception as e:
+        log("RESOLVE_PROVIDER_ERROR", error=str(e), fragment=name_fragment, module=MODULE)
+        raise RuntimeError(f"resolve_provider_failed: {e}") from e
+    finally:
+        await db.close()
+
+
 async def get_mis_citas_text(client_id: str, pg_url: str, chat_id: str) -> str | None:
     """Returns the formatted text for 'Mis Citas' or None if error/no results."""
     try:

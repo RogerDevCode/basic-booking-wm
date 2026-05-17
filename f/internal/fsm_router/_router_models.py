@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from ...reminder_config._config_models import InlineButton  # noqa: TC001
 
@@ -20,6 +20,7 @@ class RouterInput(BaseModel):
     callback_message_id: int | None = None
     ai_intent: str | None = None
     ai_confidence: float | None = None
+    ai_entities: dict[str, object] = Field(default_factory=dict)
     requires_fsm_routing: bool = False
 
 
