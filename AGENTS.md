@@ -24,6 +24,9 @@ LAW-11  ZERO REMOTE OVERHEAD → NO internal task_script
 LAW-12  TOP-LEVEL IMPORTS ONLY → NO lazy imports  
 LAW-13  ONE EVENT LOOP → NO asyncio.run inside main_async  
 LAW-14  EXCEPT = LOG + RAISE → NO silent swallow, NO error dict return  
+LAW-15  FSM-SAFE BY DEFAULT → Fallback de orquestación a FSM si IA falla o no corre.
+LAW-16  HYBRID EXTRACTION OVER LLM → Extraer datos (fechas, IDs) vía Python primero. LLM solo como fallback.
+LAW-17  FAIL-FAST EN ORQUESTACIÓN → Abortar flow yaml inmediatamente si hay inyección/amenaza.
 
 ---
 
@@ -290,6 +293,9 @@ BANNED-06 mutable defaults
 BANNED-07 Any leakage  
 BANNED-08 task_script for internal module calls  
 BANNED-09 "Error." or placeholder strings in logic  
+BANNED-10 extra="allow" EN PYDANTIC BOUNDARIES  
+BANNED-11 LLM DIRECT TO DB → LLM extrae JSON, Python valida y consulta.
+BANNED-12 SILENT DEGRADATION EN YAML → Prohibido skip_if que no maneje explícitamente undefined/null.
 
 ---
 

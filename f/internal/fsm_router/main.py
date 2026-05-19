@@ -5,12 +5,16 @@
 #   "pydantic>=2.10.0",
 #   "email-validator>=2.2.0",
 #   "asyncpg>=0.30.0",
-#   "cryptography>=44.0.0",
+#   "cryptography>=48.0.0",
 #   "beartype>=0.19.0",
 #   "returns>=0.24.0",
 #   "redis>=7.4.0",
-#   "typing-extensions>=4.12.0"
+#   "typing-extensions>=4.12.0",
+#   "dateparser>=1.2.0",
+#   "rapidfuzz>=3.5.2",
+#   "jellyfish>=1.0.3"
 # ]
+# ///
 # ///
 from __future__ import annotations
 
@@ -21,13 +25,16 @@ from beartype import beartype
 if TYPE_CHECKING:
     from ...reminder_config._config_models import InlineButton
 
+from ...nlu._datetime_resolver import resolve_datetime as _resolve_datetime_hybrid
 from ...nlu._tfidf_classifier import classify_intent
 from .._booking_shared import get_mis_citas_text, resolve_provider_by_name
+from .._date_resolver import resolve_date
 from .._db_client import create_db_client as _create_db_client
 from .._nlu_cache import ensure_nlu_cache
 from .._wmill_adapter import log
 from ..booking_fsm._fsm_machine import apply_transition, get_main_menu_text, parse_action, parse_callback_data
-from ..booking_fsm._fsm_models import BookingStateRoot, DraftBooking
+from ..booking_fsm._fsm_models import BookingStateRoot, DraftBooking, NamedItem
+from ..booking_fsm._fsm_responses import build_specialty_prompt
 from ..booking_prefetch.main import (
     _fetch_slots_for_doctor as _prefetch_slots,
 )
@@ -50,11 +57,15 @@ async def _has_active_booking_for_provider(client_id: str, provider_id: str, pg_
         await db.close()
 
 
-async def _fetch_slots_for_doctor(pg_url: str, doctor_id: str) -> list[dict[str, object]]:
+async def _fetch_slots_for_doctor(
+    pg_url: str,
+    doctor_id: str,
+    target_date: str | None = None,
+) -> list[dict[str, object]]:
     """Wrapper around prefetch's _fetch_slots_for_doctor with own DB conn."""
     db = await _create_db_client(pg_url)
     try:
-        return await _prefetch_slots(db, doctor_id)
+        return await _prefetch_slots(db, doctor_id, target_date)
     finally:
         await db.close()
 
@@ -187,8 +198,38 @@ async def _handle_smart_prefill(
                 ),
             )
 
+    # Resolve target date from AI entities (e.g., "viernes" → "2026-05-22")
+    target_date: str | None = None
+    date_entity = entities.get("date")
+    if date_entity:
+        try:
+            # Get provider timezone for accurate date resolution
+            db = await _create_db_client(input_data.pg_url)
+            try:
+                tz_row = await db.fetchrow(
+                    "SELECT t.name as tz_name FROM providers p"
+                    " LEFT JOIN timezones t ON t.id = p.timezone_id"
+                    " WHERE p.provider_id = $1::uuid",
+                    provider_id,
+                )
+                provider_tz = str(tz_row["tz_name"]) if tz_row and tz_row["tz_name"] else "America/Santiago"
+            finally:
+                await db.close()
+
+            # Hybrid pipeline: fuzzy+phonetic+dateparser+LLM fallback
+            date_str = str(date_entity)
+            hybrid_result = _resolve_datetime_hybrid(date_str, provider_tz=provider_tz)
+            if hybrid_result.intent_detected and hybrid_result.datetime_iso:
+                target_date = hybrid_result.datetime_iso[:10]
+            else:
+                # Fallback to deterministic resolver for simple cases
+                target_date = resolve_date(date_str, {"timezone": provider_tz})
+        except Exception:
+            log("DATE_RESOLUTION_FAILED", date=str(date_entity), chat_id=input_data.chat_id, module=MODULE)
+            target_date = None
+
     try:
-        slots = await _fetch_slots_for_doctor(input_data.pg_url, provider_id)
+        slots = await _fetch_slots_for_doctor(input_data.pg_url, provider_id, target_date)
     except Exception:
         log("SMART_PREFETCH_SLOTS_FAILED", chat_id=input_data.chat_id, module=MODULE)
         slots = []
@@ -198,10 +239,13 @@ async def _handle_smart_prefill(
         specialty_name=specialty_name,
         doctor_id=provider_id,
         doctor_name=doctor_name,
-        target_date=str(entities.get("date")) if entities.get("date") else None,
+        target_date=target_date or (str(entities.get("date")) if entities.get("date") else None),
     )
 
     if slots:
+        date_label = ""
+        if target_date:
+            date_label = f" para el {target_date}"
         return RouterResult(
             handled=True,
             nextState={
@@ -212,15 +256,16 @@ async def _handle_smart_prefill(
                 "items": slots,
             },
             nextDraft=cast("dict[str, object]", draft.model_dump()),
-            response_text=(f"Encontré al *{doctor_name}* ({specialty_name}). Horarios disponibles:"),
+            response_text=(f"Encontré al *{doctor_name}* ({specialty_name}). Horarios disponibles{date_label}:"),
         )
 
+    date_msg = f" para el {target_date}" if target_date else " esta semana"
     return RouterResult(
         handled=True,
         nextState={"name": "selecting_specialty"},
         nextDraft=cast("dict[str, object]", draft.model_dump()),
         response_text=(
-            f"El *{doctor_name}* no tiene horarios disponibles esta semana.\n\n"
+            f"El *{doctor_name}* no tiene horarios disponibles{date_msg}.\n\n"
             "¿Te gustaría ver otras especialidades o elegir otro doctor?"
         ),
     )
@@ -411,8 +456,19 @@ async def _route(input_data: RouterInput) -> RouterResult:
                 if smart_result.handled:
                     return smart_result
 
-                current_state_name = "selecting_specialty"
-                current_state_raw = {"name": "selecting_specialty"}
+                # Intent detected — show specialty list, do NOT apply_transition
+                # (user hasn't selected anything yet, just expressed intent)
+                specialty_items_raw = list(input_data.items) if input_data.items else []
+                specialty_items = cast("list[NamedItem]", specialty_items_raw)
+                if specialty_items:
+                    response = build_specialty_prompt(specialty_items)
+                else:
+                    response = "Buscando especialidades disponibles..."
+                return RouterResult(
+                    handled=True,
+                    nextState={"name": "selecting_specialty", "items": specialty_items_raw},
+                    response_text=response,
+                )
             elif intent in ("mis_citas", "ver_mis_citas") or intent in ("cancelar_cita", "reagendar_cita"):
                 return await _handle_mis_citas(input_data, current_state_raw)
             elif intent == "mostrar_menu_principal":

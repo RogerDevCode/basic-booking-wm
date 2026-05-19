@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from ._config_service import default_preferences, parse_preferences_payload
 
@@ -19,17 +19,18 @@ async def load_preferences(db: DBClient, client_id: str) -> ReminderPreferences:
     if metadata_raw is None:
         return default_preferences()
 
-    metadata_obj: object
+    metadata_obj: dict[str, object]
     if isinstance(metadata_raw, str):
-        metadata_obj = json.loads(metadata_raw)
+        metadata_obj = cast("dict[str, object]", json.loads(metadata_raw))
+    elif isinstance(metadata_raw, dict):
+        metadata_obj = cast("dict[str, object]", metadata_raw)
     else:
-        metadata_obj = metadata_raw
+        metadata_obj = {}
 
-    if not isinstance(metadata_obj, dict):
-        raise ValueError("client_metadata_invalid")
-
-    raw_preferences = metadata_obj.get("reminder_preferences")
-    return parse_preferences_payload(raw_preferences)
+    raw_preferences: object = metadata_obj.get("reminder_preferences")
+    if raw_preferences is not None and not isinstance(raw_preferences, dict):
+        return default_preferences()
+    return parse_preferences_payload(cast("dict[str, object] | None", raw_preferences))
 
 
 async def save_preferences(db: DBClient, client_id: str, preferences: ReminderPreferences) -> None:

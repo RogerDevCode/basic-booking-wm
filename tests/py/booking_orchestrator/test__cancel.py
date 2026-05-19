@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -31,7 +32,7 @@ def _make_delegates(**overrides: object) -> dict[str, AsyncMock]:
 @pytest.mark.asyncio
 async def test_handle_cancel_booking_no_id_delegates_to_get_my_bookings() -> None:
     conn = AsyncMock()
-    mock_result = {
+    mock_result: dict[str, Any] = {
         "action": "mis_citas",
         "success": True,
         "data": [],

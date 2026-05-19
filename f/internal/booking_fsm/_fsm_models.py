@@ -69,7 +69,7 @@ class IdleState(BaseModel):
 class SelectingSpecialtyState(BaseModel):
     name: Literal["selecting_specialty"] = "selecting_specialty"
     error: str | None = None
-    items: list[NamedItem] = Field(default_factory=list)  # pyright: ignore[reportUnknownMemberType]
+    items: list[NamedItem] = Field(default_factory=list[NamedItem])
 
 
 class SelectingDoctorState(BaseModel):
@@ -77,7 +77,7 @@ class SelectingDoctorState(BaseModel):
     specialtyId: str
     specialtyName: str
     error: str | None = None
-    items: list[NamedItem] = Field(default_factory=list)  # pyright: ignore[reportUnknownMemberType]
+    items: list[NamedItem] = Field(default_factory=list[NamedItem])
 
 
 class SelectingTimeState(BaseModel):
@@ -87,7 +87,7 @@ class SelectingTimeState(BaseModel):
     doctorName: str
     targetDate: str | None = None
     error: str | None = None
-    items: list[TimeSlotItem] = Field(default_factory=list)  # pyright: ignore[reportUnknownMemberType]
+    items: list[TimeSlotItem] = Field(default_factory=list[TimeSlotItem])
 
 
 class ConfirmingState(BaseModel):

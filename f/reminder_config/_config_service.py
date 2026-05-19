@@ -26,12 +26,9 @@ def default_preferences() -> ReminderPreferences:
     return DEFAULT_PREFERENCES.model_copy(deep=True)
 
 
-def parse_preferences_payload(raw_payload: object) -> ReminderPreferences:
+def parse_preferences_payload(raw_payload: dict[str, object] | None) -> ReminderPreferences:
     if raw_payload is None:
         return default_preferences()
-
-    if not isinstance(raw_payload, dict):
-        raise ValueError("reminder_preferences_payload_invalid")
 
     if "channels" in raw_payload or "windows" in raw_payload:
         return ReminderPreferences.model_validate(raw_payload)

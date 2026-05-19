@@ -102,7 +102,11 @@ def adjust_intent_with_context(
 
 
 def extract_entities(text: str) -> EntityMap:
+    import unicodedata
+
     lower_text = text.lower()
+    # Normalised text for accent-insensitive matching (e.g., "miércoles" → "miercoles")
+    normalised_text = "".join(c for c in unicodedata.normalize("NFD", lower_text) if unicodedata.category(c) != "Mn")
     data: dict[str, str | None] = {
         "date": None,
         "time": None,
@@ -117,8 +121,10 @@ def extract_entities(text: str) -> EntityMap:
 
     relative_dates: list[str] = get_nlu_rule("relative_dates", [])
     for rel in relative_dates:
-        if rel in lower_text:
-            data["date"] = rel
+        # Normalise rel for accent-insensitive matching
+        rel_norm = "".join(c for c in unicodedata.normalize("NFD", rel) if unicodedata.category(c) != "Mn")
+        if rel_norm in normalised_text:
+            data["date"] = rel if rel in lower_text else rel_norm
             break
 
     if not data["date"]:
@@ -136,7 +142,7 @@ def extract_entities(text: str) -> EntityMap:
     if not data["date"]:
         day_names: dict[str, str] = get_nlu_rule("day_names", {})
         for day in day_names:
-            if day in lower_text:
+            if day in normalised_text:
                 data["date"] = day
                 break
 

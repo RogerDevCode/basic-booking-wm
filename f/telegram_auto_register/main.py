@@ -5,7 +5,7 @@
 #   "pydantic>=2.10.0",
 #   "email-validator>=2.2.0",
 #   "asyncpg>=0.30.0",
-#   "cryptography>=44.0.0",
+#   "cryptography>=48.0.0",
 #   "beartype>=0.19.0",
 #   "returns>=0.24.0",
 #   "redis>=7.4.0",
@@ -67,12 +67,13 @@ def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
     from pydantic import BaseModel
 
     try:
+        pg_url: str | None = None
         if isinstance(args, InputSchema):
             validated = args
             clean: dict[str, object] = validated.model_dump()
         else:
             # Strip pg_url before validation — InputSchema has extra="forbid"
-            pg_url = args.get("pg_url")
+            pg_url = str(args["pg_url"]) if args.get("pg_url") is not None else None
             clean = {k: v for k, v in args.items() if k != "pg_url"}
             validated = InputSchema.model_validate(clean)
 

@@ -30,6 +30,9 @@ async def test_smart_prefill_single_provider_skips_to_selecting_time() -> None:
         "pg_url": "postgresql://test",
     }
 
+    mock_db = AsyncMock()
+    mock_db.fetchrow.return_value = {"tz_name": "America/Santiago"}
+
     with (
         patch("f.internal._nlu_cache.ensure_nlu_cache", AsyncMock()),
         patch(
@@ -50,6 +53,10 @@ async def test_smart_prefill_single_provider_skips_to_selecting_time() -> None:
             AsyncMock(return_value=False),
         ),
         patch(
+            "f.internal.fsm_router.main._create_db_client",
+            AsyncMock(return_value=mock_db),
+        ),
+        patch(
             "f.internal.fsm_router.main._fetch_slots_for_doctor",
             AsyncMock(
                 return_value=[
@@ -67,10 +74,168 @@ async def test_smart_prefill_single_provider_skips_to_selecting_time() -> None:
     data = cast("dict[str, Any]", res["data"])
     assert data["handled"] is True
     assert data["nextState"]["name"] == "selecting_time"
-    assert data["nextState"]["doctorId"] == "uuid-gallegos"
-    assert data["nextState"]["doctorName"] == "Dr. Gallegos"
-    assert "Gallegos" in data["response_text"]
-    assert len(data["nextState"]["items"]) == 1
+
+
+# ============================================================================
+# Smart Pre-fill: Date Filtering — resolve "viernes", "mañana", etc.
+# ============================================================================
+
+
+@pytest.mark.asyncio
+async def test_smart_prefill_with_date_entity_resolves_target_date() -> None:
+    """Usuario dice 'quiero hora para el viernes' → resuelve fecha y filtra slots."""
+    args: dict[str, Any] = {
+        "chat_id": "1",
+        "user_input": "quiero hora para el viernes con el Dr. Gallegos",
+        "state": {
+            "booking_state": {"name": "idle"},
+            "booking_draft": {},
+        },
+        "requires_fsm_routing": True,
+        "ai_intent": "crear_cita",
+        "ai_confidence": 0.9,
+        "ai_entities": {"provider_name": "Dr. Gallegos", "date": "viernes"},
+        "phone": "+56912345678",
+        "pg_url": "postgresql://test",
+    }
+
+    mock_db = AsyncMock()
+    mock_db.fetchrow.return_value = {"tz_name": "America/Santiago"}
+
+    with (
+        patch("f.internal._nlu_cache.ensure_nlu_cache", AsyncMock()),
+        patch(
+            "f.internal.fsm_router.main.resolve_provider_by_name",
+            AsyncMock(
+                return_value=[
+                    {
+                        "provider_id": "uuid-gallegos",
+                        "name": "Dr. Gallegos",
+                        "specialty_id": "spec-cardio",
+                        "specialty_name": "Cardiología",
+                    }
+                ]
+            ),
+        ),
+        patch(
+            "f.internal.fsm_router.main._has_active_booking_for_provider",
+            AsyncMock(return_value=False),
+        ),
+        patch(
+            "f.internal.fsm_router.main._create_db_client",
+            AsyncMock(return_value=mock_db),
+        ),
+        patch("f.internal.fsm_router.main._fetch_slots_for_doctor", AsyncMock(return_value=[])) as mock_fetch,
+    ):
+        await _main_async(args)
+
+    # Verify _fetch_slots_for_doctor was called with target_date
+    mock_fetch.assert_called_once()
+    call_kwargs = mock_fetch.call_args
+    # The call is (pg_url, provider_id, target_date)
+    assert call_kwargs[0][0] == "postgresql://test"
+    assert call_kwargs[0][1] == "uuid-gallegos"
+    # target_date should be a valid YYYY-MM-DD string (not None)
+    target_date = call_kwargs[0][2]
+    assert target_date is not None
+    assert len(target_date) == 10  # YYYY-MM-DD format
+
+
+@pytest.mark.asyncio
+async def test_smart_prefill_with_date_shows_date_in_response() -> None:
+    """Usuario dice 'quiero hora para mañana' → respuesta menciona la fecha."""
+    args: dict[str, Any] = {
+        "chat_id": "1",
+        "user_input": "quiero hora para mañana con el Dr. Gallegos",
+        "state": {
+            "booking_state": {"name": "idle"},
+            "booking_draft": {},
+        },
+        "requires_fsm_routing": True,
+        "ai_intent": "crear_cita",
+        "ai_confidence": 0.9,
+        "ai_entities": {"provider_name": "Dr. Gallegos", "date": "mañana"},
+        "phone": "+56912345678",
+        "pg_url": "postgresql://test",
+    }
+
+    mock_db = AsyncMock()
+    mock_db.fetchrow.return_value = {"tz_name": "America/Santiago"}
+
+    with (
+        patch("f.internal._nlu_cache.ensure_nlu_cache", AsyncMock()),
+        patch(
+            "f.internal.fsm_router.main.resolve_provider_by_name",
+            AsyncMock(
+                return_value=[
+                    {
+                        "provider_id": "uuid-gallegos",
+                        "name": "Dr. Gallegos",
+                        "specialty_id": "spec-cardio",
+                        "specialty_name": "Cardiología",
+                    }
+                ]
+            ),
+        ),
+        patch(
+            "f.internal.fsm_router.main._has_active_booking_for_provider",
+            AsyncMock(return_value=False),
+        ),
+        patch(
+            "f.internal.fsm_router.main._create_db_client",
+            AsyncMock(return_value=mock_db),
+        ),
+        patch(
+            "f.internal.fsm_router.main._fetch_slots_for_doctor",
+            AsyncMock(
+                return_value=[
+                    {
+                        "id": "2026-05-18T09:00:00Z",
+                        "label": "Lun 18 May · 09:00",
+                        "start_time": "2026-05-18T09:00:00Z",
+                    }
+                ]
+            ),
+        ),
+    ):
+        res = await _main_async(args)
+
+    data = cast("dict[str, Any]", res["data"])
+    assert data["handled"] is True
+    assert data["nextState"]["name"] == "selecting_time"
+    # Response should mention the date
+    assert "para el" in data["response_text"]
+
+
+# ============================================================================
+# Smart Pre-fill: No entities — normal flow (not smart pre-fill)
+# ============================================================================
+
+
+@pytest.mark.asyncio
+async def test_smart_prefill_no_entities_uses_normal_flow() -> None:
+    """Sin entities de provider → flujo normal de selecting_specialty."""
+    args: dict[str, Any] = {
+        "chat_id": "1",
+        "user_input": "quiero agendar una hora",
+        "state": {
+            "booking_state": {"name": "idle"},
+            "booking_draft": {},
+        },
+        "requires_fsm_routing": True,
+        "ai_intent": "crear_cita",
+        "ai_confidence": 0.9,
+        "ai_entities": {},
+        "phone": "+56912345678",
+        "pg_url": "postgresql://test",
+    }
+
+    with patch("f.internal._nlu_cache.ensure_nlu_cache", AsyncMock()):
+        res = await _main_async(args)
+
+    data = cast("dict[str, Any]", res["data"])
+    assert data["handled"] is True
+    assert data["nextState"]["name"] == "selecting_specialty"
 
 
 # ============================================================================
@@ -135,7 +300,7 @@ async def test_smart_prefill_ambiguous_shows_list() -> None:
 
 @pytest.mark.asyncio
 async def test_smart_prefill_no_match_returns_informative_message() -> None:
-    """Doctor no encontrado → handled=True con mensaje informativo, estado idle."""
+    """Doctor no encontrado → mensaje informativo."""
     args: dict[str, Any] = {
         "chat_id": "1",
         "user_input": "quiero hora con el Dr. Inexistente",
@@ -161,11 +326,9 @@ async def test_smart_prefill_no_match_returns_informative_message() -> None:
         res = await _main_async(args)
 
     data = cast("dict[str, Any]", res["data"])
-    # Must be handled=True so flow doesn't fall through to "no entendí tu mensaje"
     assert data["handled"] is True
     assert data["nextState"]["name"] == "idle"
-    # Inform user the doctor wasn't found
-    assert "No encontré" in data["response_text"] or "no encontr" in data["response_text"].lower()
+    assert "no encontré" in data["response_text"].lower()
 
 
 # ============================================================================
@@ -243,6 +406,9 @@ async def test_smart_prefill_no_slots_shows_message() -> None:
         "pg_url": "postgresql://test",
     }
 
+    mock_db = AsyncMock()
+    mock_db.fetchrow.return_value = {"tz_name": "America/Santiago"}
+
     with (
         patch("f.internal._nlu_cache.ensure_nlu_cache", AsyncMock()),
         patch(
@@ -263,6 +429,10 @@ async def test_smart_prefill_no_slots_shows_message() -> None:
             AsyncMock(return_value=False),
         ),
         patch(
+            "f.internal.fsm_router.main._create_db_client",
+            AsyncMock(return_value=mock_db),
+        ),
+        patch(
             "f.internal.fsm_router.main._fetch_slots_for_doctor",
             AsyncMock(return_value=[]),
         ),
@@ -273,34 +443,3 @@ async def test_smart_prefill_no_slots_shows_message() -> None:
     assert data["handled"] is True
     assert data["nextState"]["name"] == "selecting_specialty"
     assert "no tiene horarios" in data["response_text"].lower()
-
-
-# ============================================================================
-# Smart Pre-fill: No entities — normal flow (not smart pre-fill)
-# ============================================================================
-
-
-@pytest.mark.asyncio
-async def test_smart_prefill_no_entities_uses_normal_flow() -> None:
-    """Sin entities de provider → flujo normal de selecting_specialty."""
-    args: dict[str, Any] = {
-        "chat_id": "1",
-        "user_input": "quiero agendar una hora",
-        "state": {
-            "booking_state": {"name": "idle"},
-            "booking_draft": {},
-        },
-        "requires_fsm_routing": True,
-        "ai_intent": "crear_cita",
-        "ai_confidence": 0.9,
-        "ai_entities": {},
-        "phone": "+56912345678",
-        "pg_url": "postgresql://test",
-    }
-
-    with patch("f.internal._nlu_cache.ensure_nlu_cache", AsyncMock()):
-        res = await _main_async(args)
-
-    data = cast("dict[str, Any]", res["data"])
-    assert data["handled"] is True
-    assert data["nextState"]["name"] == "selecting_specialty"

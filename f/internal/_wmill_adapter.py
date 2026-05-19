@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
     try:
@@ -21,7 +21,10 @@ except ImportError:
 
 
 def is_dict_str_obj(val: object) -> TypeIs[dict[str, object]]:
-    return isinstance(val, dict) and all(isinstance(k, str) for k in val)
+    if not isinstance(val, dict):
+        return False
+    d = cast("dict[object, object]", val)
+    return all(isinstance(k, str) for k in d)
 
 
 def get_variable_strict(path: str) -> str:

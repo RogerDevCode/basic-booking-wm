@@ -1,11 +1,12 @@
 from datetime import datetime
-from typing import Any
 
 from ..internal._result import DBClient
 from ._user_models import InputSchema, UserInfo, UsersListResult
 
 
-def map_row(r: dict[str, Any]) -> UserInfo:
+def map_row(r: dict[str, object]) -> UserInfo:
+    last_login_raw = r.get("last_login")
+    created_at_raw = r.get("created_at")
     return {
         "full_name": str(r["full_name"]),
         "email": str(r["email"]) if r.get("email") else None,
@@ -14,14 +15,12 @@ def map_row(r: dict[str, Any]) -> UserInfo:
         "role": str(r["role"]),
         "is_active": bool(r["is_active"]),
         "telegram_chat_id": str(r["telegram_chat_id"]) if r.get("telegram_chat_id") else None,
-        "last_login": r["last_login"].isoformat()
-        if isinstance(r.get("last_login"), datetime)
-        else str(r.get("last_login"))
-        if r.get("last_login")
+        "last_login": last_login_raw.isoformat()
+        if isinstance(last_login_raw, datetime)
+        else str(last_login_raw)
+        if last_login_raw
         else None,
-        "created_at": r["created_at"].isoformat()
-        if isinstance(r.get("created_at"), datetime)
-        else str(r.get("created_at")),
+        "created_at": created_at_raw.isoformat() if isinstance(created_at_raw, datetime) else str(created_at_raw),
     }
 
 
@@ -54,8 +53,8 @@ async def handle_user_actions(db: DBClient, input_data: InputSchema) -> UserInfo
 
     elif action == "update":
         _ALLOWED = {"full_name", "email", "phone", "role"}
-        fields = []
-        params = []
+        fields: list[str] = []
+        params: list[object] = []
         idx = 1
         for field in ["full_name", "email", "phone", "role"]:
             if field not in _ALLOWED:

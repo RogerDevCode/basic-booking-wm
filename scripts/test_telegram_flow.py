@@ -55,7 +55,10 @@ def send_telegram_message(
     with httpx.Client(timeout=120.0) as client:
         response = client.post(url, json=payload, headers=headers)
         response.raise_for_status()
-        return response.json()  # type: ignore[no-any-return]
+        try:
+            return response.json()  # type: ignore[no-any-return]
+        except ValueError:
+            return {"response_text": response.text}
 
 
 def main(args: argparse.Namespace) -> None:

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -48,5 +48,5 @@ async def test_provider_agenda_success() -> None:
         result = await main(args)
         assert result is not None
         assert isinstance(result, list)
-        assert len(result) == 1
+        assert len(cast("list[dict[str, object]]", result)) == 1
         assert result[0]["booking_id"] == "b1"

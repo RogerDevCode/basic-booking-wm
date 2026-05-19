@@ -20,7 +20,7 @@ class MenuResponse(BaseModel):
     model_config = ConfigDict(strict=True)
     handled: bool
     response_text: str
-    inline_buttons: list[list[dict[str, str]]] = Field(default_factory=list)
+    inline_buttons: list[list[dict[str, str]]] = Field(default_factory=list[list[dict[str, str]]])
 
 
 class InputSchema(MenuInput):

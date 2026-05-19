@@ -438,7 +438,7 @@
 - 🔧 `fn` `get_redis_client` (L14)
 - ⚡ `async_fn` `load_nlu_rules_to_redis` (L19)
 - ⚡ `async_fn` `ensure_nlu_cache` (L42)
-- 🔧 `fn` `get_nlu_rule` (L104)
+- 🔧 `fn` `get_nlu_rule` (L113)
 
 ### `f/internal/_redis_client.py`
 - ⚡ `async_fn` `create_redis_client` (L42)
@@ -458,22 +458,22 @@
 
 ### `f/internal/_wmill_adapter.py`
 - 🔧 `fn` `is_dict_str_obj` (L23)
-- 🔧 `fn` `get_variable_strict` (L27)
-- 🔧 `fn` `get_resource_strict` (L35)
-- 🔧 `fn` `get_variable` (L43)
-- 🔧 `fn` `get_resource` (L55)
-- 🔧 `fn` `run_script` (L67)
-- 🔧 `fn` `log` (L97)
+- 🔧 `fn` `get_variable_strict` (L30)
+- 🔧 `fn` `get_resource_strict` (L38)
+- 🔧 `fn` `get_variable` (L46)
+- 🔧 `fn` `get_resource` (L58)
+- 🔧 `fn` `run_script` (L70)
+- 🔧 `fn` `log` (L100)
 
 ### `f/internal/ai_agent/_ai_agent_logic.py`
 - 🔧 `fn` `compute_requires_fsm_routing` (L43)
 - 🔧 `fn` `adjust_intent_with_context` (L55)
 - 🔧 `fn` `extract_entities` (L104)
-- 🔧 `fn` `detect_context` (L184)
-- 🔧 `fn` `determine_escalation_level` (L221)
-- 🔧 `fn` `generate_ai_response` (L246)
-- 🔧 `fn` `detect_social` (L263)
-- 🔧 `fn` `detect_menu_command` (L317)
+- 🔧 `fn` `detect_context` (L190)
+- 🔧 `fn` `determine_escalation_level` (L227)
+- 🔧 `fn` `generate_ai_response` (L252)
+- 🔧 `fn` `detect_social` (L269)
+- 🔧 `fn` `detect_menu_command` (L323)
 
 ### `f/internal/ai_agent/_ai_agent_models.py`
 - 📦 `class` `ConversationState` (L11)
@@ -568,7 +568,7 @@
 - 🔧 `fn` `build_confirmation_keyboard` (L88)
 
 ### `f/internal/booking_prefetch/main.py`
-- 🔧 `fn` `main` (L256)
+- 🔧 `fn` `main` (L267)
 
 ### `f/internal/client_register/main.py`
 - 🔧 `fn` `main` (L73)
@@ -623,7 +623,7 @@
 - ⚡ `async_fn` `handle` (L20)
 
 ### `f/internal/fsm_router/main.py`
-- 🔧 `fn` `main` (L481)
+- 🔧 `fn` `main` (L537)
 
 ### `f/internal/gcal_utils/_gcal_logic.py`
 - 🔧 `fn` `build_gcal_event` (L6)
@@ -692,22 +692,33 @@
 - 🔧 `fn` `main` (L60)
 
 ### `f/message_preprocessor/_modism_mapper.py`
-- 🔧 `fn` `apply_modism_map` (L48)
+- 🔧 `fn` `apply_modism_map` (L52)
 
 ### `f/message_preprocessor/_preprocessor_models.py`
-- 📦 `class` `SpellCorrection` (L6)
-- 📦 `class` `ModismMatch` (L13)
-- 📦 `class` `PreprocessorInput` (L20)
-- 📦 `class` `PreprocessorOutput` (L26)
+- 📦 `class` `SpellCorrection` (L10)
+- 📦 `class` `ModismMatch` (L17)
+- 📦 `class` `SecurityScanResult` (L24)
+- 📦 `class` `PreprocessorInput` (L31)
+- 📦 `class` `PreprocessorOutput` (L37)
 
 ### `f/message_preprocessor/_spell_normalizer.py`
-- 🔧 `fn` `apply_spell_correction` (L144)
+- 🔧 `fn` `apply_spell_correction` (L169)
 
 ### `f/message_preprocessor/_text_cleaner.py`
-- 🔧 `fn` `clean_text` (L18)
+- 🔧 `fn` `clean_text` (L23)
+
+### `f/message_preprocessor/_threat_scanner.py`
+- 🔧 `fn` `scan_threats` (L58)
 
 ### `f/message_preprocessor/main.py`
-- 🔧 `fn` `main` (L54)
+- 🔧 `fn` `main` (L67)
+
+### `f/nlu/_datetime_resolver.py`
+- 📦 `class` `ResolverResult` (L33)
+- 🔧 `fn` `normalize_text` (L124)
+- 🔧 `fn` `semantic_match` (L172)
+- 🔧 `fn` `parse_with_dateparser` (L225)
+- 🔧 `fn` `resolve_datetime` (L290)
 
 ### `f/nlu/_tfidf_classifier.py`
 - 📦 `class` `ModelData` (L290)
@@ -819,15 +830,15 @@
 
 ### `f/reminder_config/_config_repository.py`
 - ⚡ `async_fn` `load_preferences` (L13)
-- ⚡ `async_fn` `save_preferences` (L35)
+- ⚡ `async_fn` `save_preferences` (L36)
 
 ### `f/reminder_config/_config_service.py`
 - 🔧 `fn` `default_preferences` (L25)
 - 🔧 `fn` `parse_preferences_payload` (L29)
-- 🔧 `fn` `toggle_channel` (L61)
-- 🔧 `fn` `toggle_window` (L71)
-- 🔧 `fn` `deactivate_all` (L91)
-- 🔧 `fn` `activate_all` (L107)
+- 🔧 `fn` `toggle_channel` (L58)
+- 🔧 `fn` `toggle_window` (L68)
+- 🔧 `fn` `deactivate_all` (L88)
+- 🔧 `fn` `activate_all` (L104)
 
 ### `f/reminder_config/_config_view.py`
 - 🔧 `fn` `build_config_view` (L11)
@@ -1113,12 +1124,12 @@
 - 🔧 `fn` `main` (L64)
 
 ### `f/web_admin_specialties_crud/_specialty_logic.py`
-- 🔧 `fn` `map_row` (L8)
-- ⚡ `async_fn` `list_specialties` (L22)
-- ⚡ `async_fn` `create_specialty` (L30)
-- ⚡ `async_fn` `update_specialty` (L52)
-- ⚡ `async_fn` `delete_specialty` (L82)
-- ⚡ `async_fn` `set_status` (L90)
+- 🔧 `fn` `map_row` (L7)
+- ⚡ `async_fn` `list_specialties` (L20)
+- ⚡ `async_fn` `create_specialty` (L28)
+- ⚡ `async_fn` `update_specialty` (L50)
+- ⚡ `async_fn` `delete_specialty` (L80)
+- ⚡ `async_fn` `set_status` (L88)
 
 ### `f/web_admin_specialties_crud/_specialty_models.py`
 - 📦 `class` `SpecialtyRow` (L6)
@@ -1129,20 +1140,20 @@
 - 🔧 `fn` `main` (L77)
 
 ### `f/web_admin_tags/_tags_logic.py`
-- 🔧 `fn` `map_category` (L8)
-- 🔧 `fn` `map_tag` (L22)
-- ⚡ `async_fn` `verify_admin_access` (L38)
-- 📦 `class` `TagRepository` (L47)
-- ⚡ `async_fn` `list_categories` (L51)
-- ⚡ `async_fn` `create_category` (L67)
-- ⚡ `async_fn` `update_category` (L81)
-- ⚡ `async_fn` `set_category_status` (L106)
-- ⚡ `async_fn` `delete_category` (L119)
-- ⚡ `async_fn` `list_tags` (L126)
-- ⚡ `async_fn` `create_tag` (L150)
-- ⚡ `async_fn` `update_tag` (L172)
-- ⚡ `async_fn` `set_tag_status` (L202)
-- ⚡ `async_fn` `delete_tag` (L215)
+- 🔧 `fn` `map_category` (L7)
+- 🔧 `fn` `map_tag` (L20)
+- ⚡ `async_fn` `verify_admin_access` (L35)
+- 📦 `class` `TagRepository` (L44)
+- ⚡ `async_fn` `list_categories` (L48)
+- ⚡ `async_fn` `create_category` (L64)
+- ⚡ `async_fn` `update_category` (L78)
+- ⚡ `async_fn` `set_category_status` (L103)
+- ⚡ `async_fn` `delete_category` (L116)
+- ⚡ `async_fn` `list_tags` (L123)
+- ⚡ `async_fn` `create_tag` (L147)
+- ⚡ `async_fn` `update_tag` (L169)
+- ⚡ `async_fn` `set_tag_status` (L199)
+- ⚡ `async_fn` `delete_tag` (L212)
 
 ### `f/web_admin_tags/_tags_models.py`
 - 📦 `class` `CategoryRow` (L6)
@@ -1154,8 +1165,8 @@
 - 🔧 `fn` `main` (L115)
 
 ### `f/web_admin_users/_user_logic.py`
-- 🔧 `fn` `map_row` (L8)
-- ⚡ `async_fn` `handle_user_actions` (L28)
+- 🔧 `fn` `map_row` (L7)
+- ⚡ `async_fn` `handle_user_actions` (L27)
 
 ### `f/web_admin_users/_user_models.py`
 - 📦 `class` `UserInfo` (L6)
@@ -1254,10 +1265,10 @@
 - 🔧 `fn` `main` (L65)
 
 ### `f/web_patient_profile/_profile_logic.py`
-- 🔧 `fn` `map_to_profile` (L7)
-- ⚡ `async_fn` `find_user` (L19)
-- ⚡ `async_fn` `find_or_create_client` (L29)
-- ⚡ `async_fn` `update_profile` (L55)
+- 🔧 `fn` `map_to_profile` (L5)
+- ⚡ `async_fn` `find_user` (L18)
+- ⚡ `async_fn` `find_or_create_client` (L28)
+- ⚡ `async_fn` `update_profile` (L54)
 
 ### `f/web_patient_profile/_profile_models.py`
 - 📦 `class` `ProfileResult` (L6)
@@ -1464,9 +1475,11 @@
 - `f/message_preprocessor/_preprocessor_models.script.yaml`
 - `f/message_preprocessor/_spell_normalizer.script.yaml`
 - `f/message_preprocessor/_text_cleaner.script.yaml`
+- `f/message_preprocessor/_threat_scanner.script.yaml`
 - `f/message_preprocessor/main.script.yaml`
 - `f/nlu/__init__.script.yaml`
 - `f/nlu/_constants.script.yaml`
+- `f/nlu/_datetime_resolver.script.yaml`
 - `f/nlu/_tfidf_classifier.script.yaml`
 - `f/nlu/main.script.yaml`
 - `f/noshow_trigger/_noshow_logic.script.yaml`

@@ -131,3 +131,55 @@ async def test_desconocido_from_idle_no_fsm() -> None:
     assert res["success"] is True
     data = cast("dict[str, Any]", res["data"])
     assert data["requires_fsm_routing"] is False
+
+
+@pytest.mark.asyncio
+async def test_entity_extraction_day_with_accent() -> None:
+    """BUGFIX: 'miércoles' con tilde debe extraerse como date entity."""
+    from f.internal._nlu_cache import _NLU_CACHE
+
+    _NLU_CACHE.clear()
+
+    with patch("f.internal._nlu_cache.get_redis_client", side_effect=Exception("Redis unavailable")):
+        args: dict[str, Any] = {
+            "chat_id": "1",
+            "text": "quiero hora para el miércoles",
+            "conversation_state": {
+                "active_flow": "none",
+                "flow_step": 0,
+                "pending_data": {},
+                "booking_state_name": "idle",
+            },
+        }
+        res = await main(args)
+
+    assert res["success"] is True
+    data = cast("dict[str, Any]", res["data"])
+    entities = data.get("entities", {})
+    assert entities.get("date") is not None, "Date entity should be extracted from 'miércoles'"
+
+
+@pytest.mark.asyncio
+async def test_entity_extraction_day_without_accent() -> None:
+    """'miercoles' sin tilde debe extraerse como date entity."""
+    from f.internal._nlu_cache import _NLU_CACHE
+
+    _NLU_CACHE.clear()
+
+    with patch("f.internal._nlu_cache.get_redis_client", side_effect=Exception("Redis unavailable")):
+        args: dict[str, Any] = {
+            "chat_id": "1",
+            "text": "quiero hora para el miercoles",
+            "conversation_state": {
+                "active_flow": "none",
+                "flow_step": 0,
+                "pending_data": {},
+                "booking_state_name": "idle",
+            },
+        }
+        res = await main(args)
+
+    assert res["success"] is True
+    data = cast("dict[str, Any]", res["data"])
+    entities = data.get("entities", {})
+    assert entities.get("date") is not None, "Date entity should be extracted from 'miercoles'"

@@ -8,7 +8,7 @@ does today so that FASE 3 refactoring can verify nothing regresses.
 from __future__ import annotations
 
 import sys
-from typing import Any
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 # Mock wmill before importing the module under test
@@ -128,7 +128,7 @@ class TestPrefetchIdleState:
             )
         assert result["prefetch_type"] == "specialties"
         assert isinstance(result["items"], list)
-        assert len(result["items"]) == 1
+        assert len(cast("list[object]", result["items"])) == 1
         assert result["items"][0]["id"] == _SPECIALTY_ID
 
     @pytest.mark.asyncio
@@ -175,7 +175,7 @@ class TestPrefetchSelectingSpecialtyState:
             )
         assert result["prefetch_type"] == "doctors"
         assert result["resolved_specialty_id"] == _SPECIALTY_ID
-        assert len(result["items"]) == 1  # type: ignore[arg-type]
+        assert len(cast("list[object]", result["items"])) == 1
 
     @pytest.mark.asyncio
     async def test_selecting_specialty_unresolvable_input_falls_through(self) -> None:
@@ -254,7 +254,7 @@ class TestPrefetchSelectingDoctorState:
             )
         assert result["prefetch_type"] == "time_slots"
         assert result["resolved_doctor_id"] == _DOCTOR_ID
-        assert len(result["items"]) == 1  # type: ignore[arg-type]
+        assert len(cast("list[object]", result["items"])) == 1
 
     @pytest.mark.asyncio
     async def test_selecting_doctor_no_client_id_skips_active_booking_check(self) -> None:
@@ -298,7 +298,7 @@ class TestPrefetchSelectingDoctorState:
                 user_input=None,
             )
         assert result["prefetch_type"] == "doctors"
-        assert len(result["items"]) == 1  # type: ignore[arg-type]
+        assert len(cast("list[object]", result["items"])) == 1
 
 
 # ── _main_async: selecting_time state ─────────────────────────────────────────
@@ -325,7 +325,7 @@ class TestPrefetchSelectingTimeState:
                 pg_url=_PG_URL,
             )
         assert result["prefetch_type"] == "time_slots"
-        assert len(result["items"]) == 1  # type: ignore[arg-type]
+        assert len(cast("list[object]", result["items"])) == 1
 
     @pytest.mark.asyncio
     async def test_selecting_time_with_existing_items_returns_no_match(self) -> None:

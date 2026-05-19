@@ -1,131 +1,291 @@
+# Investigación Profunda: Mejoras al Preprocesamiento de Mensajes
+## Booking Titanium WM — Etapa de Preprocesamiento (Message Preprocessor)
 
-[TEMA: mejores practicas y prompts, para AI LLM para: ...]
-Necesito que hagas una investigación EXTENSA y RIGUROSA sobre el tema:
-**[TEMA]**
-
-### Proceso obligatorio
-1. Busca primero en fuentes primarias: documentación oficial, white papers,
-   RFC, changelogs, repos oficiales GitHub
-2. Por cada fuente encontrada: sigue los links internos relevantes
-   (referencias, "see also", notas técnicas)
-3. Busca papers académicos en: arxiv.org, scholar.google.com,
-   semanticscholar.org — prioriza citados 50+ veces
-4. Revisa issues/bugs conocidos en GitHub del proyecto oficial
-5. Consulta foros técnicos de autoridad: Stack Overflow (score >50),
-   comunidades oficiales
-6. Si hay contradicciones entre fuentes: documéntalas explícitamente,
-   no elijas una sin justificar
-
-### Jerarquía de fuentes (respétala estrictamente)
-Tier 1 — Autoritativas:
-  - Documentación oficial del proyecto/tecnología
-  - White papers de los autores originales
-  - RFCs / estándares (IETF, ISO, IEEE, W3C)
-  - Repos oficiales + changelogs
-
-Tier 2 — Alta confianza:
-  - Papers peer-reviewed (arXiv, ACM, IEEE Xplore)
-  - Blogs técnicos del equipo core (ej: engineering.atspotify.com)
-  - Postmortems públicos de empresas reales
-
-Tier 3 — Suplementario:
-  - Stack Overflow (respuestas aceptadas, score >50)
-  - Foros oficiales de la comunidad
-  - Artículos técnicos con autor identificable
-
-❌ EXCLUIR: Medium genérico, Reddit especulativo, SEO-bait,
-   fuentes sin autor, artículos sin fecha
-
-### Formato de entrega
-Para cada afirmación importante:
-  → Citar fuente exacta (URL + fecha de publicación)
-  → Indicar tier de confianza
-  → Si es contradictoria con otra fuente: marcarla con ⚠️
-
-### Estructura del reporte final
-1. Resumen ejecutivo (5-10 líneas)
-2. Hallazgos principales con fuentes citadas
-3. Bugs/limitaciones conocidas documentadas
-4. Contradicciones o debates abiertos en la comunidad
-5. Gaps: qué NO encontraste y dónde buscaste
-6. Lista completa de fuentes con tier asignado
-```
+**Fecha:** 2026-05-18
+**Alcance:** Pipeline de preprocesamiento de texto en español (Chile/LatAm) para chatbot de agendamiento médico vía Telegram.
 
 ---
 
-## Técnicas adicionales que mejoran la profundidad
+## 1. ESTADO ACTUAL DEL PIPELINE
 
-### Técnica 1 — "Sigue el hilo"
-```
-Para cada paper o doc que encuentres:
-- Lee su sección "References" y sigue los 3 más relevantes
-- Busca quién cita ese paper (Google Scholar → "Cited by")
-- Rastrea la evolución del concepto en el tiempo
-```
+El pipeline actual tiene 4 etapas secuenciales:
 
-### Técnica 2 — "Perspectiva adversarial"
-```
-Además de buscar evidencia a FAVOR del tema,
-busca activamente:
-- Críticas documentadas
-- Casos donde falló
-- Alternativas que lo superan según sus propios autores
-```
+1. **Text Cleaner** → Elimina caracteres invisibles (Cc/Cf), colapsa whitespace, remueve HTML tags.
+2. **SQL Sanitizer** → Detecta y censura patrones de inyección SQL (DROP, DELETE, etc.).
+3. **Modism Mapper** → Mapeo determinístico de modismos chilenos ("kiero"→"quiero", "sacar hora"→"hacer una cita", "po"→"").
+4. **Spell Normalizer** → Corrección ortográfica con pyspellchecker (diccionario ES + custom words).
+5. **Datetime Resolver** → Pipeline híbrido (exact→fuzzy→phonetic→dateparser→LLM fallback).
 
-### Técnica 3 — "Audit de fechas"
-```
-Para cada fuente, reporta:
-- Fecha de publicación
-- Si hay versión más reciente disponible
-- Si el contexto ha cambiado desde esa fecha
-Descarta fuentes >3 años si el tema evoluciona rápido
-```
-
-### Técnica 4 — "Iteración por rondas"
-```
-Ronda 1: Busca los 5 recursos más autoritativos
-Ronda 2: Por cada uno, sigue sus referencias clave
-Ronda 3: Busca papers que citen los papers encontrados
-Ronda 4: Busca issues/limitaciones conocidas
-Ronda 5: Sintetiza y detecta contradicciones
-```
+**Fortalezas identificadas:**
+- Arquitectura modular y determinística.
+- Buen coverage de modismos chilenos de salud ("ora", "sacar hora", "pal").
+- Guard de títulos (dr/dra) para proteger apellidos de corrección ortográfica.
+- Custom words extenso para vocabulario médico chileno (fonasa, isapre, copago, etc.).
+- Pipeline híbrido de resolución temporal con falsos cognates.
 
 ---
 
-[Si tienes disponible, Activa Deep Research o equivalente]
+## 2. HALLAZGOS DE INVESTIGACIÓN — ÁREAS DE MEJORA
 
-Investiga exhaustivamente: [TEMA]
+### 2.1. CORRECCIÓN ORTOGRÁFICA: LIMITACIONES DE pyspellchecker
 
-Restricciones:
-- Sólo fuentes con URL verificable
-- Mínimo 15 fuentes distintas
-- Al menos 3 deben ser documentación técnica oficial
-- Reporta explícitamente qué buscaste y no encontraste
-- Cita con URL + fecha para cada dato específico
-```
+**Problema:** pyspellchecker usa el algoritmo de Peter Norvig (Levenshtein distance + frecuencia). Para español tiene limitaciones documentadas:
+
+- **Diccionario estático:** Basado en frecuencias de Wikipedia/es, no cubre conjugaciones verbales completas ni vocabulario coloquial latinoamericano.
+- **Sin contexto:** Corrige palabra por palabra, sin entender el contexto de la oración. "komo"→"como" funciona, pero "estoi" podría ir a "estoy" o "esto" indistintamente.
+- **Distance=2 es agresivo:** Para palabras largas en español, distance=2 genera candidatos irrelevantes. La propia documentación recomienda distance=1 para palabras >6 caracteres.
+
+**Sugerencias de la comunidad Python/español:**
+
+a) **language_tool_python (LanguageTool):**
+   - Corrector gramatical y ortográfico completo para español.
+   - Detecta errores de concordancia, acentuación, puntuación.
+   - Soporta español de Latinoamérica (es-AR, es-MX, es-CL).
+   - **Contra:** Requiere Java (servidor local) o llamada a API pública (latencia).
+   - **Recomendación:** Usar como capa opcional de validación post-pyspellchecker, no como reemplazo.
+
+b) **symspellpy:**
+   - Basado en Symmetric Delete Spell Correction.
+   - 100x más rápido que pyspellchecker para diccionarios grandes.
+   - Mejor para producción con alto throughput.
+   - **Recomendación:** Evaluar si la latencia del preprocesamiento se vuelve un cuello de botella.
+
+c) **spanish-nlp (Jorge Ortiz-Fuentes, U. de Chile):**
+   - Librería chilena específica para PLN en español.
+   - Incluye preprocess, spell checker, clasificación (hate speech, sentiment).
+   - Usa pyspellchecker internamente pero con API unificada.
+   - **Recomendación:** No adoptar como dependencia (ya tenemos pyspellchecker directo), pero consultar su lista de custom words y preprocess pipeline como referencia.
+
+d) **Contextual LM (BERT-based):**
+   - Modelos como `dccuchile/bert-base-spanish-wwm-uncased` (U. de Chile) para corrección contextual.
+   - Corrige "estoi feliz" → "estoy feliz" entendiendo el contexto.
+   - **Contra:** Requiere PyTorch/transformers, pesado para un preprocesador ligero.
+   - **Recomendación:** Reservar para fase futura si se necesita corrección de alta precisión.
+
+### 2.2. MODISMOS Y JERGA: COBERTURA REGIONAL
+
+**Problema actual:** El modism mapper cubre modismos chilenos pero no otros dialectos latinoamericanos.
+
+**Investigación SEPLN (Sociedad Española para el Procesamiento del Lenguaje Natural):**
+- El español tiene variaciones significativas por región en chatbots de salud.
+- Argentina: "sacar turno" (Chile: "sacar hora"), "consultorio" vs "centro de salud".
+- México: "agendar cita", "consultorio", "turno".
+- Colombia: "agendar cita", "turno médico".
+- Perú: "cita médica", "turno".
+
+**Sugerencia:** Hacer el modism mapper configurable por región/país. Actualmente está hardcodeado para Chile. Si el sistema se expande, necesitará:
+- `_modism_mapper_cl.py` (Chile)
+- `_modism_mapper_ar.py` (Argentina)
+- `_modism_mapper_mx.py` (México)
+- O un sistema de detección automática de dialecto.
+
+### 2.3. ENTIDADES NO NORMALIZADAS: URLs, TELÉFONOS, EMAILS
+
+**Hallazgo crítico:** El pipeline actual NO maneja explícitamente:
+
+a) **URLs:** Un usuario puede pegar un link de Google Maps, un link de laboratorio, etc.
+   - Las URLs pasan intactas al LLM, consumiendo tokens innecesarios.
+   - **Sugerencia:** Detectar y reemplazar URLs con placeholder `[URL]` o extraer dominio.
+   - Librería recomendada: `url-normalize` (RFC 3986 compliant) o regex simple.
+
+b) **Teléfonos:** Números de teléfono chilenos (+56912345678, 912345678).
+   - Pueden ser intención de contacto, pero también ruido.
+   - **Sugerencia:** Extraer y estructurar como entidad `phone_number` en el output.
+   - Regex para Chile: `r"\+?56\s?9\s?\d{4}\s?\d{4}"` o `r"9\s?\d{4}\s?\d{4}"`.
+
+c) **Emails:** Direcciones de email en mensajes de Telegram.
+   - **Sugerencia:** Extraer como entidad `email` con regex estándar.
+
+d) **RUT chileno:** Formato 12.345.678-5 o 12345678-5.
+   - Crítico para sistema de salud chileno (Fonasa/Isapre).
+   - **Sugerencia:** Detectar y validar RUT como entidad estructurada.
+
+### 2.4. EMOJIS Y EMOTICONES
+
+**Problema:** El pipeline actual NO procesa emojis. En Telegram, los emojis son frecuentes:
+- "🏥" puede indicar intención médica.
+- "📅" puede indicar agendamiento.
+- "❌" puede indicar cancelación.
+- "😷" puede indicar urgencia/síntoma.
+
+**Sugerencias de la comunidad NLP:**
+- **Opción A (conservadora):** Eliminar emojis en el text cleaner (ya se pierden en normalización).
+- **Opción B (recomendada):** Convertir emojis a texto descriptivo con `emoji` library: "🏥" → ":hospital:", "📅" → ":calendar:".
+- **Opción C (avanzada):** Usar emojis como features adicionales para el clasificador de intención.
+
+**Librería recomendada:** `emoji` (PyPI) — `emoji.replace_text()` convierte emojis a aliases CLDR.
+
+### 2.5. LENGUAJE INCLUSIVO Y VARIANTES ORTOGRÁFICAS
+
+**Hallazgo:** El español chileno usa frecuentemente:
+- "todxs", "amigxs", "doctores/as" — lenguaje inclusivo con "x".
+- "todes", "amigues" — lenguaje inclusivo con "e".
+- "Holaaaaa", "graciassss" — elongación de vocales (común en WhatsApp/Telegram).
+
+**Sugerencia:**
+- Normalizar "x" y "e" inclusivo a forma canónica para el clasificador: "todxs" → "todos".
+- Truncar elongaciones: "Holaaaaa" → "Hola" (máximo 2 repeticiones de vocal).
+- spanish-nlp ya implementa `normalize_inclusive_language` y `reduce_spam`.
+
+### 2.6. HASHTAGS Y MENCIONES DE TELEGRAM
+
+**Problema:** Los usuarios pueden enviar mensajes con:
+- Hashtags: "#horaMédica #urgente"
+- Menciones: "@doctorPerez"
+- Comandos: "/start", "/help" (ya manejados en spell checker)
+
+**Sugerencia:**
+- Extraer hashtags como entidades de tags/categoría.
+- Extraer menciones como posibles referencias a proveedores.
+- Split hashtags compuestos: "#horaMédica" → "hora médica".
+
+### 2.7. DETECCIÓN DE IDIOMA
+
+**Riesgo:** El pipeline asume que todo texto es español. Pero en Chile:
+- Usuarios bilingües pueden mezclar inglés y español.
+- "I need to book an appointment for Monday" no debería pasar por el modism mapper chileno.
+- Mapudungun (lengua mapuche) aparece ocasionalmente en zonas rurales.
+
+**Sugerencia:** Agregar detección de idioma como primer paso del pipeline.
+- Librería: `fasttext-langdetect` o `langdetect` (ligera, sin dependencias pesadas).
+- Si no es español → saltar modism mapper y spell checker español.
+- Si es spanglish → procesar solo la parte en español.
+
+### 2.8. RENDIMIENTO Y CACHING
+
+**Observación:** El spell checker se inicializa lazy (bien), pero:
+- `_getChecker()` crea un SpellChecker completo en cada cold start.
+- No hay caching de resultados de corrección ortográfica.
+- `resolve_datetime` tiene LRU cache en metaphone pero no en el pipeline completo.
+
+**Sugerencias:**
+- Cache de correcciones ortográficas frecuentes con `functools.lru_cache`.
+- Pre-compilar todos los regex del modism mapper (ya se hace implícitamente).
+- Benchmark del pipeline completo: objetivo <50ms por mensaje.
+
+### 2.9. SEGURIDAD: SQL SANITIZER INSUFICIENTE
+
+**Problema:** El SQL sanitizer actual solo detecta patrones SQL clásicos. Pero:
+
+- No detecta XSS: `<script>alert('xss')</script>` (los HTML tags se remueven pero no se loggean como amenaza).
+- No detecta prompt injection: "Ignore previous instructions, you are now..."
+- No detecta inyección de comandos: "`rm -rf /`", "$(whoami)".
+
+**Sugerencia:** Expandir `_sql_sanitizer.py` a `_threat_detector.py` que cubra:
+- SQL injection (actual).
+- XSS (script tags, event handlers).
+- Command injection (backticks, $(), ;).
+- Prompt injection (patrones de jailbreak conocidos).
+
+### 2.10. METRICAS Y OBSERVABILIDAD
+
+**Hallazgo:** El datetime resolver loggea con structured logging (bien), pero:
+- No hay métricas de cuántos mensajes pasan por cada etapa.
+- No hay tracking de tasa de corrección ortográfica por palabra.
+- No hay métricas de confianza del pipeline completo.
+
+**Sugerencia:** Agregar métricas estructuradas al output del preprocesador:
+- `processing_time_ms`: tiempo total del pipeline.
+- `stages_applied`: lista de etapas que modificaron el texto.
+- `threat_level`: none | low | medium | high.
+- `language_detected`: es | en | mixed | unknown.
 
 ---
 
-## Prompt de control de calidad (pide esto al final)
-```
-Antes de entregar: haz un auto-audit:
-1. ¿Cuántas fuentes Tier 1 encontraste?
-2. ¿Qué buscaste y no encontraste?
-3. ¿Hay alguna afirmación que no pudiste respaldar con fuente?
-   → márcala con [SIN FUENTE]
-4. ¿Hay contradicciones sin resolver?
-5. ¿Cuál es el nivel de confianza general del reporte (0-100%)?
-```
-Responde el siguiente tema en formato Markdown completo, pero envuelve
-TODA tu respuesta dentro de un único bloque de código con hint "markdown",
-usando exactamente 4 backticks (````) de apertura y cierre.
-No escribas NADA fuera del bloque.
-Dentro del bloque usa máximo 3 backticks para ejemplos de código internos.
+## 3. PRIORIZACIÓN DE MEJORAS
 
-REGLAS DE FORMATO ESTRICTAS:
-1. Tu respuesta COMPLETA debe estar envuelta en un bloque de código con
-   4 backticks y hint "markdown": ```` ```markdown ````
-2. Cierra con otros 4 backticks.
-3. Dentro usa MÁXIMO 3 backticks para bloques de código internos.
-4. No renderices nada. Entrega el Markdown como texto plano copiable.
-5. No escribas ningún texto antes ni después del bloque.
+### CRÍTICO (implementar ahora):
+1. **URL/Phone/Email extraction** — Entidades que se pierden y consumen tokens del LLM.
+2. **Emoji handling** — Telegram los usa masivamente, contienen señal de intención.
+3. **Language detection** — Prevenir procesamiento incorrecto de texto no-español.
+4. **Prompt injection detection** — Seguridad del agente AI.
+
+### IMPORTANTE (próximo sprint):
+5. **Spell checker contextual** — Mejorar correcciones con contexto de oración.
+6. **Inclusive language normalization** — "todxs" → "todos" para el clasificador.
+7. **Vowel elongation reduction** — "Holaaaaa" → "Hola".
+8. **Hashtag/mention extraction** — Extraer señal de tags y proveedores.
+
+### FUTURO (cuando escale):
+9. **Dialect detection** — Chile vs Argentina vs México.
+10. **symspellpy migration** — Si la latencia es problema.
+11. **BERT-based correction** — Si se necesita precisión >95%.
+12. **RUT extraction** — Si se integra con sistema de salud chileno.
+
+---
+
+## 4. FUENTES DE INVESTIGACIÓN
+
+### Documentación oficial y librerías:
+1. **pyspellchecker docs** — https://pyspellchecker.readthedocs.io/en/latest
+   - Algoritmo de Norvig, limitaciones de distance=2, soporte multi-idioma.
+
+2. **language_tool_python** — https://github.com/jxmorris12/language_tool_python
+   - Wrapper de LanguageTool para Python, soporte es-AR/es-MX/es-CL.
+
+3. **spanish-nlp (U. de Chile)** — https://github.com/jorgeortizfuentes/spanish_nlp
+   - Librería chilena de PLN en español. Preprocess, spell check, clasificación.
+   - Autor: Jorge Ortiz-Fuentes, Linguist & Data Scientist, U. de Chile.
+
+4. **url-normalize** — https://pypi.org/project/url-normalize/
+   - Normalización de URLs RFC 3986 compliant.
+
+5. **spaCy** — https://spacy.io/usage/spacy-101
+   - Framework NLP production-ready, pipelines modulares.
+
+### Investigación académica y comunidad:
+6. **SEPLN** — https://www.sepln.org/
+   - Sociedad Española para el Procesamiento del Lenguaje Natural.
+   - Congreso anual desde 1983, journal "Procesamiento del Lenguaje Natural" (ESCI-indexed).
+
+7. **IBM Think (ES)** — https://www.ibm.com/mx-es/think/topics/natural-language-processing
+   - Overview de PLN aplicado a chatbots empresariales.
+
+8. **datos.gob.es** — https://datos.gob.es/es/blog/procesamiento-del-lenguaje-natural
+   - Guía de PLN en español para administración pública.
+
+### Guías prácticas y tutoriales:
+9. **GeeksforGeeks — Text Preprocessing** — https://www.geeksforgeeks.org/nlp/text-preprocessing-for-nlp-tasks/
+   - Implementación paso a paso de preprocessing en Python.
+
+10. **Michael Brenndoerfer — Text Preprocessing Guide** — https://mbrenndoerfer.com/writing/text-preprocessing-nlp-tokenization-normalization
+    - Guía completa de tokenización, normalización y cleaning para NLP.
+
+11. **Crazeneurons — Emoji Handling in NLP** — https://crazeneurons.com/2025/10/30/handling-emojis-text-preprocessing-in-nlp/
+    - Técnicas de manejo de emojis en preprocessing para chatbots.
+
+12. **Real Python — Build a Chatbot** — https://realpython.com/build-a-chatbot-python-chatterbot/
+    - Limpieza de datos de WhatsApp/Telegram para chatbots.
+
+13. **Latitude — LLM Preprocessing Pipelines** — https://latitude.so/blog/ultimate-guide-to-preprocessing-pipelines-for-llms
+    - Best practices para pipelines de preprocessing en LLMs.
+
+14. **Advantai Labs — AI Chatbots with Python NLP** — https://advantailabs.com/blog/how-we-build-ai-chatbots-for-businesses-with-python-nlp-a-step-by-step-guide/
+    - Guía paso a paso de chatbots empresariales con Python + NLP.
+
+### Modismos y variación dialectal:
+15. **Preply — Modismos en español** — https://preply.com/es/blog/los-idiomas-espanoles
+    - 25 modismos y expresiones en español por región.
+
+16. **Los Tiempos — Modismos Bolivia** — https://www.lostiempos.com/actualidad/pais/20230807/modismos-jergas-que-caracterizan-bolivianos-region
+    - Regionalismos y modismos por departamento (referencia de variación dialectal).
+
+17. **INMSOL — Jerga hispanohablante** — https://www.inmsol.com/es/blog-escuela/cultura-literatura-historia-espana-es/jerga-y-modismos-de-los-paises-hispanohablantes-un-viaje-de-palabras-pintorescas
+    - Jerga y modismos de países hispanohablantes.
+
+### Seguridad:
+18. **Kaspersky — URL Normalization** — https://support.kaspersky.com/cyber-trace/4.2/231546
+    - 13 reglas de normalización de URLs para detección de amenazas.
+
+---
+
+## 5. CONCLUSIONES
+
+El pipeline actual de preprocesamiento es **sólido para su scope actual** (chatbot médico chileno vía Telegram). Las mejoras más impactantes a corto plazo son:
+
+1. **Extracción de entidades estructuradas** (URLs, teléfonos, emails) que actualmente se pierden.
+2. **Manejo de emojis** que contienen señal de intención en Telegram.
+3. **Detección de idioma** para evitar procesamiento incorrecto.
+4. **Detección de prompt injection** para seguridad del agente AI.
+
+Estas 4 mejoras pueden implementarse sin cambiar la arquitectura existente, agregando nuevas etapas al pipeline antes del modism mapper.

@@ -33,11 +33,15 @@ _MODISMS: Final[tuple[tuple[str, str], ...]] = (
     ("truno", "turno"),
     ("bieres", "viernes"),
     ("vierne", "viernes"),
+    ("savado", "sabado"),
     ("lune", "lunes"),
     # ASCII substitute for ñ (common on non-Spanish keyboards)
     ("manana", "mañana"),
+    ("mñn", "mañana"),
     # Preposition shorthand
     ("pal", "para el"),
+    ("pa", "para"),
+    ("prox", "próximo"),
     # Chilean fillers — removed (empty canonical)
     ("weon", ""),
     ("weón", ""),

@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict
+
+from ..nlu._datetime_resolver import ResolverResult
 
 
 class SpellCorrection(BaseModel):
@@ -15,6 +19,13 @@ class ModismMatch(BaseModel):
 
     phrase: str
     canonical: str
+
+
+class SecurityScanResult(BaseModel):
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    threat_detected: bool = False
+    threat_type: Literal["sql_injection", "xss", "command_injection", "prompt_injection", "none"] = "none"
 
 
 class PreprocessorInput(BaseModel):
@@ -32,3 +43,5 @@ class PreprocessorOutput(BaseModel):
     spell_corrections: list[SpellCorrection]
     modism_matches: list[ModismMatch]
     confidence: float
+    datetime_resolution: ResolverResult | None = None
+    security_scan: SecurityScanResult

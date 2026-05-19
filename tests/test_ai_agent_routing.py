@@ -8,7 +8,7 @@ from f.internal.ai_agent.main import _main_async as main
 class TestAIAgentRouting:
     @pytest.mark.asyncio
     async def test_crear_cita_from_idle_requires_fsm(self) -> None:
-        args = {
+        args: dict[str, object] = {
             "chat_id": "1",
             "text": "quiero agendar una cita",
             "conversation_state": {
@@ -26,7 +26,7 @@ class TestAIAgentRouting:
 
     @pytest.mark.asyncio
     async def test_mid_fsm_always_requires_fsm(self) -> None:
-        args = {
+        args: dict[str, object] = {
             "chat_id": "1",
             "text": "hola",
             "conversation_state": {
@@ -41,7 +41,7 @@ class TestAIAgentRouting:
 
     @pytest.mark.asyncio
     async def test_greeting_from_idle_no_fsm(self) -> None:
-        args = {
+        args: dict[str, object] = {
             "chat_id": "1",
             "text": "hola",
             "conversation_state": {

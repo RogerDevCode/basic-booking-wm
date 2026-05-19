@@ -60,7 +60,9 @@ value:
         path: f/internal/conversation_get/main
       skip_if:
         expr: '!results.webhook_trigger.chat_id ||
-          results.telegram_deduplicate.duplicate'
+          results.telegram_deduplicate.duplicate ||
+          results.message_preprocessor?.data?.security_scan?.threat_detected ===
+          true'
     - id: telegram_auto_register
       summary: Registrar/resolver usuario Telegram → user_id en DB
       value:
@@ -77,7 +79,9 @@ value:
         path: f/telegram_auto_register/main
       skip_if:
         expr: '!results.webhook_trigger.chat_id ||
-          results.telegram_deduplicate.duplicate'
+          results.telegram_deduplicate.duplicate ||
+          results.message_preprocessor?.data?.security_scan?.threat_detected ===
+          true'
     - id: ai_agent
       summary: Clasificar intención — social + TF-IDF + LLM
       value:
@@ -86,12 +90,6 @@ value:
           chat_id:
             type: javascript
             expr: results.webhook_trigger.chat_id
-          text:
-            type: javascript
-            expr: results.message_preprocessor?.cleaned_text || results.webhook_trigger.canonical_text || ""
-          provider_id:
-            type: javascript
-            expr: "null"
           conversation_state:
             type: javascript
             expr: >-
@@ -99,13 +97,21 @@ value:
                 "flow_step": 0,
                 "pending_data": {},
                 "booking_state_name": results.get_conversation_state.data?.booking_state?.name || "idle" }
+          provider_id:
+            type: javascript
+            expr: 'null'
+          text:
+            type: javascript
+            expr: results.message_preprocessor?.cleaned_text ||
+              results.webhook_trigger.canonical_text || ""
         path: f/internal/ai_agent/main
       skip_if:
-        expr: >-
-          !results.webhook_trigger.chat_id ||
+        expr: '!results.webhook_trigger.chat_id ||
           results.telegram_deduplicate.duplicate ||
           results.webhook_trigger.event_kind !== "message" ||
-          results.webhook_trigger.text_kind !== "plain_text"
+          results.webhook_trigger.text_kind !== "plain_text" ||
+          results.message_preprocessor?.data?.security_scan?.threat_detected ===
+          true'
     - id: booking_prefetch
       summary: Pre-fetch especialidades/doctores segun estado FSM actual
       value:
@@ -129,9 +135,10 @@ value:
               results.webhook_trigger.canonical_text || null
         path: f/internal/booking_prefetch/main
       skip_if:
-        expr: >-
-          results.telegram_deduplicate.duplicate ||
-          (results.ai_agent?.data && results.ai_agent.data.requires_fsm_routing === false)
+        expr: results.telegram_deduplicate.duplicate || (results.ai_agent?.data &&
+          results.ai_agent.data.requires_fsm_routing === false) ||
+          results.message_preprocessor?.data?.security_scan?.threat_detected ===
+          true
     - id: fsm_router
       summary: FSM booking — solo transiciones de estado
       value:
@@ -140,25 +147,26 @@ value:
           args:
             type: javascript
             expr: >-
-               { "chat_id": results.webhook_trigger.chat_id,
-                 "user_input": results.message_preprocessor?.cleaned_text || results.webhook_trigger.canonical_text,
-                 "state": results.get_conversation_state.data || {},
-                 "items": results.booking_prefetch?.items || [],
-                 "phone": results.telegram_auto_register?.phone ?? null,
-                 "client_name": results.telegram_auto_register?.name ?? null,
-                 "prefetch_block_reason": results.booking_prefetch?.block_reason || null,
-                 "client_id": results.telegram_auto_register?.client_id ?? null,
-                 "callback_message_id": results.webhook_trigger.callback_message_id ?? null,
-                 "pg_url": variable("u/admin/DATABASE_URL"),
-                 "ai_intent": results.ai_agent?.data?.intent ?? null,
-                 "ai_confidence": results.ai_agent?.data?.confidence ?? null,
-                 "ai_entities": results.ai_agent?.data?.entities || {},
-                 "requires_fsm_routing": results.ai_agent?.data?.requires_fsm_routing ?? true }
+              { "chat_id": results.webhook_trigger.chat_id,
+                "user_input": results.message_preprocessor?.cleaned_text || results.webhook_trigger.canonical_text,
+                "state": results.get_conversation_state.data || {},
+                "items": results.booking_prefetch?.items || [],
+                "phone": results.telegram_auto_register?.phone ?? null,
+                "client_name": results.telegram_auto_register?.name ?? null,
+                "prefetch_block_reason": results.booking_prefetch?.block_reason || null,
+                "client_id": results.telegram_auto_register?.client_id ?? null,
+                "callback_message_id": results.webhook_trigger.callback_message_id ?? null,
+                "pg_url": variable("u/admin/DATABASE_URL"),
+                "ai_intent": results.ai_agent?.data?.intent ?? null,
+                "ai_confidence": results.ai_agent?.data?.confidence ?? null,
+                "ai_entities": results.ai_agent?.data?.entities || {},
+                "requires_fsm_routing": results.ai_agent?.data?.requires_fsm_routing ?? true }
         path: f/internal/fsm_router/main
       skip_if:
-        expr: >-
-          results.telegram_deduplicate.duplicate ||
-          (results.ai_agent?.data && results.ai_agent.data.requires_fsm_routing === false)
+        expr: results.telegram_deduplicate.duplicate || (results.ai_agent?.data &&
+          results.ai_agent.data.requires_fsm_routing === false) ||
+          results.message_preprocessor?.data?.security_scan?.threat_detected ===
+          true
     - id: conversational_router
       summary: Respuesta conversacional — no-FSM
       value:
@@ -179,11 +187,9 @@ value:
                 "current_state_name": results.get_conversation_state.data?.booking_state?.name || "idle" }
         path: f/internal/conversational_router/main
       skip_if:
-        expr: >-
-          !results.ai_agent?.data || 
-          results.ai_agent.data.requires_fsm_routing === true ||
-          results.webhook_trigger.event_kind !== "message" ||
-          results.telegram_deduplicate.duplicate
+        expr: '!results.ai_agent?.data ||  results.ai_agent.data.requires_fsm_routing
+          === true || results.webhook_trigger.event_kind !== "message" ||
+          results.telegram_deduplicate.duplicate'
     - id: client_register
       summary: Actualizar datos del cliente tras registro
       value:
@@ -206,7 +212,9 @@ value:
             expr: results.fsm_router?.data?.registration_data?.phone ?? null
         path: f/internal/client_register/main
       skip_if:
-        expr: '!results.fsm_router?.data?.registration_data'
+        expr: '!results.fsm_router?.data?.registration_data ||
+          results.message_preprocessor?.data?.security_scan?.threat_detected ===
+          true'
     - id: update_conversation_state
       summary: Persistir nuevo estado en Redis
       value:
@@ -214,7 +222,7 @@ value:
         input_transforms:
           args:
             type: javascript
-            expr: |-
+            expr: >-
               { "chat_id": results.webhook_trigger.chat_id,
                 "booking_state": results.fsm_router?.data?.nextState || results.conversational_router?.data?.nextState,
                 "active_flow": results.fsm_router?.data?.active_flow || null,
@@ -231,7 +239,9 @@ value:
         path: f/internal/conversation_update/main
       skip_if:
         expr: '!results.webhook_trigger.chat_id ||
-          results.telegram_deduplicate.duplicate'
+          results.telegram_deduplicate.duplicate ||
+          results.message_preprocessor?.data?.security_scan?.threat_detected ===
+          true'
     - id: booking_commit
       summary: Crear cita real en DB cuando usuario confirma desde estado confirming
       value:
@@ -258,7 +268,9 @@ value:
           !(results.get_conversation_state?.data?.booking_state?.name ===
           "confirming" &&
             results.fsm_router?.data?.nextState?.name === "idle" &&
-            !results.telegram_deduplicate?.duplicate)
+            !results.telegram_deduplicate?.duplicate) ||
+          results.message_preprocessor?.data?.security_scan?.threat_detected ===
+          true
     - id: send_telegram_response
       summary: Enviar respuesta a Telegram
       value:
@@ -283,8 +295,10 @@ value:
             expr: 'results.fsm_router?.data?.edit_message ? "edit_message" : "send_message"'
           text:
             type: javascript
-            expr: >-
-              (results.booking_commit?.success) ?
+            expr: |-
+              (results.message_preprocessor?.data?.security_scan?.threat_detected === true) ?
+                ("🚫 Lo siento, tu mensaje ha sido bloqueado por políticas de seguridad.")
+              : (results.booking_commit?.success) ?
                 ("✅ *Reserva Confirmada*\n\n" +
                  "📋 " + results.booking_commit.service_name + " con " + results.booking_commit.provider_name + "\n" +
                  "🆔 Ref: `" + results.booking_commit.booking_short_id + "`\n\n" +
@@ -293,14 +307,11 @@ value:
               : (results.booking_commit?.error) ?
                 ("❌ No se pudo confirmar la cita.\n\n" +
                  (results.booking_commit.user_message || "Por favor intenta de nuevo en unos minutos."))
-              : (results.fsm_router?.data?.handled &&
-              results.fsm_router?.data?.response_text) ?
+              : (results.fsm_router?.data?.handled && results.fsm_router?.data?.response_text) ?
                 results.fsm_router?.data?.response_text
-              : (results.conversational_router?.data?.handled &&
-              results.conversational_router?.data?.response_text) ?
+              : (results.conversational_router?.data?.handled && results.conversational_router?.data?.response_text) ?
                 results.conversational_router?.data?.response_text
-              : "Lo siento, no entendí tu mensaje. 😊\n\nEscribe /start para ver
-              el menú principal."
+              : "Lo siento, no entendí tu mensaje. 😊\n\nEscribe /start para ver el menú principal."
         path: f/telegram_send/main
       skip_if:
         expr: '!results.webhook_trigger.chat_id ||

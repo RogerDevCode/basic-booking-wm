@@ -5,7 +5,7 @@
 #   "pydantic>=2.10.0",
 #   "email-validator>=2.2.0",
 #   "asyncpg>=0.30.0",
-#   "cryptography>=44.0.0",
+#   "cryptography>=48.0.0",
 #   "beartype>=0.19.0",
 #   "returns>=0.24.0",
 #   "redis>=7.4.0",
@@ -29,7 +29,7 @@ def _normalize_text(value: object) -> str:
     if isinstance(value, str):
         return value
     if isinstance(value, tuple):
-        return " ".join(str(part) for part in value)
+        return " ".join(str(part) for part in cast("tuple[object, ...]", value))
     if value is None:
         return ""
     return str(value)

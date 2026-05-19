@@ -23,18 +23,18 @@ async def load_nlu_rules_to_redis() -> None:
     try:
         rows = await conn.fetch("SELECT rule_key, threshold_value, keywords FROM nlu_rules")
         r = get_redis_client()
-        pipeline = r.pipeline()
+        pipeline: object = r.pipeline()  # pyright: ignore[reportUnknownMemberType]
         for row in rows:
             key = f"nlu_rule:{row['rule_key']}"
             if row["keywords"] is not None:
                 val = row["keywords"]
                 if isinstance(val, str):
-                    pipeline.set(key, val)
+                    pipeline.set(key, val)  # type: ignore[attr-defined]
                 else:
-                    pipeline.set(key, json.dumps(val))
+                    pipeline.set(key, json.dumps(val))  # type: ignore[attr-defined]
             elif row["threshold_value"] is not None:
-                pipeline.set(key, str(row["threshold_value"]))
-        pipeline.execute()
+                pipeline.set(key, str(row["threshold_value"]))  # type: ignore[attr-defined]
+        pipeline.execute()  # type: ignore[attr-defined]
     finally:
         await conn.close()
 
@@ -47,20 +47,19 @@ async def ensure_nlu_cache() -> None:
     try:
         # Try loading from Redis first
         r = get_redis_client()
-        keys = r.keys("nlu_rule:*")
+        keys: list[str] = cast("list[str]", r.keys("nlu_rule:*"))  # pyright: ignore[reportUnknownMemberType]
 
         if not keys:
             # Load from DB to Redis
             await load_nlu_rules_to_redis()
-            keys = r.keys("nlu_rule:*")
+            keys = cast("list[str]", r.keys("nlu_rule:*"))  # pyright: ignore[reportUnknownMemberType]
 
         if not keys:
             return
 
         # Fetch all from Redis
-        str_keys = cast("list[str]", keys)
-        values = cast("list[str | None]", r.mget(str_keys))
-        for k, v in zip(str_keys, values, strict=False):
+        values = cast("list[str | None]", r.mget(keys))
+        for k, v in zip(keys, values, strict=False):
             if not v:
                 continue
             key_name = k.replace("nlu_rule:", "")
@@ -97,6 +96,16 @@ async def ensure_nlu_cache() -> None:
                 "escalation_priority_queue_max": 0.6,
                 "escalation_human_handoff_max": 0.4,
                 "escalation_tfidf_minimum": 0.4,
+                "day_names": {
+                    "lunes": "Lunes",
+                    "martes": "Martes",
+                    "miercoles": "Miércoles",
+                    "jueves": "Jueves",
+                    "viernes": "Viernes",
+                    "sabado": "Sábado",
+                    "domingo": "Domingo",
+                },
+                "relative_dates": ["hoy", "mañana", "manana"],
             }
         )
 

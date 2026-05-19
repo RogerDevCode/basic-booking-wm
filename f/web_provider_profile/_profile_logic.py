@@ -78,8 +78,8 @@ class ProfileRepository:
             "region_id",
             "commune_id",
         }
-        fields = []
-        params = []
+        fields: list[str] = []
+        params: list[object] = []
         idx = 1
         for f in _ALLOWED:
             val = getattr(data, f)

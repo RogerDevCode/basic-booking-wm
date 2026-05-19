@@ -5,7 +5,7 @@
 #   "pydantic>=2.10.0",
 #   "email-validator>=2.2.0",
 #   "asyncpg>=0.30.0",
-#   "cryptography>=44.0.0",
+#   "cryptography>=48.0.0",
 #   "beartype>=0.19.0",
 #   "returns>=0.24.0",
 #   "redis>=7.4.0",
@@ -60,7 +60,11 @@ def _slot_label(start_iso: str, provider_tz: str = "UTC") -> str:
     return f"{day} {dt.day} {_MONTHS_ES[dt.month]} · {dt.strftime('%H:%M')}"
 
 
-async def _fetch_slots_for_doctor(db: DBClient, doctor_id: str) -> list[dict[str, object]]:
+async def _fetch_slots_for_doctor(
+    db: DBClient,
+    doctor_id: str,
+    target_date: str | None = None,
+) -> list[dict[str, object]]:
     row = await db.fetchrow(
         "SELECT service_id FROM services WHERE provider_id = $1::uuid LIMIT 1",
         doctor_id,
@@ -86,13 +90,20 @@ async def _fetch_slots_for_doctor(db: DBClient, doctor_id: str) -> list[dict[str
             provider_tz = str(pref_row["tz_name"])
         prefs = pref_row["ui_preferences"]
         if isinstance(prefs, dict):
-            require_advance = bool(prefs.get("require_advance_booking", False))
+            require_advance = bool(cast("dict[str, object]", prefs).get("require_advance_booking", False))
 
     # Use provider's local date as "today", not the server's UTC date
     tz = zoneinfo.ZoneInfo(provider_tz)
     provider_today = datetime.now(tz).date()
-    date_from = (provider_today + timedelta(days=1) if require_advance else provider_today).isoformat()
-    date_to = (provider_today + timedelta(days=7)).isoformat()
+
+    if target_date:
+        # Fetch only the specific date requested
+        date_from = target_date
+        date_to = target_date
+    else:
+        # Default: 7-day window
+        date_from = (provider_today + timedelta(days=1) if require_advance else provider_today).isoformat()
+        date_to = (provider_today + timedelta(days=7)).isoformat()
 
     results = await get_availability_range(db, doctor_id, service_id, date_from, date_to)
     if not results:

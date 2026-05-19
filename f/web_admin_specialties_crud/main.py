@@ -5,7 +5,7 @@
 #   "pydantic>=2.10.0",
 #   "email-validator>=2.2.0",
 #   "asyncpg>=0.30.0",
-#   "cryptography>=44.0.0",
+#   "cryptography>=48.0.0",
 #   "beartype>=0.19.0",
 #   "returns>=0.24.0",
 #   "redis>=7.4.0",

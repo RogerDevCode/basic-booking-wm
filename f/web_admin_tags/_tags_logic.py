@@ -1,25 +1,24 @@
 from datetime import datetime
-from typing import Any
 
 from ..internal._result import DBClient
 from ._tags_models import CategoryRow, InputSchema, TagRow
 
 
-def map_category(r: dict[str, Any]) -> CategoryRow:
+def map_category(r: dict[str, object]) -> CategoryRow:
+    created_at_raw = r.get("created_at")
     return {
         "category_id": str(r["category_id"]),
         "name": str(r["name"]),
         "description": str(r["description"]) if r.get("description") else None,
         "is_active": bool(r["is_active"]),
-        "sort_order": int(r["sort_order"]),
-        "created_at": r["created_at"].isoformat()
-        if isinstance(r.get("created_at"), datetime)
-        else str(r.get("created_at")),
-        "tag_count": int(r.get("tag_count", 0)),
+        "sort_order": int(str(r["sort_order"])),
+        "created_at": created_at_raw.isoformat() if isinstance(created_at_raw, datetime) else str(created_at_raw),
+        "tag_count": int(str(r.get("tag_count", 0))),
     }
 
 
-def map_tag(r: dict[str, Any]) -> TagRow:
+def map_tag(r: dict[str, object]) -> TagRow:
+    created_at_raw = r.get("created_at")
     return {
         "tag_id": str(r["tag_id"]),
         "category_id": str(r["category_id"]),
@@ -28,10 +27,8 @@ def map_tag(r: dict[str, Any]) -> TagRow:
         "description": str(r["description"]) if r.get("description") else None,
         "color": str(r["color"]),
         "is_active": bool(r["is_active"]),
-        "sort_order": int(r["sort_order"]),
-        "created_at": r["created_at"].isoformat()
-        if isinstance(r.get("created_at"), datetime)
-        else str(r.get("created_at")),
+        "sort_order": int(str(r["sort_order"])),
+        "created_at": created_at_raw.isoformat() if isinstance(created_at_raw, datetime) else str(created_at_raw),
     }
 
 
@@ -81,8 +78,8 @@ class TagRepository:
     async def update_category(self, category_id: str, input_data: InputSchema) -> CategoryRow:
         try:
             _ALLOWED = {"name", "description", "sort_order"}
-            fields = []
-            params = []
+            fields: list[str] = []
+            params: list[object] = []
             idx = 1
             for field in ["name", "description", "sort_order"]:
                 if field not in _ALLOWED:
@@ -103,7 +100,7 @@ class TagRepository:
         except Exception as e:
             raise RuntimeError(f"update_failed: {e}") from e
 
-    async def set_category_status(self, category_id: str, active: bool) -> dict[str, Any]:
+    async def set_category_status(self, category_id: str, active: bool) -> dict[str, object]:
         try:
             rows = await self.db.fetch(
                 "UPDATE tag_categories SET is_active = $1, updated_at = NOW() WHERE category_id = $2::uuid RETURNING category_id, is_active",  # noqa: E501
@@ -172,8 +169,8 @@ class TagRepository:
     async def update_tag(self, tag_id: str, input_data: InputSchema) -> TagRow:
         try:
             _ALLOWED = {"name", "description", "color", "sort_order", "category_id"}
-            fields = []
-            params = []
+            fields: list[str] = []
+            params: list[object] = []
             idx = 1
             for field in ["name", "description", "color", "sort_order"]:
                 if field not in _ALLOWED:
@@ -199,7 +196,7 @@ class TagRepository:
         except Exception as e:
             raise RuntimeError(f"update_failed: {e}") from e
 
-    async def set_tag_status(self, tag_id: str, active: bool) -> dict[str, Any]:
+    async def set_tag_status(self, tag_id: str, active: bool) -> dict[str, object]:
         try:
             rows = await self.db.fetch(
                 "UPDATE tags SET is_active = $1, updated_at = NOW() WHERE tag_id = $2::uuid RETURNING tag_id, is_active",  # noqa: E501

@@ -41,4 +41,4 @@ class InputSchema(BaseModel):
         "custom",
     ]
     booking_details: dict[str, object] = Field(default_factory=dict)
-    action_links: list[ActionLink] = Field(default_factory=list)
+    action_links: list[ActionLink] = Field(default_factory=list[ActionLink])

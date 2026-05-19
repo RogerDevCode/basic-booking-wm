@@ -3,7 +3,7 @@ from __future__ import annotations
 import contextlib
 import json
 import urllib.request
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -57,13 +57,13 @@ def _answer_callback_query(callback_query_id: str, bot_token: str) -> None:
 
 async def _main_async(webhook_payload: dict[str, Any]) -> dict[str, Any]:
     # Extract actual Telegram payload from Windmill's wrapper if present
-    payload = webhook_payload
+    payload: dict[str, Any] = webhook_payload
     if "body" in webhook_payload and isinstance(webhook_payload["body"], dict):
-        payload = webhook_payload["body"]
+        payload = cast("dict[str, Any]", webhook_payload["body"])
     elif "message" not in webhook_payload and "callback_query" not in webhook_payload:
         for key in ["webhook_payload", "data", "event"]:
             if key in webhook_payload and isinstance(webhook_payload[key], dict):
-                payload = webhook_payload[key]
+                payload = cast("dict[str, Any]", webhook_payload[key])
                 break
 
     # Pydantic validation at the boundary (LAW-07)

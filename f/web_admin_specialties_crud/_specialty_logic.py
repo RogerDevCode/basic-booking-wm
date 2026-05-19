@@ -1,21 +1,19 @@
 from datetime import datetime
-from typing import Any
 
 from ..internal._result import DBClient
 from ._specialty_models import InputSchema, SpecialtyRow
 
 
-def map_row(r: dict[str, Any]) -> SpecialtyRow:
+def map_row(r: dict[str, object]) -> SpecialtyRow:
+    created_at_raw = r.get("created_at")
     return {
         "specialty_id": str(r["specialty_id"]),
         "name": str(r["name"]),
         "description": str(r["description"]) if r.get("description") else None,
         "category": str(r["category"]) if r.get("category") else None,
         "is_active": bool(r["is_active"]),
-        "sort_order": int(r["sort_order"]),
-        "created_at": r["created_at"].isoformat()
-        if isinstance(r.get("created_at"), datetime)
-        else str(r.get("created_at")),
+        "sort_order": int(str(r["sort_order"])),
+        "created_at": created_at_raw.isoformat() if isinstance(created_at_raw, datetime) else str(created_at_raw),
     }
 
 
@@ -52,8 +50,8 @@ async def create_specialty(db: DBClient, input_data: InputSchema) -> SpecialtyRo
 async def update_specialty(db: DBClient, id: str, input_data: InputSchema) -> SpecialtyRow:
     try:
         _ALLOWED = {"name", "description", "category", "sort_order"}
-        fields = []
-        params = []
+        fields: list[str] = []
+        params: list[object] = []
         idx = 1
 
         for field in ["name", "description", "category", "sort_order"]:
@@ -87,7 +85,7 @@ async def delete_specialty(db: DBClient, id: str) -> dict[str, bool]:
         raise RuntimeError(f"delete_failed: {e}") from e
 
 
-async def set_status(db: DBClient, id: str, active: bool) -> dict[str, Any]:
+async def set_status(db: DBClient, id: str, active: bool) -> dict[str, object]:
     try:
         res = await db.execute("UPDATE specialties SET is_active = $1 WHERE specialty_id = $2::uuid", active, id)
         if "UPDATE 1" not in res:

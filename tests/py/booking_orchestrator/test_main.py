@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -45,7 +46,12 @@ async def test_main_async_valid_intent_routes_to_handler() -> None:
         "date": None,
         "time": None,
     }
-    mock_result = {"action": "mis_citas", "success": True, "data": [], "message": "📋 No tienes próximas citas."}
+    mock_result: dict[str, Any] = {
+        "action": "mis_citas",
+        "success": True,
+        "data": [],
+        "message": "📋 No tienes próximas citas.",
+    }
 
     with (
         patch("f.booking_orchestrator.main.create_db_client", return_value=mock_db),
