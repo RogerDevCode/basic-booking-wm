@@ -26,6 +26,7 @@ class SendMessageInput(BaseTelegramInput):
     text: str = Field(min_length=1)
     inline_buttons: list[object] | None = Field(default_factory=lambda: [])
     message_id: int | None = None
+    reply_keyboard: list[list[object]] | None = None  # for request_contact button
 
 
 class EditMessageInput(BaseTelegramInput):

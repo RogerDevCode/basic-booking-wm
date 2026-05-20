@@ -45,6 +45,7 @@ async def simulate(text: str) -> None:
             "requires_fsm_routing": True,
             "ai_intent": ai_data.get("intent"),
             "ai_confidence": ai_data.get("confidence"),
+            "client_id": "client-123",
             "phone": "+56912345678",  # Simula usuario ya registrado
         }
         try:

@@ -70,10 +70,17 @@ async def _fetch_slots_for_doctor(
         await db.close()
 
 
-def _get_start_text() -> str:
+def _get_start_text(name: str | None = None, phone: str | None = None) -> str:
+    greeting = f"¡Hola, {name}! 👋" if name else "¡Hola! 👋"
+    user_info_lines: list[str] = []
+    if name:
+        user_info_lines.append(f"👤 {name}")
+    if phone:
+        user_info_lines.append(f"📞 {phone}")
+    info_block = "\n".join(user_info_lines) + "\n\n" if user_info_lines else ""
     return (
-        "¡Hola! Soy tu asistente de reservas. 👋\n\n"
-        "Puedo ayudarte a agendar, consultar o cancelar una hora médica.\n\n" + get_main_menu_text()
+        f"{greeting} Soy tu asistente de reservas.\n\n"
+        f"{info_block}" + get_main_menu_text()
     )
 
 
@@ -99,6 +106,35 @@ def _start_registration(
             "¿Empezamos? Responde *sí* para continuar o *no* para volver al menú."
         ),
     )
+
+
+# Native Telegram "share contact" button payload
+_PHONE_REPLY_KEYBOARD: list[list[object]] = [
+    [{"text": "📱 Compartir mi número", "request_contact": True}],
+    [{"text": "✏️ Escribir manualmente"}],
+]
+
+
+def _start_phone_only(
+    input_data: RouterInput,
+    draft_raw: dict[str, object],
+) -> RouterResult:
+    """Client exists in DB but has no phone. Ask only for phone — skip name."""
+    new_draft: dict[str, object] = {**draft_raw, "reg_source": "agendar", "reg_name": input_data.client_name or ""}
+    name = input_data.client_name or "amigo"
+    return RouterResult(
+        handled=True,
+        nextState={"name": "reg_collecting_phone"},
+        nextDraft=new_draft,
+        active_flow="booking",
+        reply_keyboard=_PHONE_REPLY_KEYBOARD,
+        response_text=(
+            f"Hola, {name}! 👋\n\n"
+            "Para confirmar tu reserva necesito tu teléfono de contacto.\n\n"
+            "📱 Toca el botón o escríbelo manualmente:"
+        ),
+    )
+
 
 
 async def _handle_mis_citas(
@@ -370,7 +406,8 @@ def _handle_registration_state(
                 handled=True,
                 nextState={"name": "reg_collecting_phone"},
                 nextDraft=dict(draft_raw),
-                response_text="Por favor escribe tu número de teléfono.",
+                reply_keyboard=_PHONE_REPLY_KEYBOARD,
+                response_text="Por favor comparte o escribe tu número de teléfono.",
             )
         new_draft3: dict[str, object] = {**dict(draft_raw), "reg_phone": user_text}
         return RouterResult(
@@ -409,7 +446,7 @@ async def _route(input_data: RouterInput) -> RouterResult:
             handled=True,
             active_flow="booking",
             nextState={"name": "idle"},
-            response_text=_get_start_text(),
+            response_text=_get_start_text(input_data.client_name, input_data.phone),
         )
 
     current_state_raw = cast("dict[str, object]", state_dict.get("booking_state") or {"name": "idle"})
@@ -449,8 +486,12 @@ async def _route(input_data: RouterInput) -> RouterResult:
                 intent = str(nlu_res["intent"]) if nlu_res["confidence"] > 0.6 else ""
 
             if intent in ("crear_cita", "ver_disponibilidad"):
-                if not input_data.phone:
+                if not input_data.client_id:
+                    # No client in DB at all → full registration
                     return _start_registration(input_data, source="agendar", draft_raw=draft_raw)
+                if not input_data.phone:
+                    # Client exists but no phone → ask only for phone
+                    return _start_phone_only(input_data, draft_raw=draft_raw)
 
                 smart_result = await _handle_smart_prefill(input_data, draft_raw)
                 if smart_result.handled:

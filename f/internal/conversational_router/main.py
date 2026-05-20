@@ -26,6 +26,16 @@ from ..booking_fsm._fsm_machine import get_main_menu_text
 MODULE: Final[str] = "conversational_router"
 
 
+def _format_menu_with_user_info(name: str | None = None, phone: str | None = None) -> str:
+    user_info_lines: list[str] = []
+    if name:
+        user_info_lines.append(f"👤 {name}")
+    if phone:
+        user_info_lines.append(f"📞 {phone}")
+    info_block = "\n".join(user_info_lines) + "\n\n" if user_info_lines else ""
+    return info_block + get_main_menu_text()
+
+
 class ConversationalInput(BaseModel):
     model_config = ConfigDict(strict=True)
     chat_id: str
@@ -94,7 +104,7 @@ async def _handle(inp: ConversationalInput) -> ConversationalResult:
         return ConversationalResult(
             handled=True,
             nextState=state_raw,
-            response_text="¡Hola! 👋\n\n" + get_main_menu_text(),
+            response_text="¡Hola! 👋\n\n" + _format_menu_with_user_info(inp.client_name, inp.phone),
         )
 
     if handler == "farewell":
@@ -108,14 +118,14 @@ async def _handle(inp: ConversationalInput) -> ConversationalResult:
         return ConversationalResult(
             handled=True,
             nextState=state_raw,
-            response_text="¡Con gusto! 😊\n\n" + get_main_menu_text(),
+            response_text="¡Con gusto! 😊\n\n" + _format_menu_with_user_info(inp.client_name, inp.phone),
         )
 
     if handler == "menu":
         return ConversationalResult(
             handled=True,
             nextState={"name": "idle"},
-            response_text=get_main_menu_text(),
+            response_text=_format_menu_with_user_info(inp.client_name, inp.phone),
         )
 
     if handler == "mis_citas":

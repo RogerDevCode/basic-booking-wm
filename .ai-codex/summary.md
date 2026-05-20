@@ -312,10 +312,11 @@
 ### `f/flows/telegram_webhook__flow/telegram_webhook_trigger.py`
 - 📦 `class` `TelegramChat` (L14)
 - 📦 `class` `TelegramFrom` (L19)
-- 📦 `class` `TelegramMessage` (L27)
-- 📦 `class` `TelegramCallbackQuery` (L35)
-- 📦 `class` `TelegramUpdate` (L43)
-- 🔧 `fn` `main` (L168)
+- 📦 `class` `TelegramContact` (L27)
+- 📦 `class` `TelegramMessage` (L35)
+- 📦 `class` `TelegramCallbackQuery` (L44)
+- 📦 `class` `TelegramUpdate` (L52)
+- 🔧 `fn` `main` (L179)
 
 ### `f/gcal_reconcile/_reconcile_logic.py`
 - ⚡ `async_fn` `retry_with_backoff` (L20)
@@ -516,7 +517,7 @@
 - 🔧 `fn` `main` (L169)
 
 ### `f/internal/apply_fix_migration.py`
-- 🔧 `fn` `main` (L24)
+- 🔧 `fn` `main` (L38)
 
 ### `f/internal/booking_confirm/main.py`
 - 📦 `class` `BookingConfirmOutput` (L45)
@@ -596,9 +597,9 @@
 - 🔧 `fn` `main` (L58)
 
 ### `f/internal/conversational_router/main.py`
-- 📦 `class` `ConversationalInput` (L29)
-- 📦 `class` `ConversationalResult` (L43)
-- 🔧 `fn` `main` (L208)
+- 📦 `class` `ConversationalInput` (L39)
+- 📦 `class` `ConversationalResult` (L53)
+- 🔧 `fn` `main` (L218)
 
 ### `f/internal/debug_db.py`
 - 🔧 `fn` `main` (L22)
@@ -623,7 +624,7 @@
 - ⚡ `async_fn` `handle` (L20)
 
 ### `f/internal/fsm_router/main.py`
-- 🔧 `fn` `main` (L537)
+- 🔧 `fn` `main` (L578)
 
 ### `f/internal/gcal_utils/_gcal_logic.py`
 - 🔧 `fn` `build_gcal_event` (L6)
@@ -1037,20 +1038,20 @@
 - 📦 `class` `TelegramService` (L21)
 - ⚡ `async_fn` `execute` (L26)
 - 🔧 `fn` `prepare_request` (L52)
-- ⚡ `async_fn` `api_call` (L90)
-- 🔧 `fn` `normalize_keyboard` (L108)
+- ⚡ `async_fn` `api_call` (L101)
+- 🔧 `fn` `normalize_keyboard` (L119)
 
 ### `f/telegram_send/_telegram_models.py`
 - 📦 `class` `InlineButton` (L12)
 - 📦 `class` `BaseTelegramInput` (L18)
 - 📦 `class` `SendMessageInput` (L24)
-- 📦 `class` `EditMessageInput` (L31)
-- 📦 `class` `DeleteMessageInput` (L38)
-- 📦 `class` `AnswerCallbackInput` (L49)
-- 📦 `class` `TelegramInputRoot` (L67)
-- 📦 `class` `TelegramResponseResult` (L71)
-- 📦 `class` `TelegramResponse` (L75)
-- 📦 `class` `TelegramSendData` (L83)
+- 📦 `class` `EditMessageInput` (L32)
+- 📦 `class` `DeleteMessageInput` (L39)
+- 📦 `class` `AnswerCallbackInput` (L50)
+- 📦 `class` `TelegramInputRoot` (L68)
+- 📦 `class` `TelegramResponseResult` (L72)
+- 📦 `class` `TelegramResponse` (L76)
+- 📦 `class` `TelegramSendData` (L84)
 
 ### `f/telegram_send/main.py`
 - 🔧 `fn` `main` (L85)

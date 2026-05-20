@@ -216,7 +216,7 @@ locks:
   f/internal/ai_agent/tfidf-classifier: 21934c7dd1db670ca7c1be0ffd27c95afce094e820d817bc8b7c7294e63f6100
   f/internal/ai_agent/tracing: a6af0a970b0f677c89ed8fd742b7906ad0e0c5be888ed64b9d7b91e067fd008f
   f/internal/ai_agent/types: 1f5c83e143fd2518efddf780da467cd252d3d098dcbb3fa538134524e0aa6707
-  f/internal/apply_fix_migration: aa3117a129c974572718f645d7115c4ddfef8531cea2d07b0b923d4c34d26d78
+  f/internal/apply_fix_migration: 02f07cb98801fd0885e3721710a9a4d9308cddaf77af56e136297088e04fbd48
   f/internal/booking_confirm/main: 9285a58efd6f1597e7fe21ad7ff836cc4cf9e897e6a4d5fc4e18eaf36792103a
   f/internal/booking_fsm/__init__: 19fac8db7a71d7f04e596c59d0601aedde493b9524251bd260d9cd717e297c10
   f/internal/booking_fsm/_fsm_machine: 9df852faae297d5827ce7d36ec8c5b86de1891042d5ad63ea96f4765d66618a8

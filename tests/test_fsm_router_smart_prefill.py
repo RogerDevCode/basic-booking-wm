@@ -26,6 +26,7 @@ async def test_smart_prefill_single_provider_skips_to_selecting_time() -> None:
         "ai_intent": "crear_cita",
         "ai_confidence": 0.9,
         "ai_entities": {"provider_name": "Dr. Gallegos", "date": "mañana"},
+        "client_id": "client-123",
         "phone": "+56912345678",
         "pg_url": "postgresql://test",
     }
@@ -95,6 +96,7 @@ async def test_smart_prefill_with_date_entity_resolves_target_date() -> None:
         "ai_intent": "crear_cita",
         "ai_confidence": 0.9,
         "ai_entities": {"provider_name": "Dr. Gallegos", "date": "viernes"},
+        "client_id": "client-123",
         "phone": "+56912345678",
         "pg_url": "postgresql://test",
     }
@@ -155,6 +157,7 @@ async def test_smart_prefill_with_date_shows_date_in_response() -> None:
         "ai_intent": "crear_cita",
         "ai_confidence": 0.9,
         "ai_entities": {"provider_name": "Dr. Gallegos", "date": "mañana"},
+        "client_id": "client-123",
         "phone": "+56912345678",
         "pg_url": "postgresql://test",
     }
@@ -226,6 +229,7 @@ async def test_smart_prefill_no_entities_uses_normal_flow() -> None:
         "ai_intent": "crear_cita",
         "ai_confidence": 0.9,
         "ai_entities": {},
+        "client_id": "client-123",
         "phone": "+56912345678",
         "pg_url": "postgresql://test",
     }
@@ -257,6 +261,7 @@ async def test_smart_prefill_ambiguous_shows_list() -> None:
         "ai_intent": "crear_cita",
         "ai_confidence": 0.9,
         "ai_entities": {"provider_name": "Pérez"},
+        "client_id": "client-123",
         "phone": "+56912345678",
         "pg_url": "postgresql://test",
     }
@@ -312,6 +317,7 @@ async def test_smart_prefill_no_match_returns_informative_message() -> None:
         "ai_intent": "crear_cita",
         "ai_confidence": 0.9,
         "ai_entities": {"provider_name": "Dr. Inexistente"},
+        "client_id": "client-123",
         "phone": "+56912345678",
         "pg_url": "postgresql://test",
     }
@@ -350,8 +356,8 @@ async def test_smart_prefill_already_booked_blocks() -> None:
         "ai_intent": "crear_cita",
         "ai_confidence": 0.9,
         "ai_entities": {"provider_name": "Dr. Gallegos"},
-        "phone": "+56912345678",
         "client_id": "client-001",
+        "phone": "+56912345678",
         "pg_url": "postgresql://test",
     }
 
@@ -402,6 +408,7 @@ async def test_smart_prefill_no_slots_shows_message() -> None:
         "ai_intent": "crear_cita",
         "ai_confidence": 0.9,
         "ai_entities": {"provider_name": "Dr. Gallegos"},
+        "client_id": "client-123",
         "phone": "+56912345678",
         "pg_url": "postgresql://test",
     }

@@ -157,6 +157,7 @@ class TestFSMRouter_SolicitarHora:
             "ai_intent": "crear_cita",
             "ai_confidence": 0.9,
             "ai_entities": {},
+            "client_id": "client-123",
             "phone": "+56912345678",
         }
 
@@ -181,6 +182,7 @@ class TestFSMRouter_SolicitarHora:
             "ai_intent": "crear_cita",
             "ai_confidence": 0.9,
             "ai_entities": {"provider_name": "Dr. Gallegos", "date": "mañana"},
+            "client_id": "client-123",
             "phone": "+56912345678",
             "pg_url": "postgresql://test",
         }
@@ -239,6 +241,7 @@ class TestFSMRouter_SolicitarHora:
             "ai_intent": "crear_cita",
             "ai_confidence": 0.9,
             "ai_entities": {"date": "mañana"},
+            "client_id": "client-123",
             "phone": "+56912345678",
         }
 

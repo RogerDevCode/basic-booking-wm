@@ -55,11 +55,22 @@ class TelegramService:
         if mode == "send_message":
             inp_s = cast("SendMessageInput", input_data)
             keyboard = self.normalize_keyboard(inp_s.inline_buttons)
+            # reply_keyboard takes precedence over inline_keyboard (mutually exclusive in Telegram)
+            if inp_s.reply_keyboard:
+                reply_markup: dict[str, object] = {
+                    "keyboard": inp_s.reply_keyboard,
+                    "one_time_keyboard": True,
+                    "resize_keyboard": True,
+                }
+            elif keyboard:
+                reply_markup = {"inline_keyboard": keyboard}
+            else:
+                reply_markup = {}
             return f"{self.base_url}/sendMessage", {
                 "chat_id": inp_s.chat_id,
                 "text": inp_s.text,
                 "parse_mode": inp_s.parse_mode,
-                "reply_markup": {"inline_keyboard": keyboard} if keyboard else None,
+                "reply_markup": reply_markup if reply_markup else None,
             }
 
         elif mode == "edit_message":

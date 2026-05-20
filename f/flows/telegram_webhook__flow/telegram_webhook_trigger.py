@@ -24,12 +24,21 @@ class TelegramFrom(BaseModel):
     username: str | None = None
 
 
+class TelegramContact(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    phone_number: str
+    first_name: str
+    last_name: str | None = None
+    user_id: int | None = None
+
+
 class TelegramMessage(BaseModel):
     model_config = ConfigDict(extra="ignore")
     message_id: int
     chat: TelegramChat | None = None
     from_: TelegramFrom | None = Field(None, alias="from")
     text: str | None = None
+    contact: TelegramContact | None = None
 
 
 class TelegramCallbackQuery(BaseModel):
@@ -91,6 +100,8 @@ async def _main_async(webhook_payload: dict[str, Any]) -> dict[str, Any]:
             chat_id = str(message.chat.id)
         if message.text:
             text = message.text
+        elif message.contact:
+            text = message.contact.phone_number
         if from_data:
             username = from_data.username or "unknown"
             first_name = from_data.first_name or "Usuario"

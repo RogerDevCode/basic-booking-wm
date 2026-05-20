@@ -1,9 +1,23 @@
+# /// script
+# requires-python = ">=3.13"
+# dependencies = [
+#   "asyncpg>=0.30.0",
+#   "beartype>=0.19.0",
+#   "wmill"
+# ]
+# ///
+from __future__ import annotations
+
 import asyncio
 
 from f.internal._db_client import create_db_client
 
 
 async def _main() -> None:
+    import os
+    from f.internal._db_client import _resolve_db_url
+    print(f"DATABASE_URL env: {repr(os.getenv('DATABASE_URL'))}")
+    print(f"Resolved DB URL: {repr(_resolve_db_url())}")
     conn = await create_db_client()
     try:
         print("--- APPLYING FIX MIGRATION ---")

@@ -31,6 +31,7 @@ class RouterResult(BaseModel):
     nextState: dict[str, object] | None = None
     nextDraft: dict[str, object] | None = None
     inline_buttons: list[list[InlineButton]] | None = None
+    reply_keyboard: list[list[object]] | None = None  # native Telegram ReplyKeyboard
     active_flow: str | None = None
     registration_data: dict[str, str | None] | None = None
     edit_message: bool = False

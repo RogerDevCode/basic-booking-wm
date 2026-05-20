@@ -51,6 +51,7 @@ async def test_fsm_router_crearcita_from_idle_starts_registration() -> None:
         "requires_fsm_routing": True,
         "ai_intent": "crear_cita",
         "ai_confidence": 0.95,
+        "client_id": None,
         "phone": None,
     }
     res = await _main_async(args)
@@ -72,7 +73,8 @@ async def test_fsm_router_crearcita_from_idle_with_phone() -> None:
         "requires_fsm_routing": True,
         "ai_intent": "crear_cita",
         "ai_confidence": 0.95,
-        "phone": "+56912345678",
+        "client_id": "client-123",
+            "phone": "+56912345678",
     }
     with patch("f.internal._nlu_cache.ensure_nlu_cache", AsyncMock()):
         res = await _main_async(args)

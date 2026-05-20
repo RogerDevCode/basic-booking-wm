@@ -89,6 +89,7 @@ def main(
     bot_token: str | None = None,
     parse_mode: str | None = None,
     inline_buttons_json: str | None = None,
+    reply_keyboard_json: str | None = None,
     message_id: int | None = None,
 ) -> dict[str, object]:
     import json
@@ -104,6 +105,17 @@ def main(
 
             log("JSON parse error for inline_buttons", error=str(e), data=inline_buttons_json)
 
+    reply_keyboard: list[list[object]] | None = None
+    if reply_keyboard_json:
+        try:
+            rk_data = json.loads(reply_keyboard_json)
+            if isinstance(rk_data, list):
+                reply_keyboard = cast("list[list[object]]", rk_data)
+        except Exception as e:
+            from ..internal._wmill_adapter import log
+
+            log("JSON parse error for reply_keyboard", error=str(e), data=reply_keyboard_json)
+
     normalized_text = _normalize_text(text)
 
     args: dict[str, object] = {
@@ -113,6 +125,7 @@ def main(
         "bot_token": bot_token,
         "parse_mode": parse_mode or "Markdown",
         "inline_buttons": inline_buttons,
+        "reply_keyboard": reply_keyboard,
         "message_id": message_id,
     }
 
