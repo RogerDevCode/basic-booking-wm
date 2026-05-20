@@ -14,6 +14,9 @@
 # ///
 from __future__ import annotations
 
+import asyncio
+import traceback
+
 # ============================================================================
 # PRE-FLIGHT CHECKLIST
 # Mission         : Service health monitor and failure isolation
@@ -122,9 +125,6 @@ async def _main_async(args: dict[str, object]) -> dict[str, object]:
 
 
 def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
-    import asyncio
-    import traceback
-
     try:
         if isinstance(args, InputSchema):
             validated = args

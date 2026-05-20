@@ -256,8 +256,8 @@
 - 📦 `class` `InputSchema` (L31)
 
 ### `f/circuit_breaker/main.py`
-- ⚡ `async_fn` `operation` (L48)
-- 🔧 `fn` `main` (L124)
+- ⚡ `async_fn` `operation` (L51)
+- 🔧 `fn` `main` (L127)
 
 ### `f/conversation_logger/_logger_logic.py`
 - ⚡ `async_fn` `persist_log` (L11)
@@ -1080,7 +1080,7 @@
 - 📦 `class` `TelegramSendData` (L83)
 
 ### `f/telegram_send/main.py`
-- 🔧 `fn` `main` (L84)
+- 🔧 `fn` `main` (L85)
 
 ### `f/web_admin_dashboard/_dashboard_logic.py`
 - ⚡ `async_fn` `fetch_dashboard_stats` (L10)

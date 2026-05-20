@@ -14,9 +14,10 @@
 # ///
 from __future__ import annotations
 
+import asyncio
 import os
 import traceback
-from typing import cast
+from typing import Any, cast
 
 from ..internal._wmill_adapter import log
 from ._telegram_logic import TelegramService
@@ -90,7 +91,6 @@ def main(
     inline_buttons_json: str | None = None,
     message_id: int | None = None,
 ) -> dict[str, object]:
-    import asyncio
     import json
 
     inline_buttons: list[object] = []
@@ -117,9 +117,7 @@ def main(
     }
 
     try:
-        result = asyncio.run(_main_async(args))
-        #         if result is None:
-        #             return {"sent": False, "mode": mode, "message_id": None, "chat_id": None}
+        result: Any = asyncio.run(_main_async(args))
         return cast("dict[str, object]", result.model_dump())
     except Exception as e:
         tb = traceback.format_exc()
