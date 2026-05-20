@@ -81,7 +81,7 @@ def _get_agent() -> Agent:
     if _agent_cache is None:
         _agent_cache = Agent(
             name="booking_classifier",
-            model="gemini-2.5-flash",
+            model="gemini-2.5-flash-lite",
             instruction=_INSTRUCTION,
             tools=[_clasificar_intent],
         )
