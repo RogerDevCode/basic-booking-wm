@@ -1,4 +1,10 @@
+# /// script
+# requires-python = ">=3.13"
+# dependencies = []
+# ///
 from __future__ import annotations
+
+from typing import Any
 
 """
 PRE-FLIGHT
@@ -12,6 +18,9 @@ Zod Schemas      : NO
 """
 
 
-def get_entity(entities: dict[str, str | None], key: str) -> str | None:
+def get_entity(entities: dict[str, Any], key: str) -> str | None:
     """Extracts a value from the entities dictionary, returning None if not found."""
-    return entities.get(key)
+    val = entities.get(key)
+    if isinstance(val, str) and val:
+        return val.strip() or None
+    return None

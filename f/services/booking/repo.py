@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, Any, Final, Protocol, TypeVar, cast
 
+from f.booking_orchestrator._get_entity import get_entity
 from f.internal._date_resolver import resolve_date, resolve_time
 from f.internal._state_machine import BookingStatus, validate_transition
 from f.services.booking._booking_errors import BookingSlotUnavailableError
@@ -22,13 +23,6 @@ _STATUS_TO_EVENT: Final[dict[str, str]] = {
     "completed": "COMPLETE",
     "no_show": "MARK_NO_SHOW",
 }
-
-
-def get_entity(entities: dict[str, Any], key: str) -> str | None:
-    val = entities.get(key)
-    if isinstance(val, str) and val:
-        return val.strip() or None
-    return None
 
 
 class BookingRepo(Protocol):

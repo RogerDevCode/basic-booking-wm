@@ -47,13 +47,13 @@ FLOW  : returns
 
 ## PROJECT STRUCTURE
 
-src/
-  booking_create.py
-  booking_cancel.py
-  booking_validate.py
-  booking_fsm.py
-  models.py
-  errors.py
+f/
+  booking_create/main.py
+  booking_cancel/main.py
+  booking_orchestrator/main.py
+  services/booking/core.py
+  services/booking/repo.py
+  internal/booking_fsm/_fsm_machine.py
 
 tests/
   test_booking_create.py

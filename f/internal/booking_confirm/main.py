@@ -166,7 +166,7 @@ async def _confirm_booking_core(
 
     result = await with_tenant_context(conn, provider_id, operation)
 
-    if not getattr(result, "booking_id", None):
+    if not result or not result.booking_id:
         raise RuntimeError("no_result_from_booking_create")
 
     booking_id = str(result.booking_id)
