@@ -447,7 +447,7 @@ def _handle_registration_state(
 
 
 @beartype
-async def _route(input_data: RouterInput) -> RouterResult:
+async def _route_impl(input_data: RouterInput) -> RouterResult:
     state_dict = input_data.state or {}
     active_flow = cast("str | None", state_dict.get("active_flow"))
 
@@ -477,6 +477,13 @@ async def _route(input_data: RouterInput) -> RouterResult:
         return RouterResult(handled=False)
 
     draft_raw = cast("dict[str, object]", state_dict.get("booking_draft") or {})
+
+    # Defensive fix: Redis Lua cjson serializes empty lists as {} instead of []
+    # Convert back to [] for known list fields to prevent Pydantic validation errors
+    if isinstance(current_state_raw.get("items"), dict):
+        current_state_raw["items"] = []
+    if isinstance(draft_raw.get("items"), dict):
+        draft_raw["items"] = []
 
     # Registration states must be checked before BookingStateRoot.model_validate
     if current_state_name in REG_STATES:
@@ -624,6 +631,25 @@ async def _route(input_data: RouterInput) -> RouterResult:
     except Exception as e:
         log("ROUTER_INTERNAL_ERROR", error=str(e), chat_id=input_data.chat_id, module=MODULE)
         raise RuntimeError(f"Router internal error: {e}") from e
+@beartype
+async def _route(input_data: RouterInput) -> RouterResult:
+    result = await _route_impl(input_data)
+    if result.handled:
+        # Only set active_flow if not already explicitly set by the handler
+        if result.active_flow is None:
+            next_state_name = "idle"
+            if result.nextState:
+                next_state_name = str(result.nextState.get("name", "idle"))
+            else:
+                state_dict = input_data.state or {}
+                current_state_raw = cast("dict[str, object]", state_dict.get("booking_state") or {"name": "idle"})
+                next_state_name = str(current_state_raw.get("name", "idle"))
+
+            if next_state_name != "idle" and next_state_name != "reminders_config":
+                result.active_flow = "booking"
+            elif next_state_name == "idle":
+                result.active_flow = None
+    return result
 
 
 async def _main_async(args: dict[str, object]) -> dict[str, object]:

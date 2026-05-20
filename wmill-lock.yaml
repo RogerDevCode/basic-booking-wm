@@ -211,7 +211,7 @@ locks:
   f/internal/ai_agent/context-adjustment: 97ace27e16db7ff8f0f9f468e4718dbac0842b13a39b468436f817d12f22e7cc
   f/internal/ai_agent/guardrails: 81eb8c5bdeccfeccfad8d24033d3def32b3c01bda40a9874ddefa1a1f1c88975
   f/internal/ai_agent/llm-client: 78402b896e8f88414241214fb37ba01893979944e2f4f237b1bade4de85c0c36
-  f/internal/ai_agent/main: c5f4e248ed7fe3e2d4c15f25cca466261be2f12200c393107e4b5eca762b4118
+  f/internal/ai_agent/main: d026680da2636b15e09b7218e20ab9228dd5c8493e47c7085fb2e1636c50d84b
   f/internal/ai_agent/pipeline: 33d6399b3dda522efc9a27da410130c38bceb1f6737bb7a616fa5a35311056d5
   f/internal/ai_agent/prompt-builder: 1e694c1057a69d020ce84ac81d887494f8116c6a0182ce1f7750a3dd77f593ab
   f/internal/ai_agent/rag-context: aaf104fde2a23d3dfad79909b543580f2c857fab62838fde351c7a66544e8cbd

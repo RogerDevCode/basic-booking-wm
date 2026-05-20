@@ -24,7 +24,7 @@ async def build_rag_context(provider_id: str | None, text: str, limit: int = 3) 
                     ' & ', ' | '
                 )::tsquery AS query
             )
-            SELECT content, provider_id
+            SELECT title, category, content, provider_id
             FROM knowledge_base, q
             WHERE (provider_id IS NULL OR provider_id = $1::uuid)
               AND is_active = true
@@ -43,7 +43,12 @@ async def build_rag_context(provider_id: str | None, text: str, limit: int = 3) 
         context_parts = ["<KNOWLEDGE_BASE_CONTEXT>"]
         has_provider = False
         for r in rows:
-            context_parts.append(f"- {r['content']}")
+            title = r["title"]
+            content = r["content"]
+            if title:
+                context_parts.append(f"- [{title}] {content}")
+            else:
+                context_parts.append(f"- {content}")
             if r["provider_id"]:
                 has_provider = True
         context_parts.append("</KNOWLEDGE_BASE_CONTEXT>")
@@ -53,7 +58,8 @@ async def build_rag_context(provider_id: str | None, text: str, limit: int = 3) 
         from .._wmill_adapter import log
 
         log("RAG_CONTEXT_DB_ERROR", error=str(e), file="_rag_context.py")
-        raise RuntimeError(f"RAG context retrieval failed: {e}") from e
+        # Graceful degradation: return empty context instead of crashing
+        return {"context": "", "count": 0, "hasProviderSpecific": False}
     finally:
         await conn.close()
 

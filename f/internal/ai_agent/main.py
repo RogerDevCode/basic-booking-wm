@@ -113,10 +113,13 @@ async def _main_async(args: dict[str, Any]) -> dict[str, Any]:
             # 2.4 LLM Path (only if TF-IDF confidence is low or unknown)
             rag_context = None
             tfidf_confident = confidence >= 0.9
-            if not tfidf_confident and input_data.provider_id:
-                if intent in [INTENT["PREGUNTA_GENERAL"], INTENT["DESCONOCIDO"]]:
+            if not tfidf_confident and intent in [INTENT["PREGUNTA_GENERAL"], INTENT["DESCONOCIDO"]]:
+                try:
                     rag_res = await build_rag_context(input_data.provider_id, text)
                     rag_context = rag_res["context"]
+                except Exception as e:
+                    log("RAG_CONTEXT_FAILED", error=str(e), chat_id=input_data.chat_id, module=MODULE)
+                    rag_context = None
 
                 sys_prompt = build_system_prompt(rag_context)
                 user_msg = build_user_message(text)
