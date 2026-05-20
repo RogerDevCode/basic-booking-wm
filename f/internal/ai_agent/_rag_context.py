@@ -18,15 +18,22 @@ async def build_rag_context(provider_id: str | None, text: str, limit: int = 3) 
         # This uses simple text search for compatibility with the TS version
         rows = await conn.fetch(
             """
+            WITH q AS (
+                SELECT replace(
+                    plainto_tsquery('spanish', immutable_unaccent($2))::text,
+                    ' & ', ' | '
+                )::tsquery AS query
+            )
             SELECT content, provider_id
-            FROM knowledge_base
+            FROM knowledge_base, q
             WHERE (provider_id IS NULL OR provider_id = $1::uuid)
-              AND (content ILIKE $2)
-            ORDER BY provider_id DESC NULLS LAST
+              AND is_active = true
+              AND q.query @@ search_vector
+            ORDER BY provider_id DESC NULLS LAST, ts_rank(search_vector, q.query) DESC
             LIMIT $3
             """,
             provider_id,
-            f"%{text[:20]}%",
+            text,
             limit,
         )
 

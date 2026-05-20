@@ -387,6 +387,16 @@
 - 📦 `class` `TokenPayload` (L6)
 - 🔧 `fn` `verify_access_token` (L11)
 
+### `f/internal/_booking_repository.py`
+- 📦 `class` `BookingRepository` (L19)
+- ⚡ `async_fn` `find_by_id` (L23)
+- ⚡ `async_fn` `find_active_by_client` (L29)
+- ⚡ `async_fn` `save` (L35)
+
+### `f/internal/_booking_service.py`
+- 📦 `class` `BookingService` (L17)
+- ⚡ `async_fn` `create_booking` (L18)
+
 ### `f/internal/_booking_shared.py`
 - ⚡ `async_fn` `query_my_bookings` (L65)
 - ⚡ `async_fn` `resolve_provider_by_name` (L96)
@@ -430,6 +440,16 @@
 - ⚡ `async_fn` `execute` (L120)
 - ⚡ `async_fn` `close` (L123)
 
+### `f/internal/_db_models.py`
+- 📦 `class` `ProviderORM` (L19)
+- 📦 `class` `ServiceORM` (L51)
+- 📦 `class` `ClientORM` (L80)
+- 📦 `class` `BookingORM` (L107)
+
+### `f/internal/_db_sqlalchemy.py`
+- 📦 `class` `Base` (L49)
+- ⚡ `async_fn` `get_db_session` (L55)
+
 ### `f/internal/_file_lock.py`
 - 📦 `class` `FileLockError` (L17)
 - 🔧 `fn` `exclusive_file_lock` (L24)
@@ -467,25 +487,25 @@
 - 🔧 `fn` `log` (L100)
 
 ### `f/internal/ai_agent/_ai_agent_logic.py`
-- 🔧 `fn` `compute_requires_fsm_routing` (L43)
-- 🔧 `fn` `adjust_intent_with_context` (L55)
-- 🔧 `fn` `extract_entities` (L104)
-- 🔧 `fn` `detect_context` (L190)
-- 🔧 `fn` `determine_escalation_level` (L227)
-- 🔧 `fn` `generate_ai_response` (L252)
-- 🔧 `fn` `detect_social` (L269)
-- 🔧 `fn` `detect_menu_command` (L323)
+- 🔧 `fn` `compute_requires_fsm_routing` (L58)
+- 🔧 `fn` `adjust_intent_with_context` (L83)
+- 🔧 `fn` `extract_entities` (L132)
+- 🔧 `fn` `detect_context` (L218)
+- 🔧 `fn` `determine_escalation_level` (L255)
+- 🔧 `fn` `generate_ai_response` (L280)
+- 🔧 `fn` `detect_social` (L297)
+- 🔧 `fn` `detect_menu_command` (L351)
 
 ### `f/internal/ai_agent/_ai_agent_models.py`
 - 📦 `class` `ConversationState` (L11)
-- 📦 `class` `UserProfile` (L31)
-- 📦 `class` `AIAgentInput` (L38)
-- 📦 `class` `EntityMap` (L49)
-- 📦 `class` `AvailabilityContext` (L64)
-- 📦 `class` `ContextAdjustment` (L76)
-- 📦 `class` `IntentResult` (L95)
-- 📦 `class` `LLMOutputEntities` (L117)
-- 📦 `class` `LLMOutput` (L125)
+- 📦 `class` `UserProfile` (L32)
+- 📦 `class` `AIAgentInput` (L39)
+- 📦 `class` `EntityMap` (L50)
+- 📦 `class` `AvailabilityContext` (L65)
+- 📦 `class` `ContextAdjustment` (L77)
+- 📦 `class` `IntentResult` (L96)
+- 📦 `class` `LLMOutputEntities` (L118)
+- 📦 `class` `LLMOutput` (L126)
 
 ### `f/internal/ai_agent/_constants.py`
 - 📦 `class` `IntentsStruct` (L28)
@@ -514,18 +534,18 @@
 ### `f/internal/ai_agent/_rag_context.py`
 - 📦 `class` `RAGResult` (L6)
 - ⚡ `async_fn` `build_rag_context` (L12)
-- ⚡ `async_fn` `get_rag_context` (L54)
+- ⚡ `async_fn` `get_rag_context` (L61)
 
 ### `f/internal/ai_agent/main.py`
 - 🔧 `fn` `main` (L199)
 
 ### `f/internal/apply_fix_migration.py`
-- 🔧 `fn` `main` (L40)
+- 🔧 `fn` `main` (L37)
 
 ### `f/internal/booking_confirm/main.py`
 - 📦 `class` `BookingConfirmOutput` (L45)
-- ⚡ `async_fn` `operation` (L161)
-- 🔧 `fn` `main` (L256)
+- ⚡ `async_fn` `operation` (L166)
+- 🔧 `fn` `main` (L261)
 
 ### `f/internal/booking_fsm/_fsm_machine.py`
 - 🔧 `fn` `get_main_menu_text` (L46)
@@ -627,7 +647,7 @@
 - ⚡ `async_fn` `handle` (L20)
 
 ### `f/internal/fsm_router/main.py`
-- 🔧 `fn` `main` (L574)
+- 🔧 `fn` `main` (L640)
 
 ### `f/internal/gcal_utils/_gcal_logic.py`
 - 🔧 `fn` `build_gcal_event` (L6)
@@ -1390,12 +1410,16 @@
 - `f/health_check/_health_models.script.yaml`
 - `f/health_check/main.script.yaml`
 - `f/internal/_auth_jwt.script.yaml`
+- `f/internal/_booking_repository.script.yaml`
+- `f/internal/_booking_service.script.yaml`
 - `f/internal/_booking_shared.script.yaml`
 - `f/internal/_booking_utils.script.yaml`
 - `f/internal/_config.script.yaml`
 - `f/internal/_crypto.script.yaml`
 - `f/internal/_date_resolver.script.yaml`
 - `f/internal/_db_client.script.yaml`
+- `f/internal/_db_models.script.yaml`
+- `f/internal/_db_sqlalchemy.script.yaml`
 - `f/internal/_file_lock.script.yaml`
 - `f/internal/_nlu_cache.script.yaml`
 - `f/internal/_redis_client.script.yaml`
