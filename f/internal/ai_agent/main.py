@@ -9,7 +9,8 @@
 #   "beartype>=0.19.0",
 #   "returns>=0.24.0",
 #   "redis>=7.4.0",
-#   "typing-extensions>=4.12.0"
+#   "typing-extensions>=4.12.0",
+#   "google-adk>=2.0.0"
 # ]
 # ///
 from __future__ import annotations
@@ -37,8 +38,9 @@ from ._ai_agent_logic import (
     extract_entities,
     generate_ai_response,
 )
-from ._ai_agent_models import AIAgentInput, IntentResult, LLMOutput
+from ._ai_agent_models import AIAgentInput, EntityMap, IntentResult, LLMOutput
 from ._constants import INTENT
+from ._gadk_agent import classify_with_gadk
 from ._guardrails import sanitize_json_response, validate_input, verify_urgency
 from ._llm_client import call_llm
 from ._prompt_builder import build_system_prompt, build_user_message
@@ -69,8 +71,9 @@ async def _main_async(args: dict[str, Any]) -> dict[str, Any]:
     # 2. Intent Detection
     intent: str = INTENT["DESCONOCIDO"]
     confidence: float = 0.0
-    provider: Literal["groq", "openai", "openrouter", "fallback", "fast-path"] = "fallback"
+    provider: Literal["groq", "openai", "openrouter", "fallback", "fast-path", "gadk"] = "fallback"
     cot_reasoning = "Fallback to rules-based detection"
+    gadk_entities: dict[str, Any] = {}
 
     # 2.1 Social Fast-Path
     social = detect_social(text)
@@ -85,37 +88,51 @@ async def _main_async(args: dict[str, Any]) -> dict[str, Any]:
         provider = "fast-path"
         cot_reasoning = "Menu fast-path matched"
     else:
-        # 2.2 TF-IDF
-        tfidf = classify_intent(text)
-        has_enough = len(text.split()) >= 2
-        if tfidf["confidence"] >= float(get_nlu_rule("escalation_tfidf_minimum", 0.4)) and has_enough:
-            intent = str(tfidf["intent"])
-            confidence = float(tfidf["confidence"])
-            cot_reasoning = f"TF-IDF semantic match ({intent})"
+        # 2.2 GADK Primary — single call to Gemini via ADK with tool calling
+        gadk_start = int(time.time() * 1000)
+        gadk_result = await classify_with_gadk(text, input_data.chat_id)
+        gadk_latency = int(time.time() * 1000) - gadk_start
 
-        # 2.3 LLM Path (only if TF-IDF confidence is low or unknown)
-        rag_context = None
-        tfidf_confident = confidence >= 0.9
-        if not tfidf_confident and input_data.provider_id:
-            if intent in [INTENT["PREGUNTA_GENERAL"], INTENT["DESCONOCIDO"]]:
-                rag_res = await build_rag_context(input_data.provider_id, text)
-                rag_context = rag_res["context"]
+        if gadk_result and gadk_result.get("intent") != INTENT["DESCONOCIDO"]:
+            intent = gadk_result["intent"]
+            confidence = gadk_result["confidence"]
+            gadk_entities = gadk_result.get("entities", {})
+            provider = "gadk"
+            cot_reasoning = f"GADK classification (latency={gadk_latency}ms)"
+            log("GADK classification", intent=intent, confidence=confidence, latency_ms=gadk_latency)
+        else:
+            # 2.3 Fallback: TF-IDF
+            log("GADK failed or unknown, falling back to TF-IDF", latency_ms=gadk_latency)
+            tfidf = classify_intent(text)
+            has_enough = len(text.split()) >= 2
+            if tfidf["confidence"] >= float(get_nlu_rule("escalation_tfidf_minimum", 0.4)) and has_enough:
+                intent = str(tfidf["intent"])
+                confidence = float(tfidf["confidence"])
+                cot_reasoning = f"TF-IDF semantic match ({intent})"
 
-            sys_prompt = build_system_prompt(rag_context)
-            user_msg = build_user_message(text)
+            # 2.4 LLM Path (only if TF-IDF confidence is low or unknown)
+            rag_context = None
+            tfidf_confident = confidence >= 0.9
+            if not tfidf_confident and input_data.provider_id:
+                if intent in [INTENT["PREGUNTA_GENERAL"], INTENT["DESCONOCIDO"]]:
+                    rag_res = await build_rag_context(input_data.provider_id, text)
+                    rag_context = rag_res["context"]
 
-            err_llm, llm_res = await call_llm(sys_prompt, user_msg)
-            if not err_llm and llm_res:
-                try:
-                    cleaned = sanitize_json_response(llm_res.content)
-                    raw_json = json.loads(cleaned)
-                    llm_out = LLMOutput.model_validate(raw_json)
-                    intent = llm_out.intent
-                    confidence = llm_out.confidence
-                    provider = llm_res.provider
-                    cot_reasoning = "LLM classification"
-                except Exception as e:
-                    log("LLM response parse failed", error=str(e), content=llm_res.content)
+                sys_prompt = build_system_prompt(rag_context)
+                user_msg = build_user_message(text)
+
+                err_llm, llm_res = await call_llm(sys_prompt, user_msg)
+                if not err_llm and llm_res:
+                    try:
+                        cleaned = sanitize_json_response(llm_res.content)
+                        raw_json = json.loads(cleaned)
+                        llm_out = LLMOutput.model_validate(raw_json)
+                        intent = llm_out.intent
+                        confidence = llm_out.confidence
+                        provider = llm_res.provider
+                        cot_reasoning = "LLM classification (fallback)"
+                    except Exception as e:
+                        log("LLM response parse failed", error=str(e), content=llm_res.content)
 
     # 2.5 Context Adjustment
     adj = adjust_intent_with_context(text, intent, confidence, input_data.conversation_state)
@@ -125,7 +142,20 @@ async def _main_async(args: dict[str, Any]) -> dict[str, Any]:
         cot_reasoning = str(adj["reason"])
 
     # 3. Entities & Context Logic
-    entities = extract_entities(text)
+    regex_entities = extract_entities(text)
+    # Merge GADK entities (higher priority) with regex entities (fallback)
+    merged_entities_data = {
+        "date": gadk_entities.get("fecha") or regex_entities.date,
+        "time": gadk_entities.get("hora") or regex_entities.time,
+        "provider_name": gadk_entities.get("doctor") or regex_entities.provider_name,
+        "provider_id": regex_entities.provider_id,
+        "service_type": gadk_entities.get("especialidad") or regex_entities.service_type,
+        "service_id": regex_entities.service_id,
+        "booking_id": gadk_entities.get("booking_id") or regex_entities.booking_id,
+        "channel": regex_entities.channel,
+        "reminder_window": regex_entities.reminder_window,
+    }
+    entities = EntityMap(**merged_entities_data)
     ctx = detect_context(text, entities)
 
     ai_resp, needs_more, follow_up = generate_ai_response(intent, entities, ctx, input_data.user_profile)

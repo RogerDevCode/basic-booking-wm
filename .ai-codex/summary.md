@@ -490,6 +490,9 @@
 ### `f/internal/ai_agent/_constants.py`
 - 📦 `class` `IntentsStruct` (L28)
 
+### `f/internal/ai_agent/_gadk_agent.py`
+- ⚡ `async_fn` `classify_with_gadk` (L102)
+
 ### `f/internal/ai_agent/_guardrails.py`
 - 📦 `class` `GuardrailPass` (L9)
 - 📦 `class` `GuardrailBlocked` (L13)
@@ -514,10 +517,10 @@
 - ⚡ `async_fn` `get_rag_context` (L54)
 
 ### `f/internal/ai_agent/main.py`
-- 🔧 `fn` `main` (L169)
+- 🔧 `fn` `main` (L199)
 
 ### `f/internal/apply_fix_migration.py`
-- 🔧 `fn` `main` (L38)
+- 🔧 `fn` `main` (L40)
 
 ### `f/internal/booking_confirm/main.py`
 - 📦 `class` `BookingConfirmOutput` (L45)
@@ -624,7 +627,7 @@
 - ⚡ `async_fn` `handle` (L20)
 
 ### `f/internal/fsm_router/main.py`
-- 🔧 `fn` `main` (L578)
+- 🔧 `fn` `main` (L574)
 
 ### `f/internal/gcal_utils/_gcal_logic.py`
 - 🔧 `fn` `build_gcal_event` (L6)

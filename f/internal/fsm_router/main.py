@@ -78,10 +78,7 @@ def _get_start_text(name: str | None = None, phone: str | None = None) -> str:
     if phone:
         user_info_lines.append(f"📞 {phone}")
     info_block = "\n".join(user_info_lines) + "\n\n" if user_info_lines else ""
-    return (
-        f"{greeting} Soy tu asistente de reservas.\n\n"
-        f"{info_block}" + get_main_menu_text()
-    )
+    return f"{greeting} Soy tu asistente de reservas.\n\n{info_block}" + get_main_menu_text()
 
 
 _SI_WORDS: Final[frozenset[str]] = frozenset({"s", "y", "si", "sí", "yes", "ok", "dale", "claro", "correcto", "exacto"})
@@ -134,7 +131,6 @@ def _start_phone_only(
             "📱 Toca el botón o escríbelo manualmente:"
         ),
     )
-
 
 
 async def _handle_mis_citas(
