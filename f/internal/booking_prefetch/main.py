@@ -74,9 +74,10 @@ async def _fetch_slots_for_doctor(
     service_id = str(row["service_id"])
 
     # Get provider timezone and booking preferences
+    # NOTE: ui_preferences column may not exist if migration 018 not applied yet
     pref_row = await db.fetchrow(
         """
-        SELECT p.ui_preferences, t.name as tz_name
+        SELECT t.name as tz_name
         FROM providers p
         LEFT JOIN timezones t ON t.id = p.timezone_id
         WHERE p.provider_id = $1::uuid
@@ -85,12 +86,20 @@ async def _fetch_slots_for_doctor(
     )
     require_advance = False
     provider_tz = "UTC"
-    if pref_row:
-        if pref_row["tz_name"]:
-            provider_tz = str(pref_row["tz_name"])
-        prefs = pref_row["ui_preferences"]
-        if isinstance(prefs, dict):
-            require_advance = bool(cast("dict[str, object]", prefs).get("require_advance_booking", False))
+    if pref_row and pref_row["tz_name"]:
+        provider_tz = str(pref_row["tz_name"])
+
+    # Try to fetch ui_preferences if column exists (migration 018)
+    try:
+        prefs_row = await db.fetchrow(
+            "SELECT ui_preferences FROM providers WHERE provider_id = $1::uuid",
+            doctor_id,
+        )
+        if prefs_row and isinstance(prefs_row["ui_preferences"], dict):
+            prefs = cast("dict[str, object]", prefs_row["ui_preferences"])
+            require_advance = bool(prefs.get("require_advance_booking", False))
+    except Exception:
+        pass  # Column not yet migrated; default require_advance=False
 
     # Use provider's local date as "today", not the server's UTC date
     tz = zoneinfo.ZoneInfo(provider_tz)
