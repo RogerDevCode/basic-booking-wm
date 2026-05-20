@@ -14,6 +14,10 @@
 # ///
 from __future__ import annotations
 
+import asyncio
+import traceback
+from typing import Any, cast
+
 # ============================================================================
 # PRE-FLIGHT CHECKLIST
 # Mission         : Search and filter bookings
@@ -24,7 +28,7 @@ from __future__ import annotations
 # RLS Tenant ID   : YES (if provider_id is supplied, but since it is optional, we might query globally if authorized)
 # Zod Schemas     : YES — SearchInput validates all inputs
 # ============================================================================
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
 from ..internal._db_client import create_db_client
 from ..internal._wmill_adapter import log
@@ -65,29 +69,17 @@ async def _main_async(args: dict[str, object]) -> BookingSearchResult:
 
 
 def main(args: SearchInput | dict[str, object]) -> dict[str, object]:
-    import asyncio
-    import traceback
-    from typing import cast
-
-    from pydantic import BaseModel
-
     try:
         if isinstance(args, SearchInput):
             validated = args
         else:
             validated = SearchInput.model_validate(args)
 
-        result = asyncio.run(_main_async(validated.model_dump()))
-
-        #         if result is None:
-        #             return {}
+        result: Any = asyncio.run(_main_async(validated.model_dump()))
 
         if isinstance(result, BaseModel):
             return cast("dict[str, object]", result.model_dump())
-        if True:  # patched unnecessary isinstance
-            return cast("dict[str, object]", result)
-        else:
-            return {"data": result}
+        return cast("dict[str, object]", result)
 
     except Exception as e:
         tb = traceback.format_exc()

@@ -47,5 +47,5 @@ async def test_patient_bookings_list_success() -> None:
         result = cast("dict[str, Any]", await main(args))
 
         assert result["total"] == 1
-        # Result split into upcoming/past based on current time (mocking time would be better but let's assume now < May 2026)  # noqa: E501
+        # Result split into upcoming/past based on current time (mocking time would be better but let's assume now < May 2026)
         assert len(result["upcoming"]) + len(result["past"]) == 1

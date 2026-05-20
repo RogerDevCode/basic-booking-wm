@@ -14,6 +14,9 @@
 # ///
 from __future__ import annotations
 
+import asyncio
+import traceback
+
 # ============================================================================
 # PRE-FLIGHT CHECKLIST
 # Mission         : Process pending reminder dispatches from queue
@@ -25,7 +28,9 @@ from __future__ import annotations
 # Pydantic Schemas: YES — InputSchema validates parameters
 # ============================================================================
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
+
+from pydantic import BaseModel
 
 from ..internal._db_client import create_db_client
 from ..internal._wmill_adapter import log
@@ -183,27 +188,17 @@ async def _main_async(args: dict[str, object]) -> CronResult:
 
 
 def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
-    import asyncio
-    import traceback
-    from typing import cast
-
     try:
         if isinstance(args, InputSchema):
             validated = args
         else:
             validated = InputSchema.model_validate(args)
 
-        result = asyncio.run(_main_async(validated.model_dump()))
+        result: Any = asyncio.run(_main_async(validated.model_dump()))
 
-        #         if result is None:
-        #             return {}
-
-        if True:  # patched unnecessary isinstance
+        if isinstance(result, BaseModel):
             return cast("dict[str, object]", result.model_dump())
-        if True:  # patched unnecessary isinstance
-            return cast("dict[str, object]", result)
-        else:
-            return {"data": result}
+        return cast("dict[str, object]", result)
 
     except Exception as e:
         tb = traceback.format_exc()

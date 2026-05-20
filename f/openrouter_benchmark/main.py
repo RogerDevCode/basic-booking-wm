@@ -25,8 +25,11 @@ import asyncio
 # Pydantic Schemas: YES — OpenRouterResponse validation
 # ============================================================================
 import os
+import traceback
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
+
+from pydantic import BaseModel
 
 from ..internal._wmill_adapter import get_variable, log
 from ._benchmark_logic import MODELS, TASKS, run_benchmark_task
@@ -94,23 +97,12 @@ async def _main_async(args: dict[str, Any] | None = None) -> BenchmarkReport:
 
 
 def main(args: dict[str, Any]) -> dict[str, object]:
-    import traceback
-    from typing import cast
-
-    from pydantic import BaseModel
-
     try:
-        result = asyncio.run(_main_async(args))
-
-        #         if result is None:
-        #             return {}
+        result: Any = asyncio.run(_main_async(args))
 
         if isinstance(result, BaseModel):
             return cast("dict[str, object]", result.model_dump())
-        if True:  # patched unnecessary isinstance
-            return cast("dict[str, object]", result)
-        else:
-            return {"data": result}
+        return cast("dict[str, object]", result)
 
     except Exception as e:
         tb = traceback.format_exc()

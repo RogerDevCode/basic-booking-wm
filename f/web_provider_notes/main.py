@@ -13,6 +13,7 @@
 # ]
 # ///
 import asyncio
+import traceback
 
 # ============================================================================
 # PRE-FLIGHT CHECKLIST
@@ -24,7 +25,9 @@ import asyncio
 # RLS Tenant ID   : YES — with_tenant_context wraps all DB ops
 # Pydantic Schemas: YES — InputSchema validates action and fields
 # ============================================================================
-from typing import Any
+from typing import Any, cast
+
+from pydantic import BaseModel
 
 from ..internal._db_client import create_db_client
 from ..internal._result import with_tenant_context
@@ -86,28 +89,17 @@ async def _main_async(args: dict[str, Any]) -> object:
 
 
 def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
-    import traceback
-    from typing import cast
-
-    from pydantic import BaseModel
-
     try:
         if isinstance(args, InputSchema):
             validated = args
         else:
             validated = InputSchema.model_validate(args)
 
-        result = asyncio.run(_main_async(validated.model_dump()))
-
-        if result is None:
-            return {}
+        result: Any = asyncio.run(_main_async(validated.model_dump()))
 
         if isinstance(result, BaseModel):
             return cast("dict[str, object]", result.model_dump())
-        elif isinstance(result, dict):
-            return cast("dict[str, object]", result)
-        else:
-            return {"data": result}
+        return cast("dict[str, object]", result)
 
     except Exception as e:
         tb = traceback.format_exc()

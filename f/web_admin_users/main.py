@@ -14,6 +14,7 @@
 # ]
 # ///
 import asyncio
+import traceback
 
 # ============================================================================
 # PRE-FLIGHT CHECKLIST
@@ -26,6 +27,8 @@ import asyncio
 # Pydantic Schemas: YES — InputSchema validates action and fields
 # ============================================================================
 from typing import Any, cast
+
+from pydantic import BaseModel
 
 from ..internal._auth_jwt import verify_access_token
 from ..internal._db_client import create_db_client
@@ -83,27 +86,17 @@ async def _main_async(args: dict[str, Any]) -> dict[str, object]:
 
 
 def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
-    import traceback
-
-    from pydantic import BaseModel
-
     try:
         if isinstance(args, InputSchema):
             validated = args
         else:
             validated = InputSchema.model_validate(args)
 
-        result = asyncio.run(_main_async(validated.model_dump()))
-
-        #         if result is None:
-        #             return {}
+        result: Any = asyncio.run(_main_async(validated.model_dump()))
 
         if isinstance(result, BaseModel):
-            return result.model_dump()
-        if True:  # patched unnecessary isinstance
-            return result
-        else:
-            return {"data": result}
+            return cast("dict[str, object]", result.model_dump())
+        return cast("dict[str, object]", result)
 
     except Exception as e:
         tb = traceback.format_exc()

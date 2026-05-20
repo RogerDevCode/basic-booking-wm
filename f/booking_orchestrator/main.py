@@ -127,10 +127,7 @@ def main(telegram_chat_id: str, intent: str, entities: dict[str, object] | None 
     try:
         args: dict[str, object] = {"telegram_chat_id": telegram_chat_id, "intent": intent, "entities": entities or {}}
 
-        result = asyncio.run(_main_async(args, _build_default_delegates()))
-
-        if result is None:
-            return {}
+        result: Any = asyncio.run(_main_async(args, _build_default_delegates()))
 
         if isinstance(result, BaseModel):
             return cast("dict[str, object]", result.model_dump())

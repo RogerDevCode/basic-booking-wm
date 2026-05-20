@@ -14,6 +14,9 @@
 # ///
 from __future__ import annotations
 
+import asyncio
+import traceback
+
 # ============================================================================
 # PRE-FLIGHT CHECKLIST
 # Mission         : Auto-register user from Telegram webhook payload
@@ -24,7 +27,9 @@ from __future__ import annotations
 # RLS Tenant ID   : YES — with_admin_context bypasses RLS for user discovery
 # Pydantic Schemas: YES — InputSchema validates Telegram webhook structure
 # ============================================================================
-from typing import cast
+from typing import Any, cast
+
+from pydantic import BaseModel
 
 from ..internal._db_client import create_db_client
 from ..internal._result import with_admin_context
@@ -61,11 +66,6 @@ async def _main_async(args: dict[str, object], pg_url: str | None = None) -> dic
 
 
 def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
-    import asyncio
-    import traceback
-
-    from pydantic import BaseModel
-
     try:
         pg_url: str | None = None
         if isinstance(args, InputSchema):
@@ -77,17 +77,11 @@ def main(args: InputSchema | dict[str, object]) -> dict[str, object]:
             clean = {k: v for k, v in args.items() if k != "pg_url"}
             validated = InputSchema.model_validate(clean)
 
-        result = asyncio.run(_main_async(validated.model_dump(), pg_url=str(pg_url) if pg_url else None))
-
-        #         if result is None:
-        #             return {}
+        result: Any = asyncio.run(_main_async(validated.model_dump(), pg_url=str(pg_url) if pg_url else None))
 
         if isinstance(result, BaseModel):
-            return result.model_dump()
-        if True:  # patched unnecessary isinstance
-            return result
-        else:
-            return {"data": result}
+            return cast("dict[str, object]", result.model_dump())
+        return cast("dict[str, object]", result)
 
     except Exception as e:
         tb = traceback.format_exc()

@@ -14,6 +14,8 @@
 # ///
 from __future__ import annotations
 
+import asyncio
+import traceback
 from typing import Any, cast
 
 from ..internal._db_client import create_db_client
@@ -100,8 +102,6 @@ async def main_async(args: dict[str, Any]) -> dict[str, Any]:
 
 def main(args: InputSchema | dict[str, Any]) -> dict[str, Any]:
     """Windmill sync wrapper."""
-    import asyncio
-    import traceback
 
     try:
         if isinstance(args, InputSchema):
@@ -109,13 +109,9 @@ def main(args: InputSchema | dict[str, Any]) -> dict[str, Any]:
         else:
             validated = InputSchema.model_validate(args)
 
-        result = asyncio.run(main_async(validated.model_dump()))
+        result: Any = asyncio.run(main_async(validated.model_dump()))
 
-        #         if result is None:
-        #             return {}
-
-        return result
-
+        return cast("dict[str, Any]", result)
     except Exception as e:
         tb = traceback.format_exc()
         try:

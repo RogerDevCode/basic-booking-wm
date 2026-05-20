@@ -22,7 +22,7 @@ async def test_provider_agenda_success() -> None:
     et = datetime(2026, 5, 1, 10, 30, tzinfo=UTC)
 
     # get_provider_agenda solo hace UNA llamada a fetch para traer las reservas.
-    # El resto de validaciones (provider, etc) parecen no estar en la lógica actual de f/provider_agenda/_agenda_logic.py  # noqa: E501
+    # El resto de validaciones (provider, etc) parecen no estar en la lógica actual de f/provider_agenda/_agenda_logic.py
     booking_row = {
         "booking_id": "b1",
         "start_time": st,

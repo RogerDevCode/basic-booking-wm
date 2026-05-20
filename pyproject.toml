@@ -76,7 +76,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["ANN", "PERF", "PLE", "SIM117"]  # PLE: chaos tests need raw control chars; SIM117: nested patch() with blocks are intentional
+"tests/**" = ["ANN", "PERF", "PLE", "SIM117", "RUF001", "RUF003", "E501"]  # PLE: chaos tests need raw control chars; SIM117: nested patch() with blocks are intentional; RUF001/003: homoglyphs for threat scanning tests; E501: long test inputs
 "scripts/**" = ["ANN", "T20", "SIM", "PLW", "PERF"]
 "stubs/**" = ["ANN401"]               # **kwargs: Any is idiomatic in stub files
 "patch_auth.py" = ["ANN", "T20", "E501", "I"]

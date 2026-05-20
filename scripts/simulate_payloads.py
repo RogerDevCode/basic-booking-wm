@@ -6,7 +6,7 @@ from f.internal.fsm_router.main import _main_async as fsm_router_main
 from f.message_preprocessor.main import _preprocess
 
 
-async def simulate(text: str):
+async def simulate(text: str) -> None:
     print(f"\n{'=' * 60}\nPAYLOAD: '{text}'\n{'-' * 60}")
 
     # 1. Preprocessor
@@ -28,7 +28,9 @@ async def simulate(text: str):
         ai_res = await ai_agent_main(ai_args)
         ai_data = ai_res["data"]
         print(
-            f"[AI AGENT] intent: {ai_data.get('intent')} | conf: {ai_data.get('confidence'):.2f} | requires_fsm: {ai_data.get('requires_fsm_routing')}"
+            f"[AI AGENT] intent: {ai_data.get('intent')} | "
+            f"conf: {ai_data.get('confidence'):.2f} | "
+            f"requires_fsm: {ai_data.get('requires_fsm_routing')}"
         )
     except Exception as e:
         print(f"[AI AGENT ERROR] {e}")
@@ -74,7 +76,7 @@ async def simulate(text: str):
             print(f"[CONV ROUTER ERROR] {e}")
 
 
-async def main():
+async def main() -> None:
     payloads = [
         "quiero agendar una hora para mañana",
         "necesito cita medica",
