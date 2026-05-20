@@ -4,7 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
-from ..nlu._datetime_resolver import ResolverResult
+from ..nlu._datetime_resolver import ResolverResult  # noqa: TC001
 
 
 class SpellCorrection(BaseModel):

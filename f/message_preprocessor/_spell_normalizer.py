@@ -7,6 +7,7 @@ from typing import Final
 
 from symspellpy import SymSpell, Verbosity  # type: ignore[import-untyped]
 
+from ..internal._wmill_adapter import log
 from ._preprocessor_models import SpellCorrection
 
 # Words loaded into the Spanish checker to prevent false corrections.
@@ -133,8 +134,6 @@ _TITLES: Final[frozenset[str]] = frozenset(
 # Module-level singleton — lazy-initialised on first call to avoid side-effects at import.
 _sym_spell: SymSpell | None = None
 
-
-from ..internal._wmill_adapter import log
 
 MODULE: Final[str] = "spell_normalizer"
 
