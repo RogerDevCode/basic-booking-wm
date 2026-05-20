@@ -151,9 +151,21 @@ class TestAIAgentLogic:
         # Assert
         assert result is False
 
-    def test_compute_requires_fsm_routing_mid_fsm_always_true(self) -> None:
-        # Act — non-FSM intent but mid-flow must never leave the FSM
-        result = compute_requires_fsm_routing(str(INTENT["SALUDO"]), "selecting_doctor")
+    def test_compute_requires_fsm_routing_mid_fsm_low_conf_true(self) -> None:
+        # Act — interrupt intent but low confidence → must stay in FSM
+        result = compute_requires_fsm_routing(str(INTENT["SALUDO"]), "selecting_doctor", confidence=0.5)
+        # Assert
+        assert result is True
+
+    def test_compute_requires_fsm_routing_mid_fsm_interrupt_high_conf_false(self) -> None:
+        # Act — interrupt intent with high confidence → allows conversational router
+        result = compute_requires_fsm_routing(str(INTENT["SALUDO"]), "selecting_doctor", confidence=0.95)
+        # Assert
+        assert result is False
+
+    def test_compute_requires_fsm_routing_mid_fsm_non_interrupt_true(self) -> None:
+        # Act — non-interrupt intent mid-flow → must stay in FSM
+        result = compute_requires_fsm_routing(str(INTENT["CREAR_CITA"]), "selecting_doctor", confidence=0.9)
         # Assert
         assert result is True
 

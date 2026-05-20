@@ -76,11 +76,32 @@ async def test_crear_cita_from_idle_requires_fsm() -> None:
 
 
 @pytest.mark.asyncio
-async def test_mid_fsm_always_requires_fsm() -> None:
-    """INVARIANTE 2: FSM en curso → requires_fsm_routing = True siempre."""
+async def test_mid_fsm_interrupt_intent_allows_conversational() -> None:
+    """INVARIANT 2: FSM en curso + interrupt intent (alta confianza) → requires_fsm_routing = False."""
     args: dict[str, Any] = {
         "chat_id": "1",
         "text": "hola",
+        "conversation_state": {
+            "active_flow": "none",
+            "flow_step": 0,
+            "pending_data": {},
+            "booking_state_name": "selecting_doctor",
+        },
+    }
+    res = await main(args)
+    assert res["success"] is True
+    data = cast("dict[str, Any]", res["data"])
+    # "hola" → saludo (0.95 fast-path) → interrupt intent → allows conversational router
+    assert data["requires_fsm_routing"] is False
+    assert data["intent"] == INTENT["SALUDO"]
+
+
+@pytest.mark.asyncio
+async def test_mid_fsm_non_interrupt_requires_fsm() -> None:
+    """INVARIANT 2b: FSM en curso + non-interrupt intent → requires_fsm_routing = True."""
+    args: dict[str, Any] = {
+        "chat_id": "1",
+        "text": "quiero una cita",
         "conversation_state": {
             "active_flow": "none",
             "flow_step": 0,

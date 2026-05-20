@@ -9,15 +9,12 @@
 from __future__ import annotations
 
 import asyncio
+import os
 
-from f.internal._db_client import create_db_client
+from f.internal._db_client import _resolve_db_url, create_db_client
 
 
 async def _main() -> None:
-    import os
-
-    from f.internal._db_client import _resolve_db_url
-
     print(f"DATABASE_URL env: {os.getenv('DATABASE_URL')!r}")
     print(f"Resolved DB URL: {_resolve_db_url()!r}")
     conn = await create_db_client()

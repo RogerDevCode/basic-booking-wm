@@ -25,10 +25,27 @@ class TestAIAgentRouting:
         assert res["data"]["requires_fsm_routing"] is True
 
     @pytest.mark.asyncio
-    async def test_mid_fsm_always_requires_fsm(self) -> None:
+    async def test_mid_fsm_interrupt_intent_allows_conversational(self) -> None:
         args: dict[str, object] = {
             "chat_id": "1",
             "text": "hola",
+            "conversation_state": {
+                "active_flow": "none",
+                "flow_step": 0,
+                "pending_data": {},
+                "booking_state_name": "selecting_doctor",
+            },
+        }
+        res = await main(args)
+        # "hola" → saludo (0.95 fast-path) → interrupt intent → allows conversational router
+        assert res["data"]["requires_fsm_routing"] is False
+        assert res["data"]["intent"] == "saludo"
+
+    @pytest.mark.asyncio
+    async def test_mid_fsm_non_interrupt_requires_fsm(self) -> None:
+        args: dict[str, object] = {
+            "chat_id": "1",
+            "text": "quiero una cita",
             "conversation_state": {
                 "active_flow": "none",
                 "flow_step": 0,

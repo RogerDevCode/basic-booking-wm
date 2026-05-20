@@ -93,7 +93,7 @@ value:
           conversation_state:
             type: javascript
             expr: >-
-              { "active_flow": "none",
+              { "active_flow": results.get_conversation_state.data?.active_flow || "none",
                 "flow_step": 0,
                 "pending_data": {},
                 "booking_state_name": results.get_conversation_state.data?.booking_state?.name || "idle" }

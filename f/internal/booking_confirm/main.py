@@ -103,6 +103,11 @@ async def _insert_dlq(
     error: Exception,
 ) -> None:
     try:
+        try:
+            parsed_start = datetime.fromisoformat(start_time.replace("Z", "+00:00"))
+        except ValueError:
+            parsed_start = datetime.now()
+
         await conn.execute(
             """
             INSERT INTO booking_dlq (
@@ -113,7 +118,7 @@ async def _insert_dlq(
             provider_id,
             service_id,
             chat_id,
-            start_time,
+            parsed_start,
             idempotency_key,
             json.dumps(
                 {"client_id": client_id, "provider_id": provider_id, "start_time": start_time, "chat_id": chat_id}

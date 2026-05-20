@@ -19,6 +19,7 @@ class ConversationState(BaseModel):
         "reminder_flow",
         "selecting_specialty",
         "selecting_datetime",
+        "booking",
         "none",
     ] = "none"
     flow_step: int = Field(default=0, ge=0)

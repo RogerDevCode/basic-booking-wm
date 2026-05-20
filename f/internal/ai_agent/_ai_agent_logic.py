@@ -32,16 +32,44 @@ _FSM_ACTIVE_STATES: frozenset[str] = frozenset(
         "reg_entering_name",
         "reg_collecting_phone",
         "reg_collecting_email",
-        # reminders_config is handled by fsm_router delegating to _router_reminders.py.
-        # We keep it here to ensure that free-text inputs while in this state
-        # are routed through the FSM protector.
         "reminders_config",
     }
 )
 
+# Intents that should interrupt an active flow (high-confidence only)
+_FLOW_INTERRUPT_INTENTS: frozenset[str] = frozenset(
+    {
+        "cancelar_cita",
+        "saludo",
+        "despedida",
+        "agradecimiento",
+        "mostrar_menu_principal",
+        "ver_mis_citas",
+        "ver_mis_datos",
+        "activar_recordatorios",
+        "pregunta_general",
+        "urgencia",
+    }
+)
 
-def compute_requires_fsm_routing(intent: str, booking_state_name: str) -> bool:
-    """Returns True if this message must go through the FSM router."""
+_FLOW_INTERRUPT_THRESHOLD: float = 0.8
+
+
+def compute_requires_fsm_routing(intent: str, booking_state_name: str, confidence: float = 0.0) -> bool:
+    """Returns True if this message must go through the FSM router.
+
+    When the user is mid-flow but the AI detects a high-confidence interrupt
+    intent (e.g., "quiero cancelar" while selecting a doctor), we allow the
+    conversational router to handle it instead of forcing FSM routing.
+    """
+    # Interrupt check: high-confidence non-booking intent during active flow
+    if (
+        booking_state_name in _FSM_ACTIVE_STATES
+        and intent in _FLOW_INTERRUPT_INTENTS
+        and confidence >= _FLOW_INTERRUPT_THRESHOLD
+    ):
+        return False
+
     if booking_state_name in _FSM_ACTIVE_STATES:
         return True
     return intent in _FSM_INTENTS and booking_state_name == "idle"

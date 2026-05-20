@@ -47,6 +47,23 @@ from .handlers._registration_handler import REG_STATES
 
 MODULE: Final[str] = "fsm_router"
 
+# Intents that can interrupt an active FSM flow (safety net in fsm_router)
+_FSM_INTERRUPT_INTENTS: frozenset[str] = frozenset(
+    {
+        "cancelar_cita",
+        "saludo",
+        "despedida",
+        "agradecimiento",
+        "mostrar_menu_principal",
+        "ver_mis_citas",
+        "ver_mis_datos",
+        "activar_recordatorios",
+        "pregunta_general",
+        "urgencia",
+    }
+)
+_FSM_INTERRUPT_THRESHOLD: float = 0.7
+
 
 async def _has_active_booking_for_provider(client_id: str, provider_id: str, pg_url: str) -> bool:
     """Wrapper around prefetch's _has_active_booking_for_provider with own DB conn."""
@@ -469,6 +486,55 @@ async def _route(input_data: RouterInput) -> RouterResult:
         return await handle_reminders_config(input_data, current_state_raw)
 
     await ensure_nlu_cache()
+
+    # Flow-interrupt safety net: if AI detected a clear non-booking intent,
+    # handle it here instead of forcing through FSM transitions.
+    # This catches cases where confidence is below the routing threshold
+    # but the intent is still unambiguous.
+    ai_intent = input_data.ai_intent or ""
+    ai_conf = input_data.ai_confidence or 0.0
+    if current_state_name != "idle" and ai_intent in _FSM_INTERRUPT_INTENTS and ai_conf >= _FSM_INTERRUPT_THRESHOLD:
+        if ai_intent == "cancelar_cita":
+            return RouterResult(
+                handled=True,
+                nextState={"name": "idle"},
+                response_text="He cancelado la reserva en curso.\n\n" + get_main_menu_text(),
+            )
+        if ai_intent == "mostrar_menu_principal":
+            return RouterResult(
+                handled=True,
+                nextState={"name": "idle"},
+                response_text=get_main_menu_text(),
+            )
+        if ai_intent == "ver_mis_citas":
+            return await _handle_mis_citas(input_data, current_state_raw)
+        if ai_intent in ("saludo", "despedida", "agradecimiento"):
+            return RouterResult(
+                handled=True,
+                nextState=current_state_raw,
+                response_text=(
+                    "Entendido. Cuando quieras continuar con tu reserva, "
+                    "responde con la opción que necesitas.\n\n" + get_main_menu_text()
+                ),
+            )
+        if ai_intent in ("ver_mis_datos", "activar_recordatorios", "pregunta_general"):
+            return RouterResult(
+                handled=True,
+                nextState=current_state_raw,
+                response_text=(
+                    f"He registrado tu consulta ({ai_intent}). "
+                    "Para continuar con tu reserva, selecciona una opción del menú.\n\n" + get_main_menu_text()
+                ),
+            )
+        if ai_intent == "urgencia":
+            return RouterResult(
+                handled=True,
+                nextState={"name": "idle"},
+                response_text=(
+                    "⚠️ He detectado una situación urgente. "
+                    "Tu reserva en curso se ha pausado.\n\n" + get_main_menu_text()
+                ),
+            )
 
     try:
         # Handle booking intent from idle — translate to keyword-based FSM

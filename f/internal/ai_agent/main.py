@@ -179,8 +179,8 @@ async def _main_async(args: dict[str, Any]) -> dict[str, Any]:
 
     verified = verify_urgency(result, text)
 
-    # Compute requires_fsm_routing based on intent and booking state
-    requires_fsm = compute_requires_fsm_routing(verified.intent, booking_state_name)
+    # Compute requires_fsm_routing based on intent, booking state, and confidence
+    requires_fsm = compute_requires_fsm_routing(verified.intent, booking_state_name, confidence)
 
     final_result = IntentResult.model_validate({**verified.model_dump(), "requires_fsm_routing": requires_fsm})
 
