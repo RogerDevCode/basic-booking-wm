@@ -491,7 +491,7 @@
 - 📦 `class` `IntentsStruct` (L28)
 
 ### `f/internal/ai_agent/_gadk_agent.py`
-- ⚡ `async_fn` `classify_with_gadk` (L102)
+- ⚡ `async_fn` `classify_with_gadk` (L104)
 
 ### `f/internal/ai_agent/_guardrails.py`
 - 📦 `class` `GuardrailPass` (L9)
@@ -572,7 +572,7 @@
 - 🔧 `fn` `build_confirmation_keyboard` (L88)
 
 ### `f/internal/booking_prefetch/main.py`
-- 🔧 `fn` `main` (L267)
+- 🔧 `fn` `main` (L276)
 
 ### `f/internal/client_register/main.py`
 - 🔧 `fn` `main` (L73)
@@ -1405,6 +1405,7 @@
 - `f/internal/ai_agent/_ai_agent_logic.script.yaml`
 - `f/internal/ai_agent/_ai_agent_models.script.yaml`
 - `f/internal/ai_agent/_constants.script.yaml`
+- `f/internal/ai_agent/_gadk_agent.script.yaml`
 - `f/internal/ai_agent/_guardrails.script.yaml`
 - `f/internal/ai_agent/_llm_client.script.yaml`
 - `f/internal/ai_agent/_prompt_builder.script.yaml`
