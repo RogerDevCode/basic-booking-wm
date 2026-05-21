@@ -136,3 +136,11 @@ NORMALIZATION_MAP: Final[dict[str, str]] = {
 }
 PROFANITY_TO_IGNORE: Final[list[str]] = []
 OFF_TOPIC_PATTERNS: Final[list[str]] = []
+
+# ============================================================================
+# GADK MODEL CONFIGURATION — Single Source of Truth
+# ============================================================================
+
+GADK_MODEL: Final[str] = "openrouter/nvidia/nemotron-3-super-120b-a12b:free"
+GADK_MODEL_DISPLAY: Final[str] = "nemotron-3-super-120b:free"
+GADK_APP_NAME: Final[str] = "booking_classifier"
