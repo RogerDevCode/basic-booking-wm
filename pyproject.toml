@@ -16,7 +16,7 @@ dependencies = [
     "typing-extensions>=4.15.0",
     "wmill>=1.693.3",
     "symspellpy>=6.9.0",
-    "google-adk>=2.0.0",
+    "google-adk[extensions]>=2.0.0",
     "sqlalchemy>=2.0.25",
 ]
 
