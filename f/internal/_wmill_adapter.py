@@ -49,7 +49,11 @@ def get_variable(path: str) -> str | None:
         val = wmill.get_variable(path)
         if val is None:
             return None
-        return str(val)
+        # Guard against MagicMock in non-Windmill environments
+        val_str = str(val)
+        if "MagicMock" in val_str or "<MagicMock" in val_str:
+            return None
+        return val_str
     except Exception as e:
         _init_logging().warning("get_variable failed for %s: %s", path, e)
         return None

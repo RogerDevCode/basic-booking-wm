@@ -54,7 +54,7 @@
     }
   },
   "ui": {
-    "theme": "ansi dark",
+    "theme": "ANSI Dark",
     "hideBanner": false,
     "hideTips": false,
     "footer": {

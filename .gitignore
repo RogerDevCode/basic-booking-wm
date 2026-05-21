@@ -204,6 +204,9 @@ test-results/
 playwright-report/
 playwright/.cache/
 
+# Integration tests with live credentials (NEVER COMMIT)
+tests/py/google_ai_studio/
+
 # =============================================================================
 # WINDMILL-SPECIFIC
 # =============================================================================

@@ -44,6 +44,9 @@ class AIAgentInput(BaseModel):
     provider_id: str | None = None
     conversation_state: ConversationState | None = None
     user_profile: UserProfile | None = None
+    pg_url: str | None = None
+    groq_api_key: str | None = None
+    openrouter_api_key: str | None = None
 
 
 # ── Entities

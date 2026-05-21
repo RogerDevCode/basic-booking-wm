@@ -70,6 +70,7 @@ class SelectingSpecialtyState(BaseModel):
     name: Literal["selecting_specialty"] = "selecting_specialty"
     error: str | None = None
     items: list[NamedItem] = Field(default_factory=list[NamedItem])
+    invalid_attempts: int = 0
 
 
 class SelectingDoctorState(BaseModel):
@@ -78,6 +79,7 @@ class SelectingDoctorState(BaseModel):
     specialtyName: str
     error: str | None = None
     items: list[NamedItem] = Field(default_factory=list[NamedItem])
+    invalid_attempts: int = 0
 
 
 class SelectingTimeState(BaseModel):
@@ -88,6 +90,7 @@ class SelectingTimeState(BaseModel):
     targetDate: str | None = None
     error: str | None = None
     items: list[TimeSlotItem] = Field(default_factory=list[TimeSlotItem])
+    invalid_attempts: int = 0
 
 
 class ConfirmingState(BaseModel):

@@ -43,7 +43,7 @@ async def test_handle_reminders_config_show_returns_reminders_state(mock_run: As
     result = await handle_reminders_config(input_data, {"name": "idle"})
 
     assert isinstance(result, RouterResult)
-    assert result.nextState == {"name": "reminders_config", "client_id": "c1"}
+    assert result.nextState == {"name": "reminders_config", "client_id": "c1", "invalid_attempts": 0}
     assert result.inline_buttons is not None
 
 

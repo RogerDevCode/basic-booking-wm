@@ -9,10 +9,11 @@ class RAGResult(TypedDict):
     hasProviderSpecific: bool
 
 
-async def build_rag_context(provider_id: str | None, text: str, limit: int = 3) -> RAGResult:
+async def build_rag_context(provider_id: str | None, text: str, limit: int = 3, pg_url: str | None = None) -> RAGResult:
     # 1. Fetch relevant FAQs from knowledge_base
-    # (Semantic search simplified to keyword search for now as in TS)
-    conn = await create_db_client()
+    # Ensure pg_url is a non-empty string before passing to create_db_client
+    clean_pg_url = pg_url if pg_url and str(pg_url).strip() else None
+    conn = await create_db_client(clean_pg_url)
     try:
         # Search in public docs OR provider specific docs
         # This uses simple text search for compatibility with the TS version

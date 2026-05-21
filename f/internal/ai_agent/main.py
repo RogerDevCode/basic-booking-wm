@@ -10,7 +10,8 @@
 #   "returns>=0.24.0",
 #   "redis>=7.4.0",
 #   "typing-extensions>=4.12.0",
-#   "google-adk>=2.0.0"
+#   "google-adk[extensions]>=2.0.0",
+#   "litellm>=1.71.2"
 # ]
 # ///
 from __future__ import annotations
@@ -18,6 +19,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import json
+import os
 import time
 import traceback
 from typing import Any, Final, Literal, cast
@@ -54,6 +56,19 @@ async def _main_async(args: dict[str, Any]) -> dict[str, Any]:
 
     # 0. Load rules into memory cache
     await ensure_nlu_cache()
+
+    # 0b. Resolve DB URL from args or Windmill variables
+    pg_url_raw = args.get("pg_url")
+    pg_url = pg_url_raw if pg_url_raw and str(pg_url_raw).strip() else os.getenv("DATABASE_URL")
+
+    # 0c. Inject API keys from flow args into env vars for LLM client
+    groq_api_key = args.get("groq_api_key")
+    if groq_api_key and str(groq_api_key).strip():
+        os.environ["GROQ_API_KEY"] = str(groq_api_key)
+
+    openrouter_api_key = args.get("openrouter_api_key")
+    if openrouter_api_key and str(openrouter_api_key).strip():
+        os.environ["OPENROUTER_API_KEY"] = str(openrouter_api_key)
 
     # 1. Validate Input
     input_data = AIAgentInput.model_validate(args)
@@ -115,7 +130,9 @@ async def _main_async(args: dict[str, Any]) -> dict[str, Any]:
             tfidf_confident = confidence >= 0.9
             if not tfidf_confident and intent in [INTENT["PREGUNTA_GENERAL"], INTENT["DESCONOCIDO"]]:
                 try:
-                    rag_res = await build_rag_context(input_data.provider_id, text)
+                    rag_res = await build_rag_context(
+                        input_data.provider_id, text, pg_url=str(pg_url) if pg_url else None
+                    )
                     rag_context = rag_res["context"]
                 except Exception as e:
                     log("RAG_CONTEXT_FAILED", error=str(e), chat_id=input_data.chat_id, module=MODULE)
@@ -200,13 +217,22 @@ async def _main_async(args: dict[str, Any]) -> dict[str, Any]:
 
 
 def main(
-    chat_id: str, text: str, provider_id: str | None = None, conversation_state: dict[str, Any] | None = None
+    chat_id: str,
+    text: str,
+    provider_id: str | None = None,
+    conversation_state: dict[str, Any] | None = None,
+    pg_url: str | None = None,
+    groq_api_key: str | None = None,
+    openrouter_api_key: str | None = None,
 ) -> dict[str, object]:
     args: dict[str, Any] = {
         "chat_id": chat_id,
         "text": text,
         "provider_id": provider_id,
         "conversation_state": conversation_state,
+        "pg_url": pg_url,
+        "groq_api_key": groq_api_key,
+        "openrouter_api_key": openrouter_api_key,
     }
 
     try:

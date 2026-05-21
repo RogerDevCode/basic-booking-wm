@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import time
 from typing import Any, Final, Literal, TypedDict, cast
 
@@ -40,29 +41,37 @@ class LLMResponse(BaseModel):
 
 async def call_llm(system_prompt: str, user_message: str) -> tuple[Exception | None, LLMResponse | None]:
     # ─── Configuration ──────────────
-    order_str = get_variable("LLM_PROVIDER_ORDER") or "openai,groq,openrouter"
+    order_str = (
+        get_variable("u/admin/LLM_PROVIDER_ORDER")
+        or os.getenv("LLM_PROVIDER_ORDER")
+        or "groq,openai,openrouter"
+    )
     provider_order = [s.strip().lower() for s in order_str.split(",")]
 
     providers: Final[dict[str, ProviderConfig]] = {
         "groq": {
             "name": "groq",
             "url": "https://api.groq.com/openai/v1/chat/completions",
-            "key": get_variable("GROQ_API_KEY"),
-            "model": get_variable("GROQ_MODEL") or "llama-3.3-70b-versatile",
+            "key": get_variable("u/admin/GROQ_API_KEY") or os.getenv("GROQ_API_KEY"),
+            "model": get_variable("u/admin/GROQ_MODEL") or os.getenv("GROQ_MODEL") or "llama-3.3-70b-versatile",
             "structured": False,
         },
         "openai": {
             "name": "openai",
             "url": "https://api.openai.com/v1/chat/completions",
-            "key": get_variable("OPENAI_API_KEY"),
-            "model": get_variable("OPENAI_MODEL") or "gpt-4o-mini",
+            "key": get_variable("u/admin/OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY"),
+            "model": get_variable("u/admin/OPENAI_MODEL") or os.getenv("OPENAI_MODEL") or "gpt-4o-mini",
             "structured": True,
         },
         "openrouter": {
             "name": "openrouter",
             "url": "https://openrouter.ai/api/v1/chat/completions",
-            "key": get_variable("OPENROUTER_API_KEY"),
-            "model": get_variable("OPENROUTER_MODEL") or "openrouter/auto:free",
+            "key": get_variable("u/admin/OPENROUTER_API_KEY") or os.getenv("OPENROUTER_API_KEY"),
+            "model": (
+                get_variable("u/admin/OPENROUTER_MODEL")
+                or os.getenv("OPENROUTER_MODEL")
+                or "openrouter/auto:free"
+            ),
             "structured": False,
         },
     }

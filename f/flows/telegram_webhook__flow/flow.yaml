@@ -97,6 +97,15 @@ value:
                 "flow_step": 0,
                 "pending_data": {},
                 "booking_state_name": results.get_conversation_state.data?.booking_state?.name || "idle" }
+          groq_api_key:
+            type: javascript
+            expr: variable("u/admin/GROQ_API_KEY")
+          openrouter_api_key:
+            type: javascript
+            expr: variable("u/admin/OPENROUTER_API_KEY")
+          pg_url:
+            type: javascript
+            expr: variable("u/admin/DATABASE_URL")
           provider_id:
             type: javascript
             expr: 'null'

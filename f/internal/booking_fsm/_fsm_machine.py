@@ -144,8 +144,18 @@ def apply_transition(
                     specialty = specialty_items[idx]
 
             if not specialty:
+                attempts = current_state.invalid_attempts + 1
+                if attempts >= 3:
+                    return TransitionOutcome(
+                        nextState=IdleState(),
+                        responseText="❌ Demasiados intentos inválidos. Volviendo al menú principal.\n\n"
+                        + get_main_menu_text(),
+                        advance=False,
+                    )
                 return TransitionOutcome(
-                    nextState=SelectingSpecialtyState(items=specialty_items, error="Opción inválida."),
+                    nextState=SelectingSpecialtyState(
+                        items=specialty_items, error="Opción inválida.", invalid_attempts=attempts
+                    ),
                     responseText=build_specialty_prompt(specialty_items, "⚠️ Opción inválida."),
                     advance=False,
                 )
@@ -191,12 +201,21 @@ def apply_transition(
                     doctor = doctor_items[idx]
 
             if not doctor:
+                attempts = current_state.invalid_attempts + 1
+                if attempts >= 3:
+                    return TransitionOutcome(
+                        nextState=IdleState(),
+                        responseText="❌ Demasiados intentos inválidos. Volviendo al menú principal.\n\n"
+                        + get_main_menu_text(),
+                        advance=False,
+                    )
                 return TransitionOutcome(
                     nextState=SelectingDoctorState(
                         specialtyId=current_state.specialtyId,
                         specialtyName=current_state.specialtyName,
                         items=doctor_items,
                         error="Opción inválida.",
+                        invalid_attempts=attempts,
                     ),
                     responseText=build_doctors_prompt(current_state.specialtyName, doctor_items, "⚠️ Opción inválida."),
                     advance=False,
@@ -268,6 +287,14 @@ def apply_transition(
                     slot = time_items[idx]
 
             if not slot:
+                attempts = current_state.invalid_attempts + 1
+                if attempts >= 3:
+                    return TransitionOutcome(
+                        nextState=IdleState(),
+                        responseText="❌ Demasiados intentos inválidos. Volviendo al menú principal.\n\n"
+                        + get_main_menu_text(),
+                        advance=False,
+                    )
                 return TransitionOutcome(
                     nextState=SelectingTimeState(
                         specialtyId=current_state.specialtyId,
@@ -276,6 +303,7 @@ def apply_transition(
                         targetDate=current_state.targetDate,
                         items=time_items,
                         error="Opción inválida.",
+                        invalid_attempts=attempts,
                     ),
                     responseText=build_slots_prompt(current_state.doctorName, time_items, "⚠️ Opción inválida."),
                     advance=False,

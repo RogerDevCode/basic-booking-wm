@@ -50,7 +50,7 @@ def _split_asyncpg_connect_options(db_url: str) -> tuple[str, dict[str, _Asyncpg
 
 def _resolve_db_url() -> str | None:
     local_url = os.getenv("DATABASE_URL")
-    if local_url:
+    if local_url and local_url.strip():
         return local_url
 
     paths = [
@@ -61,7 +61,7 @@ def _resolve_db_url() -> str | None:
     ]
     for path in paths:
         res = get_variable(path)
-        if res is not None:
+        if res is not None and res.strip():
             return res
 
     return None
@@ -89,6 +89,9 @@ async def _get_pool(db_url: str, connect_kwargs: dict[str, _AsyncpgOptionValue])
 
 
 async def create_db_client(db_url: str | None = None) -> DBClient:
+    # Handle empty strings as None
+    if db_url is not None and not db_url.strip():
+        db_url = None
     db_url = db_url or _resolve_db_url()
     if not db_url:
         raise RuntimeError(

@@ -1,13 +1,25 @@
+# /// script
+# requires-python = ">=3.13"
+# dependencies = [
+#   "google-adk[extensions]>=2.0.0",
+#   "google-genai>=1.75.0",
+#   "litellm>=1.71.2",
+# ]
+# ///
 from __future__ import annotations
 
 import json
 import os
+import time
+import traceback
 from typing import Any, Final
 
 from google.adk import Agent, Runner
+from google.adk.models.lite_llm import LiteLlm
 from google.adk.sessions import InMemorySessionService
 from google.genai import types
 
+from .._wmill_adapter import log
 from ._constants import INTENT
 
 MODULE: Final[str] = "gadk_agent"
@@ -79,9 +91,13 @@ _runner_cache: Runner | None = None
 def _get_agent() -> Agent:
     global _agent_cache
     if _agent_cache is None:
+        openrouter_key = os.getenv("OPENROUTER_API_KEY")
         _agent_cache = Agent(
-            name="booking_classifier",
-            model="gemini-2.5-flash-lite",
+            name=f"booking_classifier_{int(time.time())}",
+            model=LiteLlm(
+                model="openrouter/nvidia/nemotron-3-super-120b-a12b:free",
+                api_key=openrouter_key,
+            ),
             instruction=_INSTRUCTION,
             tools=[_clasificar_intent],
         )
@@ -102,15 +118,16 @@ def _get_runner() -> Runner:
 
 
 async def classify_with_gadk(text: str, chat_id: str) -> dict[str, Any] | None:
-    """Clasifica intencion usando Google ADK.
+    """Clasifica intencion usando Google ADK + LiteLlm + OpenRouter (Nemotron 3 Super).
 
     Returns dict with intent, confidence, entities or None if failed.
     """
-    api_key = os.getenv("GOOGLE_API_KEY")
+    api_key = os.getenv("OPENROUTER_API_KEY")
     if not api_key:
+        log("GADK_NO_OPENROUTER_KEY", module=MODULE)
         return None
 
-    os.environ["GOOGLE_API_KEY"] = api_key
+    log(f"GADK_START | model=nemotron-3-super-120b:free | text={text[:50]}", module=MODULE)
 
     runner = _get_runner()
     content = types.Content(role="user", parts=[types.Part(text=text)])
@@ -131,9 +148,35 @@ async def classify_with_gadk(text: str, chat_id: str) -> dict[str, Any] | None:
                                 "confidence": float(result.get("confianza", 0.0)),
                                 "entities": result.get("entidades", {}),
                             }
-                        except (json.JSONDecodeError, ValueError):
+                        except (json.JSONDecodeError, ValueError) as e:
+                            log(f"GADK_JSON_ERROR | error={e}", module=MODULE)
                             return None
-    except Exception:
+                    if hasattr(part, "function_call") and part.function_call:
+                        fc = part.function_call
+                        try:
+                            raw_args = fc.args if fc.args else "{}"
+                            args: dict[str, Any] = (
+                                json.loads(raw_args) if isinstance(raw_args, str) else (raw_args or {})
+                            )
+                            return {
+                                "intent": args.get("intent", INTENT["DESCONOCIDO"]),
+                                "confidence": float(args.get("confianza", 0.0)),
+                                "entities": {
+                                    "especialidad": args.get("especialidad"),
+                                    "fecha": args.get("fecha"),
+                                    "hora": args.get("hora"),
+                                    "doctor": args.get("doctor"),
+                                    "booking_id": args.get("booking_id"),
+                                    "pregunta": args.get("pregunta"),
+                                    "es_urgente": args.get("es_urgente", False),
+                                },
+                            }
+                        except (json.JSONDecodeError, ValueError, TypeError) as e:
+                            log(f"GADK_TOOL_ARGS_ERROR | error={e}", module=MODULE)
+                            return None
+    except Exception as e:
+        tb = traceback.format_exc()
+        log(f"GADK_EXCEPTION | error={e} | traceback={tb}", module=MODULE)
         return None
 
     return None

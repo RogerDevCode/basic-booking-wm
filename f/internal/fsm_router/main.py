@@ -631,24 +631,25 @@ async def _route_impl(input_data: RouterInput) -> RouterResult:
     except Exception as e:
         log("ROUTER_INTERNAL_ERROR", error=str(e), chat_id=input_data.chat_id, module=MODULE)
         raise RuntimeError(f"Router internal error: {e}") from e
+
+
 @beartype
 async def _route(input_data: RouterInput) -> RouterResult:
-    result = await _route_impl(input_data)
-    if result.handled:
+    result: RouterResult = await _route_impl(input_data)
+    if result.handled and result.active_flow is None:
         # Only set active_flow if not already explicitly set by the handler
-        if result.active_flow is None:
-            next_state_name = "idle"
-            if result.nextState:
-                next_state_name = str(result.nextState.get("name", "idle"))
-            else:
-                state_dict = input_data.state or {}
-                current_state_raw = cast("dict[str, object]", state_dict.get("booking_state") or {"name": "idle"})
-                next_state_name = str(current_state_raw.get("name", "idle"))
+        next_state_name = "idle"
+        if result.nextState:
+            next_state_name = str(result.nextState.get("name", "idle"))
+        else:
+            state_dict = input_data.state or {}
+            current_state_raw = cast("dict[str, object]", state_dict.get("booking_state") or {"name": "idle"})
+            next_state_name = str(current_state_raw.get("name", "idle"))
 
-            if next_state_name != "idle" and next_state_name != "reminders_config":
-                result.active_flow = "booking"
-            elif next_state_name == "idle":
-                result.active_flow = None
+        if next_state_name != "idle" and next_state_name != "reminders_config":
+            result.active_flow = "booking"
+        elif next_state_name == "idle":
+            result.active_flow = None
     return result
 
 
