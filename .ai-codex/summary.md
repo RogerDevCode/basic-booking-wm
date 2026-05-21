@@ -433,12 +433,12 @@
 - ⚡ `async_fn` `execute` (L21)
 - ⚡ `async_fn` `close` (L22)
 - ⚡ `async_fn` `create_db_client` (L91)
-- 📦 `class` `AsyncpgPoolWrapper` (L104)
-- ⚡ `async_fn` `fetch` (L109)
-- ⚡ `async_fn` `fetchrow` (L113)
-- ⚡ `async_fn` `fetchval` (L117)
-- ⚡ `async_fn` `execute` (L120)
-- ⚡ `async_fn` `close` (L123)
+- 📦 `class` `AsyncpgPoolWrapper` (L107)
+- ⚡ `async_fn` `fetch` (L112)
+- ⚡ `async_fn` `fetchrow` (L116)
+- ⚡ `async_fn` `fetchval` (L120)
+- ⚡ `async_fn` `execute` (L123)
+- ⚡ `async_fn` `close` (L126)
 
 ### `f/internal/_db_models.py`
 - 📦 `class` `ProviderORM` (L19)
@@ -482,9 +482,9 @@
 - 🔧 `fn` `get_variable_strict` (L30)
 - 🔧 `fn` `get_resource_strict` (L38)
 - 🔧 `fn` `get_variable` (L46)
-- 🔧 `fn` `get_resource` (L58)
-- 🔧 `fn` `run_script` (L70)
-- 🔧 `fn` `log` (L100)
+- 🔧 `fn` `get_resource` (L62)
+- 🔧 `fn` `run_script` (L74)
+- 🔧 `fn` `log` (L104)
 
 ### `f/internal/ai_agent/_ai_agent_logic.py`
 - 🔧 `fn` `compute_requires_fsm_routing` (L58)
@@ -500,18 +500,18 @@
 - 📦 `class` `ConversationState` (L11)
 - 📦 `class` `UserProfile` (L32)
 - 📦 `class` `AIAgentInput` (L39)
-- 📦 `class` `EntityMap` (L50)
-- 📦 `class` `AvailabilityContext` (L65)
-- 📦 `class` `ContextAdjustment` (L77)
-- 📦 `class` `IntentResult` (L96)
-- 📦 `class` `LLMOutputEntities` (L118)
-- 📦 `class` `LLMOutput` (L126)
+- 📦 `class` `EntityMap` (L53)
+- 📦 `class` `AvailabilityContext` (L68)
+- 📦 `class` `ContextAdjustment` (L80)
+- 📦 `class` `IntentResult` (L99)
+- 📦 `class` `LLMOutputEntities` (L121)
+- 📦 `class` `LLMOutput` (L129)
 
 ### `f/internal/ai_agent/_constants.py`
 - 📦 `class` `IntentsStruct` (L28)
 
 ### `f/internal/ai_agent/_gadk_agent.py`
-- ⚡ `async_fn` `classify_with_gadk` (L104)
+- ⚡ `async_fn` `classify_with_gadk` (L607)
 
 ### `f/internal/ai_agent/_guardrails.py`
 - 📦 `class` `GuardrailPass` (L9)
@@ -522,10 +522,10 @@
 - 🔧 `fn` `verify_urgency` (L89)
 
 ### `f/internal/ai_agent/_llm_client.py`
-- 📦 `class` `ChatMessage` (L18)
-- 📦 `class` `ProviderConfig` (L23)
-- 📦 `class` `LLMResponse` (L31)
-- ⚡ `async_fn` `call_llm` (L41)
+- 📦 `class` `ChatMessage` (L19)
+- 📦 `class` `ProviderConfig` (L24)
+- 📦 `class` `LLMResponse` (L32)
+- ⚡ `async_fn` `call_llm` (L42)
 
 ### `f/internal/ai_agent/_prompt_builder.py`
 - 🔧 `fn` `build_system_prompt` (L79)
@@ -534,10 +534,10 @@
 ### `f/internal/ai_agent/_rag_context.py`
 - 📦 `class` `RAGResult` (L6)
 - ⚡ `async_fn` `build_rag_context` (L12)
-- ⚡ `async_fn` `get_rag_context` (L61)
+- ⚡ `async_fn` `get_rag_context` (L68)
 
 ### `f/internal/ai_agent/main.py`
-- 🔧 `fn` `main` (L199)
+- 🔧 `fn` `main` (L219)
 
 ### `f/internal/apply_fix_migration.py`
 - 🔧 `fn` `main` (L37)
@@ -550,10 +550,10 @@
 ### `f/internal/booking_fsm/_fsm_machine.py`
 - 🔧 `fn` `get_main_menu_text` (L46)
 - 🔧 `fn` `parse_action` (L59)
-- 🔧 `fn` `parse_callback_data` (L86)
-- 🔧 `fn` `apply_transition` (L103)
-- 🔧 `fn` `extract_draft_from_state` (L396)
-- 🔧 `fn` `flow_step_from_state` (L425)
+- 🔧 `fn` `parse_callback_data` (L102)
+- 🔧 `fn` `apply_transition` (L119)
+- 🔧 `fn` `extract_draft_from_state` (L440)
+- 🔧 `fn` `flow_step_from_state` (L469)
 
 ### `f/internal/booking_fsm/_fsm_models.py`
 - 📦 `class` `NamedItem` (L20)
@@ -563,18 +563,18 @@
 - 🔧 `fn` `empty_draft` (L56)
 - 📦 `class` `IdleState` (L65)
 - 📦 `class` `SelectingSpecialtyState` (L69)
-- 📦 `class` `SelectingDoctorState` (L75)
-- 📦 `class` `SelectingTimeState` (L83)
-- 📦 `class` `ConfirmingState` (L93)
-- 📦 `class` `CompletedState` (L103)
-- 📦 `class` `BookingStateRoot` (L115)
-- 📦 `class` `SelectAction` (L124)
-- 📦 `class` `SelectDateAction` (L129)
-- 📦 `class` `BackAction` (L134)
-- 📦 `class` `CancelAction` (L138)
-- 📦 `class` `ConfirmYesAction` (L142)
-- 📦 `class` `ConfirmNoAction` (L146)
-- 📦 `class` `TransitionOutcome` (L160)
+- 📦 `class` `SelectingDoctorState` (L76)
+- 📦 `class` `SelectingTimeState` (L85)
+- 📦 `class` `ConfirmingState` (L96)
+- 📦 `class` `CompletedState` (L106)
+- 📦 `class` `BookingStateRoot` (L118)
+- 📦 `class` `SelectAction` (L127)
+- 📦 `class` `SelectDateAction` (L132)
+- 📦 `class` `BackAction` (L137)
+- 📦 `class` `CancelAction` (L141)
+- 📦 `class` `ConfirmYesAction` (L145)
+- 📦 `class` `ConfirmNoAction` (L149)
+- 📦 `class` `TransitionOutcome` (L163)
 
 ### `f/internal/booking_fsm/_fsm_responses.py`
 - 📦 `class` `InlineButton` (L13)
@@ -647,7 +647,7 @@
 - ⚡ `async_fn` `handle` (L20)
 
 ### `f/internal/fsm_router/main.py`
-- 🔧 `fn` `main` (L640)
+- 🔧 `fn` `main` (L693)
 
 ### `f/internal/gcal_utils/_gcal_logic.py`
 - 🔧 `fn` `build_gcal_event` (L6)

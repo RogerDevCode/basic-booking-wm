@@ -61,7 +61,23 @@ def parse_action(text: str, timezone: str | None = None) -> BookingAction:
 
     if trimmed in ["volver", "back", "atras", "menu", "menú", "inicio"]:
         return BackAction()
-    if trimmed in ["cancelar", "cancel", "no quiero"]:
+    if trimmed in [
+        "cancelar",
+        "cancel",
+        "no quiero",
+        "abandono",
+        "aborto",
+        "salir",
+        "dejar",
+        "parar",
+        "terminar",
+        "basta",
+        "no mas",
+        "no más",
+        "desistir",
+        "me voy",
+        "me rindo",
+    ]:
         return CancelAction()
     if trimmed in ["s", "y", "si", "sí", "yes", "confirmar", "confirmo", "ok", "dale"]:
         return ConfirmYesAction()

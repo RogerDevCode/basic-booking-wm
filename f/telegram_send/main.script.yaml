@@ -35,6 +35,11 @@ schema:
       description: ''
       default: null
       originalType: string
+    reply_keyboard_json:
+      type: string
+      description: ''
+      default: null
+      originalType: string
     text:
       type: object
       description: ''

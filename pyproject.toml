@@ -84,6 +84,11 @@ ignore = [
 "stubs/**" = ["ANN401"]               # **kwargs: Any is idiomatic in stub files
 "patch_auth.py" = ["ANN", "T20", "E501", "I"]
 
+[tool.pyright]
+include = ["f/", "scripts/"]
+exclude = ["tests/", "stubs/", ".venv/"]
+pythonVersion = "3.13"
+
 [tool.ruff.format]
 quote-style = "double"
 
@@ -92,3 +97,9 @@ testpaths  = ["tests"]
 pythonpath = ["."]
 addopts    = "-ra --strict-markers --import-mode=importlib"
 asyncio_mode = "strict"
+filterwarnings = [
+    "ignore::pytest.PytestUnraisableExceptionWarning",
+    "ignore::pytest.PytestUnhandledThreadExceptionWarning",
+    "ignore::ResourceWarning",
+    "ignore::RuntimeWarning",
+]

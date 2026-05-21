@@ -21,32 +21,35 @@ from __future__ import annotations
 
 import asyncio
 import os
-import sys
-from typing import Any, cast
-from dotenv import load_dotenv
 
 # Ensure project root is in sys.path
 import pathlib
+import sys
+from typing import Any, cast
+
+from dotenv import load_dotenv
+
 project_root = str(pathlib.Path(__file__).parent.parent.resolve())
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 # Ensure wmill is mocked
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock  # noqa: E402
+
 sys.modules["wmill"] = MagicMock()
 
 load_dotenv()
 
-from f.internal._db_client import create_db_client
-from f.internal.fsm_router.main import _main_async as fsm_router_main
-from f.internal.booking_prefetch.main import (
-    _fetch_specialties,
+from f.internal._db_client import create_db_client  # noqa: E402
+from f.internal.booking_confirm.main import _main_async as booking_confirm_main  # noqa: E402
+from f.internal.booking_prefetch.main import (  # noqa: E402
     _fetch_doctors_by_specialty,
     _fetch_slots_for_doctor,
+    _fetch_specialties,
 )
-from f.internal.booking_confirm.main import _main_async as booking_confirm_main
-from f.telegram_auto_register.main import _main_async as telegram_auto_register_main
-from f.internal.client_register.main import _main_async as client_register_main
+from f.internal.client_register.main import _main_async as client_register_main  # noqa: E402
+from f.internal.fsm_router.main import _main_async as fsm_router_main  # noqa: E402
+from f.telegram_auto_register.main import _main_async as telegram_auto_register_main  # noqa: E402
 
 # Test constants
 TEST_CHAT_ID = "999999999"
@@ -67,14 +70,25 @@ class QATestSession:
         """Clean up any pre-existing test data in the database."""
         db = await create_db_client(self.pg_url)
         try:
-            # Delete bookings associated with the test chat id
-            # Note: We must join with clients table to find bookings for our test client
             client_row = await db.fetchrow("SELECT client_id FROM clients WHERE telegram_chat_id = $1", TEST_CHAT_ID)
             if client_row:
                 client_uuid = client_row["client_id"]
+                # Delete child records first (FK order)
+                await db.execute(
+                    "DELETE FROM booking_events WHERE booking_id IN ("
+                    "SELECT booking_id FROM bookings WHERE client_id = $1"
+                    ")",
+                    client_uuid,
+                )
+                await db.execute(
+                    "DELETE FROM booking_audit WHERE booking_id IN ("
+                    "SELECT booking_id FROM bookings WHERE client_id = $1"
+                    ")",
+                    client_uuid,
+                )
                 await db.execute("DELETE FROM bookings WHERE client_id = $1", client_uuid)
                 await db.execute("DELETE FROM clients WHERE client_id = $1", client_uuid)
-                print(f"[QA Setup] Cleaned up existing test client {client_uuid} and their bookings.")
+                print(f"[QA Setup] Cleaned up test client {client_uuid} and all related data.")
         finally:
             await db.close()
 
@@ -141,8 +155,7 @@ async def run_full_qa_suite() -> None:
     # 1a. Run auto register to create the client row
     print("\n--- PHASE 0: Telegram Auto Registration ---")
     reg_res = await telegram_auto_register_main(
-        {"chat_id": TEST_CHAT_ID, "first_name": "QA", "last_name": "Test User", "username": "qa_test"},
-        pg_url=pg_url
+        {"chat_id": TEST_CHAT_ID, "first_name": "QA", "last_name": "Test User", "username": "qa_test"}, pg_url=pg_url
     )
     print(f"Auto-registration result: {reg_res}")
     session.client_id = str(reg_res["client_id"])
@@ -203,13 +216,13 @@ async def run_full_qa_suite() -> None:
 
     # Restore the actual client_id and run the registration update step (client_register)
     session.client_id = original_client_id
-    print(f"\n[QA DB Update] Updating client details in database using client_register...")
+    print("\n[QA DB Update] Updating client details in database using client_register...")
     update_res = await client_register_main(
         client_id=session.client_id,
         name=reg_data["name"],
         phone=reg_data["phone"],
         email=reg_data["email"],
-        pg_url=pg_url
+        pg_url=pg_url,
     )
     print(f"Client register update result: {update_res}")
     assert update_res["success"] is True
@@ -218,7 +231,9 @@ async def run_full_qa_suite() -> None:
     db = await create_db_client(pg_url)
     try:
         # Resolve client_id from database
-        client_row = await db.fetchrow("SELECT client_id, phone, name FROM clients WHERE telegram_chat_id = $1", TEST_CHAT_ID)
+        client_row = await db.fetchrow(
+            "SELECT client_id, phone, name FROM clients WHERE telegram_chat_id = $1", TEST_CHAT_ID
+        )
         assert client_row is not None
         session.client_id = str(client_row["client_id"])
         session.phone = str(client_row["phone"])
@@ -236,7 +251,9 @@ async def run_full_qa_suite() -> None:
     # 4. Phase 3: Booking Flow - Selecting Specialty
     print("\n--- PHASE 3: Booking Flow - Specialty Selection ---")
     # Initiate agendar again, now registered
-    res = await session.send_message("quiero agendar", ai_intent="crear_cita", ai_confidence=0.95, prefetch_items=specialties)
+    res = await session.send_message(
+        "quiero agendar", ai_intent="crear_cita", ai_confidence=0.95, prefetch_items=specialties
+    )
     assert res["handled"] is True
     assert res["nextState"]["name"] == "selecting_specialty"
 
@@ -381,7 +398,11 @@ async def run_full_qa_suite() -> None:
     print("\n--- PHASE 8: Check Registered Appointments ('Mis Horas') ---")
     res = await session.send_message("ver mis citas", ai_intent="ver_mis_citas", ai_confidence=0.95)
     assert res["handled"] is True
-    assert "Roger Gallegos" in res["response_text"] or "Ricardo Valenzuela" in res["response_text"] or "Carolina Muñoz" in res["response_text"]
+    assert (
+        "Roger Gallegos" in res["response_text"]
+        or "Ricardo Valenzuela" in res["response_text"]
+        or "Carolina Muñoz" in res["response_text"]
+    )
     assert booking_res["booking_short_id"] in res["response_text"]
 
     # 10. Phase 9: Cancellation flow (cancel booking)

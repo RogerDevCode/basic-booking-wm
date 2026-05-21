@@ -45,7 +45,25 @@ from ._router_models import RouterInput, RouterResult
 from ._router_reminders import handle_reminders_config
 from .handlers._registration_handler import REG_STATES
 
-MODULE: Final[str] = "fsm_router"
+_MODULE: Final[str] = "fsm_router"
+
+# Keywords that trigger an immediate abort to main menu (rule-based, no AI needed)
+_ABORT_KEYWORDS: Final[frozenset[str]] = frozenset(
+    {
+        "abandono",
+        "aborto",
+        "salir",
+        "dejar",
+        "parar",
+        "terminar",
+        "basta",
+        "no mas",
+        "no más",
+        "desistir",
+        "me voy",
+        "me rindo",
+    }
+)
 
 # Intents that can interrupt an active FSM flow (safety net in fsm_router)
 _FSM_INTERRUPT_INTENTS: frozenset[str] = frozenset(
@@ -198,7 +216,7 @@ async def _handle_smart_prefill(
     try:
         matches = await resolve_provider_by_name(provider_name, input_data.pg_url)
     except Exception:
-        log("SMART_PREFILL_RESOLVE_FAILED", chat_id=input_data.chat_id, module=MODULE)
+        log("SMART_PREFILL_RESOLVE_FAILED", chat_id=input_data.chat_id, module=_MODULE)
         return RouterResult(handled=False)
 
     if not matches:
@@ -274,13 +292,13 @@ async def _handle_smart_prefill(
                 # Fallback to deterministic resolver for simple cases
                 target_date = resolve_date(date_str, {"timezone": provider_tz})
         except Exception:
-            log("DATE_RESOLUTION_FAILED", date=str(date_entity), chat_id=input_data.chat_id, module=MODULE)
+            log("DATE_RESOLUTION_FAILED", date=str(date_entity), chat_id=input_data.chat_id, module=_MODULE)
             target_date = None
 
     try:
         slots = await _fetch_slots_for_doctor(input_data.pg_url, provider_id, target_date)
     except Exception:
-        log("SMART_PREFETCH_SLOTS_FAILED", chat_id=input_data.chat_id, module=MODULE)
+        log("SMART_PREFETCH_SLOTS_FAILED", chat_id=input_data.chat_id, module=_MODULE)
         slots = []
 
     draft = DraftBooking(
@@ -494,6 +512,14 @@ async def _route_impl(input_data: RouterInput) -> RouterResult:
 
     await ensure_nlu_cache()
 
+    # Rule-based abort: keywords that immediately cancel any active flow
+    if current_state_name != "idle" and user_input.strip().lower() in _ABORT_KEYWORDS:
+        return RouterResult(
+            handled=True,
+            nextState={"name": "idle"},
+            response_text="He cancelado la reserva en curso.\n\n" + get_main_menu_text(),
+        )
+
     # Flow-interrupt safety net: if AI detected a clear non-booking intent,
     # handle it here instead of forcing through FSM transitions.
     # This catches cases where confidence is below the routing threshold
@@ -629,7 +655,7 @@ async def _route_impl(input_data: RouterInput) -> RouterResult:
         )
 
     except Exception as e:
-        log("ROUTER_INTERNAL_ERROR", error=str(e), chat_id=input_data.chat_id, module=MODULE)
+        log("ROUTER_INTERNAL_ERROR", error=str(e), chat_id=input_data.chat_id, module=_MODULE)
         raise RuntimeError(f"Router internal error: {e}") from e
 
 

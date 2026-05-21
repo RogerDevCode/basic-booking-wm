@@ -42,9 +42,7 @@ class LLMResponse(BaseModel):
 async def call_llm(system_prompt: str, user_message: str) -> tuple[Exception | None, LLMResponse | None]:
     # ─── Configuration ──────────────
     order_str = (
-        get_variable("u/admin/LLM_PROVIDER_ORDER")
-        or os.getenv("LLM_PROVIDER_ORDER")
-        or "groq,openai,openrouter"
+        get_variable("u/admin/LLM_PROVIDER_ORDER") or os.getenv("LLM_PROVIDER_ORDER") or "groq,openai,openrouter"
     )
     provider_order = [s.strip().lower() for s in order_str.split(",")]
 
@@ -68,9 +66,7 @@ async def call_llm(system_prompt: str, user_message: str) -> tuple[Exception | N
             "url": "https://openrouter.ai/api/v1/chat/completions",
             "key": get_variable("u/admin/OPENROUTER_API_KEY") or os.getenv("OPENROUTER_API_KEY"),
             "model": (
-                get_variable("u/admin/OPENROUTER_MODEL")
-                or os.getenv("OPENROUTER_MODEL")
-                or "openrouter/auto:free"
+                get_variable("u/admin/OPENROUTER_MODEL") or os.getenv("OPENROUTER_MODEL") or "openrouter/auto:free"
             ),
             "structured": False,
         },
