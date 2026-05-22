@@ -42,11 +42,11 @@ async def _get_conversation(chat_id: str, redis_url: str | None = None) -> Conve
 
             # Normalization of empty lists serialized as dicts by Redis Lua
             if "booking_state" in data and isinstance(data["booking_state"], dict):
-                b_state = data["booking_state"]
+                b_state = cast("dict[str, object]", data["booking_state"])
                 if "items" in b_state and isinstance(b_state["items"], dict) and not b_state["items"]:
                     b_state["items"] = []
             if "booking_draft" in data and isinstance(data["booking_draft"], dict):
-                b_draft = data["booking_draft"]
+                b_draft = cast("dict[str, object]", data["booking_draft"])
                 if "items" in b_draft and isinstance(b_draft["items"], dict) and not b_draft["items"]:
                     b_draft["items"] = []
 

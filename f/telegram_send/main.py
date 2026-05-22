@@ -39,21 +39,21 @@ def _normalize_text(value: object) -> str:
 async def _main_async(args: dict[str, object]) -> TelegramSendData:
     from ..internal._wmill_adapter import get_variable
 
-    mode_value = args.get("mode")
-    if mode_value == "send_message":
-        raw_chat_id = args.get("chat_id")
-        raw_text = args.get("text")
-        chat_id = raw_chat_id if isinstance(raw_chat_id, str) else ""
-        text = raw_text if isinstance(raw_text, str) else ""
-        if not chat_id.strip() or not text.strip():
-            log(
-                "Skipping telegram_send due to empty chat_id/text",
-                mode="send_message",
-                has_chat_id=bool(chat_id.strip()),
-                has_text=bool(text.strip()),
-                module=MODULE,
-            )
-            return TelegramSendData(sent=False, message_id=None, chat_id=chat_id or None, mode="send_message")
+    raw_text = args.get("text")
+    text = raw_text if isinstance(raw_text, str) else ""
+
+    if not text.strip() or text.strip() == "SKIP_SEND":
+        log(
+            "Skipping telegram_send due to empty text or SKIP_SEND",
+            mode=str(args.get("mode")),
+            module=MODULE,
+        )
+        return TelegramSendData(
+            sent=False,
+            message_id=None,
+            chat_id=cast("str | None", args.get("chat_id")),
+            mode=str(args.get("mode")),
+        )
 
     # Extract bot_token if present
     token_arg = args.get("bot_token")

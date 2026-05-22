@@ -16,6 +16,10 @@ from __future__ import annotations
 
 import asyncio
 import traceback
+from typing import TYPE_CHECKING, Any, cast
+
+if TYPE_CHECKING:
+    from collections.abc import Coroutine
 
 # ============================================================================
 # PRE-FLIGHT CHECKLIST
@@ -27,15 +31,13 @@ import traceback
 # RLS Tenant ID   : YES — with_tenant_context wraps each provider's batch
 # Pydantic Schemas: YES — InputSchema validates all inputs
 # ============================================================================
-from typing import Any, cast
-
 from pydantic import BaseModel
 
 from ..internal._db_client import create_db_client
 from ..internal._result import with_tenant_context
 from ..internal._wmill_adapter import log
 from ._reconcile_logic import sync_booking_to_gcal
-from ._reconcile_models import BookingRow, InputSchema, ReconcileResult
+from ._reconcile_models import BookingRow, InputSchema, ReconcileResult, SyncResult
 
 MODULE = "gcal_reconcile"
 
@@ -97,8 +99,8 @@ async def _main_async(args: dict[str, object]) -> ReconcileResult:
                     "errors": [],
                 }
 
-                bookings_list = []
-                tasks = []
+                bookings_list: list[BookingRow] = []
+                tasks: list[Coroutine[Any, Any, SyncResult]] = []
                 for row_raw in booking_rows:
                     res["processed"] += 1
                     if input_data.dry_run:
