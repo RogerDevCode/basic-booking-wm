@@ -245,6 +245,22 @@
 - ⚡ `async_fn` `operation` (L64)
 - 🔧 `fn` `main` (L208)
 
+### `f/botilleria_chat/main.py`
+- 📦 `class` `BotilleriaChatInput` (L24)
+- 📦 `class` `BotilleriaChatOutput` (L44)
+- 🔧 `fn` `main` (L113)
+
+### `f/botilleria_flow/main.py`
+- ⚡ `async_fn` `main` (L16)
+
+### `f/botilleria_health_check/main.py`
+- 🔧 `fn` `main` (L16)
+
+### `f/botilleria_webhook/main.py`
+- 📦 `class` `TelegramWebhookPayload` (L25)
+- 📦 `class` `BotilleriaWebhookOutput` (L36)
+- 🔧 `fn` `main` (L120)
+
 ### `f/circuit_breaker/_circuit_logic.py`
 - ⚡ `async_fn` `get_state` (L11)
 - 🔧 `fn` `to_iso` (L30)
@@ -456,10 +472,9 @@
 - 🔧 `fn` `shared_file_lock` (L88)
 
 ### `f/internal/_nlu_cache.py`
-- 🔧 `fn` `get_redis_client` (L14)
-- ⚡ `async_fn` `load_nlu_rules_to_redis` (L19)
-- ⚡ `async_fn` `ensure_nlu_cache` (L42)
-- 🔧 `fn` `get_nlu_rule` (L113)
+- ⚡ `async_fn` `load_nlu_rules_to_redis` (L13)
+- ⚡ `async_fn` `ensure_nlu_cache` (L72)
+- 🔧 `fn` `get_nlu_rule` (L115)
 
 ### `f/internal/_redis_client.py`
 - ⚡ `async_fn` `create_redis_client` (L42)

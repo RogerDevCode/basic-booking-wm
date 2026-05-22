@@ -33,7 +33,7 @@ async def _update_conversation(
 ) -> ConversationUpdateResult:
     redis = await create_redis_client(redis_url)
     try:
-        key = f"conv:{input_data.chat_id}"
+        key = f"booking:conv:{input_data.chat_id}"
 
         if input_data.clear:
             await redis.delete(key)

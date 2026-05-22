@@ -38,7 +38,7 @@ async def _main_async(
 
     redis = await create_redis_client(redis_url)
     try:
-        key = f"dedup:upd:{update_id}"
+        key = f"booking:dedup:upd:{update_id}"
         # SET NX — atomically sets only if key doesn't exist
         inserted = await redis.set(key, "1", nx=True, ex=_DEDUP_TTL)
         is_duplicate = inserted is None  # None means key already existed

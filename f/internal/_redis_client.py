@@ -49,4 +49,12 @@ async def create_redis_client(redis_url: str | None = None) -> Redis:
         redis_url = _resolve_redis_url()
     if not redis_url:
         redis_url = "redis://redis:6379"
-    return Redis.from_url(_ensure_scheme(redis_url), decode_responses=True)  # pyright: ignore[reportUnknownMemberType]
+    return Redis.from_url(  # pyright: ignore[reportUnknownMemberType]
+        _ensure_scheme(redis_url),
+        decode_responses=True,
+        socket_timeout=5.0,
+        socket_connect_timeout=2.0,
+        retry_on_timeout=True,
+        health_check_interval=30,
+        max_connections=10,
+    )

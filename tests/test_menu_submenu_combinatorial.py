@@ -68,7 +68,7 @@ _BASE_ARGS: dict[str, Any] = {
 
 
 def _args(**overrides: Any) -> dict[str, Any]:
-    base = {
+    base: dict[str, Any] = {
         "chat_id": "test-chat-1",
         "user_input": "",
         "state": {"booking_state": {"name": "idle"}, "booking_draft": {}},

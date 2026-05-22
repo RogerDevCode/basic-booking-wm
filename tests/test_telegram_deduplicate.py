@@ -34,12 +34,12 @@ class TestDeduplicateFirstSeen:
 
         assert result["duplicate"] is False
         assert result["update_id"] == 100
-        redis.set.assert_awaited_once_with("dedup:upd:100", "1", nx=True, ex=3600)
+        redis.set.assert_awaited_once_with("booking:dedup:upd:100", "1", nx=True, ex=3600)
         redis.aclose.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_set_nx_called_with_correct_key_and_ttl(self) -> None:
-        """Key must be `dedup:upd:<update_id>` with 1-hour TTL."""
+        """Key must be `booking:dedup:upd:<update_id>` with 1-hour TTL."""
         redis = _make_redis(nx_return=True)
 
         with patch(
@@ -51,7 +51,7 @@ class TestDeduplicateFirstSeen:
             await _main_async(update_id=999, chat_id="7")
 
         call_kwargs = redis.set.call_args
-        assert call_kwargs.args[0] == "dedup:upd:999"
+        assert call_kwargs.args[0] == "booking:dedup:upd:999"
         assert call_kwargs.kwargs["ex"] == 3600
         assert call_kwargs.kwargs["nx"] is True
 

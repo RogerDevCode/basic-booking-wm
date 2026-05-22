@@ -31,7 +31,7 @@ MODULE: Final[str] = "conversation_get"
 async def _get_conversation(chat_id: str, redis_url: str | None = None) -> ConversationGetResult:
     redis = await create_redis_client(redis_url)
     try:
-        key = f"conv:{chat_id}"
+        key = f"booking:conv:{chat_id}"
         raw = await redis.get(key)
 
         if not raw:

@@ -1,6 +1,8 @@
 import sys
 from unittest.mock import MagicMock
 
+import pytest
+
 # ─── WMILL RUNTIME MOCK ───
 # This prevents ModuleNotFoundError: No module named 'wmill' in CI/Local Dev
 # when importing scripts that use the Windmill SDK.
@@ -20,3 +22,12 @@ wmill_mock.get_job_status.return_value = "COMPLETED"
 
 # Inject into sys.modules before any project code is imported
 sys.modules["wmill"] = wmill_mock
+
+
+def pytest_addoption(parser: pytest.Parser) -> None:
+    parser.addoption(
+        "--rpm-target",
+        action="store",
+        default="10",
+        help="Number of concurrent requests to send per model (default: 10)",
+    )

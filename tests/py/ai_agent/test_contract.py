@@ -161,7 +161,7 @@ async def test_entity_extraction_day_with_accent() -> None:
 
     _NLU_CACHE.clear()
 
-    with patch("f.internal._nlu_cache.get_redis_client", side_effect=Exception("Redis unavailable")):
+    with patch("f.internal._nlu_cache.create_redis_client", side_effect=Exception("Redis unavailable")):
         args: dict[str, Any] = {
             "chat_id": "1",
             "text": "quiero hora para el miércoles",
@@ -187,7 +187,7 @@ async def test_entity_extraction_day_without_accent() -> None:
 
     _NLU_CACHE.clear()
 
-    with patch("f.internal._nlu_cache.get_redis_client", side_effect=Exception("Redis unavailable")):
+    with patch("f.internal._nlu_cache.create_redis_client", side_effect=Exception("Redis unavailable")):
         args: dict[str, Any] = {
             "chat_id": "1",
             "text": "quiero hora para el miercoles",
