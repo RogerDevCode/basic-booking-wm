@@ -97,6 +97,8 @@ async def _main_async(args: dict[str, object]) -> ReconcileResult:
                     "errors": [],
                 }
 
+                bookings_list = []
+                tasks = []
                 for row_raw in booking_rows:
                     res["processed"] += 1
                     if input_data.dry_run:
@@ -129,38 +131,46 @@ async def _main_async(args: dict[str, object]) -> ReconcileResult:
                             "service_name": str(row["service_name"]),
                         },
                     )
+                    bookings_list.append(booking)
+                    tasks.append(sync_booking_to_gcal(booking, input_data.max_retries))
 
-                    sync_res = await sync_booking_to_gcal(booking, input_data.max_retries)
+                if tasks:
+                    sync_results = await asyncio.gather(*tasks, return_exceptions=True)
+                    for booking, sync_res in zip(bookings_list, sync_results, strict=False):
+                        if isinstance(sync_res, BaseException):
+                            res["failed"] += 1
+                            res["errors"].append(f"Booking {booking['booking_id']}: Exception {sync_res}")
+                            continue
 
-                    status: str
-                    if not sync_res["errors"]:
-                        status = "synced"
-                        res["synced"] += 1
-                    elif sync_res["providerEventId"] or sync_res["clientEventId"]:
-                        status = "partial"
-                        res["partial"] += 1
-                    else:
-                        status = "pending"
-                        res["failed"] += 1
+                        status: str
+                        if not sync_res["errors"]:
+                            status = "synced"
+                            res["synced"] += 1
+                        elif sync_res["providerEventId"] or sync_res["clientEventId"]:
+                            status = "partial"
+                            res["partial"] += 1
+                        else:
+                            status = "pending"
+                            res["failed"] += 1
 
-                    if sync_res["errors"]:
-                        res["errors"].append(f"Booking {booking['booking_id']}: {'; '.join(sync_res['errors'])}")
+                        if sync_res["errors"]:
+                            res["errors"].append(f"Booking {booking['booking_id']}: {'; '.join(sync_res['errors'])}")
 
-                    await conn.execute(
-                        """
-                        UPDATE bookings
-                        SET gcal_provider_event_id = $1,
-                            gcal_client_event_id = $2,
-                            gcal_sync_status = $3,
-                            gcal_retry_count = gcal_retry_count + 1,
-                            gcal_last_sync = NOW()
-                        WHERE booking_id = $4::uuid
-                        """,
-                        sync_res["providerEventId"],
-                        sync_res["clientEventId"],
-                        status,
-                        booking["booking_id"],
-                    )
+                        await conn.execute(
+                            """
+                            UPDATE bookings
+                            SET gcal_provider_event_id = $1,
+                                gcal_client_event_id = $2,
+                                gcal_sync_status = $3,
+                                gcal_retry_count = gcal_retry_count + 1,
+                                gcal_last_sync = NOW()
+                            WHERE booking_id = $4::uuid
+                            """,
+                            sync_res["providerEventId"],
+                            sync_res["clientEventId"],
+                            status,
+                            booking["booking_id"],
+                        )
                 return res
 
             try:

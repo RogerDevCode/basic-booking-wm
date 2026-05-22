@@ -6,7 +6,10 @@ import redis
 
 # Patch redis.from_url globally during test collection/execution
 @pytest.fixture(autouse=True)
-def mock_redis(monkeypatch: pytest.MonkeyPatch) -> None:
+def mock_redis(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) -> None:
+    if "integration" in request.node.nodeid:
+        return
+
     class DummyRedis:
         def keys(self, *args: object, **kwargs: object) -> list[object]:
             return []

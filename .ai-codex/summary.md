@@ -349,7 +349,7 @@
 
 ### `f/gcal_reconcile/main.py`
 - ⚡ `async_fn` `provider_batch` (L66)
-- 🔧 `fn` `main` (L188)
+- 🔧 `fn` `main` (L198)
 
 ### `f/gcal_sync/_gcal_api_adapter.py`
 - ⚡ `async_fn` `fetch_booking_details` (L16)
