@@ -124,6 +124,61 @@ def adjust_intent_with_context(
     return {"adjusted": False, "intent": current_intent, "confidence": current_confidence, "reason": ""}
 
 
+def detect_fsm_fast_path(text: str, state: ConversationState | None) -> tuple[str, float, str] | None:
+    if state is None or state.active_flow == "none":
+        return None
+
+    lower = text.strip().lower()
+    fsm_state = state.booking_state_name
+
+    if fsm_state in ["selecting_specialty", "selecting_doctor", "selecting_time"] and re.match(r"^\d+$", lower):
+        return cast(
+            "tuple[str, float, str]",
+            (INTENT["CREAR_CITA"], 0.95, f"Num opt in {fsm_state}"),
+        )
+
+    if fsm_state == "selecting_time" and re.match(r"^\d", lower):
+        return cast(
+            "tuple[str, float, str]",
+            (INTENT["CREAR_CITA"], 0.90, "User select date/time"),
+        )
+
+    if lower in ["no", "volver", "menu", "menú", "inicio"]:
+        high_min = float(get_nlu_rule("confidence_bound_high_min", 0.85))
+        return cast(
+            "tuple[str, float, str]",
+            (INTENT["PREGUNTA_GENERAL"], high_min, f"Exit {fsm_state}"),
+        )
+
+    if fsm_state == "confirming" and lower in ["s", "y", "si", "sí", "confirmar", "confirmo", "yes"]:
+        return cast(
+            "tuple[str, float, str]",
+            (INTENT["CREAR_CITA"], 0.95, "User confirmed booking"),
+        )
+
+    return None
+
+
+def detect_telegram_command(text: str) -> tuple[str, float] | None:
+    text = text.strip()
+    if not text.startswith("/"):
+        return None
+
+    lower = text.lower()
+    if lower in ["/start", "/menu", "/inicio"]:
+        return cast("tuple[str, float]", (INTENT["MOSTRAR_MENU_PRINCIPAL"], 1.0))
+    if lower in ["/agendar", "/reservar", "/cita"]:
+        return cast("tuple[str, float]", (INTENT["CREAR_CITA"], 1.0))
+    if lower in ["/cancelar"]:
+        return cast("tuple[str, float]", (INTENT["CANCELAR_CITA"], 1.0))
+    if lower in ["/mis_citas", "/citas", "/reservas"]:
+        return cast("tuple[str, float]", (INTENT["VER_MIS_CITAS"], 1.0))
+    if lower in ["/datos", "/perfil"]:
+        return cast("tuple[str, float]", (INTENT["VER_MIS_DATOS"], 1.0))
+
+    return cast("tuple[str, float]", (INTENT["MOSTRAR_MENU_PRINCIPAL"], 1.0))
+
+
 # ============================================================================
 # ENTITY EXTRACTION
 # ============================================================================

@@ -440,7 +440,29 @@ def _handle_registration_state(
                 reply_keyboard=_PHONE_REPLY_KEYBOARD,
                 response_text="Por favor comparte o escribe tu número de teléfono.",
             )
-        new_draft3: dict[str, object] = {**dict(draft_raw), "reg_phone": user_text}
+        import re
+
+        cleaned_phone = re.sub(r"[\s\-()]+", "", user_text)
+        if not re.match(r"^\+?\d{8,15}$", cleaned_phone):
+            attempts = int(str(current_state_raw.get("invalid_attempts", 0))) + 1
+            if attempts >= 3:
+                return RouterResult(
+                    handled=True,
+                    nextState={"name": "idle"},
+                    nextDraft={},
+                    response_text="❌ Demasiados intentos inválidos de teléfono. Volviendo al menú principal.\n\n"
+                    + get_main_menu_text(),
+                )
+            return RouterResult(
+                handled=True,
+                nextState={"name": "reg_collecting_phone", "invalid_attempts": attempts},
+                nextDraft=dict(draft_raw),
+                response_text=(
+                    "⚠️ El número de teléfono no es válido. "
+                    "Por favor ingresa un número con código de país (ejemplo: +56999040515)."
+                ),
+            )
+        new_draft3: dict[str, object] = {**dict(draft_raw), "reg_phone": cleaned_phone}
         return RouterResult(
             handled=True,
             nextState={"name": "reg_collecting_email"},
@@ -451,7 +473,32 @@ def _handle_registration_state(
     if current_state_name == "reg_collecting_email":
         reg_name = str(draft_raw.get("reg_name") or client_name)
         reg_phone = str(draft_raw.get("reg_phone") or "")
-        reg_email: str | None = None if lower in _SKIP_WORDS or lower in _NO_WORDS else user_text
+        if lower in _SKIP_WORDS or lower in _NO_WORDS:
+            reg_email = None
+        else:
+            import re
+
+            if not re.match(r"^[^@]+@[^@]+\.[^@]+$", user_text.strip()):
+                attempts = int(str(current_state_raw.get("invalid_attempts", 0))) + 1
+                if attempts >= 3:
+                    return RouterResult(
+                        handled=True,
+                        nextState={"name": "idle"},
+                        nextDraft={},
+                        response_text="❌ Demasiados intentos de correo inválidos. Registro completado sin correo.\n\n"
+                        + get_main_menu_text(),
+                        registration_data={"name": reg_name, "phone": reg_phone, "email": None},
+                    )
+                return RouterResult(
+                    handled=True,
+                    nextState={"name": "reg_collecting_email", "invalid_attempts": attempts},
+                    nextDraft=dict(draft_raw),
+                    response_text=(
+                        "⚠️ El correo electrónico no es válido. Por favor ingresa un "
+                        "correo electrónico válido (ejemplo: usuario@correo.com) o envía *saltar*."
+                    ),
+                )
+            reg_email = user_text.strip()
 
         return RouterResult(
             handled=True,
@@ -482,6 +529,31 @@ async def _route_impl(input_data: RouterInput) -> RouterResult:
 
     current_state_raw = cast("dict[str, object]", state_dict.get("booking_state") or {"name": "idle"})
     current_state_name = str(current_state_raw.get("name", "idle"))
+
+    # Callback double-click/out-of-order protection
+    if is_callback:
+        state_to_prefixes: dict[str, list[str]] = {
+            "selecting_specialty": ["spec:"],
+            "selecting_doctor": ["doc:", "back", "cancel"],
+            "selecting_time": ["time:", "slot:", "back", "cancel"],
+            "confirming": ["cfm:yes", "cfm:no", "back", "cancel"],
+        }
+        allowed = state_to_prefixes.get(current_state_name, [])
+        if allowed and not any(user_input.startswith(prefix) for prefix in allowed):
+            log(
+                "IGNORE_OUT_OF_STATE_CALLBACK",
+                user_input=user_input,
+                current_state=current_state_name,
+                module=_MODULE,
+            )
+            draft_val = state_dict.get("booking_draft")
+            next_draft = cast("dict[str, object] | None", draft_val)
+            return RouterResult(
+                handled=True,
+                nextState=current_state_raw,
+                nextDraft=next_draft,
+                response_text="SKIP_SEND",
+            )
 
     # Guard: if ai_agent determined no FSM routing needed and we're idle, skip
     if not input_data.requires_fsm_routing and current_state_name == "idle":
@@ -526,7 +598,18 @@ async def _route_impl(input_data: RouterInput) -> RouterResult:
     # but the intent is still unambiguous.
     ai_intent = input_data.ai_intent or ""
     ai_conf = input_data.ai_confidence or 0.0
-    if current_state_name != "idle" and ai_intent in _FSM_INTERRUPT_INTENTS and ai_conf >= _FSM_INTERRUPT_THRESHOLD:
+
+    is_active_booking = current_state_name in ("selecting_doctor", "selecting_time", "confirming")
+    allowed_interrupt = True
+    if is_active_booking and ai_intent not in ("cancelar_cita", "urgencia"):
+        allowed_interrupt = False
+
+    if (
+        current_state_name != "idle"
+        and ai_intent in _FSM_INTERRUPT_INTENTS
+        and ai_conf >= _FSM_INTERRUPT_THRESHOLD
+        and allowed_interrupt
+    ):
         if ai_intent == "cancelar_cita":
             return RouterResult(
                 handled=True,

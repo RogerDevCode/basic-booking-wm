@@ -78,6 +78,10 @@ locks:
   f/booking_wizard/WizardRepository: 4d6844c41a779555d6d5c7787f24ed726693d54ef4fa9a9c47425217764c51c9
   f/booking_wizard/WizardRouter: 9c753d5c7246ed02fd0f9db4e021161b478a4583a7c1f9c028734e53ade278f2
   f/booking_wizard/WizardUI: 861cd18af85de28586ee2e9b7fdba14e116018043c5c63f21d52ed9f4983ba50
+  f/botilleria_chat/main: 8d59082c848a3fbf2d15f3859442b8b981a49d3325a67ae6734551decdc2a51a
+  f/botilleria_flow/main: bf3c036baed2f139f6a7cd468e4f0cb82cff593c7672c573977767b8d9f20e7d
+  f/botilleria_health_check/main: 235bb1c9f31b73f2e1a5057a66115bb6aad9fe9cb385716fc06833f0b67e5587
+  f/botilleria_webhook/main: dd48bd1ec99aa7020b288ece914016041bae52919a7294e30e17be269f5c1fe3
   f/circuit_breaker_check/main: e9db5bf6f184148733c3438e2499ddf085e17b65d26942fc7f2dbcf6412da6b1
   f/circuit_breaker_record/main: d1f1206fe95626c0011ee30cbe9ee92456598283b20cad3ed6492a1884f5ecc3
   f/circuit_breaker/_circuit_logic: 383811688483cf61df1d36da0de5e07848fbb53734d037852506fc1a7418716f
@@ -198,7 +202,7 @@ locks:
   f/internal/_state_machine: 5db0e189c1aa2db1b08de2741acf26ffd4f8310d699a9c7857abac584ae11d18
   f/internal/_wmill_adapter: b9e26d54e49ccc4820f2bf353d275706ca0f4d214dd06a632ccd7a59a8cdb28b
   f/internal/ai_agent/__init__: c3b6cc2ab1197e686d39d5318b1143746da3f8b9f6adfc1d0ebcf07299c914b7
-  f/internal/ai_agent/_ai_agent_logic: a7bfb9b7d2abad7f393cceb44f313d080ae85caea6b15354f94c3242715235ea
+  f/internal/ai_agent/_ai_agent_logic: f387305afde15451c9469c7b2166f03951a4bc942a4adc41892f52f3764f8e7c
   f/internal/ai_agent/_ai_agent_models: 518b6f33ad80821adf027c1501a1bb77ae1a10e18b5ac2d95ee40b3cd12e436e
   f/internal/ai_agent/_constants: 125e0eb0fe66809236cc38188db8356981c3b58c8f0c78f1816a6e7db2d55cbd
   f/internal/ai_agent/_gadk_agent: 7f5b721d8d701175d9b1ccd1c23b4194043184510b16a140777436f33cdbceb7
@@ -212,7 +216,7 @@ locks:
   f/internal/ai_agent/context-adjustment: 97ace27e16db7ff8f0f9f468e4718dbac0842b13a39b468436f817d12f22e7cc
   f/internal/ai_agent/guardrails: 81eb8c5bdeccfeccfad8d24033d3def32b3c01bda40a9874ddefa1a1f1c88975
   f/internal/ai_agent/llm-client: 78402b896e8f88414241214fb37ba01893979944e2f4f237b1bade4de85c0c36
-  f/internal/ai_agent/main: a368fc2c3430e46de85feb4ee0547997db1b8b6330a95b38f2533487db84ddc4
+  f/internal/ai_agent/main: 4641d3facf5d19f4587c024a43264cbdbd6634e50a552fa27977890327803ef4
   f/internal/ai_agent/pipeline: 33d6399b3dda522efc9a27da410130c38bceb1f6737bb7a616fa5a35311056d5
   f/internal/ai_agent/prompt-builder: 1e694c1057a69d020ce84ac81d887494f8116c6a0182ce1f7750a3dd77f593ab
   f/internal/ai_agent/rag-context: aaf104fde2a23d3dfad79909b543580f2c857fab62838fde351c7a66544e8cbd

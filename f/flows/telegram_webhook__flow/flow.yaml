@@ -224,33 +224,6 @@ value:
         expr: '!results.fsm_router?.data?.registration_data ||
           results.message_preprocessor?.data?.security_scan?.threat_detected ===
           true'
-    - id: update_conversation_state
-      summary: Persistir nuevo estado en Redis
-      value:
-        type: script
-        input_transforms:
-          args:
-            type: javascript
-            expr: >-
-              { "chat_id": results.webhook_trigger.chat_id,
-                "booking_state": results.fsm_router?.data?.nextState || results.conversational_router?.data?.nextState,
-                "active_flow": results.fsm_router?.data?.active_flow || null,
-                "booking_draft": results.fsm_router?.data?.nextDraft ?? null,
-                "pending_data": {
-                  "router_handled": results.fsm_router?.data?.handled || results.conversational_router?.data?.handled,
-                  "text_kind": results.webhook_trigger.text_kind,
-                  "user_id": results.telegram_auto_register?.user_id || null,
-                  "client_id": results.telegram_auto_register?.client_id || null
-                } }
-          redis_url:
-            type: javascript
-            expr: variable("u/admin/REDIS_URL")
-        path: f/internal/conversation_update/main
-      skip_if:
-        expr: '!results.webhook_trigger.chat_id ||
-          results.telegram_deduplicate.duplicate ||
-          results.message_preprocessor?.data?.security_scan?.threat_detected ===
-          true'
     - id: booking_commit
       summary: Crear cita real en DB cuando usuario confirma desde estado confirming
       value:
@@ -280,6 +253,33 @@ value:
             !results.telegram_deduplicate?.duplicate) ||
           results.message_preprocessor?.data?.security_scan?.threat_detected ===
           true
+    - id: update_conversation_state
+      summary: Persistir nuevo estado en Redis
+      value:
+        type: script
+        input_transforms:
+          args:
+            type: javascript
+            expr: >-
+              { "chat_id": results.webhook_trigger.chat_id,
+                "booking_state": (results.booking_commit && results.booking_commit.success === false) ? results.get_conversation_state.data.booking_state : (results.fsm_router?.data?.nextState || results.conversational_router?.data?.nextState),
+                "active_flow": (results.booking_commit && results.booking_commit.success === false) ? results.get_conversation_state.data.active_flow : (results.fsm_router?.data?.active_flow || null),
+                "booking_draft": (results.booking_commit && results.booking_commit.success === false) ? results.get_conversation_state.data.booking_draft : (results.fsm_router?.data?.nextDraft ?? null),
+                "pending_data": {
+                  "router_handled": results.fsm_router?.data?.handled || results.conversational_router?.data?.handled,
+                  "text_kind": results.webhook_trigger.text_kind,
+                  "user_id": results.telegram_auto_register?.user_id || null,
+                  "client_id": results.telegram_auto_register?.client_id || null
+                } }
+          redis_url:
+            type: javascript
+            expr: variable("u/admin/REDIS_URL")
+        path: f/internal/conversation_update/main
+      skip_if:
+        expr: '!results.webhook_trigger.chat_id ||
+          results.telegram_deduplicate.duplicate ||
+          results.message_preprocessor?.data?.security_scan?.threat_detected ===
+          true'
     - id: send_telegram_response
       summary: Enviar respuesta a Telegram
       value:

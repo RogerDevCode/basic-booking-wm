@@ -34,8 +34,10 @@ from ._ai_agent_logic import (
     adjust_intent_with_context,
     compute_requires_fsm_routing,
     detect_context,
+    detect_fsm_fast_path,
     detect_menu_command,
     detect_social,
+    detect_telegram_command,
     determine_escalation_level,
     extract_entities,
     generate_ai_response,
@@ -90,11 +92,20 @@ async def _main_async(args: dict[str, Any]) -> dict[str, Any]:
     cot_reasoning = "Fallback to rules-based detection"
     gadk_entities: dict[str, Any] = {}
 
+    # 2.0 Telegram Command Fast-Path
+    cmd_fast = detect_telegram_command(text)
     # 2.1 Social Fast-Path
     social = detect_social(text)
     # 2.1b Menu Fast-Path — only from idle (mid-FSM a digit is a slot/specialty pick)
     menu = detect_menu_command(text) if booking_state_name == "idle" else None
-    if social:
+    # 2.1c FSM Fast-Path
+    fsm_fast = detect_fsm_fast_path(text, input_data.conversation_state)
+
+    if cmd_fast:
+        intent, confidence = cmd_fast
+        provider = "fast-path"
+        cot_reasoning = "Telegram command matched"
+    elif social:
         intent, confidence = social
         provider = "fast-path"
         cot_reasoning = "Social fast-path matched"
@@ -102,7 +113,11 @@ async def _main_async(args: dict[str, Any]) -> dict[str, Any]:
         intent, confidence = menu
         provider = "fast-path"
         cot_reasoning = "Menu fast-path matched"
+    elif fsm_fast:
+        intent, confidence, cot_reasoning = fsm_fast
+        provider = "fast-path"
     else:
+        log("FAST_PATH_MISS", text=text, booking_state=booking_state_name, module=MODULE)
         # 2.2 GADK Primary — single call to Gemini via ADK with tool calling
         gadk_start = int(time.time() * 1000)
         gadk_result = await classify_with_gadk(text, input_data.chat_id)

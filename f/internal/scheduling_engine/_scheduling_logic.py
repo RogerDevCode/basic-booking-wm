@@ -250,8 +250,6 @@ async def get_availability(db: DBClient, query: AvailabilityQuery) -> Availabili
 async def get_availability_range(
     db: DBClient, provider_id: str, service_id: str, date_from: str, date_to: str
 ) -> list[AvailabilityResult]:
-    results: list[AvailabilityResult] = []
-
     try:
         curr_dt = date.fromisoformat(date_from)
         end_dt = date.fromisoformat(date_to)
@@ -259,11 +257,175 @@ async def get_availability_range(
         log("GET_AVAILABILITY_RANGE_DATE_ERROR", error=str(e))
         raise RuntimeError(f"Invalid date format: {e}") from e
 
+    # 1. Fetch provider details (timezone and preferences)
+    tz_rows = await db.fetch(
+        """
+        SELECT t.name as tz_name, p.ui_preferences
+        FROM providers p
+        LEFT JOIN timezones t ON t.id = p.timezone_id
+        WHERE p.provider_id = $1::uuid
+        LIMIT 1
+        """,
+        provider_id,
+    )
+    provider_tz = str(tz_rows[0]["tz_name"]) if tz_rows and tz_rows[0]["tz_name"] else "UTC"
+
+    advance_notice_minutes = 0
+    if tz_rows and tz_rows[0].get("ui_preferences"):
+        prefs = tz_rows[0]["ui_preferences"]
+        if isinstance(prefs, dict):
+            d = cast("dict[str, object]", prefs)
+            advance_notice_minutes = int(str(d.get("advance_notice_minutes", 0)))
+
+    # 2. Fetch service details
+    service_rows = await db.fetch(
+        "SELECT service_id, duration_minutes, buffer_minutes FROM services WHERE service_id = $1::uuid LIMIT 1",
+        service_id,
+    )
+    if not service_rows:
+        raise RuntimeError(f"Service not found: {service_id}")
+
+    service = cast("ServiceRow", service_rows[0])
+    slot_duration = service["duration_minutes"]
+    slot_spacing = slot_duration + service["buffer_minutes"]
+
+    # 3. Fetch overrides for range
+    override_rows = await db.fetch(
+        """
+        SELECT override_id, provider_id, override_date, is_blocked,
+               start_time::text, end_time::text, reason
+        FROM schedule_overrides
+        WHERE provider_id = $1::uuid
+          AND override_date >= $2::date
+          AND override_date <= $3::date
+        """,
+        provider_id,
+        curr_dt,
+        end_dt,
+    )
+    overrides_list = cast("list[ScheduleOverrideRow]", override_rows)
+
+    # Map overrides by date string
+    overrides_by_date: dict[str, list[ScheduleOverrideRow]] = {}
+    for o in overrides_list:
+        od = o["override_date"]
+        od_str = od.isoformat() if isinstance(od, date) else str(od)
+        overrides_by_date.setdefault(od_str, []).append(o)
+
+    # 4. Fetch schedule rules
+    rule_rows = await db.fetch(
+        """
+        SELECT id, provider_id, day_of_week,
+               start_time::text, end_time::text
+        FROM provider_schedules
+        WHERE provider_id = $1::uuid
+        """,
+        provider_id,
+    )
+    rules_list = cast("list[ProviderScheduleRow]", rule_rows)
+    rules_by_day: dict[int, list[ProviderScheduleRow]] = {}
+    for r in rules_list:
+        rules_by_day.setdefault(r["day_of_week"], []).append(r)
+
+    # 5. Fetch bookings in range
+    booking_rows = await db.fetch(
+        """
+        SELECT start_time::text, end_time::text FROM bookings
+        WHERE provider_id = $1::uuid
+          AND start_time >= $2::date
+          AND start_time < ($3::date + INTERVAL '1 day')
+          AND status NOT IN ('cancelled', 'no_show', 'rescheduled')
+        """,
+        provider_id,
+        curr_dt,
+        end_dt,
+    )
+    bookings = cast("list[BookingTimeRow]", booking_rows)
+
+    cutoff_utc = datetime.now(UTC) + timedelta(minutes=advance_notice_minutes)
+
+    results: list[AvailabilityResult] = []
     iter_date = curr_dt
     while iter_date <= end_dt:
         date_str = iter_date.isoformat()
-        res = await get_availability(db, {"provider_id": provider_id, "date": date_str, "service_id": service_id})
-        results.append(res)
+        day_of_week = iter_date.isoweekday() % 7
+
+        # Check overrides for this day
+        day_overrides = overrides_by_date.get(date_str, [])
+        blocking_override = next((o for o in day_overrides if o["is_blocked"]), None)
+
+        if blocking_override:
+            results.append(
+                AvailabilityResult(
+                    provider_id=provider_id,
+                    date=date_str,
+                    timezone="UTC",
+                    slots=[],
+                    total_available=0,
+                    total_booked=0,
+                    is_blocked=True,
+                    block_reason=blocking_override["reason"] or "Día no disponible",
+                )
+            )
+            iter_date += timedelta(days=1)
+            continue
+
+        special_override = next(
+            (o for o in day_overrides if not o["is_blocked"] and o["start_time"] and o["end_time"]), None
+        )
+
+        day_rules: list[ProviderScheduleRow]
+        if special_override:
+            day_rules = [
+                {
+                    "id": 0,
+                    "provider_id": provider_id,
+                    "day_of_week": day_of_week,
+                    "start_time": cast("str", special_override["start_time"]),
+                    "end_time": cast("str", special_override["end_time"]),
+                }
+            ]
+        else:
+            day_rules = rules_by_day.get(day_of_week, [])
+
+        if not day_rules:
+            results.append(
+                AvailabilityResult(
+                    provider_id=provider_id,
+                    date=date_str,
+                    timezone="UTC",
+                    slots=[],
+                    total_available=0,
+                    total_booked=0,
+                    is_blocked=True,
+                    block_reason="No hay horario para este día de la semana",
+                )
+            )
+            iter_date += timedelta(days=1)
+            continue
+
+        all_slots: list[TimeSlot] = []
+        for rule in day_rules:
+            rule_slots = generate_slots_for_rule(
+                rule, date_str, slot_duration, bookings, provider_tz, slot_spacing, cutoff_utc
+            )
+            all_slots.extend(rule_slots)
+
+        available_count = len([s for s in all_slots if s["available"]])
+        booked_count = len(all_slots) - available_count
+
+        results.append(
+            AvailabilityResult(
+                provider_id=provider_id,
+                date=date_str,
+                timezone=provider_tz,
+                slots=all_slots,
+                total_available=available_count,
+                total_booked=booked_count,
+                is_blocked=False,
+                block_reason=None,
+            )
+        )
 
         iter_date += timedelta(days=1)
 

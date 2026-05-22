@@ -5,7 +5,7 @@ aiosignal==1.4.0
 aiosqlite==0.22.1
 annotated-doc==0.0.4
 annotated-types==0.7.0
-anthropic==0.103.1
+anthropic==0.104.1
 anyio==4.13.0
 asyncpg==0.31.0
 attrs==26.1.0
@@ -56,8 +56,8 @@ h11==0.16.0
 hf-xet==1.5.0
 httpcore==1.0.9
 httpx==0.28.1
-huggingface-hub==1.15.0
-idna==3.15
+huggingface-hub==1.16.1
+idna==3.16
 importlib-metadata==8.5.0
 jinja2==3.1.6
 jiter==0.15.0
@@ -72,9 +72,9 @@ kubernetes==36.0.0
 langchain-core==1.4.0
 langchain-protocol==0.0.15
 langgraph==0.4.7
-langgraph-checkpoint==4.1.0
+langgraph-checkpoint==4.1.1
 langgraph-prebuilt==1.1.0
-langgraph-sdk==0.3.14
+langgraph-sdk==0.3.15
 langsmith==0.8.5
 litellm==1.83.14
 llama-index-core==0.14.22
@@ -115,7 +115,7 @@ pydantic==2.12.5
 pydantic-core==2.41.5
 pygments==2.20.0
 pyopenssl==26.2.0
-pypdf==6.11.0
+pypdf==6.12.1
 pypika==0.51.1
 python-dateutil==2.9.0.post0
 python-dotenv==1.2.2
@@ -157,7 +157,7 @@ uvicorn==0.47.0
 watchdog==6.0.0
 websocket-client==1.9.0
 websockets==15.0.1
-wrapt==2.1.2
+wrapt==2.2.1
 xxhash==3.7.0
 yarl==1.24.2
 zipp==4.1.0

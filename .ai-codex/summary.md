@@ -504,12 +504,14 @@
 ### `f/internal/ai_agent/_ai_agent_logic.py`
 - 🔧 `fn` `compute_requires_fsm_routing` (L58)
 - 🔧 `fn` `adjust_intent_with_context` (L83)
-- 🔧 `fn` `extract_entities` (L132)
-- 🔧 `fn` `detect_context` (L218)
-- 🔧 `fn` `determine_escalation_level` (L255)
-- 🔧 `fn` `generate_ai_response` (L280)
-- 🔧 `fn` `detect_social` (L297)
-- 🔧 `fn` `detect_menu_command` (L351)
+- 🔧 `fn` `detect_fsm_fast_path` (L127)
+- 🔧 `fn` `detect_telegram_command` (L162)
+- 🔧 `fn` `extract_entities` (L187)
+- 🔧 `fn` `detect_context` (L273)
+- 🔧 `fn` `determine_escalation_level` (L310)
+- 🔧 `fn` `generate_ai_response` (L335)
+- 🔧 `fn` `detect_social` (L352)
+- 🔧 `fn` `detect_menu_command` (L406)
 
 ### `f/internal/ai_agent/_ai_agent_models.py`
 - 📦 `class` `ConversationState` (L11)
@@ -552,7 +554,7 @@
 - ⚡ `async_fn` `get_rag_context` (L68)
 
 ### `f/internal/ai_agent/main.py`
-- 🔧 `fn` `main` (L219)
+- 🔧 `fn` `main` (L234)
 
 ### `f/internal/apply_fix_migration.py`
 - 🔧 `fn` `main` (L37)
@@ -617,7 +619,7 @@
 - 📦 `class` `ConversationGetResult` (L21)
 
 ### `f/internal/conversation_get/main.py`
-- 🔧 `fn` `main` (L71)
+- 🔧 `fn` `main` (L82)
 
 ### `f/internal/conversation_update/_update_models.py`
 - 📦 `class` `ConversationUpdateInput` (L8)
@@ -662,7 +664,7 @@
 - ⚡ `async_fn` `handle` (L20)
 
 ### `f/internal/fsm_router/main.py`
-- 🔧 `fn` `main` (L693)
+- 🔧 `fn` `main` (L776)
 
 ### `f/internal/gcal_utils/_gcal_logic.py`
 - 🔧 `fn` `build_gcal_event` (L6)
@@ -697,7 +699,7 @@
 - 🔧 `fn` `generate_slots_for_rule` (L32)
 - ⚡ `async_fn` `get_availability` (L94)
 - ⚡ `async_fn` `get_availability_range` (L250)
-- ⚡ `async_fn` `validate_override` (L273)
+- ⚡ `async_fn` `validate_override` (L435)
 
 ### `f/internal/scheduling_engine/_scheduling_models.py`
 - 📦 `class` `TimeSlot` (L4)
@@ -1398,6 +1400,10 @@
 - `f/booking_wizard/_wizard_logic.script.yaml`
 - `f/booking_wizard/_wizard_models.script.yaml`
 - `f/booking_wizard/main.script.yaml`
+- `f/botilleria_chat/main.script.yaml`
+- `f/botilleria_flow/main.script.yaml`
+- `f/botilleria_health_check/main.script.yaml`
+- `f/botilleria_webhook/main.script.yaml`
 - `f/circuit_breaker/_circuit_logic.script.yaml`
 - `f/circuit_breaker/_circuit_models.script.yaml`
 - `f/circuit_breaker/main.script.yaml`

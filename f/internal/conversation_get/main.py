@@ -39,6 +39,17 @@ async def _get_conversation(chat_id: str, redis_url: str | None = None) -> Conve
 
         try:
             data = cast("dict[str, object]", json.loads(str(raw)))
+
+            # Normalization of empty lists serialized as dicts by Redis Lua
+            if "booking_state" in data and isinstance(data["booking_state"], dict):
+                b_state = data["booking_state"]
+                if "items" in b_state and isinstance(b_state["items"], dict) and not b_state["items"]:
+                    b_state["items"] = []
+            if "booking_draft" in data and isinstance(data["booking_draft"], dict):
+                b_draft = data["booking_draft"]
+                if "items" in b_draft and isinstance(b_draft["items"], dict) and not b_draft["items"]:
+                    b_draft["items"] = []
+
             # Basic validation/mapping
             state = ConversationState(
                 chat_id=chat_id,
