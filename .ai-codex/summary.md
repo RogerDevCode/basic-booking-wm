@@ -1480,8 +1480,6 @@
 - `f/internal/conversational_router/main.script.yaml`
 - `f/internal/debug_db.script.yaml`
 - `f/internal/debug_db_final.script.yaml`
-- `f/internal/debug_flow_run.script.yaml`
-- `f/internal/debug_logs.script.yaml`
 - `f/internal/debug_schedules.script.yaml`
 - `f/internal/fsm_router/_router_models.script.yaml`
 - `f/internal/fsm_router/_router_reminders.script.yaml`
