@@ -427,6 +427,13 @@
 - 🔧 `fn` `require_env` (L56)
 - 🔧 `fn` `require_database_url` (L63)
 
+### `f/internal/_conversation_tx.py`
+- 📦 `class` `ConversationConflictError` (L29)
+- 📦 `class` `ConversationSnapshot` (L34)
+- ⚡ `async_fn` `read_state` (L61)
+- ⚡ `async_fn` `write_state` (L82)
+- ⚡ `async_fn` `invalidate_cache` (L140)
+
 ### `f/internal/_crypto.py`
 - 🔧 `fn` `hash_password` (L19)
 - 🔧 `fn` `verify_password` (L25)
@@ -560,9 +567,9 @@
 - 🔧 `fn` `main` (L37)
 
 ### `f/internal/booking_confirm/main.py`
-- 📦 `class` `BookingConfirmOutput` (L45)
-- ⚡ `async_fn` `operation` (L166)
-- 🔧 `fn` `main` (L261)
+- 📦 `class` `BookingConfirmOutput` (L47)
+- ⚡ `async_fn` `operation` (L168)
+- 🔧 `fn` `main` (L306)
 
 ### `f/internal/booking_fsm/_fsm_machine.py`
 - 🔧 `fn` `get_main_menu_text` (L46)
@@ -619,14 +626,14 @@
 - 📦 `class` `ConversationGetResult` (L21)
 
 ### `f/internal/conversation_get/main.py`
-- 🔧 `fn` `main` (L82)
+- 🔧 `fn` `main` (L127)
 
 ### `f/internal/conversation_update/_update_models.py`
 - 📦 `class` `ConversationUpdateInput` (L8)
 - 📦 `class` `ConversationUpdateResult` (L21)
 
 ### `f/internal/conversation_update/main.py`
-- 🔧 `fn` `main` (L115)
+- 🔧 `fn` `main` (L112)
 
 ### `f/internal/conversation_verify/_verify_models.py`
 - 📦 `class` `PersistedConversationState` (L6)

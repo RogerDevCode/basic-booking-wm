@@ -68,17 +68,37 @@ def _patch_create_booking(
 
 def _make_db_for_service(service_id: str | None) -> MagicMock:
     db = MagicMock()
-    if service_id:
-        db.fetchrow = AsyncMock(
-            return_value={
+
+    async def _fetchrow_side_effect(query: str, *args: object) -> dict[str, object] | None:
+        if "conversation_states" in query:
+            return {
+                "booking_state": {"name": "confirming"},
+                "active_flow": "booking",
+                "booking_draft": {},
+                "pending_data": {},
+                "message_id": 1234,
+                "version": 1,
+            }
+        if "services" in query or "service_id" in query:
+            if service_id:
+                return {
+                    "service_id": service_id,
+                    "duration_minutes": 30,
+                    "provider_name": "Dr. Smith",
+                    "service_name": "Consulta General",
+                }
+            return None
+        # Default fallback
+        if service_id:
+            return {
                 "service_id": service_id,
                 "duration_minutes": 30,
                 "provider_name": "Dr. Smith",
                 "service_name": "Consulta General",
             }
-        )
-    else:
-        db.fetchrow = AsyncMock(return_value=None)
+        return None
+
+    db.fetchrow = AsyncMock(side_effect=_fetchrow_side_effect)
     db.execute = AsyncMock()
     db.close = AsyncMock()
     return db

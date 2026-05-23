@@ -14,13 +14,14 @@
 # ///
 from __future__ import annotations
 
-import json
-from datetime import UTC, datetime
-from typing import Final, cast
+import contextlib
+from typing import Final
 
 from beartype import beartype
 
-from .._redis_client import REDIS_TTL, create_redis_client
+from .._conversation_tx import invalidate_cache, read_state, write_state
+from .._db_client import create_db_client
+from .._redis_client import create_redis_client
 from .._wmill_adapter import log
 from ._update_models import ConversationUpdateInput, ConversationUpdateResult
 
@@ -29,76 +30,72 @@ MODULE: Final[str] = "conversation_update"
 
 @beartype
 async def _update_conversation(
-    input_data: ConversationUpdateInput, redis_url: str | None = None
+    input_data: ConversationUpdateInput,
+    redis_url: str | None = None,
+    pg_url: str | None = None,
 ) -> ConversationUpdateResult:
+    conn = await create_db_client(pg_url)
     redis = await create_redis_client(redis_url)
+
     try:
-        key = f"booking:conv:{input_data.chat_id}"
+        # ── BEGIN + advisory lock (serializes all ops for this chat_id) ───────
+        await conn.execute("BEGIN")
+        await conn.execute(
+            "SELECT pg_advisory_xact_lock(chat_id_lock_key($1))",
+            input_data.chat_id,
+        )
 
         if input_data.clear:
-            await redis.delete(key)
+            await conn.execute(
+                "DELETE FROM conversation_states WHERE chat_id = $1",
+                input_data.chat_id,
+            )
+            await conn.execute("COMMIT")
+            # Invalidate cache after commit
+            await invalidate_cache(redis, input_data.chat_id)
             return ConversationUpdateResult(success=True, chat_id=input_data.chat_id)
 
-        # Atomic update via Lua script to prevent race conditions
-        lua_script = """
-        local key = KEYS[1]
-        local ttl = ARGV[1]
-        local updates = cjson.decode(ARGV[2])
+        # ── Read current state (serialized by advisory lock) ─────────────────
+        state = await read_state(conn, input_data.chat_id)
 
-        local raw = redis.call('GET', key)
-        local existing = {}
-        if raw and raw ~= false then
-            existing = cjson.decode(raw)
-        end
-
-        for k, v in pairs(updates) do
-            if k == 'pending_data' and type(v) == 'table' then
-                local pending = existing['pending_data']
-                if type(pending) ~= 'table' then
-                    pending = {}
-                end
-                for pk, pv in pairs(v) do
-                    pending[pk] = pv
-                end
-                existing['pending_data'] = pending
-            else
-                existing[k] = v
-            end
-        end
-
-        local result = cjson.encode(existing)
-        redis.call('SET', key, result, 'EX', ttl)
-        return 1
-        """
-
-        updates: dict[str, object] = {}
-        if input_data.active_flow is not None:
-            updates["active_flow"] = input_data.active_flow
-        if input_data.flow_step is not None:
-            updates["flow_step"] = input_data.flow_step
-        if input_data.pending_data is not None:
-            updates["pending_data"] = input_data.pending_data
+        # ── Merge updates ────────────────────────────────────────────────────
         if input_data.booking_state is not None:
-            updates["booking_state"] = input_data.booking_state
+            state.booking_state = input_data.booking_state
+        if input_data.active_flow is not None:
+            state.active_flow = input_data.active_flow
         if input_data.booking_draft is not None:
-            updates["booking_draft"] = input_data.booking_draft
+            state.booking_draft = input_data.booking_draft
+        if input_data.pending_data is not None:
+            state.pending_data = {**state.pending_data, **input_data.pending_data}
         if input_data.message_id is not None:
-            updates["message_id"] = input_data.message_id
+            state.message_id = input_data.message_id
 
-        updates["updated_at"] = datetime.now(UTC).isoformat()
+        # ── Write with optimistic lock ───────────────────────────────────────
+        await write_state(conn, state)
 
-        await redis.eval(lua_script, 1, key, REDIS_TTL, json.dumps(updates))  # type: ignore[misc]
+        # ── COMMIT ───────────────────────────────────────────────────────────
+        await conn.execute("COMMIT")
+
+        # ── Invalidate cache (best-effort, after commit) ─────────────────────
+        await invalidate_cache(redis, input_data.chat_id)
 
         return ConversationUpdateResult(success=True, chat_id=input_data.chat_id)
 
     except Exception as e:
-        log("REDIS_UPDATE_ERROR", error=str(e), chat_id=input_data.chat_id, module=MODULE)
-        raise RuntimeError(f"redis_error: {e}") from e
+        with contextlib.suppress(Exception):
+            await conn.execute("ROLLBACK")
+        log("CONVERSATION_UPDATE_ERROR", error=str(e), chat_id=input_data.chat_id, module=MODULE)
+        raise RuntimeError(f"conversation_update failed: {e}") from e
     finally:
+        await conn.close()
         await redis.aclose()
 
 
-async def _main_async(args: object, redis_url: str | None = None) -> dict[str, object]:
+async def _main_async(
+    args: object,
+    redis_url: str | None = None,
+    pg_url: str | None = None,
+) -> dict[str, object]:
     """Windmill entrypoint."""
     if not isinstance(args, dict):
         raise RuntimeError("conversation_update failed: args is not a dict")
@@ -108,16 +105,20 @@ async def _main_async(args: object, redis_url: str | None = None) -> dict[str, o
     except Exception as e:
         raise RuntimeError(f"conversation_update validation error: {e}") from e
 
-    result = await _update_conversation(input_data, redis_url)  # type: ignore[call-arg]
-    return {"data": cast("dict[str, object]", result.model_dump())}
+    result = await _update_conversation(input_data, redis_url, pg_url)  # type: ignore[call-arg]
+    return {"data": dict(result.model_dump())}
 
 
-def main(args: object, redis_url: str | None = None) -> dict[str, object]:
+def main(
+    args: object,
+    redis_url: str | None = None,
+    pg_url: str | None = None,
+) -> dict[str, object]:
     import asyncio
     import traceback
 
     try:
-        return asyncio.run(_main_async(args, redis_url))
+        return asyncio.run(_main_async(args, redis_url, pg_url))
     except Exception as e:
         tb = traceback.format_exc()
         try:

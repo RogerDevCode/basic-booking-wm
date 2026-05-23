@@ -34,8 +34,10 @@ from ...services.booking._booking_errors import (
 from ...services.booking._booking_models import BookingCreateRequest, BookingResult
 from ...services.booking.core import create_booking
 from ...services.booking.repo import PgBookingRepo
+from .._conversation_tx import invalidate_cache, read_state, write_state
 from .._db_client import create_db_client
 from .._nlu_cache import ensure_nlu_cache, get_nlu_rule
+from .._redis_client import create_redis_client
 from .._result import DBClient, with_tenant_context
 from .._wmill_adapter import log
 
@@ -164,10 +166,42 @@ async def _confirm_booking_core(
     repo = PgBookingRepo(conn)
 
     async def operation() -> BookingResult:
+        # ── Advisory lock: serialize all ops for this chat_id ────────────
+        await conn.execute(
+            "SELECT pg_advisory_xact_lock(chat_id_lock_key($1))",
+            chat_id,
+        )
+
+        # ── Verify FSM state is 'confirming' (inside the lock) ──────────
+        state = await read_state(conn, chat_id)
+        current_name = state.booking_state.get("name", "unknown")
+        if current_name != "confirming":
+            log(
+                "CONFIRM_SKIPPED_NOT_IN_CONFIRMING",
+                actual_state=current_name,
+                chat_id=chat_id,
+                module=MODULE,
+            )
+            raise BookingMissingParamsError(f"not_in_confirming_state:actual={current_name}")
+
+        # ── Create booking (same transaction) ───────────────────────────
         active = await repo.get_active_booking_for_client(client_id, provider_id)
         if active:
             raise BookingClientAlreadyActiveError("client_already_has_active_booking")
-        return await create_booking(input_data, repo)
+        result = await create_booking(input_data, repo)
+
+        # ── Transition FSM to idle (same transaction) ───────────────────
+        state.booking_state = {"name": "idle"}
+        state.active_flow = None
+        state.booking_draft = None
+        state.pending_data = {
+            "router_handled": True,
+            "user_id": client_id,
+            "client_id": client_id,
+        }
+        await write_state(conn, state)
+
+        return result
 
     result = await with_tenant_context(conn, provider_id, operation)
 
@@ -200,6 +234,7 @@ async def _main_async(
     start_time: str | None = None,
     chat_id: str | None = None,
     pg_url: str | None = None,
+    redis_url: str | None = None,
 ) -> dict[str, object]:
     log("BOOKING_CONFIRM_START", chat_id=chat_id, provider_id=provider_id, start_time=start_time, module=MODULE)
 
@@ -228,6 +263,16 @@ async def _main_async(
             start_time=start_time,
             chat_id=chat_id,
         )
+
+        # ── Cache invalidation AFTER successful commit ───────────────────
+        if output.success:
+            try:
+                redis = await create_redis_client(redis_url)
+                await invalidate_cache(redis, chat_id)
+                await redis.aclose()
+            except Exception:
+                pass  # Non-fatal: cache expires via TTL
+
         return output.model_dump()
     except BookingError as err:
         # Business error: specific message to user, no DLQ
@@ -264,11 +309,17 @@ def main(
     start_time: str | None = None,
     chat_id: str | None = None,
     pg_url: str | None = None,
+    redis_url: str | None = None,
 ) -> dict[str, object]:
     try:
         return asyncio.run(
             _main_async(
-                client_id=client_id, provider_id=provider_id, start_time=start_time, chat_id=chat_id, pg_url=pg_url
+                client_id=client_id,
+                provider_id=provider_id,
+                start_time=start_time,
+                chat_id=chat_id,
+                pg_url=pg_url,
+                redis_url=redis_url,
             )
         )
     except Exception as e:

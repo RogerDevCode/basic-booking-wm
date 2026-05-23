@@ -57,6 +57,9 @@ value:
           redis_url:
             type: javascript
             expr: variable("u/admin/REDIS_URL")
+          pg_url:
+            type: javascript
+            expr: variable("u/admin/DATABASE_URL")
         path: f/internal/conversation_get/main
       skip_if:
         expr: '!results.webhook_trigger.chat_id ||
@@ -262,9 +265,9 @@ value:
             type: javascript
             expr: >-
               { "chat_id": results.webhook_trigger.chat_id,
-                "booking_state": (results.booking_commit && results.booking_commit.success === false) ? results.get_conversation_state.data.booking_state : (results.fsm_router?.data?.nextState || results.conversational_router?.data?.nextState),
-                "active_flow": (results.booking_commit && results.booking_commit.success === false) ? results.get_conversation_state.data.active_flow : (results.fsm_router?.data?.active_flow || null),
-                "booking_draft": (results.booking_commit && results.booking_commit.success === false) ? results.get_conversation_state.data.booking_draft : (results.fsm_router?.data?.nextDraft ?? null),
+                "booking_state": results.fsm_router?.data?.nextState || results.conversational_router?.data?.nextState,
+                "active_flow": results.fsm_router?.data?.active_flow || null,
+                "booking_draft": results.fsm_router?.data?.nextDraft ?? null,
                 "pending_data": {
                   "router_handled": results.fsm_router?.data?.handled || results.conversational_router?.data?.handled,
                   "text_kind": results.webhook_trigger.text_kind,
@@ -274,12 +277,16 @@ value:
           redis_url:
             type: javascript
             expr: variable("u/admin/REDIS_URL")
+          pg_url:
+            type: javascript
+            expr: variable("u/admin/DATABASE_URL")
         path: f/internal/conversation_update/main
       skip_if:
         expr: '!results.webhook_trigger.chat_id ||
           results.telegram_deduplicate.duplicate ||
-          results.message_preprocessor?.data?.security_scan?.threat_detected ===
-          true'
+          results.message_preprocessor?.data?.security_scan?.threat_detected === true ||
+          (results.get_conversation_state?.data?.booking_state?.name === "confirming" &&
+           results.fsm_router?.data?.nextState?.name === "idle")'
     - id: send_telegram_response
       summary: Enviar respuesta a Telegram
       value:

@@ -1,8 +1,31 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+from unittest.mock import AsyncMock, patch
+
 import pytest
 
 from f.internal.ai_agent.main import _main_async as main
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
+
+
+@pytest.fixture(autouse=True)
+def mock_llm_calls() -> Generator[None]:
+    async def fake_gadk(text: str, *args: object, **kwargs: object) -> dict[str, object]:
+        intent = "crear_cita" if ("cita" in text or "agendar" in text) else "saludo"
+        return {
+            "intent": intent,
+            "confidence": 0.95,
+            "entities": {},
+        }
+
+    with (
+        patch("f.internal.ai_agent.main.classify_with_gadk", AsyncMock(side_effect=fake_gadk)),
+        patch("f.internal.ai_agent.main.call_llm", AsyncMock(return_value=(None, None))),
+    ):
+        yield
 
 
 class TestAIAgentRouting:
