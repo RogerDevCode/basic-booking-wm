@@ -91,7 +91,7 @@ async def _update_conversation(
         with contextlib.suppress(Exception):
             await conn.execute("ROLLBACK")
         log("CONVERSATION_UPDATE_ERROR", error=str(e), chat_id=input_data.chat_id, module=MODULE)
-        raise RuntimeError(f"conversation_update failed: {e}") from e
+        raise
     finally:
         await conn.close()
         await redis.aclose()
