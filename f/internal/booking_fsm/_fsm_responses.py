@@ -44,10 +44,7 @@ def build_doctors_with_specialty_prompt(
     if not matches:
         return f"{header}No hay doctores disponibles en este momento. 🛠️"
     lines = "\n".join(f"{i + 1}. {m['name']} ({m['specialty_name']})" for i, m in enumerate(matches))
-    return (
-        f"{header}Encontré varios doctores con ese nombre. "
-        f"¿Con cuál deseas agendar?\n\n{lines}\n\nResponde con el número."
-    )
+    return f"{header}Encontré varios doctores con ese nombre. ¿Con cuál deseas agendar?\n\n{lines}"
 
 
 def build_slots_prompt(doctor_name: str, items: list[TimeSlotItem], error: str | None = None) -> str:

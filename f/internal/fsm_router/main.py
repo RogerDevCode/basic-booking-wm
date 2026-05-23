@@ -34,7 +34,11 @@ from .._nlu_cache import ensure_nlu_cache
 from .._wmill_adapter import log
 from ..booking_fsm._fsm_machine import apply_transition, get_main_menu_text, parse_action, parse_callback_data
 from ..booking_fsm._fsm_models import BookingStateRoot, DraftBooking, NamedItem
-from ..booking_fsm._fsm_responses import build_doctors_with_specialty_prompt, build_specialty_prompt
+from ..booking_fsm._fsm_responses import (
+    build_doctor_keyboard,
+    build_doctors_with_specialty_prompt,
+    build_specialty_prompt,
+)
 from ..booking_prefetch.main import (
     _fetch_slots_for_doctor as _prefetch_slots,
 )
@@ -249,6 +253,10 @@ async def _handle_smart_prefill(
             },
             nextDraft=cast("dict[str, object]", multi_draft.model_dump()),
             response_text=build_doctors_with_specialty_prompt(matches_for_prompt),
+            inline_buttons=cast(
+                "list[list[InlineButton]]",
+                build_doctor_keyboard(cast("list[NamedItem]", items_list)),
+            ),
         )
 
     provider = matches[0]
