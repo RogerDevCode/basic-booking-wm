@@ -175,3 +175,87 @@ class TestTelegramRouterMainMenu:
         assert data["handled"] is True
         next_state = cast("dict[str, Any]", data["nextState"])
         assert next_state.get("name") != "idle"
+
+
+class TestTelegramRouterEscape:
+    """Tests for early menu/abort escape logic from any state."""
+
+    @pytest.mark.asyncio
+    async def test_menu_keyword_escapes_active_booking(self) -> None:
+        args: dict[str, Any] = {
+            "chat_id": "1",
+            "user_input": "ir al menu",
+            "state": {
+                "active_flow": "booking",
+                "booking_state": {
+                    "name": "selecting_specialty",
+                    "items": [{"id": "sp1", "name": "Medicina General"}],
+                },
+                "booking_draft": {},
+            },
+        }
+        res = await main(args)
+        data = cast("dict[str, Any]", res["data"])
+        assert data["handled"] is True
+        assert data["nextState"] == {"name": "idle"}
+        assert data["nextDraft"] == {}
+        assert "cancelado" in data["response_text"].lower()
+
+    @pytest.mark.asyncio
+    async def test_menu_keyword_escapes_registration(self) -> None:
+        args: dict[str, Any] = {
+            "chat_id": "1",
+            "user_input": "menú",
+            "state": {
+                "active_flow": "booking",
+                "booking_state": {
+                    "name": "awaiting_phone",
+                },
+                "booking_draft": {},
+            },
+        }
+        res = await main(args)
+        data = cast("dict[str, Any]", res["data"])
+        assert data["handled"] is True
+        assert data["nextState"] == {"name": "idle"}
+        assert "cancelado" in data["response_text"].lower()
+
+    @pytest.mark.asyncio
+    async def test_menu_keyword_escapes_reminders_config(self) -> None:
+        args: dict[str, Any] = {
+            "chat_id": "1",
+            "user_input": "volver al menu",
+            "state": {
+                "active_flow": "booking",
+                "booking_state": {
+                    "name": "reminders_config",
+                },
+                "booking_draft": {},
+            },
+        }
+        res = await main(args)
+        data = cast("dict[str, Any]", res["data"])
+        assert data["handled"] is True
+        assert data["nextState"] == {"name": "idle"}
+        assert "cancelado" in data["response_text"].lower()
+
+    @pytest.mark.asyncio
+    async def test_menu_intent_escapes_active_booking(self) -> None:
+        args: dict[str, Any] = {
+            "chat_id": "1",
+            "user_input": "quiero ver las opciones principales",
+            "ai_intent": "mostrar_menu_principal",
+            "ai_confidence": 0.95,
+            "state": {
+                "active_flow": "booking",
+                "booking_state": {
+                    "name": "selecting_doctor",
+                },
+                "booking_draft": {},
+            },
+        }
+        res = await main(args)
+        data = cast("dict[str, Any]", res["data"])
+        assert data["handled"] is True
+        assert data["nextState"] == {"name": "idle"}
+        assert "cancelado" in data["response_text"].lower()

@@ -533,6 +533,49 @@ async def _route_impl(input_data: RouterInput) -> RouterResult:
     current_state_raw = cast("dict[str, object]", state_dict.get("booking_state") or {"name": "idle"})
     current_state_name = str(current_state_raw.get("name", "idle"))
 
+    # Early rule-based or AI-based escape to main menu (este donde este)
+    trimmed = user_input.strip().lower()
+    is_menu_keyword = trimmed in {
+        "menu",
+        "menú",
+        "ir al menu",
+        "ir al menú",
+        "ver el menu",
+        "ver el menú",
+        "volver al menu",
+        "volver al menú",
+    }
+    is_abort_keyword = trimmed in _ABORT_KEYWORDS
+
+    ai_intent = input_data.ai_intent or ""
+    ai_conf = input_data.ai_confidence or 0.0
+
+    if is_menu_keyword or (ai_intent == "mostrar_menu_principal" and ai_conf >= _FSM_INTERRUPT_THRESHOLD):
+        if current_state_name != "idle":
+            return RouterResult(
+                handled=True,
+                nextState={"name": "idle"},
+                nextDraft={},
+                response_text="He cancelado la reserva en curso.\n\n" + get_main_menu_text(),
+            )
+        else:
+            return RouterResult(
+                handled=True,
+                nextState={"name": "idle"},
+                nextDraft={},
+                response_text=get_main_menu_text(),
+            )
+
+    if current_state_name != "idle" and (
+        is_abort_keyword or (ai_intent == "cancelar_cita" and ai_conf >= _FSM_INTERRUPT_THRESHOLD)
+    ):
+        return RouterResult(
+            handled=True,
+            nextState={"name": "idle"},
+            nextDraft={},
+            response_text="He cancelado la reserva en curso.\n\n" + get_main_menu_text(),
+        )
+
     # Callback double-click/out-of-order protection
     if is_callback:
         state_to_prefixes: dict[str, list[str]] = {
