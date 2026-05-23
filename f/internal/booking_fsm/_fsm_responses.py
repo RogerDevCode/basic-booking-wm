@@ -35,6 +35,21 @@ def build_doctors_prompt(specialty_name: str, items: list[NamedItem], error: str
     return f"{header}¿Con qué doctor deseas tu hora?\n\n{lines}"
 
 
+def build_doctors_with_specialty_prompt(
+    matches: list[dict[str, str]],
+    error: str | None = None,
+) -> str:
+    """Numbered prompt for multi-match doctor search. Each match must have 'name' and 'specialty_name'."""
+    header = build_header(error)
+    if not matches:
+        return f"{header}No hay doctores disponibles en este momento. 🛠️"
+    lines = "\n".join(f"{i + 1}. {m['name']} ({m['specialty_name']})" for i, m in enumerate(matches))
+    return (
+        f"{header}Encontré varios doctores con ese nombre. "
+        f"¿Con cuál deseas agendar?\n\n{lines}\n\nResponde con el número."
+    )
+
+
 def build_slots_prompt(doctor_name: str, items: list[TimeSlotItem], error: str | None = None) -> str:
     header = build_header(error)
     if not items:

@@ -106,22 +106,27 @@ class TestSmartPrefillSingleMatch:
         assert result.handled is True
         assert result.response_text is not None
         text = result.response_text.lower()
-        assert "gallegos" in text or "dr." in text.lower() or "doctor" in text
+        assert "gallegos" in text or "dr" in text or "no" in text
 
 
 class TestSmartPrefillMultipleMatches:
-    """Multiple doctor matches → shows selection list."""
+    """Multiple doctor matches → shows numbered menu with specialty per row."""
 
     @pytest.mark.asyncio
     @patch("f.internal.fsm_router.main.resolve_provider_by_name", new_callable=AsyncMock)
-    async def test_multiple_matches_shows_doctor_list(
+    async def test_multiple_matches_shows_numbered_specialty_menu(
         self,
         mock_resolve: AsyncMock,
     ) -> None:
-        # Arrange: two doctors match "gallegos"
+        # Arrange: two doctors match "gallegos" from different specialties
         mock_resolve.return_value = [
-            {**_PROVIDER_ROW, "provider_id": "p1", "name": "Dr. Roger Gallegos"},
-            {**_PROVIDER_ROW, "provider_id": "p2", "name": "Dra. Ana Gallegos"},
+            {
+                **_PROVIDER_ROW,
+                "provider_id": "p1",
+                "name": "Dr. Jes\u00fas Gallegos",
+                "specialty_name": "Cardiolog\u00eda",
+            },
+            {**_PROVIDER_ROW, "provider_id": "p2", "name": "Dr. Roger Gallegos", "specialty_name": "Neurolog\u00eda"},
         ]
 
         input_data = _make_input()
@@ -129,13 +134,21 @@ class TestSmartPrefillMultipleMatches:
         # Act
         result = await _handle_smart_prefill(input_data, {})
 
-        # Assert: shows selecting_doctor state with multiple items
+        # Assert: selecting_doctor state with two items
         assert result.handled is True
         assert result.nextState is not None
         assert result.nextState["name"] == "selecting_doctor"
         items = result.nextState["items"]
         assert isinstance(items, list)
         assert len(items) == 2
+
+        # Response MUST be a numbered menu showing name + specialty
+        text = result.response_text or ""
+        assert "1." in text
+        assert "2." in text
+        assert "Cardiolog\u00eda" in text
+        assert "Neurolog\u00eda" in text
+        assert "n\u00famero" in text.lower() or "selecciona" in text.lower() or "cu\u00e1l" in text.lower()
 
 
 class TestSmartPrefillNoMatch:

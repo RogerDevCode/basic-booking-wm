@@ -605,15 +605,16 @@
 - 🔧 `fn` `build_header` (L18)
 - 🔧 `fn` `build_specialty_prompt` (L22)
 - 🔧 `fn` `build_doctors_prompt` (L30)
-- 🔧 `fn` `build_slots_prompt` (L38)
-- 🔧 `fn` `build_confirmation_prompt` (L46)
-- 🔧 `fn` `build_loading_doctors_prompt` (L51)
-- 🔧 `fn` `build_loading_slots_prompt` (L55)
-- 🔧 `fn` `chunk_buttons` (L64)
-- 🔧 `fn` `build_specialty_keyboard` (L68)
-- 🔧 `fn` `build_doctor_keyboard` (L74)
-- 🔧 `fn` `build_time_slot_keyboard` (L81)
-- 🔧 `fn` `build_confirmation_keyboard` (L88)
+- 🔧 `fn` `build_doctors_with_specialty_prompt` (L38)
+- 🔧 `fn` `build_slots_prompt` (L53)
+- 🔧 `fn` `build_confirmation_prompt` (L61)
+- 🔧 `fn` `build_loading_doctors_prompt` (L66)
+- 🔧 `fn` `build_loading_slots_prompt` (L70)
+- 🔧 `fn` `chunk_buttons` (L79)
+- 🔧 `fn` `build_specialty_keyboard` (L83)
+- 🔧 `fn` `build_doctor_keyboard` (L89)
+- 🔧 `fn` `build_time_slot_keyboard` (L96)
+- 🔧 `fn` `build_confirmation_keyboard` (L103)
 
 ### `f/internal/booking_prefetch/main.py`
 - 🔧 `fn` `main` (L298)
@@ -671,7 +672,7 @@
 - ⚡ `async_fn` `handle` (L20)
 
 ### `f/internal/fsm_router/main.py`
-- 🔧 `fn` `main` (L850)
+- 🔧 `fn` `main` (L854)
 
 ### `f/internal/gcal_utils/_gcal_logic.py`
 - 🔧 `fn` `build_gcal_event` (L6)

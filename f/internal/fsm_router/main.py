@@ -34,7 +34,7 @@ from .._nlu_cache import ensure_nlu_cache
 from .._wmill_adapter import log
 from ..booking_fsm._fsm_machine import apply_transition, get_main_menu_text, parse_action, parse_callback_data
 from ..booking_fsm._fsm_models import BookingStateRoot, DraftBooking, NamedItem
-from ..booking_fsm._fsm_responses import build_specialty_prompt
+from ..booking_fsm._fsm_responses import build_doctors_with_specialty_prompt, build_specialty_prompt
 from ..booking_prefetch.main import (
     _fetch_slots_for_doctor as _prefetch_slots,
 )
@@ -235,7 +235,10 @@ async def _handle_smart_prefill(
 
     if len(matches) > 1:
         items_list = [{"id": str(m["provider_id"]), "name": str(m["name"])} for m in matches]
-        names = ", ".join(str(m["name"]) for m in matches)
+        # Build specialty-aware list for prompt (name + specialty per row)
+        matches_for_prompt = [{"name": str(m["name"]), "specialty_name": str(m["specialty_name"])} for m in matches]
+        # Preserve target_date in draft so it flows through once user picks a doctor
+        multi_draft = DraftBooking(target_date=(str(entities.get("date")) if entities.get("date") else None))
         return RouterResult(
             handled=True,
             nextState={
@@ -244,7 +247,8 @@ async def _handle_smart_prefill(
                 "specialtyName": "Selecciona un doctor",
                 "items": items_list,
             },
-            response_text=(f"Encontré varios doctores con ese nombre: {names}.\n\n¿Con cuál deseas agendar?"),
+            nextDraft=cast("dict[str, object]", multi_draft.model_dump()),
+            response_text=build_doctors_with_specialty_prompt(matches_for_prompt),
         )
 
     provider = matches[0]
