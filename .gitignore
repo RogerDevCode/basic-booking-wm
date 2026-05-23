@@ -282,3 +282,4 @@ docs/audit-*.md
 docs/temp-*.md
 docs/draft-*.md
 .codebase-index-cache.pkl
+.env-old
