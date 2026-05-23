@@ -5,7 +5,9 @@
 #   "asyncpg>=0.30.0",
 #   "redis>=7.4.0",
 #   "beartype>=0.19.0",
-#   "httpx>=0.28.1"
+#   "httpx>=0.28.1",
+#   "cryptography>=48.0.0",
+#   "returns>=0.24.0"
 # ]
 # ///
 from __future__ import annotations
@@ -18,6 +20,8 @@ from typing import Any, Final
 from pydantic import BaseModel, ConfigDict
 
 from ...rag_query.main import run_rag_query
+from ...reminder_config._config_models import InputSchema as ReminderConfigInput
+from ...reminder_config.main import run_reminder_config
 from .._booking_shared import get_mis_citas_text
 from .._nlu_cache import ensure_nlu_cache
 from .._wmill_adapter import log
@@ -132,7 +136,7 @@ async def _handle(inp: ConversationalInput) -> ConversationalResult:
         if not inp.client_id or not inp.pg_url:
             return ConversationalResult(
                 handled=True,
-                nextState=state_raw,
+                nextState={"name": "idle"},
                 response_text="📋 *Mis Horas*\n\nNo pude cargar tus citas en este momento.",
             )
 
@@ -140,13 +144,13 @@ async def _handle(inp: ConversationalInput) -> ConversationalResult:
         if not text:
             return ConversationalResult(
                 handled=True,
-                nextState=state_raw,
+                nextState={"name": "idle"},
                 response_text="📋 *Mis Horas*\n\nNo tienes horas agendadas próximamente.",
             )
 
         return ConversationalResult(
             handled=True,
-            nextState=state_raw,
+            nextState={"name": "idle"},
             response_text=text + "\n\n" + get_main_menu_text(),
         )
 
@@ -175,10 +179,31 @@ async def _handle(inp: ConversationalInput) -> ConversationalResult:
         )
 
     if handler == "recordatorios":
+        if not inp.client_id:
+            return ConversationalResult(
+                handled=True,
+                nextState={"name": "idle"},
+                response_text=(
+                    "⚠️ Necesitas estar registrado para configurar recordatorios.\n\n" + get_main_menu_text()
+                ),
+            )
+        config_input = ReminderConfigInput(
+            action="show",
+            client_id=inp.client_id,
+        )
+        res_config = await run_reminder_config(config_input, inp.pg_url)
         return ConversationalResult(
             handled=True,
-            nextState={"name": "reminders_config"},
-            response_text="🔔 *Recordatorios*\n\nUsa el menú de botones para configurar tus recordatorios.",
+            nextState={
+                "name": "reminders_config",
+                "client_id": inp.client_id,
+                "invalid_attempts": 0,
+            },
+            response_text=res_config.message,
+            inline_buttons=[
+                [{"text": btn.text, "callback_data": btn.callback_data} for btn in row]
+                for row in res_config.inline_buttons
+            ],
         )
 
     # RAG fallback

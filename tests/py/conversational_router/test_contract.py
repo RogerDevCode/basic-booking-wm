@@ -31,7 +31,32 @@ async def test_conversational_handler(intent: str, expected_state: str) -> None:
         "ai_confidence": 0.9,
         "current_state_name": "idle",
     }
-    res = await _main_async(args)
+    if expected_state == "reminders_config":
+        args["client_id"] = "c1"
+        from unittest.mock import AsyncMock, patch
+
+        from f.reminder_config._config_models import (
+            ChannelPreferences,
+            ReminderConfigResult,
+            ReminderPreferences,
+            WindowPreferences,
+        )
+
+        mock_pref = ReminderPreferences(
+            channels=ChannelPreferences(telegram=True, email=False),
+            windows=WindowPreferences(
+                w_1day=True, w_24h=False, w_12h=False, w_6h=False, w_2h=False, w_1h=False, w_30min=False
+            ),
+        )
+        mock_result = ReminderConfigResult(
+            message="Status: Telegram is active.", inline_buttons=[], preferences=mock_pref
+        )
+        with patch("f.internal.conversational_router.main.run_reminder_config", new_callable=AsyncMock) as mock_config:
+            mock_config.return_value = mock_result
+            res = await _main_async(args)
+    else:
+        res = await _main_async(args)
+
     assert res["data"]["handled"] is True
     assert res["data"]["nextState"]["name"] == expected_state
 

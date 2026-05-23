@@ -644,9 +644,9 @@
 - 🔧 `fn` `main` (L58)
 
 ### `f/internal/conversational_router/main.py`
-- 📦 `class` `ConversationalInput` (L39)
-- 📦 `class` `ConversationalResult` (L53)
-- 🔧 `fn` `main` (L218)
+- 📦 `class` `ConversationalInput` (L43)
+- 📦 `class` `ConversationalResult` (L57)
+- 🔧 `fn` `main` (L243)
 
 ### `f/internal/debug_db.py`
 - 🔧 `fn` `main` (L22)
