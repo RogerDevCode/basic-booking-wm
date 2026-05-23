@@ -20,6 +20,9 @@ redis_url = os.getenv("REDIS_URL")
 if redis_url:
     os.environ["REDIS_URL"] = redis_url.replace("redis://redis:", "redis://localhost:")
 
+if not os.getenv("DATABASE_URL") or not os.getenv("REDIS_URL"):
+    pytest.skip("DATABASE_URL and REDIS_URL must be set to run integration tests", allow_module_level=True)
+
 from f.gcal_reconcile._reconcile_models import InputSchema
 from f.gcal_reconcile.main import _main_async as run_gcal_reconcile
 from f.internal._db_client import create_db_client
