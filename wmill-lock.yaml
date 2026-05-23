@@ -143,7 +143,7 @@ locks:
   f/gcal_delete_event/main: 404b49e6cf03aa9dcf72eb61c6ef70030c64782324cbf9eff6601b9a24bad7ed
   f/gcal_reconcile/_reconcile_logic: b3260bc08a2e78ee7b224ac77ab532a2775f8bcc3b53fe8ab72c347b2ac36e17
   f/gcal_reconcile/_reconcile_models: f35db26f810abd5d43a5e26e021fa9b99d6d9b9c5008eaf5f4fa3c6e5b822614
-  f/gcal_reconcile/main: 3e2d60b0a584ad85a42cc436049ba749eb2952130fb1b24230100a7e6ac48745
+  f/gcal_reconcile/main: b1efc4fd20ca10f247cde972fe7757d4d856436e83d2bdb2d09273df8156f722
   f/gcal_reconcile/services: e02ce55cba46e916657077e456b7ee3a8f5b8400187dd41b70a335488f443da3
   f/gcal_reconcile/types: 70cd40e1d650853f04c32eb34a39905e519d460fa78379bfe3d33d801762f318
   f/gcal_sync/_gcal_api_adapter: 5765104c9684d34bb6cc23185b7b5810104df044d17c52a3b199f7e3ed5f011f
@@ -190,6 +190,7 @@ locks:
   f/internal/_booking_shared: 0d0d2aa5d4ea60b8518d4ef8eed09540068b415e1e1d8252991e56372f8f5df2
   f/internal/_booking_utils: 3bba2bf1c2eb75842a9946cfb9d12ce8ea9d0e9bc677656fc44669ee151bf52c
   f/internal/_config: cefb880d08a7e49064ec70a14e0de965aa40218415d1b97aa9244e079912224b
+  f/internal/_conversation_tx: 2facdf29440677446ed574faa7ab2592ab528be51d966aab3b3cc3ae8ba69090
   f/internal/_crypto: 79c5950ad644cc42e516cefbc159450cded2d31e727f8e8293ccdaebfaf58b5e
   f/internal/_date_resolver: 0084d4f436fcda970d4b03059336336c650ce7b4303b46f2fe48958ba022f4b3
   f/internal/_db_client: 22e5635aa55c9c4eecdf6718695d03a23172e06da1a09cbd6203b3734c5bdeeb
@@ -216,7 +217,7 @@ locks:
   f/internal/ai_agent/context-adjustment: 97ace27e16db7ff8f0f9f468e4718dbac0842b13a39b468436f817d12f22e7cc
   f/internal/ai_agent/guardrails: 81eb8c5bdeccfeccfad8d24033d3def32b3c01bda40a9874ddefa1a1f1c88975
   f/internal/ai_agent/llm-client: 78402b896e8f88414241214fb37ba01893979944e2f4f237b1bade4de85c0c36
-  f/internal/ai_agent/main: 4641d3facf5d19f4587c024a43264cbdbd6634e50a552fa27977890327803ef4
+  f/internal/ai_agent/main: 85faf11a3425527200d534ac43052f4366091932d946a4bc33e4dde23a625193
   f/internal/ai_agent/pipeline: 33d6399b3dda522efc9a27da410130c38bceb1f6737bb7a616fa5a35311056d5
   f/internal/ai_agent/prompt-builder: 1e694c1057a69d020ce84ac81d887494f8116c6a0182ce1f7750a3dd77f593ab
   f/internal/ai_agent/rag-context: aaf104fde2a23d3dfad79909b543580f2c857fab62838fde351c7a66544e8cbd
@@ -226,7 +227,7 @@ locks:
   f/internal/ai_agent/tracing: a6af0a970b0f677c89ed8fd742b7906ad0e0c5be888ed64b9d7b91e067fd008f
   f/internal/ai_agent/types: 1f5c83e143fd2518efddf780da467cd252d3d098dcbb3fa538134524e0aa6707
   f/internal/apply_fix_migration: 3ce4d2bc2196ffc36979ffa6c0403fb1018d9262a5fb63b3c510dd87a67054b0
-  f/internal/booking_confirm/main: 4e5a9434084a466b0ba4fb259571480f4e6a91e25b067f75124a30c6484b995f
+  f/internal/booking_confirm/main: a1c08f18aef5a70549f3fb03f4d2b2faae48afdf1ee4b791fac03c359ae79cd2
   f/internal/booking_fsm/__init__: 19fac8db7a71d7f04e596c59d0601aedde493b9524251bd260d9cd717e297c10
   f/internal/booking_fsm/_fsm_machine: 9df852faae297d5827ce7d36ec8c5b86de1891042d5ad63ea96f4765d66618a8
   f/internal/booking_fsm/_fsm_models: e29633cd086eb8a3161b8621433bc697157191efa2ca38b830435719ac95cf18
@@ -243,11 +244,11 @@ locks:
   f/internal/client_register/main: d35775a23541de395ce60a769162b5219f9c25c2b5bb3c404b0c48708f74b318
   f/internal/config/index: 641378f929c9896d042634242d5275148e458eeff7b9ee7130ce3b8c2bf837b6
   f/internal/conversation_get/_conversation_models: c4fc1c82e39861ed349e998b41a9d80da58a23fd7a3394773a124148a4d80e9b
-  f/internal/conversation_get/main: 142490f8d85269107ea6514ce4ab185006f92610812185c55eb1d3048c8abe0b
+  f/internal/conversation_get/main: ccb2521a80d0df3662b1a60490672ea342f252b2014fbfa20ce8940c2eb6193d
   f/internal/conversation_get/services: 55293f4e25f14183b440ed40626929beed15a3c1757554756ac154894dd1c3f6
   f/internal/conversation_get/types: bd0a7965450b74ff40b392c7d838475662e4dbdaef39f5bc84a7ad334d4e8b5f
   f/internal/conversation_update/_update_models: 29c09075dbd155cb28ca048ade53123d281f118bb1e2a007126e02caec02d74f
-  f/internal/conversation_update/main: efe08277708dce0c861e3110abeecace29a46d75ef9ad7f73c4f70c04e73ae30
+  f/internal/conversation_update/main: aa6469e0e543339ad6a3b48bc4e5695e4122a392295cd3cd88d0ab99f222d694
   f/internal/conversation_update/services: 73369028282757e3544db013441ac4287af36c781d8ce9d96abe7ac7297e7930
   f/internal/conversation_update/types: 1592aad61136cf21328d67d7528b62ed1002c1afd2eeaf1b8ee89a5b38e6ef49
   f/internal/conversation_verify/_verify_models: 2e1d1493030e96a99571063f86fdf2393f94094f890f849fe40c00b189ad7c7f
@@ -269,7 +270,7 @@ locks:
   f/internal/fsm_router/handlers/_booking_handler: 5e2bd2bbb0c9850a8a0883eb7c2873b06ef13bf62bc57fc9656f53d0c576fc4e
   f/internal/fsm_router/handlers/_menu_handler: d2d92cdac8107f92cb046f651b311889759ac9fff48686d236f0ddb1b43faba0
   f/internal/fsm_router/handlers/_registration_handler: f42b76d8fea0f580505d6c26f82318e40de81856a4b2e608e17937e23f4437fb
-  f/internal/fsm_router/main: fec2b044a5492d83e4b1f375cb188eb88f3e1291191c3a608bb7f5a006487264
+  f/internal/fsm_router/main: 33558b6d6bd136ee4ad41892661806dd83debbaf7493419f79736b834b266d45
   f/internal/fsm_router/services: 62bb43b0a8c8df7fed0c1e2769a6f37ed52f1c4d1ea587f1208224957a44c90b
   f/internal/fsm_router/types: 6bae7350c95aed1107ff0e35145129859c1dab4ca946a391d7a33cf92b6b43d5
   f/internal/fsm_router/wizard-integration: e5c9f74eaf251e6056456770aa5178e4d1ac151a1943e6c42472423aa68227ed
@@ -418,7 +419,7 @@ locks:
   f/telegram_menu/types: a42272e1ee760dc27fa79b50f4f79667cbc925b97e0de03cfa961cda50750f53
   f/telegram_send/_telegram_logic: 223c91594d153bc1943d3989fb46f219e461cda14af84d83c2f29e617a009485
   f/telegram_send/_telegram_models: 5cbe1d821155e4863f0609caee2a124dd5847bd880aebec022c31030e8601a95
-  f/telegram_send/main: 636cd314aed3376d4ca35d1f4f8ddeef6a652385ba95fe288824858abd46e010
+  f/telegram_send/main: b656a6d7c1d8ef57a633791142598971908878ac1aa4c2ffb14046fe1126427c
   f/telegram_send/services: 5452abeb7055d4da3f5423a4f15f34aae17dbf1ea798790ca1120fdc2b41e048
   f/telegram_send/types: d6cca05a6993770934e9f1d2afd580f4f59950908da83578c213a04952ceeca1
   f/web_admin_dashboard/_dashboard_logic: 4ed740aaa8651b9ed2eaeb76961e516bf7bf2017eb4d5efe94a4274f5ca54d53

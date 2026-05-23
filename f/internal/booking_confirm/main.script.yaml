@@ -26,6 +26,11 @@ schema:
       description: ''
       default: null
       originalType: string
+    redis_url:
+      type: string
+      description: ''
+      default: null
+      originalType: string
     start_time:
       type: string
       description: ''
