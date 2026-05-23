@@ -175,7 +175,8 @@ async def _handle_mis_citas(
     if not input_data.client_id or not input_data.pg_url:
         return RouterResult(
             handled=True,
-            nextState=current_state_raw,
+            nextState={"name": "idle"},
+            nextDraft={},
             response_text=("📋 *Mis Horas*\n\nNo pudimos cargar tus horas en este momento.\n\n" + get_main_menu_text()),
         )
 
@@ -184,7 +185,8 @@ async def _handle_mis_citas(
     if not text:
         return RouterResult(
             handled=True,
-            nextState=current_state_raw,
+            nextState={"name": "idle"},
+            nextDraft={},
             response_text=(
                 "📋 *Mis Horas*\n\n"
                 "No tienes horas próximas agendadas.\n\n"
@@ -194,7 +196,8 @@ async def _handle_mis_citas(
 
     return RouterResult(
         handled=True,
-        nextState=current_state_raw,
+        nextState={"name": "idle"},
+        nextDraft={},
         response_text=text + "\n\n" + get_main_menu_text(),
     )
 
