@@ -19,7 +19,7 @@ from typing import Final
 
 from beartype import beartype
 
-from .._conversation_tx import invalidate_cache, read_state, write_state
+from .._conversation_tx import ConversationConflictError, invalidate_cache, read_state, write_state
 from .._db_client import create_db_client
 from .._redis_client import create_redis_client
 from .._wmill_adapter import log
@@ -57,6 +57,12 @@ async def _update_conversation(
 
         # ── Read current state (serialized by advisory lock) ─────────────────
         state = await read_state(conn, input_data.chat_id)
+
+        # ── Verify optimistic locking ────────────────────────────────────────
+        if input_data.version is not None and state.version != input_data.version:
+            raise ConversationConflictError(
+                f"Optimistic lock conflict: expected version {input_data.version}, found {state.version}"
+            )
 
         # ── Merge updates ────────────────────────────────────────────────────
         if input_data.booking_state is not None:

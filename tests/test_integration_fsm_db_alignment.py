@@ -237,3 +237,40 @@ async def test_integration_concurrent_gcal_reconcile() -> None:
     assert "processed" in result
     assert "synced" in result
     assert isinstance(result["errors"], list)
+
+
+@pytest.mark.asyncio
+async def test_integration_optimistic_lock_conflict() -> None:
+    # AAA Pattern
+    # PREMISE: Expected version is different from Postgres version
+    from f.internal._conversation_tx import ConversationConflictError
+    from f.internal.conversation_update._update_models import ConversationUpdateInput
+    from f.internal.conversation_update.main import _update_conversation
+
+    chat_id = "test-integration-optimistic-lock-conflict"
+
+    db = await create_db_client()
+    try:
+        await db.execute("DELETE FROM conversation_states WHERE chat_id = $1", chat_id)
+
+        # Insert initial state at version=1
+        await db.execute(
+            "INSERT INTO conversation_states (chat_id, booking_state, version) VALUES ($1, $2::jsonb, 1)",
+            chat_id,
+            json.dumps({"name": "idle"}),
+        )
+
+        # ACTION: Try to update conversation state expecting version=2 (conflict, since DB has version=1)
+        inp = ConversationUpdateInput(
+            chat_id=chat_id,
+            booking_state={"name": "selecting_specialty"},
+            version=2,  # Conflicting version
+        )
+
+        with pytest.raises(ConversationConflictError) as exc_info:
+            await _update_conversation(inp)
+
+        assert "Optimistic lock conflict" in str(exc_info.value)
+    finally:
+        await db.execute("DELETE FROM conversation_states WHERE chat_id = $1", chat_id)
+        await db.close()

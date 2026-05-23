@@ -247,6 +247,9 @@ value:
           start_time:
             type: javascript
             expr: results.get_conversation_state.data?.booking_state?.draft?.start_time
+          version:
+            type: javascript
+            expr: results.get_conversation_state.data?.version || null
         path: f/internal/booking_confirm/main
       skip_if:
         expr: >-
@@ -268,6 +271,7 @@ value:
                 "booking_state": results.fsm_router?.data?.nextState || results.conversational_router?.data?.nextState,
                 "active_flow": results.fsm_router?.data?.active_flow || null,
                 "booking_draft": results.fsm_router?.data?.nextDraft ?? null,
+                "version": results.get_conversation_state.data?.version || null,
                 "pending_data": {
                   "router_handled": results.fsm_router?.data?.handled || results.conversational_router?.data?.handled,
                   "text_kind": results.webhook_trigger.text_kind,

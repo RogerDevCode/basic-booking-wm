@@ -141,6 +141,7 @@ async def _confirm_booking_core(
     duration: int,
     start_time: str,
     chat_id: str,
+    version: int | None = None,
 ) -> BookingConfirmOutput:
     try:
         parsed_start = datetime.fromisoformat(start_time.replace("Z", "+00:00"))
@@ -174,6 +175,8 @@ async def _confirm_booking_core(
 
         # ── Verify FSM state is 'confirming' (inside the lock) ──────────
         state = await read_state(conn, chat_id)
+        if version is not None and state.version != version:
+            raise BookingMissingParamsError(f"state_version_mismatch:expected={version},actual={state.version}")
         current_name = state.booking_state.get("name", "unknown")
         if current_name != "confirming":
             log(
@@ -235,6 +238,7 @@ async def _main_async(
     chat_id: str | None = None,
     pg_url: str | None = None,
     redis_url: str | None = None,
+    version: int | None = None,
 ) -> dict[str, object]:
     log("BOOKING_CONFIRM_START", chat_id=chat_id, provider_id=provider_id, start_time=start_time, module=MODULE)
 
@@ -262,6 +266,7 @@ async def _main_async(
             duration=duration,
             start_time=start_time,
             chat_id=chat_id,
+            version=version,
         )
 
         # ── Cache invalidation AFTER successful commit ───────────────────
@@ -310,6 +315,7 @@ def main(
     chat_id: str | None = None,
     pg_url: str | None = None,
     redis_url: str | None = None,
+    version: int | None = None,
 ) -> dict[str, object]:
     try:
         return asyncio.run(
@@ -320,6 +326,7 @@ def main(
                 chat_id=chat_id,
                 pg_url=pg_url,
                 redis_url=redis_url,
+                version=version,
             )
         )
     except Exception as e:

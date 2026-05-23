@@ -15,6 +15,7 @@ class ConversationState(BaseModel):
     booking_state: dict[str, Any] | None = None
     booking_draft: dict[str, Any] | None = None
     message_id: int | None = None
+    version: int = 1
     updated_at: str
 
 

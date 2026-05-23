@@ -14,6 +14,7 @@
 # ///
 from __future__ import annotations
 
+import contextlib
 import json
 from datetime import UTC, datetime
 from typing import Final, cast
@@ -48,6 +49,7 @@ def _snapshot_to_state(chat_id: str, data: dict[str, object]) -> ConversationSta
         booking_state=cast("dict[str, object] | None", data.get("booking_state")),
         booking_draft=cast("dict[str, object] | None", data.get("booking_draft")),
         message_id=cast("int | None", data.get("message_id")),
+        version=cast("int", data.get("version", 1)),
         updated_at=cast("str", data.get("updated_at", datetime.now(UTC).isoformat())),
     )
 
@@ -81,9 +83,15 @@ async def _get_conversation(
     # ── 2. Cache MISS or Redis down → rebuild from Postgres ──────────────────
     conn = await create_db_client(pg_url)
     try:
+        await conn.execute("BEGIN")
+        await conn.execute(
+            "SELECT pg_advisory_xact_lock(chat_id_lock_key($1))",
+            chat_id,
+        )
         snapshot = await read_state(conn, chat_id)
 
         if snapshot.is_new:
+            await conn.execute("COMMIT")
             return ConversationGetResult(data=None)
 
         now = datetime.now(UTC).isoformat()
@@ -93,6 +101,7 @@ async def _get_conversation(
             "booking_draft": snapshot.booking_draft,
             "pending_data": snapshot.pending_data,
             "message_id": snapshot.message_id,
+            "version": snapshot.version,
             "updated_at": now,
         }
         state = _snapshot_to_state(chat_id, state_dict)
@@ -105,9 +114,12 @@ async def _get_conversation(
         except Exception:
             pass  # Cache refill failure is non-fatal
 
+        await conn.execute("COMMIT")
         return ConversationGetResult(data=state)
 
     except Exception as pg_err:
+        with contextlib.suppress(Exception):
+            await conn.execute("ROLLBACK")
         log("PG_READ_ERROR", error=str(pg_err), chat_id=chat_id, module=MODULE)
         raise RuntimeError(f"conversation_get pg_error: {pg_err}") from pg_err
     finally:

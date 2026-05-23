@@ -15,6 +15,7 @@ class ConversationUpdateInput(BaseModel):
     booking_state: dict[str, Any] | None = None
     booking_draft: dict[str, Any] | None = None
     message_id: int | None = None
+    version: int | None = None
     clear: bool = False
 
 

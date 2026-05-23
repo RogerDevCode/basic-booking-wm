@@ -568,8 +568,8 @@
 
 ### `f/internal/booking_confirm/main.py`
 - 📦 `class` `BookingConfirmOutput` (L47)
-- ⚡ `async_fn` `operation` (L168)
-- 🔧 `fn` `main` (L306)
+- ⚡ `async_fn` `operation` (L169)
+- 🔧 `fn` `main` (L311)
 
 ### `f/internal/booking_fsm/_fsm_machine.py`
 - 🔧 `fn` `get_main_menu_text` (L46)
@@ -623,17 +623,17 @@
 
 ### `f/internal/conversation_get/_conversation_models.py`
 - 📦 `class` `ConversationState` (L8)
-- 📦 `class` `ConversationGetResult` (L21)
+- 📦 `class` `ConversationGetResult` (L22)
 
 ### `f/internal/conversation_get/main.py`
-- 🔧 `fn` `main` (L127)
+- 🔧 `fn` `main` (L139)
 
 ### `f/internal/conversation_update/_update_models.py`
 - 📦 `class` `ConversationUpdateInput` (L8)
-- 📦 `class` `ConversationUpdateResult` (L21)
+- 📦 `class` `ConversationUpdateResult` (L22)
 
 ### `f/internal/conversation_update/main.py`
-- 🔧 `fn` `main` (L112)
+- 🔧 `fn` `main` (L118)
 
 ### `f/internal/conversation_verify/_verify_models.py`
 - 📦 `class` `PersistedConversationState` (L6)
