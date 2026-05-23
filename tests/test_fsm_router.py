@@ -259,3 +259,90 @@ class TestTelegramRouterEscape:
         assert data["handled"] is True
         assert data["nextState"] == {"name": "idle"}
         assert "cancelado" in data["response_text"].lower()
+
+
+class TestTelegramRouterDateHandling:
+    """Tests to verify target date extraction, propagation, and prefetch logic."""
+
+    @pytest.mark.asyncio
+    async def test_router_initial_intent_saves_target_date(self) -> None:
+        # Arrange
+        args: dict[str, Any] = {
+            "chat_id": "123",
+            "client_id": "c1",
+            "user_input": "quiero hora para el 2026-05-27",
+            "ai_intent": "crear_cita",
+            "ai_confidence": 1.0,
+            "ai_entities": {"date": "2026-05-27"},
+            "state": {
+                "active_flow": "booking",
+                "booking_state": {"name": "idle"},
+                "booking_draft": {},
+            },
+            "requires_fsm_routing": True,
+            "items": [{"id": "spec1", "name": "Cardiología"}],
+            "phone": "+34600000000",
+        }
+
+        # Act
+        res = await main(args)
+        assert res is not None
+        data = cast("dict[str, Any]", res["data"])
+
+        # Assert
+        assert data["handled"] is True
+        assert data["nextState"]["name"] == "selecting_specialty"
+        assert data["nextDraft"].get("target_date") == "2026-05-27"
+
+    @pytest.mark.asyncio
+    async def test_fsm_machine_propagates_target_date(self) -> None:
+        # Arrange
+        from f.internal.booking_fsm._fsm_machine import apply_transition, extract_draft_from_state
+        from f.internal.booking_fsm._fsm_models import (
+            ConfirmingState,
+            DraftBooking,
+            SelectAction,
+            SelectingDoctorState,
+            SelectingTimeState,
+        )
+
+        current_state = SelectingDoctorState(
+            specialtyId="s1",
+            specialtyName="Cardiología",
+            items=[{"id": "doc1", "name": "Carolina Muñoz Soto"}],
+        )
+        action = SelectAction(value="doc1")
+        draft = DraftBooking(target_date="2026-05-27")
+        time_slots = [{"id": "slot1", "label": "Mié 27 May · 10:00", "start_time": "2026-05-27T10:00:00Z"}]
+
+        # Act
+        outcome = apply_transition(current_state, action, draft, items=time_slots)
+
+        # Assert
+        next_state = outcome["nextState"]
+        assert isinstance(next_state, SelectingTimeState)
+        assert next_state.targetDate == "2026-05-27"
+
+        # Act 2: Extract draft from SelectingDoctorState should preserve target_date
+        extracted_doctor_draft = extract_draft_from_state(current_state, previous_draft=draft)
+        assert extracted_doctor_draft.target_date == "2026-05-27"
+
+        # Act 3: SelectingTimeState selecting slot -> ConfirmingState
+        time_state = SelectingTimeState(
+            specialtyId="s1",
+            doctorId="doc1",
+            doctorName="Carolina Muñoz Soto",
+            targetDate="2026-05-27",
+            items=[{"id": "slot1", "label": "Mié 27 May · 10:00", "start_time": "2026-05-27T10:00:00Z"}],
+        )
+        time_action = SelectAction(value="slot1")
+        time_outcome = apply_transition(time_state, time_action, draft)
+
+        # Assert 3
+        confirming_state = time_outcome["nextState"]
+        assert isinstance(confirming_state, ConfirmingState)
+        assert confirming_state.draft.target_date == "2026-05-27"
+
+        # Act 4: Extract draft from ConfirmingState
+        extracted_confirming_draft = extract_draft_from_state(confirming_state)
+        assert extracted_confirming_draft.target_date == "2026-05-27"

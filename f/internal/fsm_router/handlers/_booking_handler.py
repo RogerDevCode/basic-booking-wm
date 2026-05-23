@@ -143,7 +143,7 @@ async def handle(input_data: RouterInput) -> RouterResult:
             return RouterResult(handled=False)
 
         next_state = outcome["nextState"]
-        next_draft = extract_draft_from_state(next_state)
+        next_draft = extract_draft_from_state(next_state, previous_draft=draft)
 
         return RouterResult(
             handled=True,

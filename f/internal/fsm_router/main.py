@@ -323,6 +323,7 @@ async def _handle_smart_prefill(
                 "specialtyId": specialty_id,
                 "doctorId": provider_id,
                 "doctorName": doctor_name,
+                "targetDate": target_date,
                 "items": slots,
             },
             nextDraft=cast("dict[str, object]", draft.model_dump()),
@@ -721,6 +722,27 @@ async def _route_impl(input_data: RouterInput) -> RouterResult:
                 if smart_result.handled:
                     return smart_result
 
+                # Resolve target date from AI entities
+                target_date: str | None = None
+                date_entity = input_data.ai_entities.get("date")
+                if date_entity:
+                    try:
+                        default_tz = "America/Santiago"
+                        date_str = str(date_entity)
+                        hybrid_result = _resolve_datetime_hybrid(date_str, provider_tz=default_tz)
+                        if hybrid_result.intent_detected and hybrid_result.datetime_iso:
+                            target_date = hybrid_result.datetime_iso[:10]
+                        else:
+                            target_date = resolve_date(date_str, {"timezone": default_tz})
+                    except Exception:
+                        log(
+                            "DATE_RESOLUTION_FAILED",
+                            date=str(date_entity),
+                            chat_id=input_data.chat_id,
+                            module=_MODULE,
+                        )
+                        target_date = None
+
                 # Intent detected — show specialty list, do NOT apply_transition
                 # (user hasn't selected anything yet, just expressed intent)
                 specialty_items_raw = list(input_data.items) if input_data.items else []
@@ -729,9 +751,15 @@ async def _route_impl(input_data: RouterInput) -> RouterResult:
                     response = build_specialty_prompt(specialty_items)
                 else:
                     response = "Buscando especialidades disponibles..."
+
+                next_draft = dict(draft_raw)
+                if target_date:
+                    next_draft["target_date"] = target_date
+
                 return RouterResult(
                     handled=True,
                     nextState={"name": "selecting_specialty", "items": specialty_items_raw},
+                    nextDraft=next_draft,
                     response_text=response,
                 )
             elif intent in ("mis_citas", "ver_mis_citas") or intent in ("cancelar_cita", "reagendar_cita"):

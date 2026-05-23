@@ -576,14 +576,14 @@
 - 🔧 `fn` `parse_action` (L59)
 - 🔧 `fn` `parse_callback_data` (L102)
 - 🔧 `fn` `apply_transition` (L119)
-- 🔧 `fn` `extract_draft_from_state` (L440)
-- 🔧 `fn` `flow_step_from_state` (L469)
+- 🔧 `fn` `extract_draft_from_state` (L443)
+- 🔧 `fn` `flow_step_from_state` (L480)
 
 ### `f/internal/booking_fsm/_fsm_models.py`
 - 📦 `class` `NamedItem` (L20)
 - 📦 `class` `TimeSlotItem` (L25)
 - 📦 `class` `DraftCore` (L36)
-- 📦 `class` `DraftBooking` (L48)
+- 📦 `class` `DraftBooking` (L49)
 - 🔧 `fn` `empty_draft` (L56)
 - 📦 `class` `IdleState` (L65)
 - 📦 `class` `SelectingSpecialtyState` (L69)
@@ -616,7 +616,7 @@
 - 🔧 `fn` `build_confirmation_keyboard` (L88)
 
 ### `f/internal/booking_prefetch/main.py`
-- 🔧 `fn` `main` (L276)
+- 🔧 `fn` `main` (L298)
 
 ### `f/internal/client_register/main.py`
 - 🔧 `fn` `main` (L73)
@@ -671,7 +671,7 @@
 - ⚡ `async_fn` `handle` (L20)
 
 ### `f/internal/fsm_router/main.py`
-- 🔧 `fn` `main` (L822)
+- 🔧 `fn` `main` (L850)
 
 ### `f/internal/gcal_utils/_gcal_logic.py`
 - 🔧 `fn` `build_gcal_event` (L6)

@@ -17,7 +17,7 @@ from __future__ import annotations
 import asyncio
 import traceback
 import zoneinfo
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import TYPE_CHECKING, Final, cast
 
 from ...services.booking._booking_errors import BookingPrefetchBlockedError
@@ -106,9 +106,13 @@ async def _fetch_slots_for_doctor(
     provider_today = datetime.now(tz).date()
 
     if target_date:
-        # Fetch only the specific date requested
-        date_from = target_date
-        date_to = target_date
+        # Fetch starting from the target date for a 7-day window
+        try:
+            start_dt = date.fromisoformat(target_date)
+        except Exception:
+            start_dt = provider_today
+        date_from = start_dt.isoformat()
+        date_to = (start_dt + timedelta(days=7)).isoformat()
     else:
         # Default: 7-day window
         date_from = (provider_today + timedelta(days=1) if require_advance else provider_today).isoformat()
@@ -236,8 +240,16 @@ async def _main_async(
                 if client_id and await _has_active_booking_for_provider(db, client_id, doctor_id):
                     log("PREFETCH_BLOCKED_ACTIVE_BOOKING", client_id=client_id, provider_id=doctor_id, module=MODULE)
                     raise BookingPrefetchBlockedError("already_booked")
-                slots = await _fetch_slots_for_doctor(db, doctor_id)
-                log("PREFETCH_SLOTS_AHEAD", count=len(slots), doctor_id=doctor_id, module=MODULE)
+                draft = booking_draft or {}
+                target_date = cast("str | None", draft.get("target_date"))
+                slots = await _fetch_slots_for_doctor(db, doctor_id, target_date)
+                log(
+                    "PREFETCH_SLOTS_AHEAD",
+                    count=len(slots),
+                    doctor_id=doctor_id,
+                    target_date=target_date,
+                    module=MODULE,
+                )
                 return {"items": slots, "prefetch_type": "time_slots", "resolved_doctor_id": doctor_id}
             # Fallback: fetch doctor list if state has no items
             if not state_items:
@@ -256,8 +268,18 @@ async def _main_async(
             if not state_time_items:
                 doctor_id = cast("str | None", (booking_state or {}).get("doctorId"))
                 if doctor_id:
-                    slots = await _fetch_slots_for_doctor(db, str(doctor_id))
-                    log("PREFETCH_SLOTS_RETRY", count=len(slots), doctor_id=doctor_id, module=MODULE)
+                    state_raw = booking_state or {}
+                    target_date = cast("str | None", state_raw.get("targetDate"))
+                    if not target_date:
+                        target_date = cast("str | None", (booking_draft or {}).get("target_date"))
+                    slots = await _fetch_slots_for_doctor(db, str(doctor_id), target_date)
+                    log(
+                        "PREFETCH_SLOTS_RETRY",
+                        count=len(slots),
+                        doctor_id=doctor_id,
+                        target_date=target_date,
+                        module=MODULE,
+                    )
                     return {"items": slots, "prefetch_type": "time_slots"}
 
         log("PREFETCH_NO_MATCH", state_name=state_name, module=MODULE)

@@ -244,6 +244,7 @@ def apply_transition(
                         specialtyId=current_state.specialtyId,
                         doctorId=doctor["id"],
                         doctorName=doctor["name"],
+                        targetDate=draft.target_date,
                         items=time_items,
                     ),
                     responseText=build_slots_prompt(doctor["name"], time_items),
@@ -254,6 +255,7 @@ def apply_transition(
                     specialtyId=current_state.specialtyId,
                     doctorId=doctor["id"],
                     doctorName=doctor["name"],
+                    targetDate=draft.target_date,
                     items=[],
                 ),
                 responseText=build_loading_slots_prompt(doctor["name"]),
@@ -348,6 +350,7 @@ def apply_transition(
                         start_time=new_draft.start_time,
                         time_label=new_draft.time_label,
                         client_id=new_draft.client_id,
+                        target_date=new_draft.target_date,
                     ),
                 ),
                 responseText=build_confirmation_prompt(slot["label"], current_state.doctorName),
@@ -437,8 +440,10 @@ STEP_TO_FLOW_STEP: Final[dict[str, int]] = {
 }
 
 
-def extract_draft_from_state(state: BookingState) -> DraftBooking:
+def extract_draft_from_state(state: BookingState, previous_draft: DraftBooking | None = None) -> DraftBooking:
     """Extract accumulated draft data from a booking state."""
+    target_date = previous_draft.target_date if previous_draft else None
+
     if isinstance(state, ConfirmingState):
         return DraftBooking(
             specialty_id=state.draft.specialty_id,
@@ -448,22 +453,28 @@ def extract_draft_from_state(state: BookingState) -> DraftBooking:
             start_time=state.draft.start_time,
             time_label=state.draft.time_label,
             client_id=state.draft.client_id,
+            target_date=state.draft.target_date or target_date,
         )
     if isinstance(state, SelectingTimeState):
         return DraftBooking(
             specialty_id=state.specialtyId,
             doctor_id=state.doctorId,
             doctor_name=state.doctorName,
-            target_date=state.targetDate,
+            target_date=state.targetDate or target_date,
         )
     if isinstance(state, SelectingDoctorState):
         return DraftBooking(
             specialty_id=state.specialtyId,
             specialty_name=state.specialtyName,
+            target_date=target_date,
+        )
+    if isinstance(state, SelectingSpecialtyState):
+        return DraftBooking(
+            target_date=target_date,
         )
     if isinstance(state, CompletedState):
         return DraftBooking(last_state_name="completed")
-    return DraftBooking()
+    return DraftBooking(target_date=target_date)
 
 
 def flow_step_from_state(state: BookingState) -> int:

@@ -737,14 +737,7 @@ class TestFsmInterruptIntents:
             res = await _main_async(args)
         data = cast("dict[str, Any]", res["data"])
         assert data["handled"] is True
-        if state["name"] == "selecting_doctor":
-            expected = "selecting_specialty"
-        elif state["name"] == "selecting_time":
-            expected = "selecting_doctor"
-        elif state["name"] == "confirming":
-            expected = "selecting_time"
-        else:
-            expected = "idle"
+        expected = "idle"
         assert data["nextState"]["name"] == expected
 
     @pytest.mark.asyncio

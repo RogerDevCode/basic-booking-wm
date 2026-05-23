@@ -43,10 +43,10 @@ class DraftCore(BaseModel):
     start_time: str | None = None
     time_label: str | None = None
     client_id: str | None = None
+    target_date: str | None = None
 
 
 class DraftBooking(DraftCore):
-    target_date: str | None = None
     provider_id: str | None = None
     service_id: str | None = None
     # Avoid circular dependency with BookingState for now
