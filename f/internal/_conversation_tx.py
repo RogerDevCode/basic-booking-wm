@@ -85,7 +85,7 @@ async def write_state(conn: DBClient, state: ConversationSnapshot) -> None:
     Must be called inside a transaction that holds the advisory lock.
     Raises ConversationConflictError if version mismatch detected.
     """
-    now = datetime.now(UTC).isoformat()
+    now = datetime.now(UTC)
     bs_json = json.dumps(state.booking_state)
     bd_json = json.dumps(state.booking_draft) if state.booking_draft else None
     pd_json = json.dumps(state.pending_data)
