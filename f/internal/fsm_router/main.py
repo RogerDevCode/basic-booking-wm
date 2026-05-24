@@ -18,26 +18,41 @@
 # ///
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Final, cast
+from typing import TYPE_CHECKING, Any, Final, cast
 
 from beartype import beartype
+
+from f.internal._config import DEFAULT_TIMEZONE
 
 if TYPE_CHECKING:
     from ...reminder_config._config_models import InlineButton
 
 from ...nlu._datetime_resolver import resolve_datetime as _resolve_datetime_hybrid
 from ...nlu._tfidf_classifier import classify_intent
-from .._booking_shared import get_mis_citas_text, resolve_provider_by_name
+from .._booking_shared import (
+    get_mis_citas_buttons,
+    get_mis_citas_text,
+    resolve_provider_by_name,
+)
 from .._date_resolver import resolve_date
 from .._db_client import create_db_client as _create_db_client
 from .._nlu_cache import ensure_nlu_cache
+from .._report_logic import generate_booking_report
 from .._wmill_adapter import log
-from ..booking_fsm._fsm_machine import apply_transition, get_main_menu_text, parse_action, parse_callback_data
-from ..booking_fsm._fsm_models import BookingStateRoot, DraftBooking, NamedItem
+from ..booking_fsm._fsm_machine import (
+    apply_transition,
+    get_main_menu_inline_buttons,
+    get_main_menu_text,
+    parse_action,
+    parse_callback_data,
+)
+from ..booking_fsm._fsm_models import BookingStateRoot, DraftBooking, NamedItem, TimeSlotItem
 from ..booking_fsm._fsm_responses import (
     build_doctor_keyboard,
     build_doctors_with_specialty_prompt,
+    build_specialty_keyboard,
     build_specialty_prompt,
+    build_time_slot_keyboard,
 )
 from ..booking_prefetch.main import (
     _fetch_slots_for_doctor as _prefetch_slots,
@@ -175,6 +190,7 @@ def _start_phone_only(
 async def _handle_mis_citas(
     input_data: RouterInput,
     current_state_raw: dict[str, object],
+    session_id: str | None = None,
 ) -> RouterResult:
     if not input_data.client_id or not input_data.pg_url:
         return RouterResult(
@@ -187,28 +203,30 @@ async def _handle_mis_citas(
     text = await get_mis_citas_text(input_data.client_id, input_data.pg_url, input_data.chat_id)
 
     if not text:
+        msg = "📋 *Mis Horas*\n\n" "No tienes horas próximas agendadas."
+
         return RouterResult(
             handled=True,
             nextState={"name": "idle"},
             nextDraft={},
-            response_text=(
-                "📋 *Mis Horas*\n\n"
-                "No tienes horas próximas agendadas.\n\n"
-                "Puedes agendar una nueva hora seleccionando la opción 1.\n\n" + get_main_menu_text()
-            ),
+            response_text=msg + "\n\n" + get_main_menu_text(),
         )
+
+    buttons = await get_mis_citas_buttons(input_data.client_id, input_data.pg_url, session_id=session_id)
 
     return RouterResult(
         handled=True,
         nextState={"name": "idle"},
         nextDraft={},
         response_text=text + "\n\n" + get_main_menu_text(),
+        inline_buttons=cast("list[list[InlineButton]] | None", buttons),
     )
 
 
 async def _handle_smart_prefill(
     input_data: RouterInput,
     draft_raw: dict[str, object],
+    session_id: str | None = None,
 ) -> RouterResult:
     """Smart pre-fill: resolve provider from AI entities and skip steps."""
     entities = input_data.ai_entities
@@ -254,8 +272,8 @@ async def _handle_smart_prefill(
             nextDraft=cast("dict[str, object]", multi_draft.model_dump()),
             response_text=build_doctors_with_specialty_prompt(matches_for_prompt),
             inline_buttons=cast(
-                "list[list[InlineButton]]",
-                build_doctor_keyboard(cast("list[NamedItem]", items_list)),
+                "list[list[dict[str, str]]]",
+                build_doctor_keyboard(cast("list[NamedItem]", items_list), session_id=session_id),
             ),
         )
 
@@ -294,7 +312,7 @@ async def _handle_smart_prefill(
                     " WHERE p.provider_id = $1::uuid",
                     provider_id,
                 )
-                provider_tz = str(tz_row["tz_name"]) if tz_row and tz_row["tz_name"] else "America/Santiago"
+                provider_tz = str(tz_row["tz_name"]) if tz_row and tz_row["tz_name"] else DEFAULT_TIMEZONE
             finally:
                 await db.close()
 
@@ -340,18 +358,26 @@ async def _handle_smart_prefill(
             },
             nextDraft=cast("dict[str, object]", draft.model_dump()),
             response_text=(f"Encontré al *{doctor_name}* ({specialty_name}). Horarios disponibles{date_label}:"),
+            inline_buttons=cast(
+                "list[list[dict[str, str]]]", build_time_slot_keyboard(cast("list[TimeSlotItem]", slots), session_id=session_id)
+            ),
         )
 
     date_msg = f" para el {target_date}" if target_date else " esta semana"
+    specialty_items_raw = list(input_data.items) if input_data.items else []
+    specialty_items = cast("list[NamedItem]", specialty_items_raw)
     return RouterResult(
         handled=True,
-        nextState={"name": "selecting_specialty"},
+        nextState={"name": "selecting_specialty", "items": specialty_items_raw},
         nextDraft=cast("dict[str, object]", draft.model_dump()),
         response_text=(
             f"El *{doctor_name}* no tiene horarios disponibles{date_msg}.\n\n"
             "¿Te gustaría ver otras especialidades o elegir otro doctor?"
         ),
-    )
+        inline_buttons=cast(
+            "list[list[dict[str, str]]] | None",
+            build_specialty_keyboard(specialty_items, session_id=session_id) if specialty_items else None,
+        ),    )
 
 
 def _handle_registration_state(
@@ -534,13 +560,137 @@ async def _route_impl(input_data: RouterInput) -> RouterResult:
 
     user_input = input_data.user_input
     is_callback = ":" in user_input or user_input in ["back", "cancel", "cfm:yes", "cfm:no"]
+    current_state_raw = cast("dict[str, object]", state_dict.get("booking_state") or {"name": "idle"})
+    current_session = str(state_dict.get("session_id") or "")
 
     if user_input.strip() == "/start":
         return RouterResult(
             handled=True,
             active_flow="booking",
-            nextState={"name": "idle"},
+            nextState={"name": "idle", "session_id": str(input_data.update_id)},
             response_text=_get_start_text(input_data.client_name, input_data.phone),
+        )
+
+    # ─── Session Validation (Callback security) ───
+    if is_callback:
+        if current_session and "|" in user_input:
+            parts = user_input.split("|")
+            btn_session = parts[1]
+            if btn_session != current_session:
+                log(
+                    "SESSION_MISMATCH_IGNORED",
+                    current=current_session,
+                    button=btn_session,
+                    user_input=user_input,
+                    module=_MODULE,
+                )
+                return RouterResult(
+                    handled=True,
+                    nextState=current_state_raw,
+                    response_text="⚠️ Este menú ha caducado por una nueva sesión (/start). Por favor usa el menú más reciente.",
+                    active_flow=active_flow,
+                )
+        # Strip session_id for internal processing
+        if "|" in user_input:
+            user_input = user_input.split("|")[0]
+            is_callback = ":" in user_input or user_input in ["back", "cancel", "cfm:yes", "cfm:no"]
+
+    # ─── Fast-Track (Wallet) Bypass ───
+    if user_input.startswith("cmd:repeat:"):
+        parts = user_input.split(":")
+        if len(parts) == 4:
+            pid = parts[2]
+            # sid = parts[3] # Not strictly needed for the fetch, but keep for future use if sid is required
+
+            # Fetch slots ahead to jump straight to time selection
+            if not input_data.pg_url:
+                return RouterResult(handled=False)
+
+            try:
+                slots = await _fetch_slots_for_doctor(input_data.pg_url, pid)
+                db = await _create_db_client(input_data.pg_url)
+                try:
+                    p_row = await db.fetchrow(
+                        "SELECT name, specialty_id FROM providers WHERE provider_id = $1::uuid", pid
+                    )
+                    p_name = str(p_row["name"]) if p_row else "Especialista"
+                    sp_id = str(p_row["specialty_id"]) if p_row else ""
+
+                    sp_row = await db.fetchrow("SELECT name FROM specialties WHERE specialty_id = $1::uuid", sp_id)
+                    sp_name = str(sp_row["name"]) if sp_row else ""
+                finally:
+                    await db.close()
+
+                draft_ft = DraftBooking(
+                    specialty_id=sp_id,
+                    specialty_name=sp_name,
+                    doctor_id=pid,
+                    doctor_name=p_name,
+                )
+
+                return RouterResult(
+                    handled=True,
+                    nextState={
+                        "name": "selecting_time",
+                        "specialtyId": sp_id,
+                        "doctorId": pid,
+                        "doctorName": p_name,
+                        "items": slots,
+                    },
+                    nextDraft=cast("dict[str, object]", draft_ft.model_dump()),
+                    response_text=(
+                        f"🔁 *Repitiendo reserva*\n\nDoctor: *{p_name}*\n"
+                        f"Especialidad: {sp_name}\n\nSelecciona un nuevo horario:"
+                    ),
+                    inline_buttons=cast(
+                        "list[list[InlineButton]]", build_time_slot_keyboard(cast("list[TimeSlotItem]", slots), session_id=current_session)
+                    ),
+                )
+            except Exception as e:
+                log("FAST_TRACK_BYPASS_FAILED", error=str(e), module=_MODULE)
+                # Fallback to main menu if fast-track fails
+                return RouterResult(
+                    handled=True,
+                    nextState={"name": "idle"},
+                    response_text=(
+                        "No pudimos repetir la reserva. Por favor selecciona una opción:\n\n" + get_main_menu_text()
+                    ),
+                    inline_buttons=get_main_menu_inline_buttons(),
+                )
+
+    # ─── Activity Report (with Pagination) ───
+    if user_input.startswith("cmd:reporte"):
+        if not input_data.client_id or not input_data.pg_url:
+            return RouterResult(
+                handled=True,
+                nextState={"name": "idle"},
+                response_text="📊 *Generar Reporte*\n\nNo pude generar tu reporte en este momento.\n\n"
+                + get_main_menu_text(),
+                inline_buttons=get_main_menu_inline_buttons(),
+            )
+
+        page = 1
+        if user_input.startswith("cmd:reporte:p:"):
+            try:
+                page = int(user_input.split(":")[-1])
+            except (ValueError, IndexError):
+                page = 1
+
+        report = await generate_booking_report(input_data.client_id, input_data.pg_url, page=page, session_id=current_session)
+        if not report:
+            return RouterResult(
+                handled=True,
+                nextState={"name": "idle"},
+                response_text="📊 *Generar Reporte*\n\nHubo un error al generar el reporte.\n\n" + get_main_menu_text(),
+                inline_buttons=get_main_menu_inline_buttons(),
+            )
+
+        return RouterResult(
+            handled=True,
+            nextState={"name": "idle"},
+            response_text=report["text"] + "\n\n" + get_main_menu_text(),
+            inline_buttons=cast("list[list[Any]] | None", report["inline_buttons"]),
+            edit_message=page > 1,
         )
 
     current_state_raw = cast("dict[str, object]", state_dict.get("booking_state") or {"name": "idle"})
@@ -682,7 +832,7 @@ async def _route_impl(input_data: RouterInput) -> RouterResult:
                 response_text=get_main_menu_text(),
             )
         if ai_intent == "ver_mis_citas":
-            return await _handle_mis_citas(input_data, current_state_raw)
+            return await _handle_mis_citas(input_data, current_state_raw, session_id=current_session)
         if ai_intent in ("saludo", "despedida", "agradecimiento"):
             return RouterResult(
                 handled=True,
@@ -730,7 +880,7 @@ async def _route_impl(input_data: RouterInput) -> RouterResult:
                     # Client exists but no phone → ask only for phone
                     return _start_phone_only(input_data, draft_raw=draft_raw)
 
-                smart_result = await _handle_smart_prefill(input_data, draft_raw)
+                smart_result = await _handle_smart_prefill(input_data, draft_raw, session_id=current_session)
                 if smart_result.handled:
                     return smart_result
 
@@ -739,7 +889,7 @@ async def _route_impl(input_data: RouterInput) -> RouterResult:
                 date_entity = input_data.ai_entities.get("date")
                 if date_entity:
                     try:
-                        default_tz = "America/Santiago"
+                        default_tz = DEFAULT_TIMEZONE
                         date_str = str(date_entity)
                         hybrid_result = _resolve_datetime_hybrid(date_str, provider_tz=default_tz)
                         if hybrid_result.intent_detected and hybrid_result.datetime_iso:
@@ -773,11 +923,39 @@ async def _route_impl(input_data: RouterInput) -> RouterResult:
                     nextState={"name": "selecting_specialty", "items": specialty_items_raw},
                     nextDraft=next_draft,
                     response_text=response,
-                )
+                    inline_buttons=cast(
+                        "list[list[dict[str, str]]] | None",
+                        build_specialty_keyboard(specialty_items, session_id=current_session) if specialty_items else None,
+                    ),                )
             elif intent in ("mis_citas", "ver_mis_citas") or intent in ("cancelar_cita", "reagendar_cita"):
-                return await _handle_mis_citas(input_data, current_state_raw)
-            elif intent == "mostrar_menu_principal":
+                return await _handle_mis_citas(input_data, current_state_raw, session_id=current_session)
+            elif intent == "generar_reporte":
+                if not input_data.client_id or not input_data.pg_url:
+                    return RouterResult(
+                        handled=True,
+                        nextState={"name": "idle"},
+                        response_text="📊 *Generar Reporte*\n\nNo pude generar tu reporte en este momento.\n\n"
+                        + get_main_menu_text(),
+                        inline_buttons=get_main_menu_inline_buttons(),
+                    )
+
+                report = await generate_booking_report(input_data.client_id, input_data.pg_url)
+                if not report:
+                    return RouterResult(
+                        handled=True,
+                        nextState={"name": "idle"},
+                        response_text="📊 *Generar Reporte*\n\nHubo un error al generar el reporte.\n\n"
+                        + get_main_menu_text(),
+                        inline_buttons=get_main_menu_inline_buttons(),
+                    )
+
                 return RouterResult(
+                    handled=True,
+                    nextState={"name": "idle"},
+                    response_text=report["text"] + "\n\n" + get_main_menu_text(),
+                    inline_buttons=cast("list[list[Any]] | None", report["inline_buttons"]),
+                )
+            elif intent == "mostrar_menu_principal":                return RouterResult(
                     handled=True,
                     nextState=current_state_raw,
                     response_text=get_main_menu_text(),
@@ -819,7 +997,7 @@ async def _route_impl(input_data: RouterInput) -> RouterResult:
             response_text=outcome["responseText"],
             nextState=cast("dict[str, object]", outcome["nextState"].model_dump()) if outcome["nextState"] else None,
             nextDraft=None,
-            inline_buttons=cast("list[list[InlineButton]] | None", outcome.get("inlineButtons")),
+            inline_buttons=cast("list[list[dict[str, str]]] | None", outcome.get("inlineButtons")),
             edit_message=is_callback,
         )
 
@@ -831,6 +1009,18 @@ async def _route_impl(input_data: RouterInput) -> RouterResult:
 @beartype
 async def _route(input_data: RouterInput) -> RouterResult:
     result: RouterResult = await _route_impl(input_data)
+    
+    # ─── Session ID Injection (Final Guard) ───
+    # Ensure every nextState returned by this router preserves the session_id
+    if result.nextState:
+        state_dict = input_data.state or {}
+        current_session = str(state_dict.get("session_id") or "")
+        
+        # If /start was just called, a NEW session was generated in nextState.
+        # Otherwise, we carry forward the current session.
+        if "session_id" not in result.nextState and current_session:
+            result.nextState["session_id"] = current_session
+
     if result.handled and result.active_flow is None:
         # Only set active_flow if not already explicitly set by the handler
         next_state_name = "idle"
@@ -845,6 +1035,8 @@ async def _route(input_data: RouterInput) -> RouterResult:
             result.active_flow = "booking"
         elif next_state_name == "idle":
             result.active_flow = None
+            if not result.inline_buttons:
+                result.inline_buttons = get_main_menu_inline_buttons()
     return result
 
 
@@ -861,5 +1053,14 @@ async def _main_async(args: dict[str, object]) -> dict[str, object]:
 
 def main(args: dict[str, object]) -> dict[str, object]:
     import asyncio
+    import traceback
 
-    return asyncio.run(_main_async(args))
+    try:
+        return asyncio.run(_main_async(args))
+    except Exception as e:
+        tb = traceback.format_exc()
+        try:
+            log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=_MODULE)
+        except Exception:
+            pass
+        raise RuntimeError(f"Execution failed: {e}") from e

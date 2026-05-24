@@ -34,18 +34,40 @@ from ._fsm_models import (
     TransitionOutcome,
 )
 from ._fsm_responses import (
+    build_confirmation_keyboard,
     build_confirmation_prompt,
+    build_doctor_keyboard,
     build_doctors_prompt,
     build_loading_doctors_prompt,
     build_loading_slots_prompt,
     build_slots_prompt,
+    build_specialty_keyboard,
     build_specialty_prompt,
+    build_time_slot_keyboard,
 )
 
 
 def get_main_menu_text() -> str:
-    default_text = "📱 *Menú Principal*\n\n1️⃣ Agendar hora\n2️⃣ Mis horas\n3️⃣ Recordatorios\n4️⃣ Información\n5️⃣ Mis datos"
+    default_text = (
+        "📱 *Menú Principal*\n\n"
+        "1. 📅 Agendar hora\n"
+        "2. 📋 Mis horas\n"
+        "3. 📊 Generar reporte\n"
+        "4. ⏰ Recordatorios\n"
+        "5. ℹ️ Información\n"
+        "6. 👤 Mis datos"
+    )
     return str(get_nlu_rule("msg_main_menu", default_text))
+
+def get_main_menu_inline_buttons() -> list[list[dict[str, str]]]:
+    return [
+        [{"text": "📅 Agendar hora", "callback_data": "cmd:agendar"}],
+        [{"text": "📋 Mis horas", "callback_data": "cmd:mis_citas"}],
+        [{"text": "📊 Generar reporte", "callback_data": "cmd:reporte"}],
+        [{"text": "⏰ Recordatorios", "callback_data": "cmd:recordatorios"}],
+        [{"text": "ℹ️ Información", "callback_data": "cmd:info"}],  # noqa: RUF001
+        [{"text": "👤 Mis datos", "callback_data": "cmd:perfil"}],
+    ]
 
 
 def _is_named_item_list(val: list[Any]) -> TypeIs[list[NamedItem]]:
@@ -100,16 +122,33 @@ def parse_action(text: str, timezone: str | None = None) -> BookingAction:
 
 
 def parse_callback_data(data: str) -> BookingAction | None:
-    if data == "back":
+    # Remove session suffix if present (format: action|session_id)
+    raw_data = data
+    if "|" in data:
+        raw_data = data.split("|")[0]
+
+    if raw_data == "back":
         return BackAction()
-    if data == "cancel":
+    if raw_data == "cancel":
         return CancelAction()
-    if data == "cfm:yes":
+    if raw_data == "cfm:yes":
         return ConfirmYesAction()
-    if data == "cfm:no":
+    if raw_data == "cfm:no":
         return ConfirmNoAction()
 
-    match = re.match(r"^(spec|doc|time|slot):(.+)$", data)
+    # Legacy numeric or direct selection
+    if raw_data == "agendar":
+        return SelectAction(value="1")
+
+    # Command prefix (from main menu or rebooking)
+    if raw_data.startswith("cmd:"):
+        val = raw_data[4:]
+        # Map some commands to numeric selection for the idle->selecting_specialty transition
+        if val == "agendar":
+            return SelectAction(value="1")
+        return SelectAction(value=val)
+
+    match = re.match(r"^(spec|doc|time|slot):(.+)$", raw_data)
     if match:
         return SelectAction(value=match.group(2))
 
@@ -131,7 +170,11 @@ def apply_transition(
 
     # 1. Global Actions
     if isinstance(action, CancelAction):
-        return TransitionOutcome(nextState=IdleState(), responseText=get_main_menu_text(), advance=False)
+        return TransitionOutcome(
+            nextState=IdleState(session_id=current_state.session_id),
+            responseText=get_main_menu_text(),
+            advance=False,
+        )
 
     # 2. Step Handlers
     if isinstance(current_state, IdleState):
@@ -139,16 +182,19 @@ def apply_transition(
             raw_items = items if items is not None else []
             if _is_named_item_list(raw_items):
                 return TransitionOutcome(
-                    nextState=SelectingSpecialtyState(items=raw_items),
+                    nextState=SelectingSpecialtyState(items=raw_items, session_id=current_state.session_id),
                     responseText=build_specialty_prompt(raw_items),
                     advance=True,
+                    inlineButtons=build_specialty_keyboard(raw_items, session_id=current_state.session_id),
                 )
             raise RuntimeError("no_specialties_available")
         raise RuntimeError("invalid_idle_action")
 
     elif isinstance(current_state, SelectingSpecialtyState):
         if isinstance(action, BackAction):
-            return TransitionOutcome(nextState=IdleState(), responseText=get_main_menu_text(), advance=False)
+            return TransitionOutcome(
+                nextState=IdleState(session_id=current_state.session_id), responseText=get_main_menu_text(), advance=False
+            )
 
         if isinstance(action, SelectAction):
             specialty_items = current_state.items
@@ -163,17 +209,21 @@ def apply_transition(
                 attempts = current_state.invalid_attempts + 1
                 if attempts >= 3:
                     return TransitionOutcome(
-                        nextState=IdleState(),
+                        nextState=IdleState(session_id=current_state.session_id),
                         responseText="❌ Demasiados intentos inválidos. Volviendo al menú principal.\n\n"
                         + get_main_menu_text(),
                         advance=False,
                     )
                 return TransitionOutcome(
                     nextState=SelectingSpecialtyState(
-                        items=specialty_items, error="Opción inválida.", invalid_attempts=attempts
+                        items=specialty_items,
+                        error="Opción inválida.",
+                        invalid_attempts=attempts,
+                        session_id=current_state.session_id,
                     ),
                     responseText=build_specialty_prompt(specialty_items, "⚠️ Opción inválida."),
                     advance=False,
+                    inlineButtons=build_specialty_keyboard(specialty_items, session_id=current_state.session_id),
                 )
 
             doctor_items = items if items is not None else []
@@ -183,12 +233,19 @@ def apply_transition(
                         specialtyId=specialty["id"],
                         specialtyName=specialty["name"],
                         items=doctor_items,
+                        session_id=current_state.session_id,
                     ),
                     responseText=build_doctors_prompt(specialty["name"], doctor_items),
                     advance=True,
+                    inlineButtons=build_doctor_keyboard(doctor_items, session_id=current_state.session_id),
                 )
             return TransitionOutcome(
-                nextState=SelectingDoctorState(specialtyId=specialty["id"], specialtyName=specialty["name"], items=[]),
+                nextState=SelectingDoctorState(
+                    specialtyId=specialty["id"],
+                    specialtyName=specialty["name"],
+                    items=[],
+                    session_id=current_state.session_id,
+                ),
                 responseText=build_loading_doctors_prompt(specialty["name"]),
                 advance=True,
             )
@@ -198,9 +255,10 @@ def apply_transition(
             raw_items = items if items is not None else []
             if _is_named_item_list(raw_items):
                 return TransitionOutcome(
-                    nextState=SelectingSpecialtyState(items=raw_items),
+                    nextState=SelectingSpecialtyState(items=raw_items, session_id=current_state.session_id),
                     responseText=build_specialty_prompt(raw_items),
                     advance=False,
+                    inlineButtons=build_specialty_keyboard(raw_items, session_id=current_state.session_id),
                 )
             raise RuntimeError("invalid_state_transition_no_items")
 
@@ -220,7 +278,7 @@ def apply_transition(
                 attempts = current_state.invalid_attempts + 1
                 if attempts >= 3:
                     return TransitionOutcome(
-                        nextState=IdleState(),
+                        nextState=IdleState(session_id=current_state.session_id),
                         responseText="❌ Demasiados intentos inválidos. Volviendo al menú principal.\n\n"
                         + get_main_menu_text(),
                         advance=False,
@@ -232,9 +290,11 @@ def apply_transition(
                         items=doctor_items,
                         error="Opción inválida.",
                         invalid_attempts=attempts,
+                        session_id=current_state.session_id,
                     ),
                     responseText=build_doctors_prompt(current_state.specialtyName, doctor_items, "⚠️ Opción inválida."),
                     advance=False,
+                    inlineButtons=build_doctor_keyboard(doctor_items, session_id=current_state.session_id),
                 )
 
             time_items = items if items is not None else []
@@ -246,9 +306,11 @@ def apply_transition(
                         doctorName=doctor["name"],
                         targetDate=draft.target_date,
                         items=time_items,
+                        session_id=current_state.session_id,
                     ),
                     responseText=build_slots_prompt(doctor["name"], time_items),
                     advance=True,
+                    inlineButtons=build_time_slot_keyboard(time_items, session_id=current_state.session_id),
                 )
             return TransitionOutcome(
                 nextState=SelectingTimeState(
@@ -257,6 +319,7 @@ def apply_transition(
                     doctorName=doctor["name"],
                     targetDate=draft.target_date,
                     items=[],
+                    session_id=current_state.session_id,
                 ),
                 responseText=build_loading_slots_prompt(doctor["name"]),
                 advance=True,
@@ -271,9 +334,11 @@ def apply_transition(
                         specialtyId=current_state.specialtyId,
                         specialtyName="",  # Will be filled by UI/Service
                         items=raw_items,
+                        session_id=current_state.session_id,
                     ),
                     responseText=build_doctors_prompt("", raw_items),
                     advance=False,
+                    inlineButtons=build_doctor_keyboard(raw_items, session_id=current_state.session_id),
                 )
             raise RuntimeError("invalid_state_transition_no_items")
 
@@ -285,6 +350,7 @@ def apply_transition(
                     doctorName=current_state.doctorName,
                     targetDate=action.value,
                     items=[],
+                    session_id=current_state.session_id,
                 ),
                 responseText=f"Buscando horarios para el {action.value}...",
                 advance=True,
@@ -308,7 +374,7 @@ def apply_transition(
                 attempts = current_state.invalid_attempts + 1
                 if attempts >= 3:
                     return TransitionOutcome(
-                        nextState=IdleState(),
+                        nextState=IdleState(session_id=current_state.session_id),
                         responseText="❌ Demasiados intentos inválidos. Volviendo al menú principal.\n\n"
                         + get_main_menu_text(),
                         advance=False,
@@ -322,9 +388,11 @@ def apply_transition(
                         items=time_items,
                         error="Opción inválida.",
                         invalid_attempts=attempts,
+                        session_id=current_state.session_id,
                     ),
                     responseText=build_slots_prompt(current_state.doctorName, time_items, "⚠️ Opción inválida."),
                     advance=False,
+                    inlineButtons=build_time_slot_keyboard(time_items, session_id=current_state.session_id),
                 )
 
             new_draft = draft.model_copy()
@@ -352,15 +420,17 @@ def apply_transition(
                         client_id=new_draft.client_id,
                         target_date=new_draft.target_date,
                     ),
+                    session_id=current_state.session_id,
                 ),
                 responseText=build_confirmation_prompt(slot["label"], current_state.doctorName),
                 advance=True,
+                inlineButtons=build_confirmation_keyboard(session_id=current_state.session_id),
             )
 
     elif isinstance(current_state, ConfirmingState):
         if isinstance(action, ConfirmYesAction):
             return TransitionOutcome(
-                nextState=IdleState(),
+                nextState=IdleState(session_id=current_state.session_id),
                 responseText="⏳ Procesando tu reserva...",
                 advance=True,
             )
@@ -375,16 +445,18 @@ def apply_transition(
                         doctorName=current_state.doctorName,
                         targetDate=draft.target_date,
                         items=raw_items,
+                        session_id=current_state.session_id,
                     ),
                     responseText=build_slots_prompt(current_state.doctorName, raw_items),
                     advance=False,
+                    inlineButtons=build_time_slot_keyboard(raw_items, session_id=current_state.session_id),
                 )
             raise RuntimeError("invalid_state_transition_no_items")
 
         if isinstance(action, SelectAction):
             if action.value == "1":
                 return TransitionOutcome(
-                    nextState=IdleState(),
+                    nextState=IdleState(session_id=current_state.session_id),
                     responseText="⏳ Procesando tu reserva...",
                     advance=True,
                 )
@@ -398,14 +470,16 @@ def apply_transition(
                             doctorName=current_state.doctorName,
                             targetDate=draft.target_date,
                             items=raw_items,
+                            session_id=current_state.session_id,
                         ),
                         responseText=build_slots_prompt(current_state.doctorName, raw_items),
                         advance=False,
+                        inlineButtons=build_time_slot_keyboard(raw_items, session_id=current_state.session_id),
                     )
             attempts = getattr(current_state, "invalid_attempts", 0) + 1
             if attempts >= 3:
                 return TransitionOutcome(
-                    nextState=IdleState(),
+                    nextState=IdleState(session_id=current_state.session_id),
                     responseText="❌ Demasiados intentos inválidos. Volviendo al menú principal.\n\n"
                     + get_main_menu_text(),
                     advance=False,
@@ -419,13 +493,20 @@ def apply_transition(
                     timeSlot=current_state.timeSlot,
                     draft=current_state.draft,
                     invalid_attempts=attempts,
+                    session_id=current_state.session_id,
                 ),
                 responseText=build_confirmation_prompt(current_state.timeSlot, current_state.doctorName),
                 advance=False,
+                inlineButtons=build_confirmation_keyboard(session_id=current_state.session_id),
             )
 
     if True:  # patched unnecessary isinstance
-        return TransitionOutcome(nextState=IdleState(), responseText=get_main_menu_text(), advance=False)
+        return TransitionOutcome(
+            nextState=IdleState(session_id=current_state.session_id),
+            responseText=get_main_menu_text(),
+            advance=False,
+            inlineButtons=get_main_menu_inline_buttons(),
+        )
 
     raise RuntimeError(f"unknown_state_or_action: {current_state.name}")
 

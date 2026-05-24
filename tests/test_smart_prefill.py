@@ -11,7 +11,7 @@ provider_name="gallegos". The router calls _handle_smart_prefill which:
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -79,8 +79,9 @@ class TestSmartPrefillSingleMatch:
         assert result.nextState["name"] == "selecting_time"
         assert result.nextState["doctorId"] == "provider-uuid-001"
         assert result.nextState["doctorName"] == "Dr. Roger Gallegos"
-        assert isinstance(result.nextState["items"], list)
-        assert len(result.nextState["items"]) == 2
+        items = result.nextState["items"]
+        assert isinstance(items, list)
+        assert len(cast(list[object], items)) == 2
 
     @pytest.mark.asyncio
     @patch("f.internal.fsm_router.main._has_active_booking_for_provider", new_callable=AsyncMock)
@@ -140,7 +141,7 @@ class TestSmartPrefillMultipleMatches:
         assert result.nextState["name"] == "selecting_doctor"
         items = result.nextState["items"]
         assert isinstance(items, list)
-        assert len(items) == 2
+        assert len(cast(list[object], items)) == 2
 
         # Response is a numbered menu showing name + specialty (buttons replace number instruction)
         text = result.response_text or ""

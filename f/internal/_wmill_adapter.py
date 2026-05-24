@@ -10,7 +10,7 @@ if TYPE_CHECKING:
         from typing import TypeIs
 
 try:
-    import wmill
+    import wmill as wmill
 except ImportError:
     # ─── WMILL FALLBACK MOCK ───
     # This allows the code to be imported in CI/Local Dev environments

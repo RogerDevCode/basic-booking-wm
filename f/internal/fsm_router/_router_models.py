@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from typing import Any
+
 from pydantic import BaseModel, ConfigDict, Field
 
-from ...reminder_config._config_models import InlineButton  # noqa: TC001
 
 
 class RouterInput(BaseModel):
@@ -22,6 +23,7 @@ class RouterInput(BaseModel):
     ai_confidence: float | None = None
     ai_entities: dict[str, object] = Field(default_factory=dict)
     requires_fsm_routing: bool = False
+    update_id: int | None = None
 
 
 class RouterResult(BaseModel):
@@ -30,7 +32,7 @@ class RouterResult(BaseModel):
     response_text: str | None = None
     nextState: dict[str, object] | None = None
     nextDraft: dict[str, object] | None = None
-    inline_buttons: list[list[InlineButton]] | None = None
+    inline_buttons: list[list[Any]] | None = None
     reply_keyboard: list[list[object]] | None = None  # native Telegram ReplyKeyboard
     active_flow: str | None = None
     registration_data: dict[str, str | None] | None = None

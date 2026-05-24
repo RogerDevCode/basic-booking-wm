@@ -43,6 +43,33 @@ class ConfirmHandler:
 
 class CancelHandler:
     async def handle(self, context: ActionContext) -> ActionResult:
+        # Instead of cancelling immediately, show reasons
+        booking_id = context["booking_id"]
+        sid = context.get("session_id")
+        suffix = f"|{sid}" if sid else ""
+        return {
+            "responseText": "¿Por qué deseas cancelar tu cita? 🧐",
+            "followUpText": None,
+            "inlineButtons": [
+                [{"text": "📅 Cambiar de fecha/hora", "callback_data": f"cxr:{booking_id}:CH{suffix}"}],
+                [{"text": "🚨 Emergencia personal", "callback_data": f"cxr:{booking_id}:EM{suffix}"}],
+                [{"text": "❌ Ya no lo necesito", "callback_data": f"cxr:{booking_id}:NN{suffix}"}],
+                [{"text": "✏️ Error al agendar", "callback_data": f"cxr:{booking_id}:ER{suffix}"}],
+            ],
+        }
+
+
+class CancelReasonHandler:
+    async def handle(self, context: ActionContext) -> ActionResult:
+        reason_code = context.get("reason_code") or "ER"
+        reason_map = {
+            "CH": "Cambio de fecha/hora",
+            "EM": "Emergencia personal",
+            "NN": "Ya no lo necesito",
+            "ER": "Error al agendar",
+        }
+        reason_text = reason_map.get(reason_code, "Otro")
+
         conn = await create_db_client()
         try:
             repo = PgBookingRepo(conn)
@@ -50,22 +77,34 @@ class CancelHandler:
                 booking_id=context["booking_id"],
                 actor="client",
                 actor_id=context["client_id"],
-                reason="Cancelled via Telegram inline button",
+                reason=f"Motivo: {reason_text}",
             )
 
             async def operation_cancel() -> BookingResult:
                 return await cancel_booking(req, repo)
 
             await with_tenant_context(conn, context["tenantId"], operation_cancel)
-            return {
+
+            follow_up = f"Tu cita ha sido cancelada (Motivo: {reason_text})."
+            if reason_code == "CH":
+                follow_up += "\n\n🔄 ¿Te gustaría agendar una nueva hora ahora mismo?"
+
+            sid = context.get("session_id")
+            suffix = f"|{sid}" if sid else ""
+            res_obj: ActionResult = {
                 "responseText": "✅ Cita cancelada",
-                "followUpText": 'Tu cita ha sido cancelada exitosamente. Si deseas reagendar, escribe "quiero agendar una cita".',  # noqa: E501
+                "followUpText": follow_up,
             }
+            if reason_code == "CH":
+                res_obj["inlineButtons"] = [
+                    [{"text": "📅 Agendar nueva hora", "callback_data": f"cmd:agendar{suffix}"}]
+                ]
+            return res_obj
         except Exception as e:
-            log("CANCEL_CALLBACK_FAILED", error=str(e), traceback=traceback.format_exc(), module="callback_router")
+            log("CANCEL_REASON_CALLBACK_FAILED", error=str(e), traceback=traceback.format_exc(), module="callback_router")
             return {
                 "responseText": "❌ No se pudo cancelar",
-                "followUpText": "No pudimos cancelar tu cita. La cita no existe, ya fue modificada o hubo un error interno. Contacta a soporte si necesitas ayuda.",  # noqa: E501
+                "followUpText": "No pudimos procesar la cancelación. Contacta a soporte.",
             }
         finally:
             await conn.close()
