@@ -31,6 +31,14 @@
         "X-Goog-Api-Key": "$GOOGLE_API_KEY"
       },
       "enabled": true
+    },
+    "windmill-booking": {
+      "type": "remote",
+      "url": "https://titanium.stax.ink/api/mcp/w/booking-titanium/mcp",
+      "headers": {
+        "Authorization": "Bearer $WINDMILL_MCP_TOKEN"
+      },
+      "enabled": true
     }
   }
 }
