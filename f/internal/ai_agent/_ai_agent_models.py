@@ -26,6 +26,7 @@ class ConversationState(BaseModel):
     pending_data: dict[str, Any] = Field(default_factory=dict)
     last_user_utterance: str | None = None
     booking_state_name: str = "idle"
+    session_id: str | None = None
 
 
 # ── User Profile
@@ -51,7 +52,7 @@ class AIAgentInput(BaseModel):
 
 # ── Entities
 class EntityMap(BaseModel):
-    model_config = ConfigDict(strict=True, extra="allow")  # allow for custom keys
+    model_config = ConfigDict(strict=True, extra="ignore")
 
     date: str | None = None
     time: str | None = None

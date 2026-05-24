@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from f.internal._config import DEFAULT_TIMEZONE
 from f.web_provider_dashboard.main import _main_async as main
 
 if TYPE_CHECKING:
@@ -20,7 +21,7 @@ async def test_provider_dashboard_success() -> None:
     # 2. Fetch Agenda
     # 3. Monthly Stats
     mock_db.fetch.side_effect = [
-        [{"provider_id": "p1", "name": "Dr. Smith", "specialty": "Cardio", "tz_name": "America/Santiago"}],  # provider
+        [{"provider_id": "p1", "name": "Dr. Smith", "specialty": "Cardio", "tz_name": DEFAULT_TIMEZONE}],  # provider
         [
             {
                 "booking_id": "b1",

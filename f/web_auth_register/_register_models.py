@@ -2,6 +2,8 @@ from typing import TypedDict
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
+from f.internal._config import DEFAULT_TIMEZONE
+
 
 class RegisterResult(TypedDict):
     user_id: str
@@ -20,4 +22,4 @@ class InputSchema(BaseModel):
     phone: str = Field(min_length=1, max_length=50)
     password: str = Field(min_length=8, max_length=128)
     password_confirm: str = Field(min_length=8, max_length=128)
-    timezone: str = "America/Santiago"
+    timezone: str = DEFAULT_TIMEZONE

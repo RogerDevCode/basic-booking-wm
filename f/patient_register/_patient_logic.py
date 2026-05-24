@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from f.internal._config import DEFAULT_TIMEZONE
+
 if TYPE_CHECKING:
     from ..internal._result import DBClient
     from ._patient_models import ClientResult, InputSchema
@@ -100,7 +102,7 @@ async def upsert_client(db: DBClient, input_data: InputSchema) -> ClientResult:
             "email": str(r["email"]) if r.get("email") else None,
             "phone": str(r["phone"]) if r.get("phone") else None,
             "telegram_chat_id": str(r["telegram_chat_id"]) if r.get("telegram_chat_id") else None,
-            "timezone": str(r["timezone"]) if r.get("timezone") else "America/Santiago",
+            "timezone": str(r["timezone"]) if r.get("timezone") else DEFAULT_TIMEZONE,
             "created": created,
         }
 

@@ -17,7 +17,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from f.internal.fsm_router._router_models import RouterInput
-from f.internal.fsm_router.main import _handle_smart_prefill
+from f.internal.fsm_router.handlers._smart_prefill_handler import handle_smart_prefill as _handle_smart_prefill
 
 
 def _make_input(**kwargs: Any) -> RouterInput:
@@ -54,9 +54,9 @@ class TestSmartPrefillSingleMatch:
     """Single doctor match → direct to selecting_time with slots."""
 
     @pytest.mark.asyncio
-    @patch("f.internal.fsm_router.main._has_active_booking_for_provider", new_callable=AsyncMock)
-    @patch("f.internal.fsm_router.main._fetch_slots_for_doctor", new_callable=AsyncMock)
-    @patch("f.internal.fsm_router.main.resolve_provider_by_name", new_callable=AsyncMock)
+    @patch("f.internal.fsm_router.handlers._smart_prefill_handler._has_active_booking_for_provider", new_callable=AsyncMock)
+    @patch("f.internal.fsm_router.handlers._smart_prefill_handler._fetch_slots_for_doctor", new_callable=AsyncMock)
+    @patch("f.internal.fsm_router.handlers._smart_prefill_handler.resolve_provider_by_name", new_callable=AsyncMock)
     async def test_single_match_with_slots_goes_to_selecting_time(
         self,
         mock_resolve: AsyncMock,
@@ -81,12 +81,12 @@ class TestSmartPrefillSingleMatch:
         assert result.nextState["doctorName"] == "Dr. Roger Gallegos"
         items = result.nextState["items"]
         assert isinstance(items, list)
-        assert len(cast(list[object], items)) == 2
+        assert len(cast("list[object]", items)) == 2
 
     @pytest.mark.asyncio
-    @patch("f.internal.fsm_router.main._has_active_booking_for_provider", new_callable=AsyncMock)
-    @patch("f.internal.fsm_router.main._fetch_slots_for_doctor", new_callable=AsyncMock)
-    @patch("f.internal.fsm_router.main.resolve_provider_by_name", new_callable=AsyncMock)
+    @patch("f.internal.fsm_router.handlers._smart_prefill_handler._has_active_booking_for_provider", new_callable=AsyncMock)
+    @patch("f.internal.fsm_router.handlers._smart_prefill_handler._fetch_slots_for_doctor", new_callable=AsyncMock)
+    @patch("f.internal.fsm_router.handlers._smart_prefill_handler.resolve_provider_by_name", new_callable=AsyncMock)
     async def test_single_match_no_slots_shows_no_availability(
         self,
         mock_resolve: AsyncMock,
@@ -114,7 +114,7 @@ class TestSmartPrefillMultipleMatches:
     """Multiple doctor matches → shows numbered menu with specialty per row."""
 
     @pytest.mark.asyncio
-    @patch("f.internal.fsm_router.main.resolve_provider_by_name", new_callable=AsyncMock)
+    @patch("f.internal.fsm_router.handlers._smart_prefill_handler.resolve_provider_by_name", new_callable=AsyncMock)
     async def test_multiple_matches_shows_numbered_specialty_menu(
         self,
         mock_resolve: AsyncMock,
@@ -141,7 +141,7 @@ class TestSmartPrefillMultipleMatches:
         assert result.nextState["name"] == "selecting_doctor"
         items = result.nextState["items"]
         assert isinstance(items, list)
-        assert len(cast(list[object], items)) == 2
+        assert len(cast("list[object]", items)) == 2
 
         # Response is a numbered menu showing name + specialty (buttons replace number instruction)
         text = result.response_text or ""
@@ -158,7 +158,7 @@ class TestSmartPrefillNoMatch:
     """No provider found → friendly message + idle."""
 
     @pytest.mark.asyncio
-    @patch("f.internal.fsm_router.main.resolve_provider_by_name", new_callable=AsyncMock)
+    @patch("f.internal.fsm_router.handlers._smart_prefill_handler.resolve_provider_by_name", new_callable=AsyncMock)
     async def test_no_match_returns_error_message(
         self,
         mock_resolve: AsyncMock,
@@ -183,8 +183,8 @@ class TestSmartPrefillActiveBookingBlock:
     """Client already has active booking with same doctor → blocked."""
 
     @pytest.mark.asyncio
-    @patch("f.internal.fsm_router.main._has_active_booking_for_provider", new_callable=AsyncMock)
-    @patch("f.internal.fsm_router.main.resolve_provider_by_name", new_callable=AsyncMock)
+    @patch("f.internal.fsm_router.handlers._smart_prefill_handler._has_active_booking_for_provider", new_callable=AsyncMock)
+    @patch("f.internal.fsm_router.handlers._smart_prefill_handler.resolve_provider_by_name", new_callable=AsyncMock)
     async def test_active_booking_blocks_new_reservation(
         self,
         mock_resolve: AsyncMock,

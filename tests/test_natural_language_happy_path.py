@@ -190,7 +190,7 @@ class TestFSMRouter_SolicitarHora:
         with (
             patch("f.internal._nlu_cache.ensure_nlu_cache", AsyncMock()),
             patch(
-                "f.internal.fsm_router.main.resolve_provider_by_name",
+                "f.internal.fsm_router.handlers._smart_prefill_handler.resolve_provider_by_name",
                 AsyncMock(
                     return_value=[
                         {
@@ -203,11 +203,11 @@ class TestFSMRouter_SolicitarHora:
                 ),
             ),
             patch(
-                "f.internal.fsm_router.main._has_active_booking_for_provider",
+                "f.internal.fsm_router.handlers._smart_prefill_handler._has_active_booking_for_provider",
                 AsyncMock(return_value=False),
             ),
             patch(
-                "f.internal.fsm_router.main._fetch_slots_for_doctor",
+                "f.internal.fsm_router.handlers._smart_prefill_handler._fetch_slots_for_doctor",
                 AsyncMock(
                     return_value=[
                         {
@@ -277,7 +277,7 @@ class TestFSMRouter_CancelarHora:
         with (
             patch("f.internal._nlu_cache.ensure_nlu_cache", AsyncMock()),
             patch(
-                "f.internal.fsm_router.main.get_mis_citas_text",
+                "f.internal.fsm_router.handlers._wallet_handler.get_mis_citas_text",
                 AsyncMock(
                     return_value=(
                         "📋 *Mis Horas* (1 próxima)\n\n"
@@ -320,7 +320,7 @@ class TestFSMRouter_ReagendarHora:
         with (
             patch("f.internal._nlu_cache.ensure_nlu_cache", AsyncMock()),
             patch(
-                "f.internal.fsm_router.main.get_mis_citas_text",
+                "f.internal.fsm_router.handlers._wallet_handler.get_mis_citas_text",
                 AsyncMock(
                     return_value=(
                         "📋 *Mis Horas* (1 próxima)\n\n"
@@ -363,7 +363,7 @@ class TestFSMRouter_VerMisHoras:
         with (
             patch("f.internal._nlu_cache.ensure_nlu_cache", AsyncMock()),
             patch(
-                "f.internal.fsm_router.main.get_mis_citas_text",
+                "f.internal.fsm_router.handlers._wallet_handler.get_mis_citas_text",
                 AsyncMock(
                     return_value=(
                         "📋 *Mis Horas* (1 próxima)\n\n"

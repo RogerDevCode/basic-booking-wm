@@ -18,7 +18,7 @@
 # ///
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Final, cast
+from typing import TYPE_CHECKING, Final, cast
 
 from beartype import beartype
 
@@ -29,15 +29,9 @@ if TYPE_CHECKING:
 
 from ...nlu._datetime_resolver import resolve_datetime as _resolve_datetime_hybrid
 from ...nlu._tfidf_classifier import classify_intent
-from .._booking_shared import (
-    get_mis_citas_buttons,
-    get_mis_citas_text,
-    resolve_provider_by_name,
-)
 from .._date_resolver import resolve_date
 from .._db_client import create_db_client as _create_db_client
 from .._nlu_cache import ensure_nlu_cache
-from .._report_logic import generate_booking_report
 from .._wmill_adapter import log
 from ..booking_fsm._fsm_machine import (
     apply_transition,
@@ -48,21 +42,25 @@ from ..booking_fsm._fsm_machine import (
 )
 from ..booking_fsm._fsm_models import BookingStateRoot, DraftBooking, NamedItem, TimeSlotItem
 from ..booking_fsm._fsm_responses import (
-    build_doctor_keyboard,
-    build_doctors_with_specialty_prompt,
     build_specialty_keyboard,
     build_specialty_prompt,
     build_time_slot_keyboard,
 )
-from ..booking_prefetch.main import (
-    _fetch_slots_for_doctor as _prefetch_slots,
-)
-from ..booking_prefetch.main import (
-    _has_active_booking_for_provider as _prefetch_active_booking,
-)
+from ..booking_prefetch.main import _fetch_slots_for_doctor as _prefetch_slots
 from ._router_models import RouterInput, RouterResult
 from ._router_reminders import handle_reminders_config
-from .handlers._registration_handler import REG_STATES
+from .handlers._registration_handler import (
+    PHONE_REPLY_KEYBOARD as _PHONE_REPLY_KEYBOARD,
+)
+from .handlers._registration_handler import (
+    REG_STATES,
+)
+from .handlers._registration_handler import (
+    handle_registration_state as _handle_registration_state,
+)
+from .handlers._reports_handler import handle_generar_reporte
+from .handlers._smart_prefill_handler import handle_smart_prefill as _handle_smart_prefill
+from .handlers._wallet_handler import handle_mis_citas as _handle_mis_citas
 
 _MODULE: Final[str] = "fsm_router"
 
@@ -101,27 +99,14 @@ _FSM_INTERRUPT_INTENTS: frozenset[str] = frozenset(
 )
 _FSM_INTERRUPT_THRESHOLD: float = 0.7
 
-
-async def _has_active_booking_for_provider(client_id: str, provider_id: str, pg_url: str) -> bool:
-    """Wrapper around prefetch's _has_active_booking_for_provider with own DB conn."""
-    db = await _create_db_client(pg_url)
-    try:
-        return await _prefetch_active_booking(db, client_id, provider_id)
-    finally:
-        await db.close()
-
-
-async def _fetch_slots_for_doctor(
-    pg_url: str,
-    doctor_id: str,
-    target_date: str | None = None,
-) -> list[dict[str, object]]:
-    """Wrapper around prefetch's _fetch_slots_for_doctor with own DB conn."""
-    db = await _create_db_client(pg_url)
-    try:
-        return await _prefetch_slots(db, doctor_id, target_date)
-    finally:
-        await db.close()
+# Fast-path determinista: opciones numéricas del menú principal.
+_MENU_NUMERIC_INTENT_MAP: Final[dict[str, str]] = {
+    "1": "crear_cita",
+    "2": "ver_mis_citas",
+    "3": "cancelar_cita",
+    "4": "activar_recordatorios",
+    "5": "ver_mis_datos",
+}
 
 
 def _get_start_text(name: str | None = None, phone: str | None = None) -> str:
@@ -159,13 +144,6 @@ def _start_registration(
     )
 
 
-# Native Telegram "share contact" button payload
-_PHONE_REPLY_KEYBOARD: list[list[object]] = [
-    [{"text": "📱 Compartir mi número", "request_contact": True}],
-    [{"text": "✏️ Escribir manualmente"}],
-]
-
-
 def _start_phone_only(
     input_data: RouterInput,
     draft_raw: dict[str, object],
@@ -187,372 +165,6 @@ def _start_phone_only(
     )
 
 
-async def _handle_mis_citas(
-    input_data: RouterInput,
-    current_state_raw: dict[str, object],
-    session_id: str | None = None,
-) -> RouterResult:
-    if not input_data.client_id or not input_data.pg_url:
-        return RouterResult(
-            handled=True,
-            nextState={"name": "idle"},
-            nextDraft={},
-            response_text=("📋 *Mis Horas*\n\nNo pudimos cargar tus horas en este momento.\n\n" + get_main_menu_text()),
-        )
-
-    text = await get_mis_citas_text(input_data.client_id, input_data.pg_url, input_data.chat_id)
-
-    if not text:
-        msg = "📋 *Mis Horas*\n\n" "No tienes horas próximas agendadas."
-
-        return RouterResult(
-            handled=True,
-            nextState={"name": "idle"},
-            nextDraft={},
-            response_text=msg + "\n\n" + get_main_menu_text(),
-        )
-
-    buttons = await get_mis_citas_buttons(input_data.client_id, input_data.pg_url, session_id=session_id)
-
-    return RouterResult(
-        handled=True,
-        nextState={"name": "idle"},
-        nextDraft={},
-        response_text=text + "\n\n" + get_main_menu_text(),
-        inline_buttons=cast("list[list[InlineButton]] | None", buttons),
-    )
-
-
-async def _handle_smart_prefill(
-    input_data: RouterInput,
-    draft_raw: dict[str, object],
-    session_id: str | None = None,
-) -> RouterResult:
-    """Smart pre-fill: resolve provider from AI entities and skip steps."""
-    entities = input_data.ai_entities
-    provider_name_raw = entities.get("provider_name")
-    if not provider_name_raw or not input_data.pg_url:
-        return RouterResult(handled=False)
-
-    provider_name = str(provider_name_raw)
-    if not input_data.pg_url:
-        return RouterResult(handled=False)
-
-    try:
-        matches = await resolve_provider_by_name(provider_name, input_data.pg_url)
-    except Exception:
-        log("SMART_PREFILL_RESOLVE_FAILED", chat_id=input_data.chat_id, module=_MODULE)
-        return RouterResult(handled=False)
-
-    if not matches:
-        display = provider_name.strip().title()
-        return RouterResult(
-            handled=True,
-            nextState={"name": "idle"},
-            response_text=(
-                f"No encontré a *{display}* en nuestro sistema. 🔍\n\n"
-                "¿Deseas buscar por especialidad médica?\n\n" + get_main_menu_text()
-            ),
-        )
-
-    if len(matches) > 1:
-        items_list = [{"id": str(m["provider_id"]), "name": str(m["name"])} for m in matches]
-        # Build specialty-aware list for prompt (name + specialty per row)
-        matches_for_prompt = [{"name": str(m["name"]), "specialty_name": str(m["specialty_name"])} for m in matches]
-        # Preserve target_date in draft so it flows through once user picks a doctor
-        multi_draft = DraftBooking(target_date=(str(entities.get("date")) if entities.get("date") else None))
-        return RouterResult(
-            handled=True,
-            nextState={
-                "name": "selecting_doctor",
-                "specialtyId": "",
-                "specialtyName": "Selecciona un doctor",
-                "items": items_list,
-            },
-            nextDraft=cast("dict[str, object]", multi_draft.model_dump()),
-            response_text=build_doctors_with_specialty_prompt(matches_for_prompt),
-            inline_buttons=cast(
-                "list[list[dict[str, str]]]",
-                build_doctor_keyboard(cast("list[NamedItem]", items_list), session_id=session_id),
-            ),
-        )
-
-    provider = matches[0]
-    provider_id = str(provider["provider_id"])
-    specialty_id = str(provider["specialty_id"])
-    specialty_name = str(provider["specialty_name"])
-    doctor_name = str(provider["name"])
-
-    if input_data.client_id:
-        try:
-            has_active = await _has_active_booking_for_provider(input_data.client_id, provider_id, input_data.pg_url)
-        except Exception:
-            has_active = False
-        if has_active:
-            return RouterResult(
-                handled=True,
-                nextState={"name": "idle"},
-                response_text=(
-                    "⚠️ Ya tienes una cita agendada con este doctor.\n\n"
-                    "Debes cancelar tu cita actual antes de reservar una nueva.\n\n" + get_main_menu_text()
-                ),
-            )
-
-    # Resolve target date from AI entities (e.g., "viernes" → "2026-05-22")
-    target_date: str | None = None
-    date_entity = entities.get("date")
-    if date_entity:
-        try:
-            # Get provider timezone for accurate date resolution
-            db = await _create_db_client(input_data.pg_url)
-            try:
-                tz_row = await db.fetchrow(
-                    "SELECT t.name as tz_name FROM providers p"
-                    " LEFT JOIN timezones t ON t.id = p.timezone_id"
-                    " WHERE p.provider_id = $1::uuid",
-                    provider_id,
-                )
-                provider_tz = str(tz_row["tz_name"]) if tz_row and tz_row["tz_name"] else DEFAULT_TIMEZONE
-            finally:
-                await db.close()
-
-            # Hybrid pipeline: fuzzy+phonetic+dateparser+LLM fallback
-            date_str = str(date_entity)
-            hybrid_result = _resolve_datetime_hybrid(date_str, provider_tz=provider_tz)
-            if hybrid_result.intent_detected and hybrid_result.datetime_iso:
-                target_date = hybrid_result.datetime_iso[:10]
-            else:
-                # Fallback to deterministic resolver for simple cases
-                target_date = resolve_date(date_str, {"timezone": provider_tz})
-        except Exception:
-            log("DATE_RESOLUTION_FAILED", date=str(date_entity), chat_id=input_data.chat_id, module=_MODULE)
-            target_date = None
-
-    try:
-        slots = await _fetch_slots_for_doctor(input_data.pg_url, provider_id, target_date)
-    except Exception:
-        log("SMART_PREFETCH_SLOTS_FAILED", chat_id=input_data.chat_id, module=_MODULE)
-        slots = []
-
-    draft = DraftBooking(
-        specialty_id=specialty_id,
-        specialty_name=specialty_name,
-        doctor_id=provider_id,
-        doctor_name=doctor_name,
-        target_date=target_date or (str(entities.get("date")) if entities.get("date") else None),
-    )
-
-    if slots:
-        date_label = ""
-        if target_date:
-            date_label = f" para el {target_date}"
-        return RouterResult(
-            handled=True,
-            nextState={
-                "name": "selecting_time",
-                "specialtyId": specialty_id,
-                "doctorId": provider_id,
-                "doctorName": doctor_name,
-                "targetDate": target_date,
-                "items": slots,
-            },
-            nextDraft=cast("dict[str, object]", draft.model_dump()),
-            response_text=(f"Encontré al *{doctor_name}* ({specialty_name}). Horarios disponibles{date_label}:"),
-            inline_buttons=cast(
-                "list[list[dict[str, str]]]", build_time_slot_keyboard(cast("list[TimeSlotItem]", slots), session_id=session_id)
-            ),
-        )
-
-    date_msg = f" para el {target_date}" if target_date else " esta semana"
-    specialty_items_raw = list(input_data.items) if input_data.items else []
-    specialty_items = cast("list[NamedItem]", specialty_items_raw)
-    return RouterResult(
-        handled=True,
-        nextState={"name": "selecting_specialty", "items": specialty_items_raw},
-        nextDraft=cast("dict[str, object]", draft.model_dump()),
-        response_text=(
-            f"El *{doctor_name}* no tiene horarios disponibles{date_msg}.\n\n"
-            "¿Te gustaría ver otras especialidades o elegir otro doctor?"
-        ),
-        inline_buttons=cast(
-            "list[list[dict[str, str]]] | None",
-            build_specialty_keyboard(specialty_items, session_id=session_id) if specialty_items else None,
-        ),    )
-
-
-def _handle_registration_state(
-    input_data: RouterInput,
-    current_state_name: str,
-    current_state_raw: dict[str, object],
-    draft_raw: dict[str, object],
-) -> RouterResult:
-    lower = input_data.user_input.strip().lower()
-    user_text = input_data.user_input.strip()
-    client_name = input_data.client_name or "amigo"
-
-    if current_state_name == "needs_registration":
-        if lower in _SI_WORDS:
-            return RouterResult(
-                handled=True,
-                nextState={"name": "reg_confirming_name"},
-                nextDraft=dict(draft_raw),
-                response_text=(
-                    f"¡Perfecto! 😊\n\nTu nombre registrado es *{client_name}*.\n¿Es correcto? Responde *sí* o *no*."
-                ),
-            )
-        if lower in _NO_WORDS:
-            return RouterResult(
-                handled=True,
-                nextState={"name": "idle"},
-                nextDraft={},
-                response_text=(
-                    "Entendido. 👍\n\nPuedes registrarte cuando quieras para agendar horas.\n\n" + get_main_menu_text()
-                ),
-            )
-        attempts = int(str(current_state_raw.get("invalid_attempts", 0))) + 1
-        if attempts >= 3:
-            return RouterResult(
-                handled=True,
-                nextState={"name": "idle"},
-                nextDraft={},
-                response_text="❌ Demasiados intentos inválidos. Volviendo al menú principal.\n\n"
-                + get_main_menu_text(),
-            )
-        return RouterResult(
-            handled=True,
-            nextState={"name": "needs_registration", "invalid_attempts": attempts},
-            nextDraft=dict(draft_raw),
-            response_text="¿Empezamos con el registro? Responde *sí* o *no*. 😊",
-        )
-
-    if current_state_name == "reg_confirming_name":
-        if lower in _SI_WORDS:
-            new_draft: dict[str, object] = {**dict(draft_raw), "reg_name": client_name}
-            return RouterResult(
-                handled=True,
-                nextState={"name": "reg_collecting_phone"},
-                nextDraft=new_draft,
-                response_text="📱 ¿Cuál es tu número de teléfono?\n\nEjemplo: +34600000000",
-            )
-        if lower in _NO_WORDS:
-            return RouterResult(
-                handled=True,
-                nextState={"name": "reg_entering_name"},
-                nextDraft=dict(draft_raw),
-                response_text="¿Cómo te llamas? Escribe tu nombre completo.",
-            )
-        attempts = int(str(current_state_raw.get("invalid_attempts", 0))) + 1
-        if attempts >= 3:
-            return RouterResult(
-                handled=True,
-                nextState={"name": "idle"},
-                nextDraft={},
-                response_text="❌ Demasiados intentos inválidos. Volviendo al menú principal.\n\n"
-                + get_main_menu_text(),
-            )
-        return RouterResult(
-            handled=True,
-            nextState={"name": "reg_confirming_name", "invalid_attempts": attempts},
-            nextDraft=dict(draft_raw),
-            response_text=(f"Tu nombre registrado es *{client_name}*.\n¿Es correcto? Responde *sí* o *no*."),
-        )
-
-    if current_state_name == "reg_entering_name":
-        if not user_text:
-            return RouterResult(
-                handled=True,
-                nextState={"name": "reg_entering_name"},
-                nextDraft=dict(draft_raw),
-                response_text="Por favor escribe tu nombre completo.",
-            )
-        new_draft2: dict[str, object] = {**dict(draft_raw), "reg_name": user_text}
-        return RouterResult(
-            handled=True,
-            nextState={"name": "reg_collecting_phone"},
-            nextDraft=new_draft2,
-            response_text="📱 ¿Cuál es tu número de teléfono?\n\nEjemplo: +34600000000",
-        )
-
-    if current_state_name == "reg_collecting_phone":
-        if not user_text:
-            return RouterResult(
-                handled=True,
-                nextState={"name": "reg_collecting_phone"},
-                nextDraft=dict(draft_raw),
-                reply_keyboard=_PHONE_REPLY_KEYBOARD,
-                response_text="Por favor comparte o escribe tu número de teléfono.",
-            )
-        import re
-
-        cleaned_phone = re.sub(r"[\s\-()]+", "", user_text)
-        if not re.match(r"^\+?\d{8,15}$", cleaned_phone):
-            attempts = int(str(current_state_raw.get("invalid_attempts", 0))) + 1
-            if attempts >= 3:
-                return RouterResult(
-                    handled=True,
-                    nextState={"name": "idle"},
-                    nextDraft={},
-                    response_text="❌ Demasiados intentos inválidos de teléfono. Volviendo al menú principal.\n\n"
-                    + get_main_menu_text(),
-                )
-            return RouterResult(
-                handled=True,
-                nextState={"name": "reg_collecting_phone", "invalid_attempts": attempts},
-                nextDraft=dict(draft_raw),
-                response_text=(
-                    "⚠️ El número de teléfono no es válido. "
-                    "Por favor ingresa un número con código de país (ejemplo: +56999040515)."
-                ),
-            )
-        new_draft3: dict[str, object] = {**dict(draft_raw), "reg_phone": cleaned_phone}
-        return RouterResult(
-            handled=True,
-            nextState={"name": "reg_collecting_email"},
-            nextDraft=new_draft3,
-            response_text=("📧 ¿Tienes correo electrónico? (opcional)\n\nEscríbelo o envía *saltar* para omitirlo."),
-        )
-
-    if current_state_name == "reg_collecting_email":
-        reg_name = str(draft_raw.get("reg_name") or client_name)
-        reg_phone = str(draft_raw.get("reg_phone") or "")
-        if lower in _SKIP_WORDS or lower in _NO_WORDS:
-            reg_email = None
-        else:
-            import re
-
-            if not re.match(r"^[^@]+@[^@]+\.[^@]+$", user_text.strip()):
-                attempts = int(str(current_state_raw.get("invalid_attempts", 0))) + 1
-                if attempts >= 3:
-                    return RouterResult(
-                        handled=True,
-                        nextState={"name": "idle"},
-                        nextDraft={},
-                        response_text="❌ Demasiados intentos de correo inválidos. Registro completado sin correo.\n\n"
-                        + get_main_menu_text(),
-                        registration_data={"name": reg_name, "phone": reg_phone, "email": None},
-                    )
-                return RouterResult(
-                    handled=True,
-                    nextState={"name": "reg_collecting_email", "invalid_attempts": attempts},
-                    nextDraft=dict(draft_raw),
-                    response_text=(
-                        "⚠️ El correo electrónico no es válido. Por favor ingresa un "
-                        "correo electrónico válido (ejemplo: usuario@correo.com) o envía *saltar*."
-                    ),
-                )
-            reg_email = user_text.strip()
-
-        return RouterResult(
-            handled=True,
-            nextState={"name": "idle"},
-            nextDraft={},
-            registration_data={"name": reg_name, "phone": reg_phone, "email": reg_email},
-            response_text=("✅ ¡Registro completado!\n\nYa puedes agendar tu hora. 🗓️\n\n" + get_main_menu_text()),
-        )
-
-    return RouterResult(handled=False)
-
-
 @beartype
 async def _route_impl(input_data: RouterInput) -> RouterResult:
     state_dict = input_data.state or {}
@@ -570,6 +182,17 @@ async def _route_impl(input_data: RouterInput) -> RouterResult:
             nextState={"name": "idle", "session_id": str(input_data.update_id)},
             response_text=_get_start_text(input_data.client_name, input_data.phone),
         )
+
+    # ─── Fast-path: opciones numéricas del menú en estado idle ───────────────
+    current_state_name_for_fastpath = str(
+        cast("dict[str, object]", state_dict.get("booking_state") or {"name": "idle"}).get("name", "idle")
+    )
+    _injected_intent: str | None = None
+    if not is_callback and current_state_name_for_fastpath == "idle":
+        numeric_intent = _MENU_NUMERIC_INTENT_MAP.get(user_input.strip())
+        if numeric_intent is not None:
+            log("MENU_NUMERIC_FASTPATH", input=user_input.strip(), intent=numeric_intent, module=_MODULE)
+            _injected_intent = numeric_intent
 
     # ─── Session Validation (Callback security) ───
     if is_callback:
@@ -600,16 +223,15 @@ async def _route_impl(input_data: RouterInput) -> RouterResult:
         parts = user_input.split(":")
         if len(parts) == 4:
             pid = parts[2]
-            # sid = parts[3] # Not strictly needed for the fetch, but keep for future use if sid is required
 
             # Fetch slots ahead to jump straight to time selection
             if not input_data.pg_url:
                 return RouterResult(handled=False)
 
             try:
-                slots = await _fetch_slots_for_doctor(input_data.pg_url, pid)
                 db = await _create_db_client(input_data.pg_url)
                 try:
+                    slots = await _prefetch_slots(db, pid)
                     p_row = await db.fetchrow(
                         "SELECT name, specialty_id FROM providers WHERE provider_id = $1::uuid", pid
                     )
@@ -643,7 +265,8 @@ async def _route_impl(input_data: RouterInput) -> RouterResult:
                         f"Especialidad: {sp_name}\n\nSelecciona un nuevo horario:"
                     ),
                     inline_buttons=cast(
-                        "list[list[InlineButton]]", build_time_slot_keyboard(cast("list[TimeSlotItem]", slots), session_id=current_session)
+                        "list[list[InlineButton]]",
+                        build_time_slot_keyboard(cast("list[TimeSlotItem]", slots), session_id=current_session),
                     ),
                 )
             except Exception as e:
@@ -660,38 +283,7 @@ async def _route_impl(input_data: RouterInput) -> RouterResult:
 
     # ─── Activity Report (with Pagination) ───
     if user_input.startswith("cmd:reporte"):
-        if not input_data.client_id or not input_data.pg_url:
-            return RouterResult(
-                handled=True,
-                nextState={"name": "idle"},
-                response_text="📊 *Generar Reporte*\n\nNo pude generar tu reporte en este momento.\n\n"
-                + get_main_menu_text(),
-                inline_buttons=get_main_menu_inline_buttons(),
-            )
-
-        page = 1
-        if user_input.startswith("cmd:reporte:p:"):
-            try:
-                page = int(user_input.split(":")[-1])
-            except (ValueError, IndexError):
-                page = 1
-
-        report = await generate_booking_report(input_data.client_id, input_data.pg_url, page=page, session_id=current_session)
-        if not report:
-            return RouterResult(
-                handled=True,
-                nextState={"name": "idle"},
-                response_text="📊 *Generar Reporte*\n\nHubo un error al generar el reporte.\n\n" + get_main_menu_text(),
-                inline_buttons=get_main_menu_inline_buttons(),
-            )
-
-        return RouterResult(
-            handled=True,
-            nextState={"name": "idle"},
-            response_text=report["text"] + "\n\n" + get_main_menu_text(),
-            inline_buttons=cast("list[list[Any]] | None", report["inline_buttons"]),
-            edit_message=page > 1,
-        )
+        return await handle_generar_reporte(input_data, user_input, current_session)
 
     current_state_raw = cast("dict[str, object]", state_dict.get("booking_state") or {"name": "idle"})
     current_state_name = str(current_state_raw.get("name", "idle"))
@@ -710,8 +302,8 @@ async def _route_impl(input_data: RouterInput) -> RouterResult:
     }
     is_abort_keyword = trimmed in _ABORT_KEYWORDS
 
-    ai_intent = input_data.ai_intent or ""
-    ai_conf = input_data.ai_confidence or 0.0
+    ai_intent = _injected_intent or input_data.ai_intent or ""
+    ai_conf = 1.0 if _injected_intent else (input_data.ai_confidence or 0.0)
 
     if is_menu_keyword or (ai_intent == "mostrar_menu_principal" and ai_conf >= _FSM_INTERRUPT_THRESHOLD):
         if current_state_name != "idle":
@@ -805,8 +397,8 @@ async def _route_impl(input_data: RouterInput) -> RouterResult:
     # handle it here instead of forcing through FSM transitions.
     # This catches cases where confidence is below the routing threshold
     # but the intent is still unambiguous.
-    ai_intent = input_data.ai_intent or ""
-    ai_conf = input_data.ai_confidence or 0.0
+    ai_intent = _injected_intent or input_data.ai_intent or ""
+    ai_conf = 1.0 if _injected_intent else (input_data.ai_confidence or 0.0)
 
     is_active_booking = current_state_name in ("selecting_doctor", "selecting_time", "confirming")
     allowed_interrupt = True
@@ -925,37 +517,17 @@ async def _route_impl(input_data: RouterInput) -> RouterResult:
                     response_text=response,
                     inline_buttons=cast(
                         "list[list[dict[str, str]]] | None",
-                        build_specialty_keyboard(specialty_items, session_id=current_session) if specialty_items else None,
-                    ),                )
+                        build_specialty_keyboard(specialty_items, session_id=current_session)
+                        if specialty_items
+                        else None,
+                    ),
+                )
             elif intent in ("mis_citas", "ver_mis_citas") or intent in ("cancelar_cita", "reagendar_cita"):
                 return await _handle_mis_citas(input_data, current_state_raw, session_id=current_session)
             elif intent == "generar_reporte":
-                if not input_data.client_id or not input_data.pg_url:
-                    return RouterResult(
-                        handled=True,
-                        nextState={"name": "idle"},
-                        response_text="📊 *Generar Reporte*\n\nNo pude generar tu reporte en este momento.\n\n"
-                        + get_main_menu_text(),
-                        inline_buttons=get_main_menu_inline_buttons(),
-                    )
-
-                report = await generate_booking_report(input_data.client_id, input_data.pg_url)
-                if not report:
-                    return RouterResult(
-                        handled=True,
-                        nextState={"name": "idle"},
-                        response_text="📊 *Generar Reporte*\n\nHubo un error al generar el reporte.\n\n"
-                        + get_main_menu_text(),
-                        inline_buttons=get_main_menu_inline_buttons(),
-                    )
-
+                return await handle_generar_reporte(input_data, user_input, current_session)
+            elif intent == "mostrar_menu_principal":
                 return RouterResult(
-                    handled=True,
-                    nextState={"name": "idle"},
-                    response_text=report["text"] + "\n\n" + get_main_menu_text(),
-                    inline_buttons=cast("list[list[Any]] | None", report["inline_buttons"]),
-                )
-            elif intent == "mostrar_menu_principal":                return RouterResult(
                     handled=True,
                     nextState=current_state_raw,
                     response_text=get_main_menu_text(),
@@ -1009,13 +581,13 @@ async def _route_impl(input_data: RouterInput) -> RouterResult:
 @beartype
 async def _route(input_data: RouterInput) -> RouterResult:
     result: RouterResult = await _route_impl(input_data)
-    
+
     # ─── Session ID Injection (Final Guard) ───
     # Ensure every nextState returned by this router preserves the session_id
     if result.nextState:
         state_dict = input_data.state or {}
         current_session = str(state_dict.get("session_id") or "")
-        
+
         # If /start was just called, a NEW session was generated in nextState.
         # Otherwise, we carry forward the current session.
         if "session_id" not in result.nextState and current_session:

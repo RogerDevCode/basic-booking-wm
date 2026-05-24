@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Annotated, Literal, TypedDict
+from typing import Annotated, Any, Literal, NotRequired, TypedDict
 
 from pydantic import BaseModel, ConfigDict, Field, RootModel
 
@@ -64,6 +64,7 @@ def empty_draft() -> DraftBooking:
 
 class IdleState(BaseModel):
     name: Literal["idle"] = "idle"
+    session_id: str | None = None
 
 
 class SelectingSpecialtyState(BaseModel):
@@ -71,6 +72,7 @@ class SelectingSpecialtyState(BaseModel):
     error: str | None = None
     items: list[NamedItem] = Field(default_factory=list[NamedItem])
     invalid_attempts: int = 0
+    session_id: str | None = None
 
 
 class SelectingDoctorState(BaseModel):
@@ -80,6 +82,7 @@ class SelectingDoctorState(BaseModel):
     error: str | None = None
     items: list[NamedItem] = Field(default_factory=list[NamedItem])
     invalid_attempts: int = 0
+    session_id: str | None = None
 
 
 class SelectingTimeState(BaseModel):
@@ -91,6 +94,7 @@ class SelectingTimeState(BaseModel):
     error: str | None = None
     items: list[TimeSlotItem] = Field(default_factory=list[TimeSlotItem])
     invalid_attempts: int = 0
+    session_id: str | None = None
 
 
 class ConfirmingState(BaseModel):
@@ -101,11 +105,13 @@ class ConfirmingState(BaseModel):
     timeSlot: str
     draft: DraftCore
     invalid_attempts: int = 0
+    session_id: str | None = None
 
 
 class CompletedState(BaseModel):
     name: Literal["completed"] = "completed"
     bookingId: str | None = None
+    session_id: str | None = None
 
 
 # Discriminated Union for State
@@ -164,6 +170,7 @@ class TransitionOutcome(TypedDict):
     nextState: BookingState
     responseText: str
     advance: bool
+    inlineButtons: NotRequired[list[list[Any]]]
 
 
 VALID_TRANSITIONS: dict[BookingStepName, list[BookingStepName]] = {

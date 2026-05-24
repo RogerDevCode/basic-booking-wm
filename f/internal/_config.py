@@ -48,6 +48,9 @@ BOOKING_STATUS: Final[dict[str, str]] = {
     "RESCHEDULED": "rescheduled",
 }
 
+# ─── Locale Configuration
+DEFAULT_TIMEZONE: Final[str] = "America/Santiago"
+
 
 def get_env(name: str, default: str | None = None) -> str | None:
     return os.getenv(name, default)

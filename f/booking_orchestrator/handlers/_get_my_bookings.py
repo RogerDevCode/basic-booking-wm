@@ -5,6 +5,7 @@ import zoneinfo
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, cast
 
+from f.internal._config import DEFAULT_TIMEZONE
 from f.internal._result import DBClient, with_tenant_context
 
 if TYPE_CHECKING:
@@ -64,7 +65,7 @@ async def handle_get_my_bookings(
 
     rows = await with_tenant_context(conn, tenant_id, operation)
 
-    tz = zoneinfo.ZoneInfo("America/Santiago")
+    tz = zoneinfo.ZoneInfo(DEFAULT_TIMEZONE)
     lines: list[str] = []
     for r in rows:
         st = r["start_time"]

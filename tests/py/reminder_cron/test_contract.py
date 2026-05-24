@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from f.internal._config import DEFAULT_TIMEZONE
 from f.reminder_cron._reminder_models import BookingRecord
 from f.reminder_cron.main import _main_async as main
 
@@ -38,7 +39,7 @@ async def test_reminder_cron_success() -> None:
             },
             "provider_name": "Dr",
             "service_name": "S",
-            "provider_timezone": "America/Santiago",
+            "provider_timezone": DEFAULT_TIMEZONE,
         }
     )
 

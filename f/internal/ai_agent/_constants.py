@@ -21,6 +21,7 @@ IntentType = Literal[
     "paso_wizard",
     "ver_mis_citas",
     "ver_mis_datos",
+    "generar_reporte",
     "desconocido",
 ]
 
@@ -42,6 +43,7 @@ class IntentsStruct(TypedDict):
     PASO_WIZARD: Literal["paso_wizard"]
     VER_MIS_CITAS: Literal["ver_mis_citas"]
     VER_MIS_DATOS: Literal["ver_mis_datos"]
+    GENERAR_REPORTE: Literal["generar_reporte"]
     DESCONOCIDO: Literal["desconocido"]
 
 
@@ -62,6 +64,7 @@ INTENT: Final[IntentsStruct] = {
     "PASO_WIZARD": "paso_wizard",
     "VER_MIS_CITAS": "ver_mis_citas",
     "VER_MIS_DATOS": "ver_mis_datos",
+    "GENERAR_REPORTE": "generar_reporte",
     "DESCONOCIDO": "desconocido",
 }
 
@@ -126,6 +129,7 @@ INTENT_KEYWORDS: Final[dict[str, list[str]]] = {
     "activar_recordatorios": ["3", "recordatorios"],
     "pregunta_general": ["4", "informacion", "info"],
     "ver_mis_datos": ["mis datos", "datos", "mi perfil", "perfil", "5"],
+    "generar_reporte": ["reporte", "informe", "descargar citas", "obtener reporte"],
     "despedida": ["adios", "bye", "hasta luego", "chao"],
     "agradecimiento": ["gracias", "muchas gracias"],
     "mostrar_menu_principal": ["menu", "inicio", "volver"],

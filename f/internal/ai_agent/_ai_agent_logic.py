@@ -19,7 +19,9 @@ from ._constants import (
 # FSM ROUTING DECISION
 # ============================================================================
 
-_FSM_INTENTS: frozenset[str] = frozenset({"crear_cita", "cancelar_cita", "reagendar_cita", "ver_disponibilidad"})
+_FSM_INTENTS: frozenset[str] = frozenset(
+    {"crear_cita", "cancelar_cita", "reagendar_cita", "ver_disponibilidad", "generar_reporte"}
+)
 
 _FSM_ACTIVE_STATES: frozenset[str] = frozenset(
     {

@@ -22,10 +22,11 @@ from pydantic import BaseModel, ConfigDict
 from ...rag_query.main import run_rag_query
 from ...reminder_config._config_models import InputSchema as ReminderConfigInput
 from ...reminder_config.main import run_reminder_config
-from .._booking_shared import get_mis_citas_text
+from .._booking_shared import get_mis_citas_buttons, get_mis_citas_text
 from .._nlu_cache import ensure_nlu_cache
+from .._report_logic import generate_booking_report
 from .._wmill_adapter import log
-from ..booking_fsm._fsm_machine import get_main_menu_text
+from ..booking_fsm._fsm_machine import get_main_menu_inline_buttons, get_main_menu_text
 
 MODULE: Final[str] = "conversational_router"
 
@@ -52,6 +53,7 @@ class ConversationalInput(BaseModel):
     phone: str | None = None
     pg_url: str | None = None
     current_state_name: str = "idle"
+    session_id: str | None = None
 
 
 class ConversationalResult(BaseModel):
@@ -72,6 +74,7 @@ _INTENT_TO_HANDLER: dict[str, str] = {
     "urgencia": "rag",
     "ver_mis_citas": "mis_citas",
     "ver_mis_datos": "mis_datos",
+    "generar_reporte": "reporte",
     "activar_recordatorios": "recordatorios",
     "desactivar_recordatorios": "recordatorios",
     "preferencias_recordatorio": "recordatorios",
@@ -125,6 +128,29 @@ async def _handle(inp: ConversationalInput) -> ConversationalResult:
             response_text="¡Con gusto! 😊\n\n" + _format_menu_with_user_info(inp.client_name, inp.phone),
         )
 
+    if handler == "reporte":
+        if not inp.client_id or not inp.pg_url:
+            return ConversationalResult(
+                handled=True,
+                nextState={"name": "idle"},
+                response_text="📊 *Generar Reporte*\n\nNo pude generar tu reporte en este momento.",
+            )
+
+        report = await generate_booking_report(inp.client_id, inp.pg_url, session_id=inp.session_id)
+        if not report:
+            return ConversationalResult(
+                handled=True,
+                nextState={"name": "idle"},
+                response_text="📊 *Generar Reporte*\n\nHubo un error al generar el reporte.",
+            )
+
+        return ConversationalResult(
+            handled=True,
+            nextState={"name": "idle"},
+            response_text=report["text"] + "\n\n" + get_main_menu_text(),
+            inline_buttons=report["inline_buttons"],
+        )
+
     if handler == "menu":
         return ConversationalResult(
             handled=True,
@@ -148,10 +174,13 @@ async def _handle(inp: ConversationalInput) -> ConversationalResult:
                 response_text="📋 *Mis Horas*\n\nNo tienes horas agendadas próximamente.",
             )
 
+        buttons = await get_mis_citas_buttons(inp.client_id, inp.pg_url, session_id=inp.session_id)
+
         return ConversationalResult(
             handled=True,
             nextState={"name": "idle"},
             response_text=text + "\n\n" + get_main_menu_text(),
+            inline_buttons=buttons,
         )
 
     if handler == "mis_datos":
@@ -237,6 +266,10 @@ async def _handle(inp: ConversationalInput) -> ConversationalResult:
 async def _main_async(args: dict[str, Any]) -> dict[str, Any]:
     inp = ConversationalInput.model_validate(args)
     result = await _handle(inp)
+
+    if not result.inline_buttons and result.response_text and "📱 *Menú Principal*" in result.response_text:
+        result.inline_buttons = get_main_menu_inline_buttons()
+
     return {"data": result.model_dump()}
 
 

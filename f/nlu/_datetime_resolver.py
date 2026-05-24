@@ -23,6 +23,8 @@ import jellyfish
 from pydantic import BaseModel, ConfigDict
 from rapidfuzz import fuzz
 
+from f.internal._config import DEFAULT_TIMEZONE
+
 log = logging.getLogger("booking_titanium.datetime_resolver")
 
 # ============================================================================
@@ -222,7 +224,7 @@ def semantic_match(
 # ============================================================================
 
 
-def parse_with_dateparser(text: str, provider_tz: str = "America/Santiago") -> datetime | None:
+def parse_with_dateparser(text: str, provider_tz: str = DEFAULT_TIMEZONE) -> datetime | None:
     try:
         dt = dateparser.parse(
             text,
@@ -289,7 +291,7 @@ def _llm_fallback(raw_text: str) -> str | None:
 
 def resolve_datetime(
     raw_text: str,
-    provider_tz: str = "America/Santiago",
+    provider_tz: str = DEFAULT_TIMEZONE,
 ) -> ResolverResult:
     """Resuelve intención temporal con pipeline híbrido.
 

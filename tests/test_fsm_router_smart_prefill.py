@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from f.internal._config import DEFAULT_TIMEZONE
 from f.internal.fsm_router.main import _main_async
 
 # ============================================================================
@@ -32,12 +33,12 @@ async def test_smart_prefill_single_provider_skips_to_selecting_time() -> None:
     }
 
     mock_db = AsyncMock()
-    mock_db.fetchrow.return_value = {"tz_name": "America/Santiago"}
+    mock_db.fetchrow.return_value = {"tz_name": DEFAULT_TIMEZONE}
 
     with (
         patch("f.internal._nlu_cache.ensure_nlu_cache", AsyncMock()),
         patch(
-            "f.internal.fsm_router.main.resolve_provider_by_name",
+            "f.internal.fsm_router.handlers._smart_prefill_handler.resolve_provider_by_name",
             AsyncMock(
                 return_value=[
                     {
@@ -50,15 +51,15 @@ async def test_smart_prefill_single_provider_skips_to_selecting_time() -> None:
             ),
         ),
         patch(
-            "f.internal.fsm_router.main._has_active_booking_for_provider",
+            "f.internal.fsm_router.handlers._smart_prefill_handler._has_active_booking_for_provider",
             AsyncMock(return_value=False),
         ),
         patch(
-            "f.internal.fsm_router.main._create_db_client",
+            "f.internal.fsm_router.handlers._smart_prefill_handler._create_db_client",
             AsyncMock(return_value=mock_db),
         ),
         patch(
-            "f.internal.fsm_router.main._fetch_slots_for_doctor",
+            "f.internal.fsm_router.handlers._smart_prefill_handler._fetch_slots_for_doctor",
             AsyncMock(
                 return_value=[
                     {
@@ -102,12 +103,12 @@ async def test_smart_prefill_with_date_entity_resolves_target_date() -> None:
     }
 
     mock_db = AsyncMock()
-    mock_db.fetchrow.return_value = {"tz_name": "America/Santiago"}
+    mock_db.fetchrow.return_value = {"tz_name": DEFAULT_TIMEZONE}
 
     with (
         patch("f.internal._nlu_cache.ensure_nlu_cache", AsyncMock()),
         patch(
-            "f.internal.fsm_router.main.resolve_provider_by_name",
+            "f.internal.fsm_router.handlers._smart_prefill_handler.resolve_provider_by_name",
             AsyncMock(
                 return_value=[
                     {
@@ -120,14 +121,14 @@ async def test_smart_prefill_with_date_entity_resolves_target_date() -> None:
             ),
         ),
         patch(
-            "f.internal.fsm_router.main._has_active_booking_for_provider",
+            "f.internal.fsm_router.handlers._smart_prefill_handler._has_active_booking_for_provider",
             AsyncMock(return_value=False),
         ),
         patch(
-            "f.internal.fsm_router.main._create_db_client",
+            "f.internal.fsm_router.handlers._smart_prefill_handler._create_db_client",
             AsyncMock(return_value=mock_db),
         ),
-        patch("f.internal.fsm_router.main._fetch_slots_for_doctor", AsyncMock(return_value=[])) as mock_fetch,
+        patch("f.internal.fsm_router.handlers._smart_prefill_handler._fetch_slots_for_doctor", AsyncMock(return_value=[])) as mock_fetch,
     ):
         await _main_async(args)
 
@@ -163,12 +164,12 @@ async def test_smart_prefill_with_date_shows_date_in_response() -> None:
     }
 
     mock_db = AsyncMock()
-    mock_db.fetchrow.return_value = {"tz_name": "America/Santiago"}
+    mock_db.fetchrow.return_value = {"tz_name": DEFAULT_TIMEZONE}
 
     with (
         patch("f.internal._nlu_cache.ensure_nlu_cache", AsyncMock()),
         patch(
-            "f.internal.fsm_router.main.resolve_provider_by_name",
+            "f.internal.fsm_router.handlers._smart_prefill_handler.resolve_provider_by_name",
             AsyncMock(
                 return_value=[
                     {
@@ -181,15 +182,15 @@ async def test_smart_prefill_with_date_shows_date_in_response() -> None:
             ),
         ),
         patch(
-            "f.internal.fsm_router.main._has_active_booking_for_provider",
+            "f.internal.fsm_router.handlers._smart_prefill_handler._has_active_booking_for_provider",
             AsyncMock(return_value=False),
         ),
         patch(
-            "f.internal.fsm_router.main._create_db_client",
+            "f.internal.fsm_router.handlers._smart_prefill_handler._create_db_client",
             AsyncMock(return_value=mock_db),
         ),
         patch(
-            "f.internal.fsm_router.main._fetch_slots_for_doctor",
+            "f.internal.fsm_router.handlers._smart_prefill_handler._fetch_slots_for_doctor",
             AsyncMock(
                 return_value=[
                     {
@@ -269,7 +270,7 @@ async def test_smart_prefill_ambiguous_shows_list() -> None:
     with (
         patch("f.internal._nlu_cache.ensure_nlu_cache", AsyncMock()),
         patch(
-            "f.internal.fsm_router.main.resolve_provider_by_name",
+            "f.internal.fsm_router.handlers._smart_prefill_handler.resolve_provider_by_name",
             AsyncMock(
                 return_value=[
                     {
@@ -325,7 +326,7 @@ async def test_smart_prefill_no_match_returns_informative_message() -> None:
     with (
         patch("f.internal._nlu_cache.ensure_nlu_cache", AsyncMock()),
         patch(
-            "f.internal.fsm_router.main.resolve_provider_by_name",
+            "f.internal.fsm_router.handlers._smart_prefill_handler.resolve_provider_by_name",
             AsyncMock(return_value=[]),
         ),
     ):
@@ -364,7 +365,7 @@ async def test_smart_prefill_already_booked_blocks() -> None:
     with (
         patch("f.internal._nlu_cache.ensure_nlu_cache", AsyncMock()),
         patch(
-            "f.internal.fsm_router.main.resolve_provider_by_name",
+            "f.internal.fsm_router.handlers._smart_prefill_handler.resolve_provider_by_name",
             AsyncMock(
                 return_value=[
                     {
@@ -377,7 +378,7 @@ async def test_smart_prefill_already_booked_blocks() -> None:
             ),
         ),
         patch(
-            "f.internal.fsm_router.main._has_active_booking_for_provider",
+            "f.internal.fsm_router.handlers._smart_prefill_handler._has_active_booking_for_provider",
             AsyncMock(return_value=True),
         ),
     ):
@@ -414,12 +415,12 @@ async def test_smart_prefill_no_slots_shows_message() -> None:
     }
 
     mock_db = AsyncMock()
-    mock_db.fetchrow.return_value = {"tz_name": "America/Santiago"}
+    mock_db.fetchrow.return_value = {"tz_name": DEFAULT_TIMEZONE}
 
     with (
         patch("f.internal._nlu_cache.ensure_nlu_cache", AsyncMock()),
         patch(
-            "f.internal.fsm_router.main.resolve_provider_by_name",
+            "f.internal.fsm_router.handlers._smart_prefill_handler.resolve_provider_by_name",
             AsyncMock(
                 return_value=[
                     {
@@ -432,15 +433,15 @@ async def test_smart_prefill_no_slots_shows_message() -> None:
             ),
         ),
         patch(
-            "f.internal.fsm_router.main._has_active_booking_for_provider",
+            "f.internal.fsm_router.handlers._smart_prefill_handler._has_active_booking_for_provider",
             AsyncMock(return_value=False),
         ),
         patch(
-            "f.internal.fsm_router.main._create_db_client",
+            "f.internal.fsm_router.handlers._smart_prefill_handler._create_db_client",
             AsyncMock(return_value=mock_db),
         ),
         patch(
-            "f.internal.fsm_router.main._fetch_slots_for_doctor",
+            "f.internal.fsm_router.handlers._smart_prefill_handler._fetch_slots_for_doctor",
             AsyncMock(return_value=[]),
         ),
     ):

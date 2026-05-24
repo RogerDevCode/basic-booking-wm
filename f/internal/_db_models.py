@@ -13,6 +13,7 @@ from uuid import UUID, uuid4
 from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from f.internal._config import DEFAULT_TIMEZONE
 from f.internal._db_sqlalchemy import Base
 
 
@@ -26,7 +27,7 @@ class ProviderORM(Base):
     specialty: Mapped[str] = mapped_column(String(255), default="Medicina General", nullable=False)
     telegram_chat_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     gcal_calendar_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    timezone: Mapped[str] = mapped_column(String(100), default="America/Santiago", nullable=False)
+    timezone: Mapped[str] = mapped_column(String(100), default=DEFAULT_TIMEZONE, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False

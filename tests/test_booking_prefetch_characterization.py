@@ -11,6 +11,8 @@ import sys
 from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from f.internal._config import DEFAULT_TIMEZONE
+
 # Mock wmill before importing the module under test
 _wmill_mock = MagicMock()
 sys.modules.setdefault("wmill", _wmill_mock)
@@ -109,7 +111,7 @@ class TestSlotLabel:
     def test_slot_label_applies_timezone_offset(self) -> None:
         # America/Santiago is UTC-4 in winter
         label_utc = _slot_label("2026-06-01T16:00:00+00:00", "UTC")
-        label_santiago = _slot_label("2026-06-01T16:00:00+00:00", "America/Santiago")
+        label_santiago = _slot_label("2026-06-01T16:00:00+00:00", DEFAULT_TIMEZONE)
         assert label_utc != label_santiago
 
 

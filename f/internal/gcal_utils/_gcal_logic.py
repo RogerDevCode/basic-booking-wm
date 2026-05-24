@@ -1,5 +1,7 @@
 from typing import Literal
 
+from f.internal._config import DEFAULT_TIMEZONE
+
 from ._gcal_models import BookingEventData, GoogleCalendarEvent
 
 
@@ -28,8 +30,8 @@ def build_gcal_event(
     return {
         "summary": title,
         "description": description,
-        "start": {"dateTime": booking["start_time"], "timeZone": "America/Santiago"},
-        "end": {"dateTime": booking["end_time"], "timeZone": "America/Santiago"},
+        "start": {"dateTime": booking["start_time"], "timeZone": DEFAULT_TIMEZONE},
+        "end": {"dateTime": booking["end_time"], "timeZone": DEFAULT_TIMEZONE},
         "status": "cancelled" if booking["status"] == "cancelled" else "confirmed",
         "reminders": {
             "useDefault": False,

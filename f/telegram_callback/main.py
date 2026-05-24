@@ -34,7 +34,14 @@ from pydantic import BaseModel
 from ..internal._wmill_adapter import get_variable, log
 from ._callback_logic import answer_callback_query, parse_callback_data, send_followup_message
 from ._callback_models import ActionContext, InputSchema
-from ._callback_router import AcknowledgeHandler, AutoRescheduleHandler, CancelHandler, ConfirmHandler, TelegramRouter
+from ._callback_router import (
+    AcknowledgeHandler,
+    AutoRescheduleHandler,
+    CancelHandler,
+    CancelReasonHandler,
+    ConfirmHandler,
+    TelegramRouter,
+)
 
 MODULE = "telegram_callback"
 
@@ -72,6 +79,7 @@ async def _main_async(
     router = TelegramRouter()
     router.register("confirm", ConfirmHandler())
     router.register("cancel", CancelHandler())
+    router.register("cancel_reason", CancelReasonHandler())
     router.register("acknowledge", AcknowledgeHandler())
     router.register("auto_reschedule", AutoRescheduleHandler())
 
@@ -82,8 +90,10 @@ async def _main_async(
         "client_id": input_data.client_id,
         "chat_id": input_data.chat_id,
         "callback_query_id": input_data.callback_query_id,
+        "session_id": parsed_cb.get("session_id"),
         "date": parsed_cb.get("date"),
         "time": parsed_cb.get("time"),
+        "reason_code": parsed_cb.get("reason_code"),
     }
 
     result = await router.route(action, context)

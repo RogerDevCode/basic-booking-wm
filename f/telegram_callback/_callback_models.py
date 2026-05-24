@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Protocol, Required, TypedDict
+from typing import Any, NotRequired, Protocol, Required, TypedDict
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -23,13 +23,16 @@ class ActionContext(TypedDict, total=False):
     client_id: Required[str | None]
     chat_id: Required[str]
     callback_query_id: Required[str]
+    session_id: str | None
     date: str | None
     time: str | None
+    reason_code: str | None
 
 
 class ActionResult(TypedDict):
     responseText: str
     followUpText: str | None
+    inlineButtons: NotRequired[list[list[Any]]]
 
 
 class ActionHandler(Protocol):

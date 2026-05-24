@@ -92,10 +92,33 @@ async def handle_create_booking(
         }
         return res
 
-    # 2. CHECK FOR DUPLICATE ACTIVE BOOKING (Rule BE-02)
-    # client_id and provider_id are guaranteed non-None by the all() guard above
+    # 1.5. VALIDATE IDS IN DB (FAIL-FAST)
     assert client_id is not None
     assert provider_id is not None
+    assert service_id is not None
+
+    provider_check = await conn.fetchrow(
+        "SELECT 1 FROM providers WHERE provider_id = $1::uuid AND is_active = true", provider_id
+    )
+    if not provider_check:
+        return {
+            "action": "crear_cita",
+            "success": False,
+            "message": "❌ El especialista seleccionado no está disponible o ya no existe. Por favor, intenta agendar nuevamente.",
+        }
+
+    service_check = await conn.fetchrow(
+        "SELECT 1 FROM services WHERE service_id = $1::uuid AND is_active = true", service_id
+    )
+    if not service_check:
+        return {
+            "action": "crear_cita",
+            "success": False,
+            "message": "❌ El servicio seleccionado no está disponible. Por favor, intenta agendar nuevamente.",
+        }
+
+    # 2. CHECK FOR DUPLICATE ACTIVE BOOKING (Rule BE-02)
+    # client_id and provider_id are guaranteed non-None by the all() guard above
     active_booking = await get_active_booking_for_provider(conn, client_id, provider_id)
     if active_booking:
         st = active_booking["start_time"]

@@ -168,6 +168,7 @@ value:
                 "prefetch_block_reason": results.booking_prefetch?.block_reason || null,
                 "client_id": results.telegram_auto_register?.client_id ?? null,
                 "callback_message_id": results.webhook_trigger.callback_message_id ?? null,
+                "update_id": results.webhook_trigger.update_id,
                 "pg_url": variable("u/admin/DATABASE_URL"),
                 "ai_intent": results.ai_agent?.data?.intent ?? null,
                 "ai_confidence": results.ai_agent?.data?.confidence ?? null,
@@ -196,7 +197,8 @@ value:
                 "client_name": results.telegram_auto_register?.name ?? null,
                 "phone": results.telegram_auto_register?.phone ?? null,
                 "pg_url": variable("u/admin/DATABASE_URL"),
-                "current_state_name": results.get_conversation_state.data?.booking_state?.name || "idle" }
+                "current_state_name": results.get_conversation_state.data?.booking_state?.name || "idle",
+                "session_id": results.get_conversation_state.data?.booking_state?.session_id || null }
         path: f/internal/conversational_router/main
       skip_if:
         expr: '!results.ai_agent?.data ||  results.ai_agent.data.requires_fsm_routing
@@ -305,7 +307,9 @@ value:
           inline_buttons_json:
             type: javascript
             expr: 'results.fsm_router?.data?.inline_buttons ?
-              JSON.stringify(results.fsm_router.data.inline_buttons) : null'
+              JSON.stringify(results.fsm_router.data.inline_buttons) :
+              (results.conversational_router?.data?.inline_buttons ?
+              JSON.stringify(results.conversational_router.data.inline_buttons) : null)'
           message_id:
             type: javascript
             expr: 'results.fsm_router?.data?.edit_message ?
@@ -322,8 +326,7 @@ value:
                 ("✅ *Reserva Confirmada*\n\n" +
                  "📋 " + results.booking_commit.service_name + " con " + results.booking_commit.provider_name + "\n" +
                  "🆔 Ref: `" + results.booking_commit.booking_short_id + "`\n\n" +
-                 "Recibirás un recordatorio antes de tu hora.\n\n" +
-                 "📱 *Menú Principal*\n\n1️⃣ Agendar hora\n2️⃣ Mis horas\n3️⃣ Recordatorios\n4️⃣ Información\n5️⃣ Mis datos")
+                 "Recibirás un recordatorio antes de tu hora.\n\n📱 *Menú Principal*")
               : (results.booking_commit?.error) ?
                 ("❌ No se pudo confirmar la cita.\n\n" +
                  (results.booking_commit.user_message || "Por favor intenta de nuevo en unos minutos."))

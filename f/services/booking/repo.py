@@ -4,6 +4,7 @@ import json
 from typing import TYPE_CHECKING, Any, Final, Protocol, TypeVar, cast
 
 from f.booking_orchestrator._get_entity import get_entity
+from f.internal._config import DEFAULT_TIMEZONE
 from f.internal._date_resolver import resolve_date, resolve_time
 from f.internal._state_machine import BookingStatus, validate_transition
 from f.services.booking._booking_errors import BookingSlotUnavailableError
@@ -102,7 +103,7 @@ class PgBookingRepo:
             if rows:
                 service_id = str(rows[0]["service_id"])
 
-        timezone = "America/Santiago"
+        timezone = DEFAULT_TIMEZONE
         if not client_id and telegram_chat_id:
             rows = await self.db.fetch(
                 (

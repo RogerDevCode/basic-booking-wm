@@ -5,7 +5,6 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 
-
 class RouterInput(BaseModel):
     model_config = ConfigDict(strict=True)
 

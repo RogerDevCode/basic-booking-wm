@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from f.internal._booking_shared import get_mis_citas_text, query_my_bookings, resolve_provider_by_name
+from f.internal._config import DEFAULT_TIMEZONE
 
 
 @pytest.mark.asyncio
@@ -21,7 +22,7 @@ async def test_query_my_bookings_success() -> None:
             "status": "confirmed",
             "provider_name": "Dr. Smith",
             "service_name": "Consultation",
-            "tz_name": "America/Santiago",
+            "tz_name": DEFAULT_TIMEZONE,
         }
     ]
 

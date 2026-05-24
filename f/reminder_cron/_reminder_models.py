@@ -5,6 +5,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from f.internal._config import DEFAULT_TIMEZONE
+
 from ..reminder_config._config_models import (  # noqa: TC001
     InlineButton,
     ReminderChannel,
@@ -85,4 +87,4 @@ class InputSchema(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
 
     dry_run: bool = False
-    timezone: str = "America/Santiago"
+    timezone: str = DEFAULT_TIMEZONE

@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from f.booking_wizard.main import _main_async as main
+from f.internal._config import DEFAULT_TIMEZONE
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Coroutine
@@ -16,7 +17,7 @@ VALID_ID = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
 @pytest.mark.asyncio
 async def test_booking_wizard_start() -> None:
     mock_db = AsyncMock()
-    mock_db.fetchrow.return_value = {"tz_name": "America/Santiago"}
+    mock_db.fetchrow.return_value = {"tz_name": DEFAULT_TIMEZONE}
     # Mock resolve_tenant (none needed for start usually, but let's mock it)
 
     async def mock_with_tenant(db: object, tid: str, op: Callable[[], Coroutine[Any, Any, object]]) -> object:

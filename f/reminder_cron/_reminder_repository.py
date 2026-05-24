@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from ..internal._config import DEFAULT_TIMEZONE
 from ._reminder_models import BookingRecord, ReminderDispatchDecision
 
 if TYPE_CHECKING:
@@ -13,9 +14,9 @@ if TYPE_CHECKING:
 
 async def get_candidates_between(db: DBClient, start: datetime, end: datetime) -> list[BookingRecord]:
     rows = await db.fetch(
-        """
+        f"""
         SELECT
-          b.booking_id, b.client_id, b.provider_id,
+          b.booking_id::text, b.client_id::text, b.provider_id::text,
           b.start_time, b.end_time, b.status,
           cl.telegram_chat_id AS client_telegram_chat_id,
           cl.email AS client_email,
@@ -23,7 +24,7 @@ async def get_candidates_between(db: DBClient, start: datetime, end: datetime) -
           cl.metadata->'reminder_preferences' AS reminder_preferences,
           pr.name AS provider_name,
           s.name AS service_name,
-          COALESCE(tz.name, 'America/Santiago') AS provider_timezone
+          COALESCE(tz.name, '{DEFAULT_TIMEZONE}') AS provider_timezone
         FROM bookings b
         JOIN clients cl ON cl.client_id = b.client_id
         LEFT JOIN providers pr ON pr.provider_id = b.provider_id

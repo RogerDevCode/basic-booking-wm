@@ -101,7 +101,12 @@ class CancelReasonHandler:
                 ]
             return res_obj
         except Exception as e:
-            log("CANCEL_REASON_CALLBACK_FAILED", error=str(e), traceback=traceback.format_exc(), module="callback_router")
+            log(
+                "CANCEL_REASON_CALLBACK_FAILED",
+                error=str(e),
+                traceback=traceback.format_exc(),
+                module="callback_router",
+            )
             return {
                 "responseText": "❌ No se pudo cancelar",
                 "followUpText": "No pudimos procesar la cancelación. Contacta a soporte.",

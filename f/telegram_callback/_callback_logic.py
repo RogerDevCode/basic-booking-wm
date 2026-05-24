@@ -13,6 +13,7 @@ if TYPE_CHECKING:
 ACTION_MAP: dict[str, str] = {
     "cnf": "confirm",
     "cxl": "cancel",
+    "cxr": "cancel_reason",
     "res": "reagendar_cita",
     "ars": "auto_reschedule",
     "act": "activate_reminders",
@@ -29,7 +30,15 @@ def _safe_uuid(val: str) -> str | None:
 
 
 def parse_callback_data(data: str) -> dict[str, str] | None:
-    parts = data.split(":")
+    # 0. Strip session suffix if present (format: prefix:id:extra|session_id)
+    raw_payload = data
+    session_id = ""
+    if "|" in data:
+        parts_session = data.split("|")
+        raw_payload = parts_session[0]
+        session_id = parts_session[1]
+
+    parts = raw_payload.split(":")
     if len(parts) < 2:
         return None
     action_code = parts[0]
@@ -43,11 +52,14 @@ def parse_callback_data(data: str) -> dict[str, str] | None:
     if not booking_id:
         return None
 
-    res = {"action": action, "booking_id": booking_id}
+    res = {"action": action, "booking_id": booking_id, "session_id": session_id}
 
     if action == "auto_reschedule" and len(parts) == 4:
         res["date"] = parts[2]
         res["time"] = parts[3]
+
+    if action == "cancel_reason" and len(parts) == 3:
+        res["reason_code"] = parts[2]
 
     return res
 

@@ -59,6 +59,7 @@ def get_main_menu_text() -> str:
     )
     return str(get_nlu_rule("msg_main_menu", default_text))
 
+
 def get_main_menu_inline_buttons() -> list[list[dict[str, str]]]:
     return [
         [{"text": "📅 Agendar hora", "callback_data": "cmd:agendar"}],
@@ -193,7 +194,9 @@ def apply_transition(
     elif isinstance(current_state, SelectingSpecialtyState):
         if isinstance(action, BackAction):
             return TransitionOutcome(
-                nextState=IdleState(session_id=current_state.session_id), responseText=get_main_menu_text(), advance=False
+                nextState=IdleState(session_id=current_state.session_id),
+                responseText=get_main_menu_text(),
+                advance=False,
             )
 
         if isinstance(action, SelectAction):

@@ -2,13 +2,14 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
+from f.internal._config import DEFAULT_TIMEZONE
 from f.reminder_cron._window_policy import is_due, is_quiet_hours, scheduled_time_for_window
 
 
 def test_scheduled_time_for_1day_uses_previous_day_local_8am() -> None:
     start_time = datetime(2026, 5, 10, 15, 0, tzinfo=UTC)
 
-    scheduled = scheduled_time_for_window(start_time, "America/Santiago", "1day")
+    scheduled = scheduled_time_for_window(start_time, DEFAULT_TIMEZONE, "1day")
 
     assert scheduled.tzinfo == UTC
     assert scheduled < start_time

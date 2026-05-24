@@ -13,6 +13,8 @@ from __future__ import annotations
 import asyncio
 from typing import Final
 
+from f.internal._config import DEFAULT_TIMEZONE
+
 from ..internal._db_client import create_db_client
 from ..internal._wmill_adapter import log
 
@@ -32,7 +34,7 @@ MODULE: Final[str] = "admin_schedule_seed"
 WORKDAYS: Final[list[int]] = [1, 2, 3, 4, 5]  # Lunes a Viernes
 SCHEDULE_START: Final[str] = "09:00"
 SCHEDULE_END: Final[str] = "18:00"
-TARGET_TZ: Final[str] = "America/Santiago"
+TARGET_TZ: Final[str] = DEFAULT_TIMEZONE
 
 
 async def _main_async(dry_run: bool = False) -> dict[str, object]:

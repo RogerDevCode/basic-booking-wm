@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from f.internal._config import DEFAULT_TIMEZONE
 from f.patient_register._patient_logic import upsert_client
 from f.patient_register._patient_models import InputSchema
 
@@ -31,7 +32,7 @@ async def test_upsert_client_insert_success() -> None:
                 "email": "jane@example.com",
                 "phone": "5551234",
                 "telegram_chat_id": None,
-                "timezone": "America/Santiago",
+                "timezone": DEFAULT_TIMEZONE,
             }
         ],
     ]
@@ -57,7 +58,7 @@ async def test_upsert_client_update_by_telegram() -> None:
                 "email": "jane@example.com",
                 "phone": "5551234",
                 "telegram_chat_id": "tg123",
-                "timezone": "America/Santiago",
+                "timezone": DEFAULT_TIMEZONE,
             }
         ],
     ]

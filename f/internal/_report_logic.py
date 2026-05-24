@@ -45,7 +45,7 @@ async def generate_booking_report(
             client_id,
             one_year_ago,
         )
-        total_count = int(cast(int, total_row["total"])) if total_row else 0
+        total_count = int(cast("int", total_row["total"])) if total_row else 0
 
         if total_count == 0:
             return {
@@ -84,7 +84,7 @@ async def generate_booking_report(
         user_tz = zoneinfo.ZoneInfo(DEFAULT_TIMEZONE)
 
         for r in rows:
-            st = cast(datetime, r["start_time"])
+            st = cast("datetime", r["start_time"])
             if not st.tzinfo:
                 st = st.replace(tzinfo=UTC)
             local_st = st.astimezone(user_tz)
@@ -93,12 +93,8 @@ async def generate_booking_report(
             time_str = local_st.strftime("%H:%M")
             status = str(r["status"])
             status_icon = "✅" if status == "confirmed" else "❌" if status == "cancelled" else "🕒"
-            
-            lines.append(
-                f"{status_icon} *{date_str} {time_str}*\n"
-                f"👨‍⚕️ {r['provider_name']}\n"
-                f"📋 {r['service_name']}\n"
-            )
+
+            lines.append(f"{status_icon} *{date_str} {time_str}*\n👨‍⚕️ {r['provider_name']}\n📋 {r['service_name']}\n")
 
         has_more = (offset + page_size) < total_count
         buttons: list[list[dict[str, str]]] = []

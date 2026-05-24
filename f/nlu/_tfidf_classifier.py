@@ -194,12 +194,7 @@ TYPO_MAP: Final[dict[str, str]] = {
 
 
 def _keyword_match(tokens: list[str]) -> tuple[str, float] | None:
-    """Pre-TF-IDF: retorna intent si hay match exacto de keyword en tokens.
-
-    Usa INTENT_KEYWORDS de _constants. Solo activa para keywords de 1 token
-    (las multi-palabra son menos confiables sin contexto).
-    Retorna None si no hay match — se delega a TF-IDF.
-    """
+    """Pre-TF-IDF: retorna intent si hay match exacto de keyword en tokens."""
     token_set = set(tokens)
     priority_order = [
         INTENT["URGENCIA"],
@@ -225,6 +220,32 @@ def _keyword_match(tokens: list[str]) -> tuple[str, float] | None:
                     RULE_CONFIDENCE_VALUES.get("greeting_exact", 0.9),
                 )
                 return intent, confidence
+    return None
+
+def deterministic_layer_0(text: str) -> tuple[str, float] | None:
+    """Capa 0: Mapeo exacto determinista para short-texts y dígitos, evitando fallos de TF-IDF."""
+    lower = text.strip().lower()
+    mapping: dict[str, str] = {
+        "1": INTENT["CREAR_CITA"],
+        "agendar": INTENT["CREAR_CITA"],
+        "2": INTENT["VER_MIS_CITAS"],
+        "mis citas": INTENT["VER_MIS_CITAS"],
+        "reporte": INTENT["GENERAR_REPORTE"],
+        "informe": INTENT["GENERAR_REPORTE"],
+        "3": INTENT["ACTIVAR_RECORDATORIOS"],
+        "recordatorios": INTENT["ACTIVAR_RECORDATORIOS"],
+        "4": INTENT["PREGUNTA_GENERAL"],
+        "info": INTENT["PREGUNTA_GENERAL"],
+        "5": INTENT["VER_MIS_DATOS"],
+        "perfil": INTENT["VER_MIS_DATOS"],
+        "sí": INTENT["CREAR_CITA"],  # default confirm
+        "si": INTENT["CREAR_CITA"],
+        "y": INTENT["CREAR_CITA"],
+        "no": INTENT["CANCELAR_CITA"], # default reject
+        "cancelar": INTENT["CANCELAR_CITA"],
+    }
+    if lower in mapping:
+        return mapping[lower], 0.95
     return None
 
 
@@ -359,6 +380,16 @@ def extract_entities(text: str) -> dict[str, str]:
 
 def classify_intent(text: str) -> TfIdfResult:
     """Classifies intent. Keyword match first, TF-IDF as fallback."""
+    # Layer 0: deterministic match (fastest, prevents dropping short texts)
+    l0_result = deterministic_layer_0(text)
+    if l0_result is not None:
+        l0_intent, l0_confidence = l0_result
+        return {
+            "intent": l0_intent,
+            "confidence": l0_confidence,
+            "scores": [{"intent": l0_intent, "score": l0_confidence}],
+        }
+
     model = _get_model()
     query_tokens = _normalize(text)
 

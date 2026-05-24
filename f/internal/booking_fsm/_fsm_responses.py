@@ -77,30 +77,40 @@ def chunk_buttons(btns: list[InlineButton], size: int = 2) -> list[list[InlineBu
     return [btns[i : i + size] for i in range(0, len(btns), size)]
 
 
-def build_specialty_keyboard(items: list[NamedItem]) -> list[list[InlineButton]]:
-    list_btns: list[InlineButton] = [{"text": it["name"], "callback_data": f"spec:{it['id']}"} for it in items]
-    list_btns.append({"text": "❌ Cancelar", "callback_data": "cancel"})
-    return chunk_buttons(list_btns)
+def build_specialty_keyboard(items: list[NamedItem], session_id: str | None = None) -> list[list[InlineButton]]:
+    suffix = f"|{session_id}" if session_id else ""
+    list_btns: list[InlineButton] = [
+        {"text": f"{i + 1}", "callback_data": f"spec:{it['id']}{suffix}"} for i, it in enumerate(items)
+    ]
+    list_btns.append({"text": "❌ Cancelar", "callback_data": f"cancel{suffix}"})
+    return chunk_buttons(list_btns, size=5)
 
 
-def build_doctor_keyboard(items: list[NamedItem]) -> list[list[InlineButton]]:
-    list_btns: list[InlineButton] = [{"text": it["name"], "callback_data": f"doc:{it['id']}"} for it in items]
-    list_btns.append({"text": "⬅️ Volver", "callback_data": "back"})
-    list_btns.append({"text": "❌ Cancelar", "callback_data": "cancel"})
-    return chunk_buttons(list_btns)
+def build_doctor_keyboard(items: list[NamedItem], session_id: str | None = None) -> list[list[InlineButton]]:
+    suffix = f"|{session_id}" if session_id else ""
+    list_btns: list[InlineButton] = [
+        {"text": f"{i + 1}", "callback_data": f"doc:{it['id']}{suffix}"} for i, it in enumerate(items)
+    ]
+    list_btns.append({"text": "⬅️ Volver", "callback_data": f"back{suffix}"})
+    list_btns.append({"text": "❌ Cancelar", "callback_data": f"cancel{suffix}"})
+    return chunk_buttons(list_btns, size=5)
 
 
-def build_time_slot_keyboard(items: list[TimeSlotItem]) -> list[list[InlineButton]]:
-    list_btns: list[InlineButton] = [{"text": it["label"], "callback_data": f"time:{it['id']}"} for it in items]
-    list_btns.append({"text": "⬅️ Volver", "callback_data": "back"})
-    list_btns.append({"text": "❌ Cancelar", "callback_data": "cancel"})
-    return chunk_buttons(list_btns)
+def build_time_slot_keyboard(items: list[TimeSlotItem], session_id: str | None = None) -> list[list[InlineButton]]:
+    suffix = f"|{session_id}" if session_id else ""
+    list_btns: list[InlineButton] = [
+        {"text": f"{i + 1}", "callback_data": f"time:{it['id']}{suffix}"} for i, it in enumerate(items)
+    ]
+    list_btns.append({"text": "⬅️ Volver", "callback_data": f"back{suffix}"})
+    list_btns.append({"text": "❌ Cancelar", "callback_data": f"cancel{suffix}"})
+    return chunk_buttons(list_btns, size=5)
 
 
-def build_confirmation_keyboard() -> list[list[InlineButton]]:
+def build_confirmation_keyboard(session_id: str | None = None) -> list[list[InlineButton]]:
+    suffix = f"|{session_id}" if session_id else ""
     return [
         [
-            {"text": "✅ Sí, confirmar", "callback_data": "cfm:yes"},
-            {"text": "❌ No, volver", "callback_data": "cfm:no"},
+            {"text": "✅ Sí, confirmar", "callback_data": f"cfm:yes{suffix}"},
+            {"text": "❌ No, volver", "callback_data": f"cfm:no{suffix}"},
         ]
     ]

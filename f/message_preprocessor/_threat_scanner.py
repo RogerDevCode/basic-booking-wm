@@ -7,11 +7,19 @@ from ._preprocessor_models import SecurityScanResult
 
 # 1. Prompt Injection Heuristics
 # Focus on command overrides, identity manipulation, and system prompt extraction.
+# Covers Spanish and English jailbreak patterns.
 _PROMPT_INJECTION_PATTERNS = [
+    # Spanish overrides
     r"\b(?:ignora|olvida|desestima|cancela)\b.*\b(?:instrucciones|reglas|prompt|anterior)\b",
     r"\b(?:eres|actua como|simula ser)\b.*\b(?:un|una)\b.*\b(?:bot|ia|asistente|humano)\b",
     r"\b(?:system prompt|developer prompt|system message)\b",
     r"\b(?:olvida todo|nuevo objetivo|nueva directiva)\b",
+    # English jailbreak patterns (DAN, override, role-switch)
+    r"\b(?:ignore|forget|disregard|override)\b.{0,40}\b(?:instructions?|rules?|prompt|previous|above)\b",
+    r"\b(?:you are now|act as|pretend to be|roleplay as|simulate being|from now on you)\b",
+    r"\b(?:jailbreak|dan mode|developer mode|god mode|unrestricted mode)\b",
+    r"\b(?:new instruction|new directive|new goal|new objective|new persona)\b",
+    r"\b(?:ignore all|forget all|disregard all)\b",
 ]
 
 # 2. Command Injection & Path Traversal

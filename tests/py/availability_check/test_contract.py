@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from f.availability_check.main import main_async
+from f.internal._config import DEFAULT_TIMEZONE
 
 
 @pytest.mark.asyncio
@@ -13,7 +14,7 @@ async def test_availability_check_e2e_mocked() -> None:
     mock_db = AsyncMock()
 
     # Provider Data
-    provider_row = {"provider_id": "p1", "name": "Dr. Smith", "timezone": "America/Santiago"}
+    provider_row = {"provider_id": "p1", "name": "Dr. Smith", "timezone": DEFAULT_TIMEZONE}
 
     # Availability Data from engine
     mock_avail_result = {
@@ -41,7 +42,7 @@ async def test_availability_check_e2e_mocked() -> None:
                     result = await main_async(args)
 
                     assert result["provider_name"] == "Dr. Smith"
-                    assert result["timezone"] == "America/Santiago"
+                    assert result["timezone"] == DEFAULT_TIMEZONE
                     assert len(result["slots"]) == 2
                     assert result["total_available"] == 2
 

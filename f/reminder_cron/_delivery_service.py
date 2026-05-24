@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import TYPE_CHECKING
 
 from ..internal._wmill_adapter import run_script
@@ -22,7 +23,7 @@ def dispatch_reminder(
                 "chat_id": recipient_id,
                 "text": message.text,
                 "mode": "send_message",
-                "inline_buttons": [[button.model_dump() for button in row] for row in message.inline_buttons],
+                "inline_buttons_json": json.dumps([[button.model_dump() for button in row] for row in message.inline_buttons]),
             },
         )
         if err is not None:

@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from f.internal._config import DEFAULT_TIMEZONE
 from f.patient_register.main import main_async
 
 if TYPE_CHECKING:
@@ -29,7 +30,7 @@ async def test_patient_register_e2e_mocked() -> None:
                 "email": "jane@example.com",
                 "phone": "5551234",
                 "telegram_chat_id": None,
-                "timezone": "America/Santiago",
+                "timezone": DEFAULT_TIMEZONE,
             }
         ],
     ]

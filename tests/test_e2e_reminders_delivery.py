@@ -16,7 +16,9 @@ from f.reminder_cron.main import _main_async as run_cron
 load_dotenv()
 os.environ["DATABASE_URL"] = "postgresql://windmill:windmill@localhost:5432/windmill"
 
-# Simula la base de datos y la cola
+
+# Requires live PostgreSQL (run with: pytest -m e2e)
+@pytest.mark.e2e
 @pytest.mark.asyncio
 async def test_e2e_reminders_delivery_telegram() -> None:
     booking_id = None
@@ -84,7 +86,8 @@ async def test_e2e_reminders_delivery_telegram() -> None:
                     def run_in_thread() -> None:
                         try:
                             from typing import Any, cast
-                            result_container["result"] = telegram_send_main(**cast(dict[str, Any], args))
+
+                            result_container["result"] = telegram_send_main(**cast("dict[str, Any]", args))
                         except Exception as inner_e:
                             result_container["error"] = inner_e
 

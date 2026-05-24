@@ -55,7 +55,7 @@ async def get_fast_track_option(client_id: str, pg_url: str) -> FastTrackOption 
             "service_id": str(row["service_id"]),
             "provider_name": str(row["provider_name"]),
             "service_name": str(row["service_name"]),
-            "count": int(cast(int, row["booking_count"])),
+            "count": int(cast("int", row["booking_count"])),
         }
     except Exception as e:
         log("WALLET_FAST_TRACK_ERROR", error=str(e), client_id=client_id, module=MODULE)

@@ -158,3 +158,49 @@ async def get_mis_citas_text(client_id: str, pg_url: str, chat_id: str) -> str |
     count = len(rows)
     header = f"📋 *Mis Horas* ({count} próxima{'s' if count > 1 else ''})\n\n"
     return header + body
+
+
+async def get_mis_citas_buttons(
+    client_id: str, pg_url: str, session_id: str | None = None
+) -> list[list[dict[str, str]]] | None:
+    """Returns the inline buttons for 'Mis Citas' (Cancel buttons + Wallet)."""
+    from ._wallet_logic import get_fast_track_option
+
+    buttons: list[list[dict[str, str]]] = []
+    suffix = f"|{session_id}" if session_id else ""
+
+    # 1. Add Fast-Track (Wallet)
+    try:
+        fast_track = await get_fast_track_option(client_id, pg_url)
+        if fast_track:
+            buttons.append(
+                [
+                    {
+                        "text": f"🔁 Repetir: {fast_track['provider_name']}",
+                        "callback_data": f"cmd:repeat:{fast_track['provider_id']}:{fast_track['service_id']}{suffix}",
+                    }
+                ]
+            )
+    except Exception:
+        pass
+
+    # 2. Add Cancel buttons
+    try:
+        rows = await query_my_bookings(client_id, pg_url)
+        for r in rows:
+            booking_id = str(r["booking_id"])
+            short_id = booking_id[:8].upper()
+            buttons.append([{"text": f"❌ Cancelar Ref: {short_id}", "callback_data": f"cxl:{booking_id}{suffix}"}])
+    except Exception:
+        pass
+
+    return buttons if buttons else None
+
+
+async def get_mis_citas_data(
+    client_id: str, pg_url: str, chat_id: str, session_id: str | None = None
+) -> tuple[str | None, list[list[dict[str, str]]] | None]:
+    """Legacy/Helper for data tuple."""
+    text = await get_mis_citas_text(client_id, pg_url, chat_id)
+    btns = await get_mis_citas_buttons(client_id, pg_url, session_id=session_id)
+    return text, btns
