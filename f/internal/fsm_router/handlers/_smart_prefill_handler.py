@@ -95,7 +95,7 @@ async def handle_smart_prefill(
             response_text=build_doctors_with_specialty_prompt(matches_for_prompt),
             inline_buttons=cast(
                 "list[list[dict[str, str]]]",
-                build_doctor_keyboard(cast("list[NamedItem]", items_list), session_id=session_id),
+                build_doctor_keyboard([NamedItem(id=str(i.get("id", i.get("provider_id", ""))), name=str(i["name"])) for i in items_list], session_id=session_id),
             ),
         )
 
@@ -179,13 +179,13 @@ async def handle_smart_prefill(
             response_text=(f"Encontré al *{doctor_name}* ({specialty_name}). Horarios disponibles{date_label}:"),
             inline_buttons=cast(
                 "list[list[dict[str, str]]]",
-                build_time_slot_keyboard(cast("list[TimeSlotItem]", slots), session_id=session_id),
+                build_time_slot_keyboard([TimeSlotItem(id=str(s["id"]), label=str(s["label"]), start_time=str(s["start_time"])) for s in slots], session_id=session_id),
             ),
         )
 
     date_msg = f" para el {target_date}" if target_date else " esta semana"
     specialty_items_raw = list(input_data.items) if input_data.items else []
-    specialty_items = cast("list[NamedItem]", specialty_items_raw)
+    specialty_items = [NamedItem(id=str(i.get("id", i.get("specialty_id", ""))), name=str(i["name"])) for i in specialty_items_raw]
     return RouterResult(
         handled=True,
         nextState={"name": "selecting_specialty", "items": specialty_items_raw},

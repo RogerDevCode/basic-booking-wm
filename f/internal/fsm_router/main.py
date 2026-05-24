@@ -266,7 +266,7 @@ async def _route_impl(input_data: RouterInput) -> RouterResult:
                     ),
                     inline_buttons=cast(
                         "list[list[InlineButton]]",
-                        build_time_slot_keyboard(cast("list[TimeSlotItem]", slots), session_id=current_session),
+                        build_time_slot_keyboard([TimeSlotItem(id=str(s["id"]), label=str(s["label"]), start_time=str(s["start_time"])) for s in slots], session_id=current_session),
                     ),
                 )
             except Exception as e:
@@ -500,7 +500,7 @@ async def _route_impl(input_data: RouterInput) -> RouterResult:
                 # Intent detected — show specialty list, do NOT apply_transition
                 # (user hasn't selected anything yet, just expressed intent)
                 specialty_items_raw = list(input_data.items) if input_data.items else []
-                specialty_items = cast("list[NamedItem]", specialty_items_raw)
+                specialty_items = [NamedItem(id=str(i.get("id", i.get("specialty_id", ""))), name=str(i["name"])) for i in specialty_items_raw]
                 if specialty_items:
                     response = build_specialty_prompt(specialty_items)
                 else:
@@ -569,7 +569,7 @@ async def _route_impl(input_data: RouterInput) -> RouterResult:
             response_text=outcome["responseText"],
             nextState=cast("dict[str, object]", outcome["nextState"].model_dump()) if outcome["nextState"] else None,
             nextDraft=None,
-            inline_buttons=cast("list[list[dict[str, str]]] | None", outcome.get("inlineButtons")),
+            inline_buttons=cast("list[list[dict[str, str]]] | None", outcome.get("inlineButtons")),  # cast: acceptable boundary — Telegram inline button type mismatch
             edit_message=is_callback,
         )
 
