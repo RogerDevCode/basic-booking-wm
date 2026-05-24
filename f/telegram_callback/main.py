@@ -101,14 +101,25 @@ async def _main_async(
     # 6. Response to Telegram
     await answer_callback_query(bot_token, input_data.callback_query_id, result["responseText"])
 
+    reply_markup = None
+    if result.get("followUpText") and result.get("inlineButtons"):
+        reply_markup = cast("dict[str, object]", {"inline_keyboard": result.get("inlineButtons")})
+
     if result.get("followUpText"):
-        await send_followup_message(bot_token, input_data.chat_id, str(result["followUpText"]))
+        await send_followup_message(
+            bot_token,
+            input_data.chat_id,
+            str(result["followUpText"]),
+            reply_markup=reply_markup,
+        )
 
     return {
         "action": action,
         "booking_id": booking_id,
         "callback_query_id": input_data.callback_query_id,
         "response_text": result["responseText"],
+        "follow_up_text": result.get("followUpText"),
+        "inline_buttons": result.get("inlineButtons"),
     }
 
 

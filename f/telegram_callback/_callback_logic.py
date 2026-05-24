@@ -151,11 +151,18 @@ async def answer_callback_query(bot_token: str, callback_query_id: str, text: st
         return False
 
 
-async def send_followup_message(bot_token: str, chat_id: str, text: str) -> bool:
+async def send_followup_message(
+    bot_token: str,
+    chat_id: str,
+    text: str,
+    reply_markup: dict[str, object] | None = None,
+) -> bool:
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             payload: dict[str, object] = {"chat_id": chat_id, "text": text, "parse_mode": "Markdown"}
+            if reply_markup is not None:
+                payload["reply_markup"] = reply_markup
             res = await client.post(url, json=payload)
             return res.status_code == 200
     except Exception as e:

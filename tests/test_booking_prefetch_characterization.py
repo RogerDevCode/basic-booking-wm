@@ -156,6 +156,19 @@ class TestPrefetchIdleState:
             )
         assert result["prefetch_type"] == "specialties"
 
+    @pytest.mark.asyncio
+    async def test_cmd_agendar_input_forces_idle_prefetch(self) -> None:
+        db = _make_db(fetch_return=_SPECIALTY_ROWS)
+        with patch("f.internal.booking_prefetch.main._connect", AsyncMock(return_value=db)):
+            result = await _main_async(
+                booking_state={"name": "selecting_doctor"},
+                booking_draft=None,
+                pg_url=_PG_URL,
+                user_input="cmd:agendar|session123",
+            )
+        assert result["prefetch_type"] == "specialties"
+        assert len(cast("list[object]", result["items"])) == 1
+
 
 # ── _main_async: selecting_specialty state ─────────────────────────────────────
 

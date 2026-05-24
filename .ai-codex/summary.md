@@ -582,13 +582,13 @@
 - 🔧 `fn` `main` (L311)
 
 ### `f/internal/booking_fsm/_fsm_machine.py`
-- 🔧 `fn` `get_main_menu_text` (L50)
-- 🔧 `fn` `get_main_menu_inline_buttons` (L63)
-- 🔧 `fn` `parse_action` (L82)
-- 🔧 `fn` `parse_callback_data` (L125)
-- 🔧 `fn` `apply_transition` (L159)
-- 🔧 `fn` `extract_draft_from_state` (L527)
-- 🔧 `fn` `flow_step_from_state` (L564)
+- 🔧 `fn` `get_main_menu_text` (L51)
+- 🔧 `fn` `get_main_menu_inline_buttons` (L64)
+- 🔧 `fn` `parse_action` (L83)
+- 🔧 `fn` `parse_callback_data` (L126)
+- 🔧 `fn` `apply_transition` (L164)
+- 🔧 `fn` `extract_draft_from_state` (L559)
+- 🔧 `fn` `flow_step_from_state` (L596)
 
 ### `f/internal/booking_fsm/_fsm_models.py`
 - 📦 `class` `NamedItem` (L20)
@@ -599,17 +599,18 @@
 - 📦 `class` `IdleState` (L65)
 - 📦 `class` `SelectingSpecialtyState` (L70)
 - 📦 `class` `SelectingDoctorState` (L78)
-- 📦 `class` `SelectingTimeState` (L88)
-- 📦 `class` `ConfirmingState` (L100)
-- 📦 `class` `CompletedState` (L111)
-- 📦 `class` `BookingStateRoot` (L124)
-- 📦 `class` `SelectAction` (L133)
-- 📦 `class` `SelectDateAction` (L138)
-- 📦 `class` `BackAction` (L143)
-- 📦 `class` `CancelAction` (L147)
-- 📦 `class` `ConfirmYesAction` (L151)
-- 📦 `class` `ConfirmNoAction` (L155)
-- 📦 `class` `TransitionOutcome` (L169)
+- 📦 `class` `SelectingTimeState` (L89)
+- 📦 `class` `ConfirmingState` (L101)
+- 📦 `class` `CompletedState` (L112)
+- 📦 `class` `BookingStateRoot` (L125)
+- 📦 `class` `SelectAction` (L134)
+- 📦 `class` `SelectDateAction` (L139)
+- 📦 `class` `BackAction` (L144)
+- 📦 `class` `CancelAction` (L148)
+- 📦 `class` `ConfirmYesAction` (L152)
+- 📦 `class` `ConfirmNoAction` (L156)
+- 📦 `class` `PageAction` (L160)
+- 📦 `class` `TransitionOutcome` (L177)
 
 ### `f/internal/booking_fsm/_fsm_responses.py`
 - 📦 `class` `InlineButton` (L13)
@@ -624,11 +625,11 @@
 - 🔧 `fn` `chunk_buttons` (L76)
 - 🔧 `fn` `build_specialty_keyboard` (L80)
 - 🔧 `fn` `build_doctor_keyboard` (L89)
-- 🔧 `fn` `build_time_slot_keyboard` (L99)
-- 🔧 `fn` `build_confirmation_keyboard` (L109)
+- 🔧 `fn` `build_time_slot_keyboard` (L126)
+- 🔧 `fn` `build_confirmation_keyboard` (L142)
 
 ### `f/internal/booking_prefetch/main.py`
-- 🔧 `fn` `main` (L298)
+- 🔧 `fn` `main` (L301)
 
 ### `f/internal/client_register/main.py`
 - 🔧 `fn` `main` (L73)
@@ -686,7 +687,7 @@
 - ⚡ `async_fn` `handle_mis_citas` (L10)
 
 ### `f/internal/fsm_router/main.py`
-- 🔧 `fn` `main` (L626)
+- 🔧 `fn` `main` (L656)
 
 ### `f/internal/gcal_utils/_gcal_logic.py`
 - 🔧 `fn` `build_gcal_event` (L8)
@@ -788,12 +789,12 @@
 - 🔧 `fn` `resolve_datetime` (L292)
 
 ### `f/nlu/_tfidf_classifier.py`
-- 🔧 `fn` `deterministic_layer_0` (L225)
-- 📦 `class` `ModelData` (L311)
-- 📦 `class` `ScoreEntry` (L336)
-- 📦 `class` `TfIdfResult` (L341)
-- 🔧 `fn` `extract_entities` (L347)
-- 🔧 `fn` `classify_intent` (L381)
+- 🔧 `fn` `deterministic_layer_0` (L226)
+- 📦 `class` `ModelData` (L312)
+- 📦 `class` `ScoreEntry` (L337)
+- 📦 `class` `TfIdfResult` (L342)
+- 🔧 `fn` `extract_entities` (L348)
+- 🔧 `fn` `classify_intent` (L382)
 
 ### `f/nlu/main.py`
 - 📦 `class` `ExtractedIntent` (L34)
@@ -1055,17 +1056,17 @@
 - 📦 `class` `CancelReasonHandler` (L62)
 - ⚡ `async_fn` `handle` (L63)
 - ⚡ `async_fn` `operation_cancel` (L83)
-- 📦 `class` `AcknowledgeHandler` (L118)
-- ⚡ `async_fn` `handle` (L119)
-- 📦 `class` `AutoRescheduleHandler` (L123)
-- ⚡ `async_fn` `handle` (L124)
-- ⚡ `async_fn` `operation_reschedule` (L154)
-- 📦 `class` `TelegramRouter` (L182)
-- 🔧 `fn` `register` (L186)
-- ⚡ `async_fn` `route` (L189)
+- 📦 `class` `AcknowledgeHandler` (L145)
+- ⚡ `async_fn` `handle` (L146)
+- 📦 `class` `AutoRescheduleHandler` (L150)
+- ⚡ `async_fn` `handle` (L151)
+- ⚡ `async_fn` `operation_reschedule` (L181)
+- 📦 `class` `TelegramRouter` (L209)
+- 🔧 `fn` `register` (L213)
+- ⚡ `async_fn` `route` (L216)
 
 ### `f/telegram_callback/main.py`
-- 🔧 `fn` `main` (L115)
+- 🔧 `fn` `main` (L126)
 
 ### `f/telegram_gateway/_gateway_logic.py`
 - 📦 `class` `TelegramClient` (L13)
@@ -1123,7 +1124,7 @@
 - 📦 `class` `TelegramSendData` (L84)
 
 ### `f/telegram_send/main.py`
-- 🔧 `fn` `main` (L85)
+- 🔧 `fn` `main` (L92)
 
 ### `f/web_admin_dashboard/_dashboard_logic.py`
 - ⚡ `async_fn` `fetch_dashboard_stats` (L10)

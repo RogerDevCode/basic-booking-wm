@@ -37,7 +37,11 @@ def _normalize_text(value: object) -> str:
 
 
 async def _main_async(args: dict[str, object]) -> TelegramSendData:
+    import time
+
     from ..internal._wmill_adapter import get_variable
+
+    start = time.perf_counter()
 
     raw_text = args.get("text")
     text = raw_text if isinstance(raw_text, str) else ""
@@ -79,7 +83,10 @@ async def _main_async(args: dict[str, object]) -> TelegramSendData:
         raise RuntimeError("TELEGRAM_BOT_TOKEN_MISSING")
 
     service = TelegramService(str(resolved_token))
-    return await service.execute(input_data)
+    res = await service.execute(input_data)
+    elapsed_ms = (time.perf_counter() - start) * 1000
+    log("LATENCY_RESPOND", elapsed_ms=elapsed_ms, module=MODULE)
+    return res
 
 
 def main(

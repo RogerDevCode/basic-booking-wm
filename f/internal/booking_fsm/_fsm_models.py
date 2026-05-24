@@ -83,6 +83,7 @@ class SelectingDoctorState(BaseModel):
     items: list[NamedItem] = Field(default_factory=list[NamedItem])
     invalid_attempts: int = 0
     session_id: str | None = None
+    page: int = 1
 
 
 class SelectingTimeState(BaseModel):
@@ -156,10 +157,17 @@ class ConfirmNoAction(BaseModel):
     type: Literal["confirm_no"] = "confirm_no"
 
 
+class PageAction(BaseModel):
+    type: Literal["page"] = "page"
+    target: str
+    page: int
+
+
 BookingAction = Annotated[
-    SelectAction | SelectDateAction | BackAction | CancelAction | ConfirmYesAction | ConfirmNoAction,
+    SelectAction | SelectDateAction | BackAction | CancelAction | ConfirmYesAction | ConfirmNoAction | PageAction,
     Field(discriminator="type"),
 ]
+
 
 # ============================================================================
 # TRANSITION OUTCOME

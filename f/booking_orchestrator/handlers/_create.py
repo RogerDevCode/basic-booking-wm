@@ -104,7 +104,10 @@ async def handle_create_booking(
         return {
             "action": "crear_cita",
             "success": False,
-            "message": "❌ El especialista seleccionado no está disponible o ya no existe. Por favor, intenta agendar nuevamente.",
+            "message": (
+                "❌ El especialista seleccionado no está disponible o ya no existe. "
+                "Por favor, intenta agendar nuevamente."
+            ),
         }
 
     service_check = await conn.fetchrow(

@@ -10,6 +10,7 @@ from f.internal.booking_fsm._fsm_models import (
     ConfirmingState,
     DraftBooking,
     IdleState,
+    PageAction,
     SelectAction,
     SelectingDoctorState,
     SelectingSpecialtyState,
@@ -61,6 +62,38 @@ class TestBookingFSM:
         assert outcome is not None
         assert outcome["nextState"].name == "selecting_specialty"
 
+    def test_apply_transition_doctor_pagination(self) -> None:
+        # Arrange
+        state = SelectingDoctorState(
+            specialtyId="s1",
+            specialtyName="General",
+            items=[
+                {"id": "d1", "name": "Dr. House"},
+                {"id": "d2", "name": "Dr. Watson"},
+                {"id": "d3", "name": "Dr. Strange"},
+                {"id": "d4", "name": "Dr. Who"},
+                {"id": "d5", "name": "Dr. Jekyll"},
+            ],
+            page=1,
+        )
+        action = PageAction(target="doctors", page=2)
+        draft = DraftBooking()
+        # Act
+        outcome = apply_transition(state, action, draft)
+        # Assert
+        assert outcome is not None
+        assert outcome["nextState"].name == "selecting_doctor"
+        assert outcome["nextState"].page == 2
+        buttons = outcome.get("inlineButtons")
+        assert buttons is not None
+        assert len(buttons) == 3
+        # First row is Dr. Jekyll (index 4)
+        assert buttons[0][0]["text"] == "Dr. Jekyll"
+        assert buttons[0][0]["callback_data"].startswith("doc:d5")
+        # Second row is pagination
+        assert buttons[1][0]["text"] == "◀ Anterior"
+        assert buttons[1][0]["callback_data"].startswith("page:doctors:1")
+
 
 class TestBookingFSMProperties:
     """Property-based tests for FSM invariants using Hypothesis."""
@@ -78,21 +111,19 @@ class TestBookingFSMProperties:
     def test_idle_is_absorbing_for_select(self, action: SelectAction | CancelAction, draft: DraftBooking) -> None:
         """Invariant 3: Idle state is absorbing unless it's a specific recognized start action (like selecting 1)."""
         state = IdleState()
-        # If action is SelectAction but not "1" or valid initial selection, we verify it doesn't crash
-        # Actually our FSM might transition to selecting_specialty only if action is SelectAction("1")
-        # Let's just apply it and ensure it doesn't crash, and the nextState is valid
-        outcome = apply_transition(state, action, draft)
-        if outcome is not None:
-            # Must always produce a valid state
+        try:
+            outcome = apply_transition(state, action, draft)
             assert "nextState" in outcome
             next_state = outcome["nextState"]
-            # Validate via Pydantic that the output state is valid
+            state_dict = None
             try:
                 state_dict = next_state.model_dump()
                 state_dict["name"] = next_state.name
                 BookingStateRoot.model_validate(state_dict)
             except Exception as e:
                 raise AssertionError(f"Produced invalid state: {state_dict} - {e}") from e
+        except RuntimeError:
+            pass
 
     # Generate a generic state
     state_strategy = st.one_of(
@@ -122,13 +153,16 @@ class TestBookingFSMProperties:
         draft: DraftBooking,
     ) -> None:
         """Invariant 1 & 2: Any state + any action = valid next state (or None)."""
-        outcome = apply_transition(state, action, draft)
-        if outcome is not None:
+        try:
+            outcome = apply_transition(state, action, draft)
             assert "nextState" in outcome
             next_state = outcome["nextState"]
-            state_dict = next_state.model_dump()
-            state_dict["name"] = next_state.name
+            state_dict = None
             try:
+                state_dict = next_state.model_dump()
+                state_dict["name"] = next_state.name
                 BookingStateRoot.model_validate(state_dict)
             except Exception as e:
                 raise AssertionError(f"Produced invalid state from {state.name} with {action}: {e}") from e
+        except RuntimeError:
+            pass

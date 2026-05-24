@@ -66,7 +66,7 @@ def extract_entities(text: str) -> tuple[str, ExtractedEntities]:
 
     # 3. RUT extraction
     ruts_raw = RUT_REGEX.findall(text)
-    valid_ruts = []
+    valid_ruts: list[str] = []
     for r in ruts_raw:
         if _validate_rut(r):
             valid_ruts.append(r)

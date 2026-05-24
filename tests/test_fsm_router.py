@@ -102,7 +102,9 @@ class TestTelegramRouterMainMenu:
             "client_id": "c1",
             "pg_url": "postgresql://test:test@localhost:5432/test",
         }
-        with patch("f.internal.fsm_router.handlers._wallet_handler.get_mis_citas_text", new_callable=AsyncMock) as mock_query:
+        with patch(
+            "f.internal.fsm_router.handlers._wallet_handler.get_mis_citas_text", new_callable=AsyncMock
+        ) as mock_query:
             mock_query.return_value = "Tus citas..."
             res = await main(args)
             data = cast("dict[str, Any]", res["data"])
@@ -347,3 +349,35 @@ class TestTelegramRouterDateHandling:
         # Act 4: Extract draft from ConfirmingState
         extracted_confirming_draft = extract_draft_from_state(confirming_state)
         assert extracted_confirming_draft.target_date == "2026-05-27"
+
+    @pytest.mark.asyncio
+    async def test_cmd_agendar_redirects_to_selecting_specialty(self) -> None:
+        """cmd:agendar callback must override any non-idle state and redirect to selecting_specialty."""
+        # Arrange: User is in selecting_doctor state, but sends cmd:agendar callback
+        args: dict[str, Any] = {
+            "chat_id": "123",
+            "user_input": "cmd:agendar|session123",
+            "state": {
+                "active_flow": "booking",
+                "session_id": "session123",
+                "booking_state": {
+                    "name": "selecting_doctor",
+                    "specialtyId": "s1",
+                    "specialtyName": "Test",
+                    "items": [],
+                },
+                "booking_draft": {"specialty_id": "s1", "specialty_name": "Test"},
+            },
+            "items": [{"id": "spec1", "name": "Cardiología"}],
+            "requires_fsm_routing": True,
+        }
+
+        # Act
+        res = await main(args)
+        assert res is not None
+        data = cast("dict[str, Any]", res["data"])
+
+        # Assert
+        assert data["handled"] is True
+        assert data["nextState"]["name"] == "selecting_specialty"
+        assert "Cardiología" in data["response_text"]

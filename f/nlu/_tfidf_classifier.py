@@ -222,6 +222,7 @@ def _keyword_match(tokens: list[str]) -> tuple[str, float] | None:
                 return intent, confidence
     return None
 
+
 def deterministic_layer_0(text: str) -> tuple[str, float] | None:
     """Capa 0: Mapeo exacto determinista para short-texts y dígitos, evitando fallos de TF-IDF."""
     lower = text.strip().lower()
@@ -241,7 +242,7 @@ def deterministic_layer_0(text: str) -> tuple[str, float] | None:
         "sí": INTENT["CREAR_CITA"],  # default confirm
         "si": INTENT["CREAR_CITA"],
         "y": INTENT["CREAR_CITA"],
-        "no": INTENT["CANCELAR_CITA"], # default reject
+        "no": INTENT["CANCELAR_CITA"],  # default reject
         "cancelar": INTENT["CANCELAR_CITA"],
     }
     if lower in mapping:

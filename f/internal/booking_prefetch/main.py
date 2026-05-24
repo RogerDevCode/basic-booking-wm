@@ -214,6 +214,9 @@ async def _main_async(
     client_id: str | None = None,
 ) -> dict[str, object]:
     state_name = cast("str", (booking_state or {}).get("name", "idle"))
+    normalized_input = user_input.split("|")[0].strip() if user_input else ""
+    if normalized_input == "cmd:agendar":
+        state_name = "idle"
     db: DBClient | None = None
     try:
         db = await _connect(pg_url)

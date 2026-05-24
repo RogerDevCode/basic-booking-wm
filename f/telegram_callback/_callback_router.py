@@ -85,7 +85,34 @@ class CancelReasonHandler:
 
             await with_tenant_context(conn, context["tenantId"], operation_cancel)
 
+            cancel_count = 0
+            if context.get("client_id"):
+                try:
+                    val = await conn.fetchval(
+                        """
+                        SELECT COUNT(*)::int
+                        FROM bookings
+                        WHERE client_id = $1::uuid
+                          AND status = 'cancelled'
+                          AND updated_at >= NOW() - INTERVAL '30 days'
+                        """,
+                        context["client_id"],
+                    )
+                    if isinstance(val, int):
+                        cancel_count = val
+                    elif isinstance(val, str | bytes) and val.isdigit():
+                        cancel_count = int(val)
+                except Exception as ex:
+                    log("QUERY_CANCEL_COUNT_FAILED", error=str(ex), module="callback_router")
+
             follow_up = f"Tu cita ha sido cancelada (Motivo: {reason_text})."
+            if cancel_count >= 2:
+                follow_up += (
+                    "\n\n⚠️ Notamos que has cancelado varias citas recientemente. "
+                    "Si necesitas ayuda o prefieres asistencia personalizada, "
+                    "puedes comunicarte directamente con soporte técnico escribiendo a soporte@ejemplo.com."
+                )
+
             if reason_code == "CH":
                 follow_up += "\n\n🔄 ¿Te gustaría agendar una nueva hora ahora mismo?"
 

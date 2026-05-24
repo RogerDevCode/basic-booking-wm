@@ -23,7 +23,9 @@ def dispatch_reminder(
                 "chat_id": recipient_id,
                 "text": message.text,
                 "mode": "send_message",
-                "inline_buttons_json": json.dumps([[button.model_dump() for button in row] for row in message.inline_buttons]),
+                "inline_buttons_json": json.dumps(
+                    [[button.model_dump() for button in row] for row in message.inline_buttons]
+                ),
             },
         )
         if err is not None:

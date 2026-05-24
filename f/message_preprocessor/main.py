@@ -71,10 +71,16 @@ def _preprocess(raw_text: str) -> PreprocessorOutput:
 
 def main(data: dict[str, Any]) -> dict[str, Any]:
     import asyncio
+    import time
+
+    from ..internal._wmill_adapter import log
 
     async def _run() -> dict[str, Any]:
+        start = time.perf_counter()
         validated = PreprocessorInput.model_validate(data)
         result = _preprocess(validated.raw_text)
+        elapsed_ms = (time.perf_counter() - start) * 1000
+        log("LATENCY_INTAKE", elapsed_ms=elapsed_ms, module="message_preprocessor")
         output: dict[str, Any] = result.model_dump()
         return output
 

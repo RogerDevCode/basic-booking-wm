@@ -25,6 +25,7 @@ from ._fsm_models import (
     DraftCore,
     IdleState,
     NamedItem,
+    PageAction,
     SelectAction,
     SelectDateAction,
     SelectingDoctorState,
@@ -54,7 +55,7 @@ def get_main_menu_text() -> str:
         "2. 📋 Mis horas\n"
         "3. 📊 Generar reporte\n"
         "4. ⏰ Recordatorios\n"
-        "5. ℹ️ Información\n"
+        "5. ℹ️ Información\n"  # noqa: RUF001
         "6. 👤 Mis datos"
     )
     return str(get_nlu_rule("msg_main_menu", default_text))
@@ -152,6 +153,10 @@ def parse_callback_data(data: str) -> BookingAction | None:
     match = re.match(r"^(spec|doc|time|slot):(.+)$", raw_data)
     if match:
         return SelectAction(value=match.group(2))
+
+    match_page = re.match(r"^page:([a-z]+):(\d+)$", raw_data)
+    if match_page:
+        return PageAction(target=match_page.group(1), page=int(match_page.group(2)))
 
     return None
 
@@ -265,6 +270,28 @@ def apply_transition(
                 )
             raise RuntimeError("invalid_state_transition_no_items")
 
+        if isinstance(action, PageAction) and action.target == "doctors":
+            doctor_items = current_state.items if current_state.items else (items if items is not None else [])
+            if not _is_named_item_list(doctor_items):
+                raise RuntimeError("invalid_doctor_items")
+            return TransitionOutcome(
+                nextState=SelectingDoctorState(
+                    specialtyId=current_state.specialtyId,
+                    specialtyName=current_state.specialtyName,
+                    items=doctor_items,
+                    invalid_attempts=current_state.invalid_attempts,
+                    session_id=current_state.session_id,
+                    page=action.page,
+                ),
+                responseText=build_doctors_prompt(current_state.specialtyName, doctor_items),
+                advance=False,
+                inlineButtons=build_doctor_keyboard(
+                    doctor_items,
+                    page=action.page,
+                    session_id=current_state.session_id,
+                ),
+            )
+
         if isinstance(action, SelectAction):
             doctor_items = current_state.items if current_state.items else (items if items is not None else [])
             if not _is_named_item_list(doctor_items):
@@ -294,10 +321,15 @@ def apply_transition(
                         error="Opción inválida.",
                         invalid_attempts=attempts,
                         session_id=current_state.session_id,
+                        page=current_state.page,
                     ),
                     responseText=build_doctors_prompt(current_state.specialtyName, doctor_items, "⚠️ Opción inválida."),
                     advance=False,
-                    inlineButtons=build_doctor_keyboard(doctor_items, session_id=current_state.session_id),
+                    inlineButtons=build_doctor_keyboard(
+                        doctor_items,
+                        page=current_state.page,
+                        session_id=current_state.session_id,
+                    ),
                 )
 
             time_items = items if items is not None else []

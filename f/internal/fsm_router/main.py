@@ -27,6 +27,8 @@ from f.internal._config import DEFAULT_TIMEZONE
 if TYPE_CHECKING:
     from ...reminder_config._config_models import InlineButton
 
+import contextlib
+
 from ...nlu._datetime_resolver import resolve_datetime as _resolve_datetime_hybrid
 from ...nlu._tfidf_classifier import classify_intent
 from .._date_resolver import resolve_date
@@ -210,7 +212,9 @@ async def _route_impl(input_data: RouterInput) -> RouterResult:
                 return RouterResult(
                     handled=True,
                     nextState=current_state_raw,
-                    response_text="⚠️ Este menú ha caducado por una nueva sesión (/start). Por favor usa el menú más reciente.",
+                    response_text=(
+                        "⚠️ Este menú ha caducado por una nueva sesión (/start). Por favor usa el menú más reciente."
+                    ),
                     active_flow=active_flow,
                 )
         # Strip session_id for internal processing
@@ -266,7 +270,17 @@ async def _route_impl(input_data: RouterInput) -> RouterResult:
                     ),
                     inline_buttons=cast(
                         "list[list[InlineButton]]",
-                        build_time_slot_keyboard([TimeSlotItem(id=str(s["id"]), label=str(s["label"]), start_time=str(s["start_time"])) for s in slots], session_id=current_session),
+                        build_time_slot_keyboard(
+                            [
+                                TimeSlotItem(
+                                    id=str(s["id"]),
+                                    label=str(s["label"]),
+                                    start_time=str(s["start_time"]),
+                                )
+                                for s in slots
+                            ],
+                            session_id=current_session,
+                        ),
                     ),
                 )
             except Exception as e:
@@ -287,6 +301,11 @@ async def _route_impl(input_data: RouterInput) -> RouterResult:
 
     current_state_raw = cast("dict[str, object]", state_dict.get("booking_state") or {"name": "idle"})
     current_state_name = str(current_state_raw.get("name", "idle"))
+
+    if user_input == "cmd:agendar":
+        current_state_raw = cast("dict[str, object]", {"name": "idle"})
+        current_state_name = "idle"
+        state_dict["booking_draft"] = {}
 
     # Early rule-based or AI-based escape to main menu (este donde este)
     trimmed = user_input.strip().lower()
@@ -500,7 +519,10 @@ async def _route_impl(input_data: RouterInput) -> RouterResult:
                 # Intent detected — show specialty list, do NOT apply_transition
                 # (user hasn't selected anything yet, just expressed intent)
                 specialty_items_raw = list(input_data.items) if input_data.items else []
-                specialty_items = [NamedItem(id=str(i.get("id", i.get("specialty_id", ""))), name=str(i["name"])) for i in specialty_items_raw]
+                specialty_items = [
+                    NamedItem(id=str(i.get("id", i.get("specialty_id", ""))), name=str(i["name"]))
+                    for i in specialty_items_raw
+                ]
                 if specialty_items:
                     response = build_specialty_prompt(specialty_items)
                 else:
@@ -569,7 +591,10 @@ async def _route_impl(input_data: RouterInput) -> RouterResult:
             response_text=outcome["responseText"],
             nextState=cast("dict[str, object]", outcome["nextState"].model_dump()) if outcome["nextState"] else None,
             nextDraft=None,
-            inline_buttons=cast("list[list[dict[str, str]]] | None", outcome.get("inlineButtons")),  # cast: acceptable boundary — Telegram inline button type mismatch
+            inline_buttons=cast(
+                "list[list[dict[str, str]]] | None",
+                outcome.get("inlineButtons"),
+            ),  # cast: acceptable boundary — Telegram inline button type mismatch
             edit_message=is_callback,
         )
 
@@ -614,12 +639,17 @@ async def _route(input_data: RouterInput) -> RouterResult:
 
 async def _main_async(args: dict[str, object]) -> dict[str, object]:
     """Windmill entrypoint."""
+    import time
+
+    start = time.perf_counter()
     try:
         input_data = RouterInput.model_validate(args)
     except Exception as e:
         raise RuntimeError(f"Router validation error: {e}") from e
 
     result = await _route(input_data)
+    elapsed_ms = (time.perf_counter() - start) * 1000
+    log("LATENCY_PROCESS", elapsed_ms=elapsed_ms, module=_MODULE)
     return {"data": cast("dict[str, object]", result.model_dump())}
 
 
@@ -631,8 +661,6 @@ def main(args: dict[str, object]) -> dict[str, object]:
         return asyncio.run(_main_async(args))
     except Exception as e:
         tb = traceback.format_exc()
-        try:
+        with contextlib.suppress(Exception):
             log("CRITICAL_ENTRYPOINT_ERROR", error=str(e), traceback=tb, module=_MODULE)
-        except Exception:
-            pass
         raise RuntimeError(f"Execution failed: {e}") from e
