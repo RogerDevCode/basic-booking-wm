@@ -283,3 +283,16 @@ docs/temp-*.md
 docs/draft-*.md
 .codebase-index-cache.pkl
 .env-old
+
+# =============================================================================
+# PYTHON BUILD/CACHE FILES
+# =============================================================================
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.pyright/
+.ruff_cache/
+

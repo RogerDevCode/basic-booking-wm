@@ -81,13 +81,13 @@ async def generate_booking_report(
         )
 
         lines: list[str] = [f"📊 *Reporte de Actividad (Pág. {page})*\n"]
-        user_tz = zoneinfo.ZoneInfo(DEFAULT_TIMEZONE)
 
         for r in rows:
             st = cast("datetime", r["start_time"])
             if not st.tzinfo:
                 st = st.replace(tzinfo=UTC)
-            local_st = st.astimezone(user_tz)
+            row_tz = zoneinfo.ZoneInfo(str(r["tz_name"]))
+            local_st = st.astimezone(row_tz)
 
             date_str = local_st.strftime("%d/%m/%Y")
             time_str = local_st.strftime("%H:%M")

@@ -16,6 +16,7 @@ from typing import Any
 from beartype import beartype
 
 from ..nlu._datetime_resolver import resolve_datetime
+from ._entity_extractor import extract_entities
 from ._modism_mapper import apply_modism_map
 from ._preprocessor_models import PreprocessorInput, PreprocessorOutput
 from ._spell_normalizer import apply_spell_correction
@@ -25,8 +26,11 @@ from ._threat_scanner import scan_threats
 
 @beartype
 def _preprocess(raw_text: str) -> PreprocessorOutput:
+    # Stage 0: Extract structured entities (URLs, phones, RUTs) and replace emojis
+    working, extracted_entities = extract_entities(raw_text)
+
     # Stage 1: strip control/invisible chars, collapse whitespace
-    working = clean_text(raw_text)
+    working = clean_text(working)
 
     # Stage 1.5: Multi-Threat Heuristic Scan (SQLi, XSS, Cmd, Prompt Injection)
     working, security_scan = scan_threats(working)
@@ -59,6 +63,7 @@ def _preprocess(raw_text: str) -> PreprocessorOutput:
         spell_corrections=spell_corrections,
         modism_matches=modism_matches,
         confidence=confidence,
+        extracted_entities=extracted_entities,
         datetime_resolution=dt_res,
         security_scan=security_scan,
     )

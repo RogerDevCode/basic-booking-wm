@@ -28,6 +28,14 @@ class SecurityScanResult(BaseModel):
     threat_type: Literal["sql_injection", "xss", "command_injection", "prompt_injection", "none"] = "none"
 
 
+class ExtractedEntities(BaseModel):
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    urls: list[str] = []
+    phones: list[str] = []
+    ruts: list[str] = []
+
+
 class PreprocessorInput(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
 
@@ -42,6 +50,9 @@ class PreprocessorOutput(BaseModel):
     normalization_applied: bool
     spell_corrections: list[SpellCorrection]
     modism_matches: list[ModismMatch]
+
     confidence: float
+    extracted_entities: ExtractedEntities | None = None
+
     datetime_resolution: ResolverResult | None = None
     security_scan: SecurityScanResult
