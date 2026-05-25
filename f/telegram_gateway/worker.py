@@ -330,7 +330,7 @@ async def process_telegram_update(ctx: dict[str, Any], update_json: str, ingest_
         send_args: dict[str, object] = {
             "bot_token": TELEGRAM_BOT_TOKEN,
             "chat_id": chat_id,
-            "inline_buttons_json": json.dumps(inline_buttons) if inline_buttons else None,
+            "inline_buttons": inline_buttons if inline_buttons else [],
             "message_id": callback_message_id if edit_message else None,
             "mode": "edit_message" if edit_message else "send_message",
             "text": response_text,
@@ -365,6 +365,7 @@ async def process_telegram_update(ctx: dict[str, Any], update_json: str, ingest_
                     {
                         "bot_token": TELEGRAM_BOT_TOKEN,
                         "chat_id": locals()["chat_id"],
+                        "mode": "send_message",
                         "text": "❌ Ocurrió un error inesperado al procesar tu solicitud. Por favor reintenta.",
                     }
                 )
