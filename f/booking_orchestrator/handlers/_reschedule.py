@@ -34,7 +34,7 @@ async def handle_reschedule(
 
     if not booking_id:
         cloned_input = input_data.model_copy(
-            update={"notes": "Dime el ID de la cita que quieres mover y la nueva fecha/hora."}
+            update={"notes": "Dime el ID de la hora que quieres mover y la nueva fecha/hora."}
         )
         return await handle_get_my_bookings(conn, cloned_input, delegates)
 

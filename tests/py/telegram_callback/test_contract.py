@@ -42,7 +42,7 @@ async def test_telegram_callback_confirm_success() -> None:
 
         assert isinstance(result, dict)
         assert result["action"] == "confirm"
-        assert "Cita confirmada" in str(result["response_text"])
+        assert "Hora confirmada" in str(result["response_text"])
         assert mock_db.execute.called  # Update + Audit
 
 
@@ -91,7 +91,7 @@ async def test_telegram_callback_cancel_reason_proactive_support() -> None:
 
         assert isinstance(result, dict)
         assert result["action"] == "cancel_reason"
-        assert "Cita cancelada" in str(result["response_text"])
+        assert "Hora cancelada" in str(result["response_text"])
         follow_up = str(result["follow_up_text"])
         assert "soporte@ejemplo.com" in follow_up
         assert "¿Te gustaría agendar una nueva hora" in follow_up

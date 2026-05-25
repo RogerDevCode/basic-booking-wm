@@ -11,17 +11,17 @@ def build_gcal_event(
     # calendar_type reserved for future per-audience event customization
 
     title = (
-        f"[CANCELLED] Cita Médica - {booking['provider_name']}"
+        f"[CANCELLED] Hora Médica - {booking['provider_name']}"
         if booking["status"] == "cancelled"
-        else f"Cita Médica - {booking['provider_name']}"
+        else f"Hora Médica - {booking['provider_name']}"
     )
 
     description_parts = [
         f"Servicio: {booking['service_name']}",
-        f"ID de cita: {booking['booking_id']}",
+        f"ID de reserva: {booking['booking_id']}",
         f"Estado: {booking['status']}",
         "",
-        "Esta cita ha sido cancelada."
+        "Esta hora ha sido cancelada."
         if booking["status"] == "cancelled"
         else "Para cancelar o reagendar, contacta a través de Telegram.",
     ]

@@ -37,10 +37,10 @@ def build_email_content(
     color = "#4CAF50"
 
     if message_type == "booking_created":
-        subject = "✅ Cita Médica Agendada"
+        subject = "✅ Hora Médica Agendada"
         icon = "✅"
         color = "#4CAF50"
-        body = f"""<h2 style="color: {color};">Cita Agendada Exitosamente</h2>
+        body = f"""<h2 style="color: {color};">Hora Agendada Exitosamente</h2>
             <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
               <tr><td style="padding: 8px 0; font-weight: bold;">📅 Fecha:</td><td>{date}</td></tr>
               <tr><td style="padding: 8px 0; font-weight: bold;">🕐 Hora:</td><td>{time_val}</td></tr>
@@ -51,9 +51,9 @@ def build_email_content(
             <p style="color: #666;">Para cancelar o reagendar, usa los botones de abajo o responde a este correo.</p>"""  # noqa: E501
 
     elif message_type == "booking_confirmed":
-        subject = "✅ Cita Confirmada"
+        subject = "✅ Hora Confirmada"
         icon = "✅"
-        body = f"""<h2 style="color: {color};">Tu Cita Ha Sido Confirmada</h2>
+        body = f"""<h2 style="color: {color};">Tu Hora Ha Sido Confirmada</h2>
             <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
               <tr><td style="padding: 8px 0; font-weight: bold;">📅 Fecha:</td><td>{date}</td></tr>
               <tr><td style="padding: 8px 0; font-weight: bold;">🕐 Hora:</td><td>{time_val}</td></tr>
@@ -62,18 +62,18 @@ def build_email_content(
             <p style="color: #666;">Te esperamos. Recuerda llegar 10 minutos antes.</p>"""
 
     elif message_type == "booking_cancelled":
-        subject = "❌ Cita Cancelada"
+        subject = "❌ Hora Cancelada"
         icon = "❌"
         color = "#F44336"
-        body = f"""<h2 style="color: {color};">Cita Cancelada</h2>
-            <p>Tu cita ha sido cancelada:</p>
+        body = f"""<h2 style="color: {color};">Hora Cancelada</h2>
+            <p>Tu hora ha sido cancelada:</p>
             <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
               <tr><td style="padding: 8px 0; font-weight: bold;">📅 Fecha:</td><td>{date}</td></tr>
               <tr><td style="padding: 8px 0; font-weight: bold;">🕐 Hora:</td><td>{time_val}</td></tr>
               <tr><td style="padding: 8px 0; font-weight: bold;">👨‍⚕️ Doctor:</td><td>{provider_name}</td></tr>
             </table>
             {"<p><strong>Motivo:</strong> " + reason + "</p>" if reason else ""}
-            <p style="color: #666;">Si deseas agendar una nueva cita, contáctanos por Telegram o responde a este correo.</p>"""  # noqa: E501
+            <p style="color: #666;">Si deseas agendar una nueva hora, contáctanos por Telegram o responde a este correo.</p>"""  # noqa: E501
 
     elif message_type in {
         "reminder_1day",
@@ -85,19 +85,19 @@ def build_email_content(
         "reminder_30min",
     }:
         subject_map = {
-            "reminder_1day": "⏰ Recordatorio: Tu cita es mañana",
-            "reminder_24h": "⏰ Recordatorio: Tu cita es en 24 horas",
-            "reminder_12h": "⏰ Recordatorio: Tu cita es en 12 horas",
-            "reminder_6h": "⏰ Recordatorio: Tu cita es en 6 horas",
-            "reminder_2h": "⏰ Recordatorio: Tu cita es en 2 horas",
-            "reminder_1h": "⏰ Recordatorio: Tu cita es en 1 hora",
-            "reminder_30min": "⏰ Recordatorio: Tu cita es en 30 minutos",
+            "reminder_1day": "⏰ Recordatorio: Tu hora es mañana",
+            "reminder_24h": "⏰ Recordatorio: Tu hora es en 24 horas",
+            "reminder_12h": "⏰ Recordatorio: Tu hora es en 12 horas",
+            "reminder_6h": "⏰ Recordatorio: Tu hora es en 6 horas",
+            "reminder_2h": "⏰ Recordatorio: Tu hora es en 2 horas",
+            "reminder_1h": "⏰ Recordatorio: Tu hora es en 1 hora",
+            "reminder_30min": "⏰ Recordatorio: Tu hora es en 30 minutos",
         }
         subject = subject_map[message_type]
         icon = "⏰"
         color = "#2196F3"
-        body = f"""<h2 style="color: {color};">Recordatorio de Cita</h2>
-            <p style="font-size: 18px;">No olvides tu próxima cita:</p>
+        body = f"""<h2 style="color: {color};">Recordatorio de Hora</h2>
+            <p style="font-size: 18px;">No olvides tu próxima hora:</p>
             <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
               <tr><td style="padding: 8px 0; font-weight: bold;">📅 Fecha:</td><td>{date}</td></tr>
               <tr><td style="padding: 8px 0; font-weight: bold;">🕐 Hora:</td><td>{time_val}</td></tr>

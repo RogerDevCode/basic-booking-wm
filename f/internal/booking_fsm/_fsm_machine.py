@@ -511,29 +511,33 @@ def apply_transition(
                         advance=False,
                         inlineButtons=build_time_slot_keyboard(raw_items, session_id=current_state.session_id),
                     )
-            attempts = getattr(current_state, "invalid_attempts", 0) + 1
-            if attempts >= 3:
-                return TransitionOutcome(
-                    nextState=IdleState(session_id=current_state.session_id),
-                    responseText="❌ Demasiados intentos inválidos. Volviendo al menú principal.\n\n"
-                    + get_main_menu_text(),
-                    advance=False,
-                )
 
+        # Fallback for any invalid action in confirming state (e.g. invalid SelectAction, SelectDateAction, etc.)
+        attempts = getattr(current_state, "invalid_attempts", 0) + 1
+        if attempts >= 3:
             return TransitionOutcome(
-                nextState=ConfirmingState(
-                    specialtyId=current_state.specialtyId,
-                    doctorId=current_state.doctorId,
-                    doctorName=current_state.doctorName,
-                    timeSlot=current_state.timeSlot,
-                    draft=current_state.draft,
-                    invalid_attempts=attempts,
-                    session_id=current_state.session_id,
-                ),
-                responseText=build_confirmation_prompt(current_state.timeSlot, current_state.doctorName),
+                nextState=IdleState(session_id=current_state.session_id),
+                responseText="❌ Demasiados intentos inválidos. Volviendo al menú principal.\n\n"
+                + get_main_menu_text(),
                 advance=False,
-                inlineButtons=build_confirmation_keyboard(session_id=current_state.session_id),
             )
+
+        return TransitionOutcome(
+            nextState=ConfirmingState(
+                specialtyId=current_state.specialtyId,
+                doctorId=current_state.doctorId,
+                doctorName=current_state.doctorName,
+                timeSlot=current_state.timeSlot,
+                draft=current_state.draft,
+                invalid_attempts=attempts,
+                session_id=current_state.session_id,
+            ),
+            responseText=build_confirmation_prompt(
+                current_state.timeSlot, current_state.doctorName, extra="⚠️ Opción inválida. Responde sí o no."
+            ),
+            advance=False,
+            inlineButtons=build_confirmation_keyboard(session_id=current_state.session_id),
+        )
 
     if True:  # patched unnecessary isinstance
         return TransitionOutcome(

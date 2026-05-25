@@ -5,7 +5,7 @@ from typing import Final
 from ._menu_models import MenuInput, MenuResponse
 
 MAIN_MENU_INLINE: Final[list[list[dict[str, str]]]] = [
-    [{"text": "📅 Agendar Cita", "callback_data": "cmd:book"}],
+    [{"text": "📅 Agendar Hora", "callback_data": "cmd:book"}],
     [{"text": "📋 Mis Citas", "callback_data": "cmd:mybookings"}],
 ]
 

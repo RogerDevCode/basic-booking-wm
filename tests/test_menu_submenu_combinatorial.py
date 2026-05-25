@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from typing import Any, ClassVar, cast
 from unittest.mock import AsyncMock, patch
 
@@ -23,6 +24,33 @@ from f.internal.booking_fsm._fsm_models import (
     TimeSlotItem,
 )
 from f.internal.fsm_router.main import _main_async
+
+# ============================================================================
+# TIME INSTRUMENTATION — Measure test latencies for menus & submenus
+# ============================================================================
+
+_EXECUTION_TIMES: list[float] = []
+
+
+@pytest.fixture(scope="module", autouse=True)
+def report_times() -> Any:
+    yield
+    if _EXECUTION_TIMES:
+        avg = sum(_EXECUTION_TIMES) / len(_EXECUTION_TIMES)
+        print("\n========================================================")
+        print("⏱️ REPORTE DE TIEMPOS DE RESPUESTA (MENÚS Y SUBMENÚS)")
+        print(f"Total de pruebas ejecutadas: {len(_EXECUTION_TIMES)}")
+        print(f"Tiempo promedio de respuesta: {avg:.2f} ms")
+        print("========================================================")
+
+
+@pytest.fixture(autouse=True)
+def measure_time() -> Any:
+    start = time.perf_counter()
+    yield
+    end = time.perf_counter()
+    _EXECUTION_TIMES.append((end - start) * 1000)  # record in ms
+
 
 # ============================================================================
 # TEST FIXTURES — Shared data for combinatorial tests
@@ -567,6 +595,22 @@ class TestLevel2Agendar_Confirming:
         assert outcome["advance"] is False
         assert outcome["nextState"].name == "confirming"
         assert outcome["nextState"].invalid_attempts == 1
+
+    def test_confirming_invalid_date_action_increments_attempts(self) -> None:
+        """Acción de fecha inválida en confirming → incrementa intentos y reporta error."""
+        state = ConfirmingState(
+            specialtyId="spec-cardio",
+            doctorId="doc-gallegos",
+            doctorName="Dr. Gallegos",
+            timeSlot="Lun 18 May · 09:00",
+            draft=DraftCore(),
+        )
+        action = SelectDateAction(value="2026-05-25")
+        outcome = apply_transition(state, action, _EMPTY_DRAFT)
+        assert outcome["advance"] is False
+        assert outcome["nextState"].name == "confirming"
+        assert outcome["nextState"].invalid_attempts == 1
+        assert "⚠️ Opción inválida. Responde sí o no." in outcome["responseText"]
 
     def test_confirming_invalid_3_times_returns_to_menu(self) -> None:
         """3 intentos inválidos → idle con mensaje de error."""

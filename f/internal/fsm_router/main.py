@@ -559,15 +559,12 @@ async def _route_impl(input_data: RouterInput) -> RouterResult:
 
         # Block transition to time-slot selection if client already has an active booking
         if current_state_name == "selecting_doctor" and input_data.prefetch_block_reason == "already_booked":
-            return RouterResult(
-                handled=True,
-                nextState={"name": "idle"},
-                response_text=(
-                    "⚠️ Ya tienes una cita agendada.\n\n"
-                    "Debes cancelar tu cita actual antes de reservar una nueva.\n\n" + get_main_menu_text()
-                ),
+            mis_citas_res = await _handle_mis_citas(input_data, {"name": "idle"}, session_id=current_session)
+            warning = "⚠️ Ya tienes una cita agendada.\nDebes cancelar tu cita actual antes de reservar una nueva.\n\n"
+            mis_citas_res.response_text = (
+                warning + str(mis_citas_res.response_text).replace(get_main_menu_text(), "").strip()
             )
-
+            return mis_citas_res
         state_root = BookingStateRoot.model_validate(current_state_raw)
         current_state = state_root.root
 

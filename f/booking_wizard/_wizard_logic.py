@@ -97,7 +97,7 @@ class WizardUI:
     def build_confirmation(state: WizardState, provider_name: str, service_name: str) -> StepView:
         date_label = DateUtils.format_es(state.selected_date) if state.selected_date else "?"
         return {
-            "message": f"✅ *Confirma tu cita*\n\n📅 Fecha: {date_label}\n🕐 Hora: {state.selected_time}\n👨‍⚕️ Doctor: {provider_name}\n📋 Servicio: {service_name}\n\n¿Confirmas estos detalles?",  # noqa: E501
+            "message": f"✅ *Confirma tu hora*\n\n📅 Fecha: {date_label}\n🕐 Hora: {state.selected_time}\n👨‍⚕️ Doctor: {provider_name}\n📋 Servicio: {service_name}\n\n¿Confirmas estos detalles?",  # noqa: E501
             "reply_keyboard": [["✅ Confirmar", "🔄 Cambiar hora"], ["« Volver a fechas", "❌ Cancelar"]],
             "new_state": state.model_copy(update={"step": 3}),
             "force_reply": False,

@@ -32,7 +32,7 @@ async def handle_cancel_booking(
 
     if not booking_id:
         # If no ID, show current bookings so user can pick
-        cloned_input = input_data.model_copy(update={"notes": "Por favor, dime el ID de la cita que deseas cancelar."})
+        cloned_input = input_data.model_copy(update={"notes": "Por favor, dime el ID de la hora que deseas cancelar."})
         return await handle_get_my_bookings(conn, cloned_input, delegates)
 
     # Call booking_cancel core directly (in-process)
@@ -57,6 +57,6 @@ async def handle_cancel_booking(
         "action": "cancelar_cita",
         "success": True,
         "data": data,
-        "message": "✅ Tu cita ha sido cancelada exitosamente.",
+        "message": "✅ Tu hora ha sido cancelada exitosamente.",
     }
     return res

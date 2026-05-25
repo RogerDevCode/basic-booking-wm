@@ -22,21 +22,22 @@ class ConfirmHandler:
 
             success = await with_tenant_context(conn, context["tenantId"], operation)
 
-            if not success:
+            if success:
                 return {
-                    "responseText": "❌ No se pudo confirmar",
-                    "followUpText": "No pudimos confirmar tu cita. Motivo: error interno. Contacta a soporte si necesitas ayuda.",  # noqa: E501
-                }
-            elif success:
-                return {
-                    "responseText": "✅ Cita confirmada",
-                    "followUpText": "Tu cita ha sido confirmada. ¡Te esperamos!",
+                    "responseText": "✅ Hora confirmada",
+                    "followUpText": "Tu hora ha sido confirmada. ¡Te esperamos!",
                 }
             else:
                 return {
                     "responseText": "❌ No se pudo confirmar",
-                    "followUpText": "No pudimos confirmar tu cita. La cita no existe o ya fue modificada. Contacta a soporte.",  # noqa: E501
+                    "followUpText": "No pudimos confirmar tu hora. La hora no existe o ya fue modificada. Contacta a soporte.",  # noqa: E501
                 }
+        except Exception as e:
+            log("CONFIRM_CALLBACK_FAILED", error=str(e), traceback=traceback.format_exc(), module="callback_router")
+            return {
+                "responseText": "❌ No se pudo confirmar",
+                "followUpText": "No pudimos confirmar tu hora. Motivo: error interno. Contacta a soporte si necesitas ayuda.",  # noqa: E501
+            }
         finally:
             await conn.close()
 
@@ -48,7 +49,7 @@ class CancelHandler:
         sid = context.get("session_id")
         suffix = f"|{sid}" if sid else ""
         return {
-            "responseText": "¿Por qué deseas cancelar tu cita? 🧐",
+            "responseText": "¿Por qué deseas cancelar tu hora? 🧐",
             "followUpText": None,
             "inlineButtons": [
                 [{"text": "📅 Cambiar de fecha/hora", "callback_data": f"cxr:{booking_id}:CH{suffix}"}],
@@ -105,10 +106,10 @@ class CancelReasonHandler:
                 except Exception as ex:
                     log("QUERY_CANCEL_COUNT_FAILED", error=str(ex), module="callback_router")
 
-            follow_up = f"Tu cita ha sido cancelada (Motivo: {reason_text})."
+            follow_up = f"Tu hora ha sido cancelada (Motivo: {reason_text})."
             if cancel_count >= 2:
                 follow_up += (
-                    "\n\n⚠️ Notamos que has cancelado varias citas recientemente. "
+                    "\n\n⚠️ Notamos que has cancelado varias horas recientemente. "
                     "Si necesitas ayuda o prefieres asistencia personalizada, "
                     "puedes comunicarte directamente con soporte técnico escribiendo a soporte@ejemplo.com."
                 )
@@ -119,7 +120,7 @@ class CancelReasonHandler:
             sid = context.get("session_id")
             suffix = f"|{sid}" if sid else ""
             res_obj: ActionResult = {
-                "responseText": "✅ Cita cancelada",
+                "responseText": "✅ Hora cancelada",
                 "followUpText": follow_up,
             }
             if reason_code == "CH":
@@ -202,7 +203,7 @@ class AutoRescheduleHandler:
 
         return {
             "responseText": "✅ Reagendada con éxito",
-            "followUpText": f"Tu cita ha sido movida al {date} a las {time}.",
+            "followUpText": f"Tu hora ha sido movida al {date} a las {time}.",
         }
 
 

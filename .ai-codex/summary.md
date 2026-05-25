@@ -587,8 +587,8 @@
 - 🔧 `fn` `parse_action` (L83)
 - 🔧 `fn` `parse_callback_data` (L126)
 - 🔧 `fn` `apply_transition` (L164)
-- 🔧 `fn` `extract_draft_from_state` (L559)
-- 🔧 `fn` `flow_step_from_state` (L596)
+- 🔧 `fn` `extract_draft_from_state` (L563)
+- 🔧 `fn` `flow_step_from_state` (L600)
 
 ### `f/internal/booking_fsm/_fsm_models.py`
 - 📦 `class` `NamedItem` (L20)
@@ -681,13 +681,13 @@
 - ⚡ `async_fn` `handle_generar_reporte` (L12)
 
 ### `f/internal/fsm_router/handlers/_smart_prefill_handler.py`
-- ⚡ `async_fn` `handle_smart_prefill` (L49)
+- ⚡ `async_fn` `handle_smart_prefill` (L50)
 
 ### `f/internal/fsm_router/handlers/_wallet_handler.py`
 - ⚡ `async_fn` `handle_mis_citas` (L10)
 
 ### `f/internal/fsm_router/main.py`
-- 🔧 `fn` `main` (L656)
+- 🔧 `fn` `main` (L653)
 
 ### `f/internal/gcal_utils/_gcal_logic.py`
 - 🔧 `fn` `build_gcal_event` (L8)
@@ -1051,19 +1051,19 @@
 - 📦 `class` `ConfirmHandler` (L14)
 - ⚡ `async_fn` `handle` (L15)
 - ⚡ `async_fn` `operation` (L20)
-- 📦 `class` `CancelHandler` (L44)
-- ⚡ `async_fn` `handle` (L45)
-- 📦 `class` `CancelReasonHandler` (L62)
-- ⚡ `async_fn` `handle` (L63)
-- ⚡ `async_fn` `operation_cancel` (L83)
-- 📦 `class` `AcknowledgeHandler` (L145)
-- ⚡ `async_fn` `handle` (L146)
-- 📦 `class` `AutoRescheduleHandler` (L150)
-- ⚡ `async_fn` `handle` (L151)
-- ⚡ `async_fn` `operation_reschedule` (L181)
-- 📦 `class` `TelegramRouter` (L209)
-- 🔧 `fn` `register` (L213)
-- ⚡ `async_fn` `route` (L216)
+- 📦 `class` `CancelHandler` (L45)
+- ⚡ `async_fn` `handle` (L46)
+- 📦 `class` `CancelReasonHandler` (L63)
+- ⚡ `async_fn` `handle` (L64)
+- ⚡ `async_fn` `operation_cancel` (L84)
+- 📦 `class` `AcknowledgeHandler` (L146)
+- ⚡ `async_fn` `handle` (L147)
+- 📦 `class` `AutoRescheduleHandler` (L151)
+- ⚡ `async_fn` `handle` (L152)
+- ⚡ `async_fn` `operation_reschedule` (L182)
+- 📦 `class` `TelegramRouter` (L210)
+- 🔧 `fn` `register` (L214)
+- ⚡ `async_fn` `route` (L217)
 
 ### `f/telegram_callback/main.py`
 - 🔧 `fn` `main` (L126)
@@ -1082,12 +1082,37 @@
 - 📦 `class` `TelegramUpdate` (L44)
 - 📦 `class` `SendMessageOptions` (L51)
 
+### `f/telegram_gateway/app.py`
+- ⚡ `async_fn` `lifespan` (L24)
+- ⚡ `async_fn` `get_redis` (L41)
+- ⚡ `async_fn` `get_arq` (L45)
+- ⚡ `async_fn` `get_metrics` (L50)
+- ⚡ `async_fn` `telegram_webhook` (L65)
+
 ### `f/telegram_gateway/main.py`
 - 📦 `class` `TelegramRouter` (L30)
 - ⚡ `async_fn` `route_update` (L35)
 - ⚡ `async_fn` `handle_callback` (L42)
 - ⚡ `async_fn` `handle_message` (L54)
 - 🔧 `fn` `main` (L115)
+
+### `f/telegram_gateway/monitoring.py`
+- 🔧 `fn` `log_structured` (L15)
+- 📦 `class` `MetricsTracker` (L26)
+- ⚡ `async_fn` `increment_requests` (L31)
+- ⚡ `async_fn` `increment_errors` (L37)
+- ⚡ `async_fn` `record_processing_time` (L43)
+- ⚡ `async_fn` `record_telegram_send_time` (L50)
+- ⚡ `async_fn` `record_internal_processing_time` (L57)
+- ⚡ `async_fn` `record_queuing_delay` (L64)
+- ⚡ `async_fn` `get_summary` (L71)
+- ⚡ `async_fn` `get_list_avg` (L78)
+
+### `f/telegram_gateway/worker.py`
+- ⚡ `async_fn` `startup` (L38)
+- ⚡ `async_fn` `shutdown` (L53)
+- ⚡ `async_fn` `process_telegram_update` (L61)
+- 📦 `class` `WorkerSettings` (L378)
 
 ### `f/telegram_menu/_menu_logic.py`
 - 🔧 `fn` `parse_user_option` (L13)
@@ -1507,6 +1532,7 @@
 - `f/internal/fsm_router/_router_models.script.yaml`
 - `f/internal/fsm_router/_router_reminders.script.yaml`
 - `f/internal/fsm_router/handlers/_registration_handler.script.yaml`
+- `f/internal/fsm_router/handlers/_smart_prefill_handler.script.yaml`
 - `f/internal/fsm_router/main.script.yaml`
 - `f/internal/gcal_utils/_gcal_logic.script.yaml`
 - `f/internal/gcal_utils/_gcal_models.script.yaml`
@@ -1582,7 +1608,10 @@
 - `f/telegram_callback/main.script.yaml`
 - `f/telegram_gateway/_gateway_logic.script.yaml`
 - `f/telegram_gateway/_gateway_models.script.yaml`
+- `f/telegram_gateway/app.script.yaml`
 - `f/telegram_gateway/main.script.yaml`
+- `f/telegram_gateway/monitoring.script.yaml`
+- `f/telegram_gateway/worker.script.yaml`
 - `f/telegram_menu/_menu_logic.script.yaml`
 - `f/telegram_menu/_menu_models.script.yaml`
 - `f/telegram_menu/main.script.yaml`

@@ -18,6 +18,8 @@ dependencies = [
     "symspellpy>=6.9.0",
     "google-adk[extensions]>=2.0.0",
     "sqlalchemy>=2.0.25",
+    "fastapi>=0.136.1",
+    "arq>=0.25.0",
 ]
 
 [dependency-groups]

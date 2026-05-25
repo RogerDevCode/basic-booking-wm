@@ -86,7 +86,7 @@ async def _main_async(args: dict[str, Any]) -> dict[str, object]:
                     }
                 )
 
-                return {"booking_id": b["booking_id"], "status": b["status"], "message": "Cita creada exitosamente"}
+                return {"booking_id": b["booking_id"], "status": b["status"], "message": "Hora creada exitosamente"}
 
             elif input_data.action == "cancelar":
                 if not input_data.booking_id:
@@ -101,7 +101,7 @@ async def _main_async(args: dict[str, Any]) -> dict[str, object]:
                 return {
                     "booking_id": input_data.booking_id,
                     "status": "cancelled",
-                    "message": "Cita cancelada exitosamente",
+                    "message": "Hora cancelada exitosamente",
                 }
 
             elif input_data.action == "reagendar":
@@ -136,7 +136,7 @@ async def _main_async(args: dict[str, Any]) -> dict[str, object]:
                 )
 
                 await repo.update_status(input_data.booking_id, "rescheduled")
-                return {"booking_id": b["booking_id"], "status": b["status"], "message": "Cita reagendada exitosamente"}
+                return {"booking_id": b["booking_id"], "status": b["status"], "message": "Hora reagendada exitosamente"}
 
             raise RuntimeError("unsupported_action")
 

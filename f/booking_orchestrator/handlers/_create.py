@@ -175,7 +175,7 @@ async def handle_create_booking(
         "action": "crear_cita",
         "success": True,
         "data": data,
-        "message": f"✅ Cita agendada para el {date} a las {time}.",
+        "message": f"✅ Hora agendada para el {date} a las {time}.",
         "follow_up": None,
     }
     return res_final

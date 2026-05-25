@@ -105,7 +105,7 @@ async def _handle_crear_cita(intent: dict[str, Any], conn: DBClient, repo: PgBoo
     return {
         "action": "crear_cita",
         "success": True,
-        "message": f"✅ Cita agendada para el {date_str} a las {time_str}.",
+        "message": f"✅ Hora agendada para el {date_str} a las {time_str}.",
         "data": res.model_dump(),
     }
 
@@ -141,7 +141,7 @@ async def _handle_cancelar_cita(intent: dict[str, Any], conn: DBClient, repo: Pg
     return {
         "action": "cancelar_cita",
         "success": True,
-        "message": "✅ Tu cita ha sido cancelada.",
+        "message": "✅ Tu hora ha sido cancelada.",
         "data": res.model_dump(),
     }
 
@@ -187,7 +187,7 @@ async def _handle_reagendar_cita(intent: dict[str, Any], conn: DBClient, repo: P
     return {
         "action": "reagendar_cita",
         "success": True,
-        "message": f"✅ Cita reagendada para el {date_str} a las {time_str}.",
+        "message": f"✅ Hora reagendada para el {date_str} a las {time_str}.",
         "data": res.model_dump(),
     }
 
@@ -298,14 +298,14 @@ async def _handle_consultar_cita(intent: dict[str, Any], conn: DBClient, repo: P
         return {
             "action": "consultar_cita",
             "success": False,
-            "message": "❌ Necesito el ID o referencia de tu cita para consultarla.",
+            "message": "❌ Necesito el ID o referencia de tu hora para consultarla.",
         }
 
     if not row:
         return {
             "action": "consultar_cita",
             "success": False,
-            "message": "No encontré una cita activa. ¿Quieres agendar una nueva?",
+            "message": "No encontré una hora activa. ¿Quieres agendar una nueva?",
         }
 
     short_id = str(row["booking_id"]).replace("-", "").upper()[:9]
@@ -314,7 +314,7 @@ async def _handle_consultar_cita(intent: dict[str, Any], conn: DBClient, repo: P
     fmt_time = cast("datetime", st).strftime("%d/%m/%Y %H:%M") if hasattr(st, "strftime") else str(st)
     status_emoji = {"confirmed": "✅", "pending": "⏳", "cancelled": "❌"}.get(str(row["status"]), "i")
     msg = (
-        f"\U0001f4cb *Detalle de tu cita*\n\n"
+        f"\U0001f4cb *Detalle de tu hora*\n\n"
         f"*Doctor:* {row['provider_name']}\n"
         f"*Especialidad:* {row['specialty']}\n"
         f"*Servicio:* {row['service_name']}\n"

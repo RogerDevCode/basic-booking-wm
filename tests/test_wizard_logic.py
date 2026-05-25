@@ -43,6 +43,6 @@ class TestWizardLogic:
         # Act
         view = WizardUI.build_confirmation(state, "Dr. Garcia", "Consulta")
         # Assert
-        assert "Confirma tu cita" in view["message"]
+        assert "Confirma tu hora" in view["message"]
         assert "Dr. Garcia" in view["message"]
         assert view["new_state"].step == 3

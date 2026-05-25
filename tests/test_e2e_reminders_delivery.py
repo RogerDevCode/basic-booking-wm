@@ -130,7 +130,7 @@ async def test_e2e_reminders_delivery_telegram() -> None:
                 # Verify payload
                 payload = call_args[1]["json"]
                 assert payload["chat_id"] == chat_id
-                assert "Recordatorio de tu cita" in payload["text"]
+                assert "Recordatorio de tu hora" in payload["text"]
                 assert "Test Prov E2E" in payload["text"]
 
     finally:

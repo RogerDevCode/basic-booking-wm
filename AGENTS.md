@@ -296,6 +296,7 @@ BANNED-09 "Error." or placeholder strings in logic
 BANNED-10 extra="allow" EN PYDANTIC BOUNDARIES  
 BANNED-11 LLM DIRECT TO DB → LLM extrae JSON, Python valida y consulta.
 BANNED-12 SILENT DEGRADATION EN YAML → Prohibido skip_if que no maneje explícitamente undefined/null.
+BANNED-13 "CITA" IN USER MESSAGES → Nunca usar "cita" en respuestas al usuario. Siempre usar "hora" o "reserva" (Ej: "agendar una hora", no "agendar cita").
 
 ---
 

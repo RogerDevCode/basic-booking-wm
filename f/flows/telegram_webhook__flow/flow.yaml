@@ -42,10 +42,12 @@ value:
             expr: '{"raw_text": results.webhook_trigger.canonical_text}'
         path: f/message_preprocessor/main
       skip_if:
-        expr: '!results.webhook_trigger.chat_id ||
+        expr: >-
+          !results.webhook_trigger.chat_id ||
           results.telegram_deduplicate.duplicate ||
           results.webhook_trigger.event_kind !== "message" ||
-          results.webhook_trigger.text_kind !== "plain_text"'
+          results.webhook_trigger.text_kind !== "plain_text" ||
+          /^\d+$/.test((results.webhook_trigger.canonical_text || "").trim())
     - id: get_conversation_state
       summary: Obtener estado conversacional de Redis
       value:
@@ -118,12 +120,13 @@ value:
               results.webhook_trigger.canonical_text || ""
         path: f/internal/ai_agent/main
       skip_if:
-        expr: '!results.webhook_trigger.chat_id ||
+        expr: >-
+          !results.webhook_trigger.chat_id ||
           results.telegram_deduplicate.duplicate ||
           results.webhook_trigger.event_kind !== "message" ||
           results.webhook_trigger.text_kind !== "plain_text" ||
-          results.message_preprocessor?.data?.security_scan?.threat_detected ===
-          true'
+          results.message_preprocessor?.data?.security_scan?.threat_detected === true ||
+          /^\d+$/.test((results.webhook_trigger.canonical_text || "").trim())
     - id: booking_prefetch
       summary: Pre-fetch especialidades/doctores segun estado FSM actual
       value:
@@ -201,9 +204,10 @@ value:
                 "session_id": results.get_conversation_state.data?.booking_state?.session_id || null }
         path: f/internal/conversational_router/main
       skip_if:
-        expr: '!results.ai_agent?.data ||  results.ai_agent.data.requires_fsm_routing
-          === true || results.webhook_trigger.event_kind !== "message" ||
-          results.telegram_deduplicate.duplicate'
+        expr: >-
+          results.webhook_trigger.event_kind !== "message" ||
+          results.telegram_deduplicate.duplicate ||
+          results.fsm_router?.data?.handled === true
     - id: client_register
       summary: Actualizar datos del cliente tras registro
       value:

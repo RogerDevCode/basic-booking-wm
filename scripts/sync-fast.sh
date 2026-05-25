@@ -103,7 +103,7 @@ fi
 # ── Nada que hacer ────────────────────────────────────────────────────────────
 if [[ ${#TARGETS[@]} -eq 0 ]]; then
   echo -e "${B}ℹ No hay cambios Windmill pendientes.${NC}"
-  notify "dialog-information" "⚡ Sync" "Sin cambios pendientes."
+ # notify "dialog-information" "⚡ Sync" "Sin cambios pendientes."
   exit 0
 fi
 
@@ -154,4 +154,4 @@ echo -e "${B}🚀 Subiendo a Windmill...${NC}"
 ELAPSED=$(( $(date +%s) - START_TS ))
 echo ""
 echo -e "${G}✅ Sincronizado en ${ELAPSED}s — ${#TARGETS[@]} archivo(s)${NC}"
-notify "dialog-apply" "⚡ Sync OK (${ELAPSED}s)" "$(printf '%s\n' "${TARGETS[@]}" | head -5 | paste -sd ', ')"
+# notify "dialog-apply" "⚡ Sync OK (${ELAPSED}s)" "$(printf '%s\n' "${TARGETS[@]}" | head -5 | paste -sd ', ')"

@@ -342,7 +342,7 @@ def generate_ai_response(
         return (
             "Hola, soy tu asistente médico. ¿En qué puedo ayudarte?",
             True,
-            "¿Deseas agendar, cancelar o cambiar una cita?",
+            "¿Deseas agendar, cancelar o cambiar una hora?",
         )
 
     if intent == INTENT["URGENCIA"]:

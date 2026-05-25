@@ -88,7 +88,7 @@ def build_reminder_message(booking: BookingRecord, window: ReminderWindow) -> Re
     details = build_booking_details(booking)
     return ReminderMessage(
         text=(
-            "🔔 Recordatorio de tu cita:\n\n"
+            "🔔 Recordatorio de tu hora:\n\n"
             f"Doctor: {details.provider_name}\n"
             f"Fecha: {details.date}\n"
             f"Hora: {details.time}"

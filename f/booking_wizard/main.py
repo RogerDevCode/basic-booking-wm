@@ -129,14 +129,14 @@ async def _main_async(args: dict[str, object]) -> dict[str, object]:
                     ars_callback = f"ars:{active_booking['booking_id']}:{target_date}:{target_time}"
 
                     message = (
-                        f"\u2139\ufe0f *Ya tienes una cita activa*\n\n"
-                        f"Tienes una cita con *{active_booking['provider_name']}* para el *{fmt_time}*.\n\n"
-                        f"\u00bfDeseas reagendar esa cita para el nuevo horario "
+                        f"\u2139\ufe0f *Ya tienes una hora activa*\n\n"
+                        f"Tienes una hora con *{active_booking['provider_name']}* para el *{fmt_time}*.\n\n"
+                        f"\u00bfDeseas reagendar esa hora para el nuevo horario "
                         f"(*{target_date}* a las *{target_time}*) o prefieres volver al men\u00fa?"
                     )
 
                     reply_kb = [
-                        [{"text": "\ud83d\udd04 S\u00ed, reagendar cita", "callback_data": ars_callback}],
+                        [{"text": "\ud83d\udd04 S\u00ed, reagendar hora", "callback_data": ars_callback}],
                         ["\u00ab Volver al men\u00fa"],
                     ]
 
@@ -161,7 +161,7 @@ async def _main_async(args: dict[str, object]) -> dict[str, object]:
 
                 state.step = 99
                 view = {
-                    "message": "✅ *Cita confirmada!*\n\nTu cita ha sido agendada. Recibirás un recordatorio.",
+                    "message": "✅ *¡Hora confirmada!*\n\nTu hora ha sido agendada. Recibirás un recordatorio.",
                     "reply_keyboard": [["« Volver al menú"]],
                     "new_state": state,
                     "force_reply": False,
