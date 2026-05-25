@@ -1112,7 +1112,7 @@
 - ⚡ `async_fn` `startup` (L38)
 - ⚡ `async_fn` `shutdown` (L53)
 - ⚡ `async_fn` `process_telegram_update` (L61)
-- 📦 `class` `WorkerSettings` (L379)
+- 📦 `class` `WorkerSettings` (L381)
 
 ### `f/telegram_menu/_menu_logic.py`
 - 🔧 `fn` `parse_user_option` (L13)

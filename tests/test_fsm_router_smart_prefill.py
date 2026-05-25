@@ -128,7 +128,9 @@ async def test_smart_prefill_with_date_entity_resolves_target_date() -> None:
             "f.internal.fsm_router.handlers._smart_prefill_handler._create_db_client",
             AsyncMock(return_value=mock_db),
         ),
-        patch("f.internal.fsm_router.handlers._smart_prefill_handler._fetch_slots_for_doctor", AsyncMock(return_value=[])) as mock_fetch,
+        patch(
+            "f.internal.fsm_router.handlers._smart_prefill_handler._fetch_slots_for_doctor", AsyncMock(return_value=[])
+        ) as mock_fetch,
     ):
         await _main_async(args)
 

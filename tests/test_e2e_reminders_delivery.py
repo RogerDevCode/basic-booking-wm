@@ -14,7 +14,11 @@ from f.internal._wmill_adapter import wmill
 from f.reminder_cron.main import _main_async as run_cron
 
 load_dotenv()
-os.environ["DATABASE_URL"] = "postgresql://windmill:windmill@localhost:5432/windmill"
+db_url = os.getenv("DATABASE_URL")
+
+# Skip at module level if DATABASE_URL is not set (typical in CI without services)
+if not db_url:
+    pytest.skip("DATABASE_URL must be set to run E2E tests", allow_module_level=True)
 
 
 # Requires live PostgreSQL (run with: pytest -m e2e)
@@ -29,7 +33,12 @@ async def test_e2e_reminders_delivery_telegram() -> None:
     chat_id = f"test_chat_{uuid.uuid4().hex[:8]}"
 
     # 1. SETUP DB STATE
-    conn = await create_db_client()
+    try:
+        conn = await create_db_client()
+    except Exception as e:
+        pytest.skip(f"Database connection failed, skipping E2E test: {e}")
+        return
+
     try:
         # Create a provider with a specific timezone
         provider_id_res = await conn.fetch(

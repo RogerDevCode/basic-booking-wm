@@ -102,7 +102,8 @@ async def test_fsm_router_mis_citas_from_idle() -> None:
     with (
         patch("f.internal._nlu_cache.ensure_nlu_cache", AsyncMock()),
         patch(
-            "f.internal.fsm_router.handlers._wallet_handler.get_mis_citas_text", AsyncMock(return_value="📋 *Mis Horas*\n\nTus citas...")
+            "f.internal.fsm_router.handlers._wallet_handler.get_mis_citas_text",
+            AsyncMock(return_value="📋 *Mis Horas*\n\nTus citas..."),
         ),
     ):
         res = await _main_async(args)

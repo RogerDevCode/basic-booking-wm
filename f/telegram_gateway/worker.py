@@ -208,7 +208,8 @@ async def process_telegram_update(ctx: dict[str, Any], update_json: str, ingest_
                 "ai_entities": ai_entities,
                 "requires_fsm_routing": requires_fsm_routing,
             }
-            fsm_outcome = await run_fsm_router(fsm_args)
+            fsm_res_raw = await run_fsm_router(fsm_args)
+            fsm_outcome = cast("dict[str, Any]", fsm_res_raw.get("data", {}))
             fsm_handled = bool(fsm_outcome.get("handled", False))
 
         # 8. Conversational Route (if FSM didn't handle it)
@@ -229,7 +230,8 @@ async def process_telegram_update(ctx: dict[str, Any], update_json: str, ingest_
                 "current_state_name": curr_state,
                 "session_id": sess_id,
             }
-            conv_outcome = await run_conversational_router(conv_args)
+            conv_res_raw = await run_conversational_router(conv_args)
+            conv_outcome = cast("dict[str, Any]", conv_res_raw.get("data", {}))
 
         # 9. Register client metadata if FSM router requested it
         if fsm_outcome.get("registration_data"):
