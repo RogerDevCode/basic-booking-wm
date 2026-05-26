@@ -75,7 +75,7 @@ async def test_conversational_greeting_contains_menu() -> None:
     data = cast("dict[str, Any]", res["data"])
     assert data["handled"] is True
     assert "Hola" in data["response_text"]
-    assert "Agendar" in data["response_text"]
+    assert "Menú Principal" in data["response_text"]
 
 
 @pytest.mark.asyncio

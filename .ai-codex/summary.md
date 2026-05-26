@@ -687,7 +687,7 @@
 - ⚡ `async_fn` `handle_mis_citas` (L10)
 
 ### `f/internal/fsm_router/main.py`
-- 🔧 `fn` `main` (L658)
+- 🔧 `fn` `main` (L659)
 
 ### `f/internal/gcal_utils/_gcal_logic.py`
 - 🔧 `fn` `build_gcal_event` (L8)

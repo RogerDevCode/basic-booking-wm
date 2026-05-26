@@ -187,6 +187,7 @@ async def _route_impl(input_data: RouterInput) -> RouterResult:
             active_flow="booking",
             nextState={"name": "idle", "session_id": str(input_data.update_id)},
             response_text=_get_start_text(input_data.client_name, input_data.phone),
+            inline_buttons=get_main_menu_inline_buttons(),
         )
 
     # ─── Fast-path: opciones numéricas del menú en estado idle ───────────────

@@ -61,7 +61,7 @@ class TestConversationalRouter:
         res = await main(args)
         data = res["data"]
         assert data["handled"] is True
-        assert "1️⃣ Agendar" in data["response_text"]
+        assert "Menú Principal" in data["response_text"]
 
     @pytest.mark.asyncio
     async def test_recordatorios_handled(self) -> None:
