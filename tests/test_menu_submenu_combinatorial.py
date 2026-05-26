@@ -199,9 +199,9 @@ class TestLevel1MenuPrincipal:
     # --- 3. Recordatorios ---
 
     @pytest.mark.asyncio
-    async def test_idle_recordatorios_keyword_4_not_handled_by_fsm(self) -> None:
-        """Tecla '4' desde idle → not handled by FSM (delegated to conversational router)."""
-        args = _args(user_input="4", ai_intent="activar_recordatorios", ai_confidence=0.95)
+    async def test_idle_recordatorios_keyword_6_not_handled_by_fsm(self) -> None:
+        """Tecla '6' desde idle → not handled by FSM (delegated to conversational router)."""
+        args = _args(user_input="6", ai_intent="activar_recordatorios", ai_confidence=0.95)
         with patch("f.internal._nlu_cache.ensure_nlu_cache", AsyncMock()):
             res = await _main_async(args)
         data = cast("dict[str, Any]", res["data"])
@@ -219,9 +219,9 @@ class TestLevel1MenuPrincipal:
     # --- 4. Información ---
 
     @pytest.mark.asyncio
-    async def test_idle_informacion_keyword_4_not_handled_by_fsm(self) -> None:
-        """Tecla '4' desde idle → not handled by FSM (delegated to conversational router)."""
-        args = _args(user_input="4", ai_intent="pregunta_general", ai_confidence=0.95)
+    async def test_idle_informacion_keyword_7_not_handled_by_fsm(self) -> None:
+        """Tecla '7' desde idle → not handled by FSM (delegated to conversational router)."""
+        args = _args(user_input="7", ai_intent="pregunta_general", ai_confidence=0.95)
         with patch("f.internal._nlu_cache.ensure_nlu_cache", AsyncMock()):
             res = await _main_async(args)
         data = cast("dict[str, Any]", res["data"])
@@ -239,9 +239,9 @@ class TestLevel1MenuPrincipal:
     # --- 5. Mis datos ---
 
     @pytest.mark.asyncio
-    async def test_idle_mis_datos_keyword_5_not_handled_by_fsm(self) -> None:
-        """Tecla '5' desde idle → not handled by FSM (delegated to conversational router)."""
-        args = _args(user_input="5", ai_intent="ver_mis_datos", ai_confidence=0.95)
+    async def test_idle_mis_datos_keyword_8_not_handled_by_fsm(self) -> None:
+        """Tecla '8' desde idle → not handled by FSM (delegated to conversational router)."""
+        args = _args(user_input="8", ai_intent="ver_mis_datos", ai_confidence=0.95)
         with patch("f.internal._nlu_cache.ensure_nlu_cache", AsyncMock()):
             res = await _main_async(args)
         data = cast("dict[str, Any]", res["data"])

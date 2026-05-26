@@ -108,10 +108,12 @@ _FSM_INTERRUPT_THRESHOLD: float = 0.7
 _MENU_NUMERIC_INTENT_MAP: Final[dict[str, str]] = {
     "1": "crear_cita",
     "2": "ver_mis_citas",
-    "3": "generar_reporte",
-    "4": "activar_recordatorios",
-    "5": "pregunta_general",
-    "6": "ver_mis_datos",
+    "3": "cancelar_cita",
+    "4": "reagendar_cita",
+    "5": "generar_reporte",
+    "6": "activar_recordatorios",
+    "7": "pregunta_general",
+    "8": "ver_mis_datos",
 }
 
 
@@ -311,6 +313,12 @@ async def _route_impl(input_data: RouterInput) -> RouterResult:
         current_state_raw = cast("dict[str, object]", {"name": "idle"})
         current_state_name = "idle"
         state_dict["booking_draft"] = {}
+
+    # cmd:cancelar_hora / cmd:reagendar_hora → redirect to mis_citas view
+    if user_input in ("cmd:cancelar_hora", "cancelar_hora"):
+        return await _handle_mis_citas(input_data, current_state_raw, session_id=current_session)
+    if user_input in ("cmd:reagendar_hora", "reagendar_hora"):
+        return await _handle_mis_citas(input_data, current_state_raw, session_id=current_session)
 
     # Early rule-based or AI-based escape to main menu (este donde este)
     trimmed = user_input.strip().lower()
@@ -563,14 +571,6 @@ async def _route_impl(input_data: RouterInput) -> RouterResult:
             else:
                 return RouterResult(handled=False)
 
-        # Block transition to time-slot selection if client already has an active booking
-        if current_state_name == "selecting_doctor" and input_data.prefetch_block_reason == "already_booked":
-            mis_citas_res = await _handle_mis_citas(input_data, {"name": "idle"}, session_id=current_session)
-            warning = "⚠️ Ya tienes una cita agendada.\nDebes cancelar tu cita actual antes de reservar una nueva.\n\n"
-            mis_citas_res.response_text = (
-                warning + str(mis_citas_res.response_text).replace(get_main_menu_text(), "").strip()
-            )
-            return mis_citas_res
         state_root = BookingStateRoot.model_validate(current_state_raw)
         current_state = state_root.root
 
@@ -589,6 +589,96 @@ async def _route_impl(input_data: RouterInput) -> RouterResult:
         if not outcome:
             return RouterResult(handled=False)
 
+        # Intercept transition to confirming if user already has an active booking
+        next_state_obj = outcome.get("nextState")
+        next_state_name = getattr(next_state_obj, "name", None) if next_state_obj else None
+        if (
+            next_state_name == "confirming"
+            and input_data.client_id
+            and input_data.pg_url
+            and "://test" not in input_data.pg_url
+        ):
+            from .._booking_shared import query_my_bookings
+
+            active_bookings = await query_my_bookings(input_data.client_id, input_data.pg_url)
+            if active_bookings:
+                active_booking = active_bookings[0]
+                draft_obj = getattr(next_state_obj, "draft", None)
+                new_start_time = getattr(draft_obj, "start_time", None) if draft_obj else None
+                new_doctor_id = getattr(draft_obj, "doctor_id", None) if draft_obj else None
+
+                if new_start_time and new_doctor_id:
+                    from datetime import UTC, datetime
+                    from zoneinfo import ZoneInfo
+
+                    from .._booking_shared import _MONTHS_ES
+
+                    # Format old time
+                    raw_start = active_booking["start_time"]
+                    if isinstance(raw_start, datetime):
+                        start_utc = raw_start if raw_start.tzinfo else raw_start.replace(tzinfo=UTC)
+                    else:
+                        start_utc = datetime.fromisoformat(str(raw_start).replace("Z", "+00:00"))
+
+                    tz_name = cast("str", active_booking["tz_name"])
+                    tz = ZoneInfo(tz_name)
+                    local_dt = start_utc.astimezone(tz)
+                    day = local_dt.day
+                    month = _MONTHS_ES[local_dt.month]
+                    time_str = local_dt.strftime("%H:%M")
+                    fmt_old_time = f"{day} de {month} a las {time_str}"
+
+                    # Format new time
+                    new_dt = datetime.fromisoformat(new_start_time.replace("Z", "+00:00"))
+                    new_local_dt = new_dt.astimezone(tz)
+                    new_time_str = new_local_dt.strftime("%H:%M")
+                    new_date_iso = new_local_dt.strftime("%Y-%m-%d")
+
+                    suffix = f"|{current_session}" if current_session else ""
+
+                    if str(active_booking["provider_id"]) == str(new_doctor_id):
+                        ars_callback = f"ars:{active_booking['booking_id']}:{new_date_iso}:{new_time_str}{suffix}"
+                        cxl_callback = f"cxl:{active_booking['booking_id']}{suffix}"
+
+                        return RouterResult(
+                            handled=True,
+                            nextState={"name": "idle"},
+                            response_text=(
+                                f"ℹ️ *Ya tienes una hora activa*\n\n"  # noqa: RUF001
+                                f"Tienes una hora con *{active_booking['provider_name']}* "
+                                f"para el *{fmt_old_time}*.\n\n"
+                                f"¿Deseas reagendar esa hora para el nuevo horario "
+                                f"(*{new_date_iso}* a las *{new_time_str}*)?"
+                            ),
+                            inline_buttons=[
+                                [{"text": "🔄 Sí, reagendar hora", "callback_data": ars_callback}],
+                                [{"text": "❌ Cancelar hora", "callback_data": cxl_callback}],
+                                [{"text": "« Volver al menú", "callback_data": f"cmd:menu{suffix}"}],
+                            ],
+                        )
+                    else:
+                        cxl_callback = f"cxl:{active_booking['booking_id']}{suffix}"
+                        return RouterResult(
+                            handled=True,
+                            nextState={"name": "idle"},
+                            response_text=(
+                                f"⚠️ *Ya tienes una hora activa*\n\n"
+                                f"Tienes una hora con *{active_booking['provider_name']}* "
+                                f"para el *{fmt_old_time}*.\n\n"
+                                f"Debes cancelar tu hora actual antes de reservar una nueva "
+                                f"con un profesional diferente."
+                            ),
+                            inline_buttons=[
+                                [
+                                    {
+                                        "text": f"❌ Cancelar hora con {active_booking['provider_name']}",
+                                        "callback_data": cxl_callback,
+                                    }
+                                ],
+                                [{"text": "« Volver al menú", "callback_data": f"cmd:menu{suffix}"}],
+                            ],
+                        )
+
         return RouterResult(
             handled=True,
             response_text=outcome["responseText"],
@@ -597,7 +687,7 @@ async def _route_impl(input_data: RouterInput) -> RouterResult:
             inline_buttons=cast(
                 "list[list[dict[str, str]]] | None",
                 outcome.get("inlineButtons"),
-            ),  # cast: acceptable boundary — Telegram inline button type mismatch
+            ),
             edit_message=is_callback,
         )
 

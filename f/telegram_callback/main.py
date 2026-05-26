@@ -32,7 +32,12 @@ from pydantic import BaseModel
 # Pydantic Schemas: YES — InputSchema validates callback_data format
 # ============================================================================
 from ..internal._wmill_adapter import get_variable, log
-from ._callback_logic import answer_callback_query, parse_callback_data, send_followup_message
+from ._callback_logic import (
+    answer_callback_query,
+    clean_message_reply_markup,
+    parse_callback_data,
+    send_followup_message,
+)
 from ._callback_models import ActionContext, InputSchema
 from ._callback_router import (
     AcknowledgeHandler,
@@ -40,6 +45,7 @@ from ._callback_router import (
     CancelHandler,
     CancelReasonHandler,
     ConfirmHandler,
+    RescheduleCitaHandler,
     TelegramRouter,
 )
 
@@ -82,6 +88,7 @@ async def _main_async(
     router.register("cancel_reason", CancelReasonHandler())
     router.register("acknowledge", AcknowledgeHandler())
     router.register("auto_reschedule", AutoRescheduleHandler())
+    router.register("reagendar_cita", RescheduleCitaHandler())
 
     context: ActionContext = {
         "botToken": bot_token,
@@ -100,6 +107,10 @@ async def _main_async(
 
     # 6. Response to Telegram
     await answer_callback_query(bot_token, input_data.callback_query_id, result["responseText"])
+
+    # 6.1 Clean original inline markup to prevent double-click abuse
+    if input_data.message_id:
+        await clean_message_reply_markup(bot_token, input_data.chat_id, input_data.message_id)
 
     reply_markup = None
     if result.get("followUpText") and result.get("inlineButtons"):

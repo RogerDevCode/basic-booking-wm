@@ -214,18 +214,20 @@ class TestPrefetchSelectingSpecialtyState:
 
 class TestPrefetchSelectingDoctorState:
     @pytest.mark.asyncio
-    async def test_selecting_doctor_with_active_booking_returns_blocked(self) -> None:
+    async def test_selecting_doctor_with_active_booking_does_not_block_early(self) -> None:
         state: dict[str, object] = {
             "name": "selecting_doctor",
             "items": [{"id": _DOCTOR_ID, "name": "Dr. Test"}],
         }
         db = _make_db()
-        # _has_active_booking_for_provider returns True
+        fake_slots = [
+            {"id": "2026-06-01T10:00:00+00:00", "label": "Lun 1 Jun · 10:00", "start_time": "2026-06-01T10:00:00+00:00"}
+        ]
         with (
             patch("f.internal.booking_prefetch.main._connect", AsyncMock(return_value=db)),
             patch(
-                "f.internal.booking_prefetch.main._has_active_booking_for_provider",
-                AsyncMock(return_value=True),
+                "f.internal.booking_prefetch.main._fetch_slots_for_doctor",
+                AsyncMock(return_value=fake_slots),
             ),
         ):
             result = await _main_async(
@@ -235,9 +237,8 @@ class TestPrefetchSelectingDoctorState:
                 user_input="1",
                 client_id=_CLIENT_ID,
             )
-        assert result["items"] == []
-        assert result["prefetch_type"] == "blocked"
-        assert result["block_reason"] == "already_booked"
+        assert result["items"] == fake_slots
+        assert result["prefetch_type"] == "time_slots"
 
     @pytest.mark.asyncio
     async def test_selecting_doctor_no_active_booking_returns_slots(self) -> None:

@@ -36,7 +36,7 @@ class TelegramMessage(BaseModel):
 class TelegramCallback(BaseModel):
     model_config = ConfigDict(strict=True, extra="ignore")
     id: str
-    from_user: TelegramUser = Field(alias="from")
+    from_user: TelegramUser | None = Field(None, alias="from")
     message: TelegramMessage | None = None
     data: str
 

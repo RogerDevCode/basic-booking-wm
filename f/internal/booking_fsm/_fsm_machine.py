@@ -49,7 +49,15 @@ from ._fsm_responses import (
 
 
 def get_main_menu_text() -> str:
-    default_text = "📱 *Menú Principal*"
+    default_text = (
+        "📱 *Menú Principal*\n\n"
+        "1️⃣ Agendar hora\n"
+        "2️⃣ Mis horas\n"
+        "3️⃣ Generar reporte\n"
+        "4️⃣ Recordatorios\n"
+        "5️⃣ Información\n"
+        "6️⃣ Mis datos"
+    )
     return str(get_nlu_rule("msg_main_menu", default_text))
 
 
@@ -57,10 +65,12 @@ def get_main_menu_inline_buttons() -> list[list[dict[str, str]]]:
     return [
         [{"text": "1. 📅 Agendar hora", "callback_data": "cmd:agendar"}],
         [{"text": "2. 📋 Mis horas", "callback_data": "cmd:mis_citas"}],
-        [{"text": "3. 📊 Generar reporte", "callback_data": "cmd:reporte"}],
-        [{"text": "4. ⏰ Recordatorios", "callback_data": "cmd:recordatorios"}],
-        [{"text": "5. ℹ️ Información", "callback_data": "cmd:info"}],  # noqa: RUF001
-        [{"text": "6. 👤 Mis datos", "callback_data": "cmd:perfil"}],
+        [{"text": "3. ❌ Cancelar hora", "callback_data": "cmd:cancelar_hora"}],
+        [{"text": "4. 🔄 Reagendar hora", "callback_data": "cmd:reagendar_hora"}],
+        [{"text": "5. 📊 Reporte", "callback_data": "cmd:reporte"}],
+        [{"text": "6. ⏰ Recordatorios", "callback_data": "cmd:recordatorios"}],
+        [{"text": "7. ℹ️ Información", "callback_data": "cmd:info"}],  # noqa: RUF001
+        [{"text": "8. 👤 Mis datos", "callback_data": "cmd:perfil"}],
     ]
 
 
@@ -143,6 +153,10 @@ def parse_callback_data(data: str) -> BookingAction | None:
         # Map some commands to numeric selection for the idle->selecting_specialty transition
         if val == "agendar":
             return SelectAction(value="1")
+        if val == "cancelar_hora":
+            return SelectAction(value="cancelar_hora")
+        if val == "reagendar_hora":
+            return SelectAction(value="reagendar_hora")
         return SelectAction(value=val)
 
     match = re.match(r"^(spec|doc|time|slot):(.+)$", raw_data)

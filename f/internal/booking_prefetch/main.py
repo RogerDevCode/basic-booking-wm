@@ -229,9 +229,6 @@ async def _main_async(
             # Pre-fetch slots when user is picking a doctor
             doctor_id = _resolve_doctor_from_selection(user_input, state_items)
             if doctor_id:
-                if client_id and await _has_active_booking_for_provider(db, client_id, doctor_id):
-                    log("PREFETCH_BLOCKED_ACTIVE_BOOKING", client_id=client_id, provider_id=doctor_id, module=MODULE)
-                    raise BookingPrefetchBlockedError("already_booked")
                 draft = booking_draft or {}
                 target_date = cast("str | None", draft.get("target_date"))
                 slots = await _fetch_slots_for_doctor(db, doctor_id, target_date)

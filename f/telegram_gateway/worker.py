@@ -18,6 +18,7 @@ from ..internal._redis_client import create_redis_client
 from ..internal.ai_agent.main import _main_async as run_ai_agent
 from ..internal.booking_confirm.main import _main_async as run_booking_confirm
 from ..internal.booking_fsm._fsm_machine import get_main_menu_inline_buttons
+from ..internal.booking_prefetch.main import _main_async as run_booking_prefetch
 from ..internal.client_register.main import _main_async as run_client_register
 from ..internal.conversation_get.main import _get_conversation
 from ..internal.conversation_update.main import _main_async as run_conversation_update
@@ -25,6 +26,7 @@ from ..internal.conversational_router.main import _main_async as run_conversatio
 from ..internal.fsm_router.main import _main_async as run_fsm_router
 from ..message_preprocessor.main import _preprocess
 from ..telegram_auto_register.main import _main_async as run_telegram_auto_register
+from ..telegram_callback.main import _main_async as run_telegram_callback
 from ..telegram_send.main import _main_async as run_telegram_send
 from ._gateway_models import TelegramUpdate
 from .monitoring import MetricsTracker, log_structured
@@ -102,9 +104,9 @@ async def process_telegram_update(ctx: dict[str, Any], update_json: str, ingest_
             callback_message_id = update.callback_query.message.message_id
         callback_data = update.callback_query.data
         callback_query_id = update.callback_query.id
-        first_name = update.callback_query.from_user.first_name
-        last_name = update.callback_query.from_user.last_name
-        username = update.callback_query.from_user.username or "unknown"
+        first_name = update.callback_query.from_user.first_name if update.callback_query.from_user else "Usuario"
+        last_name = update.callback_query.from_user.last_name if update.callback_query.from_user else None
+        username = (update.callback_query.from_user.username if update.callback_query.from_user else None) or "unknown"
 
     if not chat_id:
         log_structured(logging.WARNING, "skipped_update_no_chat_id", update_id=update.update_id)
@@ -153,6 +155,30 @@ async def process_telegram_update(ctx: dict[str, Any], update_json: str, ingest_
         phone = reg_res.get("phone")
         client_name = reg_res.get("name")
 
+        # Intercept and process callback queries via telegram_callback
+        if callback_data:
+            parts = callback_data.split("|")[0].split(":")
+            prefix = parts[0] if parts else ""
+            if prefix in {"cnf", "cxl", "cxr", "res", "ars", "act", "dea", "ack"}:
+                callback_args: dict[str, object] = {
+                    "callback_query_id": callback_query_id,
+                    "callback_data": callback_data,
+                    "chat_id": chat_id,
+                    "client_id": str(client_id) if client_id else None,
+                    "user_id": str(client_id) if client_id else None,
+                }
+                await run_telegram_callback(callback_args)
+                elapsed_ms = (time.perf_counter() - start_time) * 1000
+                await metrics.record_processing_time(elapsed_ms)
+                log_structured(
+                    logging.INFO,
+                    "update_processing_completed",
+                    chat_id=chat_id,
+                    update_id=update.update_id,
+                    elapsed_ms=elapsed_ms,
+                )
+                return
+
         # 6. Route to AI Agent for intent classification
         intent = "desconocido"
         requires_fsm_routing = True
@@ -194,14 +220,24 @@ async def process_telegram_update(ctx: dict[str, Any], update_json: str, ingest_
         fsm_handled = False
         fsm_outcome: dict[str, Any] = {}
         if requires_fsm_routing and not security_scan_failed:
+            prefetch_res = await run_booking_prefetch(
+                booking_state=conv_state.booking_state if conv_state else None,
+                booking_draft=conv_state.booking_draft if conv_state else None,
+                pg_url=DATABASE_URL,
+                user_input=cleaned_text or callback_data,
+                client_id=str(client_id) if client_id else None,
+            )
+            items = prefetch_res.get("items", [])
+            prefetch_block_reason = prefetch_res.get("block_reason")
+
             fsm_args: dict[str, object] = {
                 "chat_id": chat_id,
                 "user_input": cleaned_text or callback_data,
                 "state": conv_state.model_dump() if conv_state else {},
-                "items": [],
+                "items": items,
                 "phone": phone,
                 "client_name": client_name,
-                "prefetch_block_reason": None,
+                "prefetch_block_reason": prefetch_block_reason,
                 "client_id": client_id,
                 "callback_message_id": callback_message_id,
                 "update_id": update.update_id,
@@ -277,7 +313,7 @@ async def process_telegram_update(ctx: dict[str, Any], update_json: str, ingest_
                 "booking_state": next_state,
                 "active_flow": active_flow,
                 "booking_draft": next_draft,
-                "version": conv_state.version if conv_state else 1,
+                "version": conv_state.version if conv_state else 0,
                 "pending_data": {
                     "router_handled": fsm_handled or conv_outcome.get("handled", False),
                     "user_id": reg_res.get("user_id"),
@@ -347,6 +383,31 @@ async def process_telegram_update(ctx: dict[str, Any], update_json: str, ingest_
             "mode": "edit_message" if edit_message else "send_message",
             "text": response_text,
         }
+
+        # Button locking: if responding to a callback with a NEW message (not editing the old one),
+        # clear the markup of the previous message so the user can't click stale buttons.
+        if callback_message_id and not edit_message:
+            import httpx as _httpx
+
+            async def _clear_old_markup() -> None:
+                url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/editMessageReplyMarkup"
+                try:
+                    async with _httpx.AsyncClient(timeout=3.0) as _client:
+                        await _client.post(
+                            url,
+                            json={
+                                "chat_id": chat_id,
+                                "message_id": callback_message_id,
+                                "reply_markup": {"inline_keyboard": []},
+                            },
+                        )
+                except Exception:
+                    pass  # Non-fatal: old buttons staying visible is cosmetic, not a crash
+
+            _clear_task = asyncio.create_task(_clear_old_markup())
+            _BACKGROUND_TASKS.add(_clear_task)
+            _clear_task.add_done_callback(_BACKGROUND_TASKS.discard)
+
         await run_telegram_send(send_args)
         tg_send_ms = (time.perf_counter() - tg_outbound_start) * 1000
         await metrics.record_telegram_send_time(tg_send_ms)

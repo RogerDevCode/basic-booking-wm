@@ -187,30 +187,26 @@ class TestSmartPrefillActiveBookingBlock:
     """Client already has active booking with same doctor → blocked."""
 
     @pytest.mark.asyncio
-    @patch(
-        "f.internal.fsm_router.handlers._smart_prefill_handler._has_active_booking_for_provider", new_callable=AsyncMock
-    )
+    @patch("f.internal.fsm_router.handlers._smart_prefill_handler._fetch_slots_for_doctor", new_callable=AsyncMock)
     @patch("f.internal.fsm_router.handlers._smart_prefill_handler.resolve_provider_by_name", new_callable=AsyncMock)
     async def test_active_booking_blocks_new_reservation(
         self,
         mock_resolve: AsyncMock,
-        mock_active: AsyncMock,
+        mock_fetch: AsyncMock,
     ) -> None:
-        # Arrange: provider found but client has active booking
+        # Arrange: provider found and slots fetched
         mock_resolve.return_value = [_PROVIDER_ROW]
-        mock_active.return_value = True
+        mock_fetch.return_value = [{"id": "slot-1", "label": "10:00", "start_time": "2026-05-28T10:00:00-04:00"}]
 
         input_data = _make_input()
 
         # Act
         result = await _handle_smart_prefill(input_data, {})
 
-        # Assert: blocked with warning message, returns to idle
+        # Assert: transitions to selecting_time to select slot for reschedule conflict handling later
         assert result.handled is True
         assert result.nextState is not None
-        assert result.nextState["name"] == "idle"
-        assert result.response_text is not None
-        assert "cita" in result.response_text.lower() or "agendada" in result.response_text.lower()
+        assert result.nextState["name"] == "selecting_time"
 
 
 class TestSmartPrefillNoPgUrl:

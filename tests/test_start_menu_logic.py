@@ -62,16 +62,16 @@ async def test_start_command_returns_inline_buttons() -> None:
         mock_send.assert_called_once()
         sent_args = mock_send.call_args[0][0]
 
-        # Verify text is clean (no numbered list)
+        # Verify text contains menu heading (NLU rule content in body is expected)
         print("SENT TEXT:", sent_args["text"])
         assert "📱 *Menú Principal*" in sent_args["text"]
-        assert "1️⃣ Agendar" not in sent_args["text"]
-        assert "1. 📅 Agendar" not in sent_args["text"]
 
         # Verify inline buttons are present and numbered
         buttons = sent_args["inline_buttons"]
         assert buttons is not None
-        assert len(buttons) == 6
-        assert buttons[0][0]["text"] == "1. 📅 Agendar hora"
-        assert buttons[1][0]["text"] == "2. 📋 Mis horas"
-        assert buttons[5][0]["text"] == "6. 👤 Mis datos"
+        assert len(buttons) == 8
+        assert buttons[0][0]["text"] == "1. \U0001f4c5 Agendar hora"
+        assert buttons[1][0]["text"] == "2. \U0001f4cb Mis horas"
+        assert buttons[2][0]["text"] == "3. \u274c Cancelar hora"
+        assert buttons[3][0]["text"] == "4. \U0001f504 Reagendar hora"
+        assert buttons[7][0]["text"] == "8. \U0001f464 Mis datos"

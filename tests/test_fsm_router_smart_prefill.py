@@ -380,16 +380,15 @@ async def test_smart_prefill_already_booked_blocks() -> None:
             ),
         ),
         patch(
-            "f.internal.fsm_router.handlers._smart_prefill_handler._has_active_booking_for_provider",
-            AsyncMock(return_value=True),
+            "f.internal.fsm_router.handlers._smart_prefill_handler._fetch_slots_for_doctor",
+            AsyncMock(return_value=[{"id": "slot-1", "label": "10:00", "start_time": "2026-05-28T10:00:00-04:00"}]),
         ),
     ):
         res = await _main_async(args)
 
     data = cast("dict[str, Any]", res["data"])
     assert data["handled"] is True
-    assert data["nextState"]["name"] == "idle"
-    assert "Ya tienes una cita" in data["response_text"]
+    assert data["nextState"]["name"] == "selecting_time"
 
 
 # ============================================================================

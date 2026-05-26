@@ -400,10 +400,16 @@ _MENU_MIS_CITAS: frozenset[str] = frozenset(
         "ver mis horas",
     }
 )
-_MENU_RECORDATORIOS: frozenset[str] = frozenset({"4", "recordatorios", "recordatorio"})
-_MENU_INFO: frozenset[str] = frozenset({"5", "informacion", "información", "info"})
-_MENU_MIS_DATOS: frozenset[str] = frozenset({"6", "mis datos", "datos", "mi perfil", "perfil", "ver mis datos"})
-_MENU_REPORTE: frozenset[str] = frozenset({"3", "reporte", "informe", "descargar citas", "obtener reporte"})
+_MENU_CANCELAR_HORA: frozenset[str] = frozenset(
+    {"3", "cancelar", "cancelar hora", "cancelar cita", "quiero cancelar", "borrar hora", "anular hora"}
+)
+_MENU_REAGENDAR_HORA: frozenset[str] = frozenset(
+    {"4", "reagendar", "reagendar hora", "reagendar cita", "cambiar hora", "cambiar cita", "mover hora", "reprogramar"}
+)
+_MENU_REPORTE: frozenset[str] = frozenset({"5", "reporte", "informe", "descargar citas", "obtener reporte"})
+_MENU_RECORDATORIOS: frozenset[str] = frozenset({"6", "recordatorios", "recordatorio"})
+_MENU_INFO: frozenset[str] = frozenset({"7", "informacion", "información", "info"})
+_MENU_MIS_DATOS: frozenset[str] = frozenset({"8", "mis datos", "datos", "mi perfil", "perfil", "ver mis datos"})
 
 
 def detect_menu_command(text: str) -> tuple[str, float] | None:
@@ -416,6 +422,10 @@ def detect_menu_command(text: str) -> tuple[str, float] | None:
         return cast("tuple[str, float]", (INTENT["CREAR_CITA"], 0.97))
     if lower in _MENU_MIS_CITAS:
         return cast("tuple[str, float]", (INTENT["VER_MIS_CITAS"], 0.97))
+    if lower in _MENU_CANCELAR_HORA:
+        return cast("tuple[str, float]", (INTENT["CANCELAR_CITA"], 0.97))
+    if lower in _MENU_REAGENDAR_HORA:
+        return cast("tuple[str, float]", (INTENT["REAGENDAR_CITA"], 0.97))
     if lower in _MENU_REPORTE:
         return cast("tuple[str, float]", (INTENT["GENERAR_REPORTE"], 0.97))
     if lower in _MENU_RECORDATORIOS:

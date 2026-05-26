@@ -1,5 +1,6 @@
 import traceback
 from datetime import datetime
+from typing import Any, cast
 
 from ..internal._db_client import create_db_client
 from ..internal._result import with_tenant_context
@@ -205,6 +206,111 @@ class AutoRescheduleHandler:
             "responseText": "✅ Reagendada con éxito",
             "followUpText": f"Tu hora ha sido movida al {date} a las {time}.",
         }
+
+
+class RescheduleCitaHandler:
+    async def handle(self, context: ActionContext) -> ActionResult:
+        # User clicked '🔄 Reagendar Ref: SHORT_ID'.
+        # We need to load their booking, find provider_id, specialty_id,
+        # and transition their FSM state to selecting_time.
+        booking_id = context["booking_id"]
+        chat_id = context["chat_id"]
+        session_id = context.get("session_id")
+
+        from ..internal._db_client import create_db_client as _factory
+        from ..internal._wmill_adapter import run_script
+        from ..internal.booking_fsm._fsm_models import DraftBooking
+        from ..internal.booking_fsm._fsm_responses import build_time_slot_keyboard
+        from ..internal.booking_prefetch.main import _fetch_slots_for_doctor
+
+        conn = await _factory()
+        try:
+            row = await conn.fetchrow(
+                """
+                SELECT 
+                    b.provider_id::text AS provider_id,
+                    p.name AS provider_name,
+                    p.specialty_id::text AS specialty_id,
+                    sp.name AS specialty_name
+                FROM bookings b
+                JOIN providers p ON p.provider_id = b.provider_id
+                JOIN specialties sp ON sp.specialty_id = p.specialty_id
+                WHERE b.booking_id = $1::uuid
+                LIMIT 1
+                """,
+                booking_id,
+            )
+            if not row:
+                return {
+                    "responseText": "⚠️ Hora no encontrada",
+                    "followUpText": "No pudimos encontrar la hora que deseas reagendar.",
+                }
+
+            provider_id = str(row["provider_id"])
+            provider_name = str(row["provider_name"])
+            specialty_id = str(row["specialty_id"])
+            specialty_name = str(row["specialty_name"])
+
+            # Fetch slots for doctor
+            slots = await _fetch_slots_for_doctor(conn, provider_id)
+
+            # Update FSM State for the conversation
+            # FSM state: selecting_time, draft_booking with doctor/specialty
+            draft = DraftBooking(
+                specialty_id=specialty_id,
+                specialty_name=specialty_name,
+                doctor_id=provider_id,
+                doctor_name=provider_name,
+            )
+
+            # Use conversation_update script to update the state in DB
+            update_payload: dict[str, object] = {
+                "chat_id": chat_id,
+                "booking_state": {
+                    "name": "selecting_time",
+                    "specialtyId": specialty_id,
+                    "doctorId": provider_id,
+                    "doctorName": provider_name,
+                    "items": slots,
+                },
+                "booking_draft": draft.model_dump(),
+            }
+
+            err, _ = run_script("f/internal/conversation_update/main", update_payload)
+            if err:
+                raise err
+
+            # Build time slot keyboard
+            # Transform slots list of dicts to list of TimeSlotItem
+            from ..internal.booking_fsm._fsm_models import TimeSlotItem
+
+            slot_items = [
+                TimeSlotItem(id=str(s["id"]), label=str(s["label"]), start_time=str(s["start_time"])) for s in slots
+            ]
+            keyboard = build_time_slot_keyboard(slot_items, session_id=session_id)
+
+            return {
+                "responseText": "🔄 Reagendando hora",
+                "followUpText": (
+                    f"Reagendando tu hora con *{provider_name}* ({specialty_name}).\n\n"
+                    "Por favor, selecciona un nuevo horario:"
+                ),
+                "inlineButtons": cast("list[list[Any]]", keyboard),
+            }
+
+        except Exception as e:
+            log(
+                "RESCHEDULE_CITA_CALLBACK_FAILED",
+                error=str(e),
+                traceback=traceback.format_exc(),
+                module="callback_router",
+            )
+            return {
+                "responseText": "❌ Error al reagendar",
+                "followUpText": "Hubo un error al iniciar la reagendación. Intenta más tarde.",
+            }
+        finally:
+            await conn.close()
 
 
 class TelegramRouter:

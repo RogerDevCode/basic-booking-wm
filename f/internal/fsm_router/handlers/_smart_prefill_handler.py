@@ -20,7 +20,6 @@ from ...booking_fsm._fsm_responses import (
 from ...booking_prefetch.main import _fetch_slots_for_doctor as _prefetch_slots
 from ...booking_prefetch.main import _has_active_booking_for_provider as _prefetch_active_booking
 from .._router_models import RouterInput, RouterResult
-from ._wallet_handler import handle_mis_citas
 
 MODULE = "smart_prefill_handler"
 
@@ -108,22 +107,6 @@ async def handle_smart_prefill(
     specialty_id = str(provider["specialty_id"])
     specialty_name = str(provider["specialty_name"])
     doctor_name = str(provider["name"])
-
-    if input_data.client_id:
-        try:
-            has_active = await _has_active_booking_for_provider(input_data.client_id, provider_id, input_data.pg_url)
-        except Exception:
-            has_active = False
-        if has_active:
-            mis_citas_res = await handle_mis_citas(input_data, {"name": "idle"}, session_id=session_id)
-            warning = (
-                "⚠️ Ya tienes una cita agendada con este doctor.\n"
-                "Debes cancelar tu cita actual antes de reservar una nueva.\n\n"
-            )
-            mis_citas_res.response_text = (
-                warning + str(mis_citas_res.response_text).replace(get_main_menu_text(), "").strip()
-            )
-            return mis_citas_res
 
     # Resolve target date from AI entities (e.g., "viernes" → "2026-05-22")
     target_date: str | None = None

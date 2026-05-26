@@ -415,10 +415,10 @@
 
 ### `f/internal/_booking_shared.py`
 - ⚡ `async_fn` `query_my_bookings` (L65)
-- ⚡ `async_fn` `resolve_provider_by_name` (L96)
-- ⚡ `async_fn` `get_mis_citas_text` (L128)
-- ⚡ `async_fn` `get_mis_citas_buttons` (L169)
-- ⚡ `async_fn` `get_mis_citas_data` (L211)
+- ⚡ `async_fn` `resolve_provider_by_name` (L97)
+- ⚡ `async_fn` `get_mis_citas_text` (L129)
+- ⚡ `async_fn` `get_mis_citas_buttons` (L170)
+- ⚡ `async_fn` `get_mis_citas_data` (L217)
 
 ### `f/internal/_booking_utils.py`
 - 📦 `class` `ActiveBookingInfo` (L9)
@@ -483,8 +483,8 @@
 
 ### `f/internal/_nlu_cache.py`
 - ⚡ `async_fn` `load_nlu_rules_to_redis` (L13)
-- ⚡ `async_fn` `ensure_nlu_cache` (L74)
-- 🔧 `fn` `get_nlu_rule` (L114)
+- ⚡ `async_fn` `ensure_nlu_cache` (L82)
+- 🔧 `fn` `get_nlu_rule` (L122)
 
 ### `f/internal/_redis_client.py`
 - ⚡ `async_fn` `create_redis_client` (L44)
@@ -529,7 +529,7 @@
 - 🔧 `fn` `determine_escalation_level` (L312)
 - 🔧 `fn` `generate_ai_response` (L337)
 - 🔧 `fn` `detect_social` (L354)
-- 🔧 `fn` `detect_menu_command` (L409)
+- 🔧 `fn` `detect_menu_command` (L415)
 
 ### `f/internal/ai_agent/_ai_agent_models.py`
 - 📦 `class` `ConversationState` (L11)
@@ -584,12 +584,12 @@
 
 ### `f/internal/booking_fsm/_fsm_machine.py`
 - 🔧 `fn` `get_main_menu_text` (L51)
-- 🔧 `fn` `get_main_menu_inline_buttons` (L56)
-- 🔧 `fn` `parse_action` (L75)
-- 🔧 `fn` `parse_callback_data` (L121)
-- 🔧 `fn` `apply_transition` (L159)
-- 🔧 `fn` `extract_draft_from_state` (L558)
-- 🔧 `fn` `flow_step_from_state` (L595)
+- 🔧 `fn` `get_main_menu_inline_buttons` (L64)
+- 🔧 `fn` `parse_action` (L85)
+- 🔧 `fn` `parse_callback_data` (L131)
+- 🔧 `fn` `apply_transition` (L173)
+- 🔧 `fn` `extract_draft_from_state` (L572)
+- 🔧 `fn` `flow_step_from_state` (L609)
 
 ### `f/internal/booking_fsm/_fsm_models.py`
 - 📦 `class` `NamedItem` (L20)
@@ -625,12 +625,12 @@
 - 🔧 `fn` `build_loading_slots_prompt` (L67)
 - 🔧 `fn` `chunk_buttons` (L76)
 - 🔧 `fn` `build_specialty_keyboard` (L80)
-- 🔧 `fn` `build_doctor_keyboard` (L89)
-- 🔧 `fn` `build_time_slot_keyboard` (L126)
-- 🔧 `fn` `build_confirmation_keyboard` (L142)
+- 🔧 `fn` `build_doctor_keyboard` (L90)
+- 🔧 `fn` `build_time_slot_keyboard` (L130)
+- 🔧 `fn` `build_confirmation_keyboard` (L145)
 
 ### `f/internal/booking_prefetch/main.py`
-- 🔧 `fn` `main` (L290)
+- 🔧 `fn` `main` (L287)
 
 ### `f/internal/client_register/main.py`
 - 🔧 `fn` `main` (L73)
@@ -682,13 +682,13 @@
 - ⚡ `async_fn` `handle_generar_reporte` (L12)
 
 ### `f/internal/fsm_router/handlers/_smart_prefill_handler.py`
-- ⚡ `async_fn` `handle_smart_prefill` (L50)
+- ⚡ `async_fn` `handle_smart_prefill` (L49)
 
 ### `f/internal/fsm_router/handlers/_wallet_handler.py`
 - ⚡ `async_fn` `handle_mis_citas` (L10)
 
 ### `f/internal/fsm_router/main.py`
-- 🔧 `fn` `main` (L659)
+- 🔧 `fn` `main` (L749)
 
 ### `f/internal/gcal_utils/_gcal_logic.py`
 - 🔧 `fn` `build_gcal_event` (L8)
@@ -1040,6 +1040,7 @@
 - ⚡ `async_fn` `update_booking_status` (L98)
 - ⚡ `async_fn` `answer_callback_query` (L138)
 - ⚡ `async_fn` `send_followup_message` (L154)
+- ⚡ `async_fn` `clean_message_reply_markup` (L173)
 
 ### `f/telegram_callback/_callback_models.py`
 - 📦 `class` `InputSchema` (L8)
@@ -1049,25 +1050,27 @@
 - ⚡ `async_fn` `handle` (L39)
 
 ### `f/telegram_callback/_callback_router.py`
-- 📦 `class` `ConfirmHandler` (L14)
-- ⚡ `async_fn` `handle` (L15)
-- ⚡ `async_fn` `operation` (L20)
-- 📦 `class` `CancelHandler` (L45)
-- ⚡ `async_fn` `handle` (L46)
-- 📦 `class` `CancelReasonHandler` (L63)
-- ⚡ `async_fn` `handle` (L64)
-- ⚡ `async_fn` `operation_cancel` (L84)
-- 📦 `class` `AcknowledgeHandler` (L146)
-- ⚡ `async_fn` `handle` (L147)
-- 📦 `class` `AutoRescheduleHandler` (L151)
-- ⚡ `async_fn` `handle` (L152)
-- ⚡ `async_fn` `operation_reschedule` (L182)
-- 📦 `class` `TelegramRouter` (L210)
-- 🔧 `fn` `register` (L214)
-- ⚡ `async_fn` `route` (L217)
+- 📦 `class` `ConfirmHandler` (L15)
+- ⚡ `async_fn` `handle` (L16)
+- ⚡ `async_fn` `operation` (L21)
+- 📦 `class` `CancelHandler` (L46)
+- ⚡ `async_fn` `handle` (L47)
+- 📦 `class` `CancelReasonHandler` (L64)
+- ⚡ `async_fn` `handle` (L65)
+- ⚡ `async_fn` `operation_cancel` (L85)
+- 📦 `class` `AcknowledgeHandler` (L147)
+- ⚡ `async_fn` `handle` (L148)
+- 📦 `class` `AutoRescheduleHandler` (L152)
+- ⚡ `async_fn` `handle` (L153)
+- ⚡ `async_fn` `operation_reschedule` (L183)
+- 📦 `class` `RescheduleCitaHandler` (L211)
+- ⚡ `async_fn` `handle` (L212)
+- 📦 `class` `TelegramRouter` (L316)
+- 🔧 `fn` `register` (L320)
+- ⚡ `async_fn` `route` (L323)
 
 ### `f/telegram_callback/main.py`
-- 🔧 `fn` `main` (L126)
+- 🔧 `fn` `main` (L137)
 
 ### `f/telegram_gateway/_gateway_logic.py`
 - 📦 `class` `TelegramClient` (L13)
@@ -1110,12 +1113,12 @@
 - ⚡ `async_fn` `get_list_avg` (L78)
 
 ### `f/telegram_gateway/worker.py`
-- ⚡ `async_fn` `startup` (L41)
-- ⚡ `async_fn` `shutdown` (L56)
-- ⚡ `async_fn` `process_telegram_update` (L64)
-- ⚡ `async_fn` `cron_auto_cancel_expired` (L391)
-- ⚡ `async_fn` `cron_gcal_reconcile` (L405)
-- 📦 `class` `WorkerSettings` (L421)
+- ⚡ `async_fn` `startup` (L43)
+- ⚡ `async_fn` `shutdown` (L58)
+- ⚡ `async_fn` `process_telegram_update` (L66)
+- ⚡ `async_fn` `cron_auto_cancel_expired` (L452)
+- ⚡ `async_fn` `cron_gcal_reconcile` (L466)
+- 📦 `class` `WorkerSettings` (L482)
 
 ### `f/telegram_menu/_menu_logic.py`
 - 🔧 `fn` `parse_user_option` (L13)

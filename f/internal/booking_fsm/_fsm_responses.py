@@ -79,11 +79,12 @@ def chunk_buttons(btns: list[InlineButton], size: int = 2) -> list[list[InlineBu
 
 def build_specialty_keyboard(items: list[NamedItem], session_id: str | None = None) -> list[list[InlineButton]]:
     suffix = f"|{session_id}" if session_id else ""
-    list_btns: list[InlineButton] = [
-        {"text": f"{it['name']}", "callback_data": f"spec:{it['id']}{suffix}"} for it in items
+    # 1 button per row with number prefix, consistent with main menu style
+    rows: list[list[InlineButton]] = [
+        [{"text": f"{i + 1}. {it['name']}", "callback_data": f"spec:{it['id']}{suffix}"}] for i, it in enumerate(items)
     ]
-    list_btns.append({"text": "🏠 Menú Principal", "callback_data": f"cancel{suffix}"})
-    return chunk_buttons(list_btns, size=2)
+    rows.append([{"text": "🏠 Menú Principal", "callback_data": f"cancel{suffix}"}])
+    return rows
 
 
 def build_doctor_keyboard(
@@ -99,11 +100,14 @@ def build_doctor_keyboard(
     end_idx = start_idx + page_size
     page_items = items[start_idx:end_idx]
 
-    list_btns: list[InlineButton] = [
-        {"text": f"{it['name']}", "callback_data": f"doc:{it['id']}{suffix}"} for it in page_items
+    # 1 button per row with number prefix, consistent with main menu style
+    global_offset = start_idx  # offset for correct numbering across pages
+    rows: list[list[InlineButton]] = [
+        [{"text": f"{global_offset + i + 1}. {it['name']}", "callback_data": f"doc:{it['id']}{suffix}"}]
+        for i, it in enumerate(page_items)
     ]
 
-    chunked = chunk_buttons(list_btns, size=2)
+    chunked = rows
 
     nav_row: list[InlineButton] = []
     if page > 1:
@@ -125,11 +129,10 @@ def build_doctor_keyboard(
 
 def build_time_slot_keyboard(items: list[TimeSlotItem], session_id: str | None = None) -> list[list[InlineButton]]:
     suffix = f"|{session_id}" if session_id else ""
-    list_btns: list[InlineButton] = [
-        {"text": f"{it['label']}", "callback_data": f"time:{it['id']}{suffix}"} for it in items
+    # 1 button per row — labels already contain full info (day + date + time)
+    chunked: list[list[InlineButton]] = [
+        [{"text": it["label"], "callback_data": f"time:{it['id']}{suffix}"}] for it in items
     ]
-
-    chunked = chunk_buttons(list_btns, size=2)
     chunked.append(
         [
             {"text": "⬅️ Volver", "callback_data": f"back{suffix}"},

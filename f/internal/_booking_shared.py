@@ -71,6 +71,7 @@ async def query_my_bookings(client_id: str, pg_url: str) -> list[dict[str, objec
             """
             SELECT
                 b.booking_id::text,
+                b.provider_id::text AS provider_id,
                 b.start_time,
                 b.status,
                 p.name  AS provider_name,
@@ -203,7 +204,12 @@ async def get_mis_citas_buttons(
     for r in rows:
         booking_id = str(r["booking_id"])
         short_id = booking_id[:8].upper()
-        buttons.append([{"text": f"❌ Cancelar Ref: {short_id}", "callback_data": f"cxl:{booking_id}{suffix}"}])
+        buttons.append(
+            [
+                {"text": f"🔄 Reagendar Ref: {short_id}", "callback_data": f"res:{booking_id}{suffix}"},
+                {"text": f"❌ Cancelar Ref: {short_id}", "callback_data": f"cxl:{booking_id}{suffix}"},
+            ]
+        )
 
     return buttons if buttons else None
 

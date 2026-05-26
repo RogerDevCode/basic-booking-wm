@@ -168,3 +168,23 @@ async def send_followup_message(
     except Exception as e:
         log("send_followup_message failed", error=str(e), module="telegram_callback")
         return False
+
+
+async def clean_message_reply_markup(
+    bot_token: str,
+    chat_id: str,
+    message_id: str,
+) -> bool:
+    url = f"https://api.telegram.org/bot{bot_token}/editMessageReplyMarkup"
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            payload: dict[str, object] = {
+                "chat_id": chat_id,
+                "message_id": int(message_id),
+                "reply_markup": {"inline_keyboard": []},
+            }
+            res = await client.post(url, json=payload)
+            return res.status_code == 200
+    except Exception as e:
+        log("clean_message_reply_markup failed", error=str(e), module="telegram_callback")
+        return False
