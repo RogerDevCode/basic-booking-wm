@@ -829,7 +829,7 @@ class TestParseActionAllMenuInputs:
 
     @pytest.mark.parametrize(
         "text",
-        ["volver", "back", "atras", "menu", "menú", "inicio"],
+        ["volver", "back", "atras"],
     )
     def test_parse_action_back_keywords(self, text: str) -> None:
         """Keywords de back → BackAction."""
@@ -838,7 +838,7 @@ class TestParseActionAllMenuInputs:
 
     @pytest.mark.parametrize(
         "text",
-        ["cancelar", "cancel", "no quiero"],
+        ["menu", "menú", "inicio", "cancelar", "cancel", "no quiero"],
     )
     def test_parse_action_cancel_keywords(self, text: str) -> None:
         """Keywords de cancel → CancelAction."""

@@ -8,9 +8,11 @@ import time
 import traceback
 from typing import Any, ClassVar, Final, cast
 
-from arq import Retry
+from arq import Retry, cron
 from arq.connections import RedisSettings
 
+from ..auto_cancel_expired.main import _main_async as run_auto_cancel_expired
+from ..gcal_reconcile.main import _main_async as run_gcal_reconcile
 from ..internal._db_client import create_db_client
 from ..internal._redis_client import create_redis_client
 from ..internal.ai_agent.main import _main_async as run_ai_agent
@@ -386,10 +388,44 @@ async def process_telegram_update(ctx: dict[str, Any], update_json: str, ingest_
         log_structured(logging.INFO, "worker_lock_released", chat_id=chat_id)
 
 
+async def cron_auto_cancel_expired(ctx: dict[str, Any]) -> None:
+    """Cron task to cancel expired pending bookings."""
+    log_structured(logging.INFO, "cron_auto_cancel_expired_started")
+    try:
+        res = await run_auto_cancel_expired()
+        log_structured(
+            logging.INFO,
+            "cron_auto_cancel_expired_completed",
+            cancelled_count=res.get("cancelled_count", 0),
+        )
+    except Exception as e:
+        log_structured(logging.ERROR, "cron_auto_cancel_expired_failed", error=str(e))
+
+
+async def cron_gcal_reconcile(ctx: dict[str, Any]) -> None:
+    """Cron task to reconcile Google Calendar events."""
+    log_structured(logging.INFO, "cron_gcal_reconcile_started")
+    try:
+        res = await run_gcal_reconcile({})
+        log_structured(
+            logging.INFO,
+            "cron_gcal_reconcile_completed",
+            processed=res.get("processed", 0),
+            synced=res.get("synced", 0),
+            failed=res.get("failed", 0),
+        )
+    except Exception as e:
+        log_structured(logging.ERROR, "cron_gcal_reconcile_failed", error=str(e))
+
+
 class WorkerSettings:
     """Settings required by arq CLI."""
 
     redis_settings = RedisSettings.from_dsn(REDIS_URL)
     functions: ClassVar[list[Any]] = [process_telegram_update]
+    cron_jobs: ClassVar[list[Any]] = [
+        cron(cron_auto_cancel_expired, unique=True, minute=None),  # Every minute
+        cron(cron_gcal_reconcile, unique=True, minute=set(range(0, 60, 5))),  # Every 5 minutes
+    ]
     on_startup = startup
     on_shutdown = shutdown

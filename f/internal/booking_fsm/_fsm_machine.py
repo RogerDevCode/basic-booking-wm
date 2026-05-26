@@ -83,9 +83,12 @@ def _is_time_slot_list(val: list[Any]) -> TypeIs[list[TimeSlotItem]]:
 def parse_action(text: str, timezone: str | None = None) -> BookingAction:
     trimmed = text.strip().lower()
 
-    if trimmed in ["volver", "back", "atras", "menu", "menú", "inicio"]:
+    if trimmed in ["volver", "back", "atras"]:
         return BackAction()
     if trimmed in [
+        "menu",
+        "menú",
+        "inicio",
         "cancelar",
         "cancel",
         "no quiero",

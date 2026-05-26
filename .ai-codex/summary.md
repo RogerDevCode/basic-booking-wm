@@ -585,10 +585,10 @@
 - 🔧 `fn` `get_main_menu_text` (L51)
 - 🔧 `fn` `get_main_menu_inline_buttons` (L64)
 - 🔧 `fn` `parse_action` (L83)
-- 🔧 `fn` `parse_callback_data` (L126)
-- 🔧 `fn` `apply_transition` (L164)
-- 🔧 `fn` `extract_draft_from_state` (L563)
-- 🔧 `fn` `flow_step_from_state` (L600)
+- 🔧 `fn` `parse_callback_data` (L129)
+- 🔧 `fn` `apply_transition` (L167)
+- 🔧 `fn` `extract_draft_from_state` (L566)
+- 🔧 `fn` `flow_step_from_state` (L603)
 
 ### `f/internal/booking_fsm/_fsm_models.py`
 - 📦 `class` `NamedItem` (L20)
@@ -687,7 +687,7 @@
 - ⚡ `async_fn` `handle_mis_citas` (L10)
 
 ### `f/internal/fsm_router/main.py`
-- 🔧 `fn` `main` (L655)
+- 🔧 `fn` `main` (L658)
 
 ### `f/internal/gcal_utils/_gcal_logic.py`
 - 🔧 `fn` `build_gcal_event` (L8)
@@ -1109,10 +1109,12 @@
 - ⚡ `async_fn` `get_list_avg` (L78)
 
 ### `f/telegram_gateway/worker.py`
-- ⚡ `async_fn` `startup` (L39)
-- ⚡ `async_fn` `shutdown` (L54)
-- ⚡ `async_fn` `process_telegram_update` (L62)
-- 📦 `class` `WorkerSettings` (L389)
+- ⚡ `async_fn` `startup` (L41)
+- ⚡ `async_fn` `shutdown` (L56)
+- ⚡ `async_fn` `process_telegram_update` (L64)
+- ⚡ `async_fn` `cron_auto_cancel_expired` (L391)
+- ⚡ `async_fn` `cron_gcal_reconcile` (L405)
+- 📦 `class` `WorkerSettings` (L421)
 
 ### `f/telegram_menu/_menu_logic.py`
 - 🔧 `fn` `parse_user_option` (L13)

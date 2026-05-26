@@ -69,6 +69,9 @@ _MODULE: Final[str] = "fsm_router"
 # Keywords that trigger an immediate abort to main menu (rule-based, no AI needed)
 _ABORT_KEYWORDS: Final[frozenset[str]] = frozenset(
     {
+        "menu",
+        "menú",
+        "inicio",
         "abandono",
         "aborto",
         "salir",
