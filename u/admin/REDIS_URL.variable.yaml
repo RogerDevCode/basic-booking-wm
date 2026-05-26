@@ -1,3 +1,0 @@
-value: "redis://redis:6379"
-is_secret: false
-description: "Redis connection URL"

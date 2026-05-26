@@ -1,1 +1,0 @@
-postgresql://windmill:windmill@db:5432/windmill?sslmode=disable&application_name=windmill&statement_cache_size=0
