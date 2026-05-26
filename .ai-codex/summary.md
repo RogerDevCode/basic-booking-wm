@@ -482,8 +482,8 @@
 
 ### `f/internal/_nlu_cache.py`
 - ⚡ `async_fn` `load_nlu_rules_to_redis` (L13)
-- ⚡ `async_fn` `ensure_nlu_cache` (L76)
-- 🔧 `fn` `get_nlu_rule` (L116)
+- ⚡ `async_fn` `ensure_nlu_cache` (L74)
+- 🔧 `fn` `get_nlu_rule` (L114)
 
 ### `f/internal/_redis_client.py`
 - ⚡ `async_fn` `create_redis_client` (L44)

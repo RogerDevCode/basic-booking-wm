@@ -41,9 +41,7 @@ async def load_nlu_rules_to_redis() -> None:
 
 
 _DEFAULT_NLU_RULES: dict[str, object] = {
-    "msg_main_menu": (
-        "📱 *Menú Principal*\n\n1️⃣ Agendar hora\n2️⃣ Mis horas\n3️⃣ Recordatorios\n4️⃣ Información\n5️⃣ Mis datos"
-    ),
+    "msg_main_menu": "📱 *Menú Principal*",
     "msg_slot_taken": "Ese horario ya fue reservado.",
     "msg_no_service": "No hay servicios.",
     "msg_generic": ("No pudimos confirmar tu hora en este momento. Por favor intenta de nuevo en unos minutos."),
