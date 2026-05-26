@@ -1,13 +1,3 @@
-{
-	layer4 {
-		:25 {
-			proxy {
-				to windmill_server:2525
-			}
-		}
-	}
-}
-
 {$BASE_URL} {
 	bind {$ADDRESS}
 	log {
@@ -15,22 +5,7 @@
 		format json
 	}
 
-	# Extra services: LSP, Multiplayer, Debugger (windmill_extra gateway)
-	reverse_proxy /ws/* /ws_mp/* /ws_debug/* http://windmill_extra:3000
-
 	# Telegram Gateway Webhook & Monitoring Routes
 	reverse_proxy /webhook/telegram http://telegram_gateway_api:8000
 	reverse_proxy /monitoring/metrics http://telegram_gateway_api:8000
-
-	# Search indexer, Enterprise Edition (windmill_indexer:8002)
-	# reverse_proxy /api/srch/* http://windmill_indexer:8002
-
-	# Default: Windmill server
-	reverse_proxy /* http://windmill_server:8000 {
-		header_up Host {header.X-Forwarded-Host}
-		header_up X-Forwarded-Proto {header.X-Forwarded-Proto}
-	}
-
-	# TLS with custom certificates
-	# tls /certs/cert.pem /certs/key.pem
 }
