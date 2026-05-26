@@ -49,26 +49,18 @@ from ._fsm_responses import (
 
 
 def get_main_menu_text() -> str:
-    default_text = (
-        "📱 *Menú Principal*\n\n"
-        "1. 📅 Agendar hora\n"
-        "2. 📋 Mis horas\n"
-        "3. 📊 Generar reporte\n"
-        "4. ⏰ Recordatorios\n"
-        "5. ℹ️ Información\n"  # noqa: RUF001
-        "6. 👤 Mis datos"
-    )
+    default_text = "📱 *Menú Principal*"
     return str(get_nlu_rule("msg_main_menu", default_text))
 
 
 def get_main_menu_inline_buttons() -> list[list[dict[str, str]]]:
     return [
-        [{"text": "📅 Agendar hora", "callback_data": "cmd:agendar"}],
-        [{"text": "📋 Mis horas", "callback_data": "cmd:mis_citas"}],
-        [{"text": "📊 Generar reporte", "callback_data": "cmd:reporte"}],
-        [{"text": "⏰ Recordatorios", "callback_data": "cmd:recordatorios"}],
-        [{"text": "ℹ️ Información", "callback_data": "cmd:info"}],  # noqa: RUF001
-        [{"text": "👤 Mis datos", "callback_data": "cmd:perfil"}],
+        [{"text": "1. 📅 Agendar hora", "callback_data": "cmd:agendar"}],
+        [{"text": "2. 📋 Mis horas", "callback_data": "cmd:mis_citas"}],
+        [{"text": "3. 📊 Generar reporte", "callback_data": "cmd:reporte"}],
+        [{"text": "4. ⏰ Recordatorios", "callback_data": "cmd:recordatorios"}],
+        [{"text": "5. ℹ️ Información", "callback_data": "cmd:info"}],  # noqa: RUF001
+        [{"text": "6. 👤 Mis datos", "callback_data": "cmd:perfil"}],
     ]
 
 

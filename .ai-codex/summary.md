@@ -583,12 +583,12 @@
 
 ### `f/internal/booking_fsm/_fsm_machine.py`
 - 🔧 `fn` `get_main_menu_text` (L51)
-- 🔧 `fn` `get_main_menu_inline_buttons` (L64)
-- 🔧 `fn` `parse_action` (L83)
-- 🔧 `fn` `parse_callback_data` (L129)
-- 🔧 `fn` `apply_transition` (L167)
-- 🔧 `fn` `extract_draft_from_state` (L566)
-- 🔧 `fn` `flow_step_from_state` (L603)
+- 🔧 `fn` `get_main_menu_inline_buttons` (L56)
+- 🔧 `fn` `parse_action` (L75)
+- 🔧 `fn` `parse_callback_data` (L121)
+- 🔧 `fn` `apply_transition` (L159)
+- 🔧 `fn` `extract_draft_from_state` (L558)
+- 🔧 `fn` `flow_step_from_state` (L595)
 
 ### `f/internal/booking_fsm/_fsm_models.py`
 - 📦 `class` `NamedItem` (L20)
