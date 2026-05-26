@@ -1,0 +1,37 @@
+includes:
+  - f/**
+excludes:
+  - "**/*.d.ts"
+  - "**/*.test.ts"
+  - "**/*.spec.ts"
+  - "**/__init__.py"
+  - "**/__pycache__/**"
+  - "f/types.ts"
+defaultTs: bun
+# NOTE: Windmill CLI no soporta defaultPy. Todo lock en este repo debe quedar
+# en `# py: 3.13`, y `sync-fast.sh` valida/corrige cualquier desvío.
+# Mantén también el default del servidor en Windmill UI → Settings → Default Python version → 3.13.x
+codebases: []
+skipVariables: false
+skipResources: false
+skipResourceTypes: false
+skipSecrets: true
+skipScripts: false
+skipFlows: false
+skipApps: false
+skipFolders: false
+includeSchedules: false
+includeTriggers: true
+includeUsers: false
+includeGroups: false
+includeSettings: false
+includeKey: false
+skipWorkspaceDependencies: false
+nonDottedPaths: true
+workspaces:
+  booking-titanium:
+    baseUrl: https://titanium.stax.ink/
+    gitBranch: main
+    gitSyncInterval: 300
+    gitAutoCommit: true
+    gitAutoCommitMessage: "chore: auto-commit from Windmill"
