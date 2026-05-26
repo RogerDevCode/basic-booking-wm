@@ -432,9 +432,10 @@
 ### `f/internal/_conversation_tx.py`
 - 📦 `class` `ConversationConflictError` (L29)
 - 📦 `class` `ConversationSnapshot` (L34)
-- ⚡ `async_fn` `read_state` (L61)
-- ⚡ `async_fn` `write_state` (L82)
-- ⚡ `async_fn` `invalidate_cache` (L140)
+- 🔧 `fn` `model_dump` (L46)
+- ⚡ `async_fn` `read_state` (L66)
+- ⚡ `async_fn` `write_state` (L87)
+- ⚡ `async_fn` `invalidate_cache` (L145)
 
 ### `f/internal/_crypto.py`
 - 🔧 `fn` `hash_password` (L19)

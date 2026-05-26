@@ -43,6 +43,11 @@ class ConversationSnapshot:
     version: int = 0
     is_new: bool = False
 
+    def model_dump(self) -> dict[str, Any]:
+        import dataclasses
+
+        return dataclasses.asdict(self)
+
 
 def _parse_jsonb(raw: object) -> dict[str, Any]:
     """Parse a JSONB value from asyncpg (could be str or dict)."""
