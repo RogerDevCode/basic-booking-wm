@@ -32,7 +32,7 @@ import jwt
 
 from ..internal._db_client import create_db_client
 from ..internal._result import with_admin_context
-from ..internal._wmill_adapter import log
+from ..internal._wmill_adapter import get_variable_strict, log
 from ._login_logic import verify_password_sync
 from ._login_models import InputSchema, LoginResult, UserRow
 
@@ -92,9 +92,7 @@ async def _main_async(args: dict[str, Any]) -> LoginResult:
             await conn.execute("UPDATE users SET last_login = NOW() WHERE user_id = $1::uuid", user["user_id"])
 
             # Generate JWT
-            import wmill as _wmill
-
-            secret = str(_wmill.get_variable("u/admin/ENCRYPTION_KEY"))
+            secret = get_variable_strict("u/admin/ENCRYPTION_KEY")
             payload = {
                 "sub": user["user_id"],
                 "role": user["role"],

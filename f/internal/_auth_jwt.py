@@ -2,6 +2,8 @@ from typing import TypedDict
 
 import jwt
 
+from ._wmill_adapter import get_variable_strict
+
 
 class TokenPayload(TypedDict):
     sub: str
@@ -9,14 +11,7 @@ class TokenPayload(TypedDict):
 
 
 def verify_access_token(token: str) -> TokenPayload:
-    try:
-        import wmill as _wmill
-
-        secret = str(_wmill.get_variable("u/admin/ENCRYPTION_KEY"))
-    except ImportError:
-        import os
-
-        secret = os.environ.get("ENCRYPTION_KEY", "")
+    secret = get_variable_strict("u/admin/ENCRYPTION_KEY")
     if not secret:
         raise RuntimeError("ENCRYPTION_KEY not configured")
     try:

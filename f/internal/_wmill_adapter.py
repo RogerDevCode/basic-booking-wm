@@ -2,6 +2,7 @@ from __future__ import annotations
 
 # Windmill Adapter Core
 import logging
+import os
 from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
@@ -30,10 +31,17 @@ def is_dict_str_obj(val: object) -> TypeIs[dict[str, object]]:
 
 def get_variable_strict(path: str) -> str:
     """Get variable; raises on any error. For gradual migration from get_variable."""
+    env_name = path.split("/")[-1]
+    if env_name in os.environ:
+        return os.environ[env_name]
+
     val = wmill.get_variable(path)
     if val is None:
         raise ValueError(f"Variable not found: {path}")
-    return str(val)
+    val_str = str(val)
+    if "MagicMock" in val_str or "<MagicMock" in val_str:
+        raise ValueError(f"Variable not found (mock active): {path}")
+    return val_str
 
 
 def get_resource_strict(path: str) -> dict[str, object]:
@@ -46,6 +54,10 @@ def get_resource_strict(path: str) -> dict[str, object]:
 
 def get_variable(path: str) -> str | None:
     """Wrapper for backward compatibility, returns None on failure."""
+    env_name = path.split("/")[-1]
+    if env_name in os.environ:
+        return os.environ[env_name]
+
     try:
         val = wmill.get_variable(path)
         if val is None:
