@@ -17,19 +17,23 @@ async def load_nlu_rules_to_redis() -> None:
         rows = await db.fetch("SELECT rule_key, threshold_value, keywords FROM nlu_rules")
         redis_client = await create_redis_client()
         try:
-            async with redis_client.pipeline(transaction=True) as pipe:
-                for row in rows:
-                    key = f"booking:nlu_rule:{row['rule_key']}"
-                    keywords = row.get("keywords")
-                    threshold_value = row.get("threshold_value")
-                    if keywords is not None:
-                        if isinstance(keywords, str):
-                            pipe.set(key, keywords)
-                        else:
-                            pipe.set(key, json.dumps(keywords))
-                    elif threshold_value is not None:
-                        pipe.set(key, str(threshold_value))
-                await pipe.execute()
+            # Delete old rules to ensure clean sync
+            await redis_client.delete("booking:nlu_rules")
+            rules_to_set: dict[str, str] = {}
+            for row in rows:
+                key = str(row["rule_key"])
+                keywords = row.get("keywords")
+                threshold_value = row.get("threshold_value")
+                if keywords is not None:
+                    if isinstance(keywords, str):
+                        rules_to_set[key] = keywords
+                    else:
+                        rules_to_set[key] = json.dumps(keywords)
+                elif threshold_value is not None:
+                    rules_to_set[key] = str(threshold_value)
+
+            if rules_to_set:
+                await redis_client.hset("booking:nlu_rules", mapping=rules_to_set)  # type: ignore[misc]
         finally:
             await redis_client.aclose()
     finally:
@@ -82,22 +86,19 @@ async def ensure_nlu_cache() -> None:
         # Try loading from Redis first
         redis_client = await create_redis_client()
         try:
-            keys = cast("list[str]", await redis_client.keys("booking:nlu_rule:*"))  # pyright: ignore[reportUnknownMemberType]
+            rules = cast("dict[str, str]", await redis_client.hgetall("booking:nlu_rules"))  # type: ignore[misc]
 
-            if not keys:
+            if not rules:
                 # Load from DB to Redis
                 await load_nlu_rules_to_redis()
-                keys = cast("list[str]", await redis_client.keys("booking:nlu_rule:*"))  # pyright: ignore[reportUnknownMemberType]
+                rules = cast("dict[str, str]", await redis_client.hgetall("booking:nlu_rules"))  # type: ignore[misc]
 
-            if not keys:
+            if not rules:
                 return
 
-            # Fetch all from Redis
-            values = cast("list[str | None]", await redis_client.mget(keys))
-            for k, v in zip(keys, values, strict=False):
+            for key_name, v in rules.items():
                 if not v:
                     continue
-                key_name = k.replace("booking:nlu_rule:", "")
                 try:
                     _NLU_CACHE[key_name] = json.loads(v)
                 except json.JSONDecodeError:

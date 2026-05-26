@@ -105,9 +105,10 @@ _FSM_INTERRUPT_THRESHOLD: float = 0.7
 _MENU_NUMERIC_INTENT_MAP: Final[dict[str, str]] = {
     "1": "crear_cita",
     "2": "ver_mis_citas",
-    "3": "cancelar_cita",
+    "3": "generar_reporte",
     "4": "activar_recordatorios",
-    "5": "ver_mis_datos",
+    "5": "pregunta_general",
+    "6": "ver_mis_datos",
 }
 
 
@@ -475,13 +476,14 @@ async def _route_impl(input_data: RouterInput) -> RouterResult:
     try:
         # Handle booking intent from idle — translate to keyword-based FSM
         if current_state_name == "idle" and not is_callback:
-            ai_conf = input_data.ai_confidence or 0.0
-            intent = ""
-            if input_data.ai_intent and ai_conf > 0.6:
-                intent = input_data.ai_intent
-            else:
-                nlu_res = classify_intent(user_input.strip())
-                intent = str(nlu_res["intent"]) if nlu_res["confidence"] > 0.6 else ""
+            ai_conf = 1.0 if _injected_intent else (input_data.ai_confidence or 0.0)
+            intent = _injected_intent or ""
+            if not intent:
+                if input_data.ai_intent and ai_conf > 0.6:
+                    intent = input_data.ai_intent
+                else:
+                    nlu_res = classify_intent(user_input.strip())
+                    intent = str(nlu_res["intent"]) if nlu_res["confidence"] > 0.6 else ""
 
             if intent in ("crear_cita", "ver_disponibilidad"):
                 if not input_data.client_id:

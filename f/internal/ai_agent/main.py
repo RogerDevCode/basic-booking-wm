@@ -118,56 +118,64 @@ async def _main_async(args: dict[str, Any]) -> dict[str, Any]:
         provider = "fast-path"
     else:
         log("FAST_PATH_MISS", text=text, booking_state=booking_state_name, module=MODULE)
-        # 2.2 GADK Primary — single call to Gemini via ADK with tool calling
-        gadk_start = int(time.time() * 1000)
-        gadk_result = await classify_with_gadk(text, input_data.chat_id)
-        gadk_latency = int(time.time() * 1000) - gadk_start
 
-        if gadk_result and gadk_result.get("intent") != INTENT["DESCONOCIDO"]:
-            intent = gadk_result["intent"]
-            confidence = gadk_result["confidence"]
-            gadk_entities = gadk_result.get("entities", {})
-            provider = "gadk"
-            cot_reasoning = f"GADK classification (latency={gadk_latency}ms)"
-            log("GADK classification", intent=intent, confidence=confidence, latency_ms=gadk_latency)
+        # 2.2 TF-IDF Primary Check
+        tfidf = classify_intent(text)
+        has_enough = len(text.split()) >= 2
+
+        if tfidf["confidence"] >= 0.85 and has_enough:
+            intent = str(tfidf["intent"])
+            confidence = float(tfidf["confidence"])
+            cot_reasoning = f"TF-IDF semantic match ({intent})"
+            log("TF-IDF bypass GADK", intent=intent, confidence=confidence, module=MODULE)
         else:
-            # 2.3 Fallback: TF-IDF
-            log("GADK failed or unknown, falling back to TF-IDF", latency_ms=gadk_latency)
-            tfidf = classify_intent(text)
-            has_enough = len(text.split()) >= 2
-            if tfidf["confidence"] >= float(get_nlu_rule("escalation_tfidf_minimum", 0.4)) and has_enough:
-                intent = str(tfidf["intent"])
-                confidence = float(tfidf["confidence"])
-                cot_reasoning = f"TF-IDF semantic match ({intent})"
+            # 2.3 GADK Fallback — single call to Gemini via ADK with tool calling
+            gadk_start = int(time.time() * 1000)
+            gadk_result = await classify_with_gadk(text, input_data.chat_id)
+            gadk_latency = int(time.time() * 1000) - gadk_start
 
-            # 2.4 LLM Path (only if TF-IDF confidence is low or unknown)
-            rag_context = None
-            tfidf_confident = confidence >= 0.9
-            if not tfidf_confident and intent in [INTENT["PREGUNTA_GENERAL"], INTENT["DESCONOCIDO"]]:
-                try:
-                    rag_res = await build_rag_context(
-                        input_data.provider_id, text, pg_url=str(pg_url) if pg_url else None
-                    )
-                    rag_context = rag_res["context"]
-                except Exception as e:
-                    log("RAG_CONTEXT_FAILED", error=str(e), chat_id=input_data.chat_id, module=MODULE)
-                    rag_context = None
+            if gadk_result and gadk_result.get("intent") != INTENT["DESCONOCIDO"]:
+                intent = gadk_result["intent"]
+                confidence = gadk_result["confidence"]
+                gadk_entities = gadk_result.get("entities", {})
+                provider = "gadk"
+                cot_reasoning = f"GADK classification (latency={gadk_latency}ms)"
+                log("GADK classification", intent=intent, confidence=confidence, latency_ms=gadk_latency)
+            else:
+                log("GADK failed or unknown, falling back to TF-IDF", latency_ms=gadk_latency)
+                if tfidf["confidence"] >= float(get_nlu_rule("escalation_tfidf_minimum", 0.4)) and has_enough:
+                    intent = str(tfidf["intent"])
+                    confidence = float(tfidf["confidence"])
+                    cot_reasoning = f"TF-IDF semantic match ({intent})"
 
-                sys_prompt = build_system_prompt(rag_context)
-                user_msg = build_user_message(text)
-
-                err_llm, llm_res = await call_llm(sys_prompt, user_msg)
-                if not err_llm and llm_res:
+                # 2.4 LLM Path (only if TF-IDF confidence is low or unknown)
+                rag_context = None
+                tfidf_confident = confidence >= 0.9
+                if not tfidf_confident and intent in [INTENT["PREGUNTA_GENERAL"], INTENT["DESCONOCIDO"]]:
                     try:
-                        cleaned = sanitize_json_response(llm_res.content)
-                        raw_json = json.loads(cleaned)
-                        llm_out = LLMOutput.model_validate(raw_json)
-                        intent = llm_out.intent
-                        confidence = llm_out.confidence
-                        provider = llm_res.provider
-                        cot_reasoning = "LLM classification (fallback)"
+                        rag_res = await build_rag_context(
+                            input_data.provider_id, text, pg_url=str(pg_url) if pg_url else None
+                        )
+                        rag_context = rag_res["context"]
                     except Exception as e:
-                        log("LLM response parse failed", error=str(e), content=llm_res.content)
+                        log("RAG_CONTEXT_FAILED", error=str(e), chat_id=input_data.chat_id, module=MODULE)
+                        rag_context = None
+
+                    sys_prompt = build_system_prompt(rag_context)
+                    user_msg = build_user_message(text)
+
+                    err_llm, llm_res = await call_llm(sys_prompt, user_msg)
+                    if not err_llm and llm_res:
+                        try:
+                            cleaned = sanitize_json_response(llm_res.content)
+                            raw_json = json.loads(cleaned)
+                            llm_out = LLMOutput.model_validate(raw_json)
+                            intent = llm_out.intent
+                            confidence = llm_out.confidence
+                            provider = llm_res.provider
+                            cot_reasoning = "LLM classification (fallback)"
+                        except Exception as e:
+                            log("LLM response parse failed", error=str(e), content=llm_res.content)
 
     # 2.5 Context Adjustment
     adj = adjust_intent_with_context(text, intent, confidence, input_data.conversation_state)

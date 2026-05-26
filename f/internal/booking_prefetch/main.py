@@ -66,40 +66,29 @@ async def _fetch_slots_for_doctor(
     target_date: str | None = None,
 ) -> list[dict[str, object]]:
     row = await db.fetchrow(
-        "SELECT service_id FROM services WHERE provider_id = $1::uuid LIMIT 1",
-        doctor_id,
-    )
-    if not row:
-        return []
-    service_id = str(row["service_id"])
-
-    # Get provider timezone and booking preferences
-    # NOTE: ui_preferences column may not exist if migration 018 not applied yet
-    pref_row = await db.fetchrow(
         """
-        SELECT t.name as tz_name
+        SELECT 
+            s.service_id::text, 
+            COALESCE(t.name, 'UTC') AS tz_name,
+            p.ui_preferences
         FROM providers p
         LEFT JOIN timezones t ON t.id = p.timezone_id
+        LEFT JOIN services s ON s.provider_id = p.provider_id AND s.is_active = true
         WHERE p.provider_id = $1::uuid
+        LIMIT 1
         """,
         doctor_id,
     )
-    require_advance = False
-    provider_tz = "UTC"
-    if pref_row and pref_row["tz_name"]:
-        provider_tz = str(pref_row["tz_name"])
+    if not row or not row["service_id"]:
+        return []
 
-    # Try to fetch ui_preferences if column exists (migration 018)
-    try:
-        prefs_row = await db.fetchrow(
-            "SELECT ui_preferences FROM providers WHERE provider_id = $1::uuid",
-            doctor_id,
-        )
-        if prefs_row and isinstance(prefs_row["ui_preferences"], dict):
-            prefs = cast("dict[str, object]", prefs_row["ui_preferences"])
-            require_advance = bool(prefs.get("require_advance_booking", False))
-    except Exception:
-        pass  # Column not yet migrated; default require_advance=False
+    service_id = str(row["service_id"])
+    provider_tz = str(row["tz_name"])
+
+    require_advance = False
+    if row["ui_preferences"] and isinstance(row["ui_preferences"], dict):
+        prefs = cast("dict[str, object]", row["ui_preferences"])
+        require_advance = bool(prefs.get("require_advance_booking", False))
 
     # Use provider's local date as "today", not the server's UTC date
     tz = zoneinfo.ZoneInfo(provider_tz)

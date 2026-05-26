@@ -3,12 +3,7 @@
   "mcpServers": {
     "codebase-index": {
       "command": "uv",
-      "args": [
-        "run",
-        "python",
-        "-m",
-        "mcp_codebase_index.server"
-      ],
+      "args": ["run", "python", "-m", "mcp_codebase_index.server"],
       "env": {
         "PROJECT_ROOT": "${workspaceFolder}"
       }
@@ -37,10 +32,7 @@
     },
     "github": {
       "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-github"
-      ],
+      "args": ["-y", "@modelcontextprotocol/server-github"],
       "env": {
         "GITHUB_TOKEN": "$GITHUB_TOKEN"
       }
@@ -54,7 +46,6 @@
     }
   },
   "ui": {
-    "theme": "ANSI Dark",
     "hideBanner": false,
     "hideTips": false,
     "footer": {
@@ -70,9 +61,7 @@
     }
   },
   "context": {
-    "fileName": [
-      "AGENTS.md"
-    ],
+    "fileName": ["AGENTS.md"],
     "fileFiltering": {
       "respectGitIgnore": true,
       "respectGeminiIgnore": true
@@ -94,9 +83,6 @@
     "enabled": false
   },
   "advanced": {
-    "excludedEnvVars": [
-      "WINDMILL_MCP_TOKEN",
-      "GITHUB_TOKEN"
-    ]
+    "excludedEnvVars": ["WINDMILL_MCP_TOKEN", "GITHUB_TOKEN"]
   }
 }

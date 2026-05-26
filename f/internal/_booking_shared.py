@@ -125,13 +125,19 @@ async def resolve_provider_by_name(
         await db.close()
 
 
-async def get_mis_citas_text(client_id: str, pg_url: str, chat_id: str) -> str | None:
+async def get_mis_citas_text(
+    client_id: str,
+    pg_url: str,
+    chat_id: str,
+    rows: list[dict[str, object]] | None = None,
+) -> str | None:
     """Returns the formatted text for 'Mis Citas' or None if error/no results."""
-    try:
-        rows = await query_my_bookings(client_id, pg_url)
-    except Exception as e:
-        log("MY_BOOKINGS_QUERY_ERROR", error=str(e), chat_id=chat_id, module=MODULE)
-        return None
+    if rows is None:
+        try:
+            rows = await query_my_bookings(client_id, pg_url)
+        except Exception as e:
+            log("MY_BOOKINGS_QUERY_ERROR", error=str(e), chat_id=chat_id, module=MODULE)
+            return None
 
     if not rows:
         return None
@@ -161,7 +167,10 @@ async def get_mis_citas_text(client_id: str, pg_url: str, chat_id: str) -> str |
 
 
 async def get_mis_citas_buttons(
-    client_id: str, pg_url: str, session_id: str | None = None
+    client_id: str,
+    pg_url: str,
+    session_id: str | None = None,
+    rows: list[dict[str, object]] | None = None,
 ) -> list[list[dict[str, str]]] | None:
     """Returns the inline buttons for 'Mis Citas' (Cancel buttons + Wallet)."""
     from ._wallet_logic import get_fast_track_option
@@ -185,14 +194,16 @@ async def get_mis_citas_buttons(
         pass
 
     # 2. Add Cancel buttons
-    try:
-        rows = await query_my_bookings(client_id, pg_url)
-        for r in rows:
-            booking_id = str(r["booking_id"])
-            short_id = booking_id[:8].upper()
-            buttons.append([{"text": f"❌ Cancelar Ref: {short_id}", "callback_data": f"cxl:{booking_id}{suffix}"}])
-    except Exception:
-        pass
+    if rows is None:
+        try:
+            rows = await query_my_bookings(client_id, pg_url)
+        except Exception:
+            rows = []
+
+    for r in rows:
+        booking_id = str(r["booking_id"])
+        short_id = booking_id[:8].upper()
+        buttons.append([{"text": f"❌ Cancelar Ref: {short_id}", "callback_data": f"cxl:{booking_id}{suffix}"}])
 
     return buttons if buttons else None
 
@@ -200,7 +211,13 @@ async def get_mis_citas_buttons(
 async def get_mis_citas_data(
     client_id: str, pg_url: str, chat_id: str, session_id: str | None = None
 ) -> tuple[str | None, list[list[dict[str, str]]] | None]:
-    """Legacy/Helper for data tuple."""
-    text = await get_mis_citas_text(client_id, pg_url, chat_id)
-    btns = await get_mis_citas_buttons(client_id, pg_url, session_id=session_id)
+    """Helper to fetch bookings once and format both text and buttons."""
+    try:
+        rows = await query_my_bookings(client_id, pg_url)
+    except Exception as e:
+        log("MY_BOOKINGS_QUERY_ERROR", error=str(e), chat_id=chat_id, module=MODULE)
+        return None, None
+
+    text = await get_mis_citas_text(client_id, pg_url, chat_id, rows=rows)
+    btns = await get_mis_citas_buttons(client_id, pg_url, session_id=session_id, rows=rows)
     return text, btns

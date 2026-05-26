@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+import asyncio
 import contextlib
-import json
 import logging
 import os
 import time
@@ -33,6 +33,7 @@ MODULE: Final[str] = "telegram_worker"
 TELEGRAM_BOT_TOKEN: Final[str] = os.getenv("TELEGRAM_BOT_TOKEN", "")
 DATABASE_URL: Final[str] = os.getenv("DATABASE_URL", "")
 REDIS_URL: Final[str] = os.getenv("REDIS_URL", "redis://redis:6379")
+_BACKGROUND_TASKS: Final[set[asyncio.Task[Any]]] = set()
 
 
 async def startup(ctx: dict[str, Any]) -> None:
@@ -118,8 +119,8 @@ async def process_telegram_update(ctx: dict[str, Any], update_json: str, ingest_
             chat_id=chat_id,
             update_id=update.update_id,
         )
-        # Defer job processing for 1.0 second, allowing active job to release lock
-        raise Retry(defer=1.0)
+        # Defer job processing for 0.3 seconds, aligning with the new low-latency FSM execution time
+        raise Retry(defer=0.3)
 
     try:
         log_structured(logging.INFO, "update_intake_received", chat_id=chat_id, update_id=update.update_id)
@@ -320,13 +321,20 @@ async def process_telegram_update(ctx: dict[str, Any], update_json: str, ingest_
 
         # Dismiss spinner for callback queries
         if callback_query_id:
-            import urllib.request
+            import httpx
 
-            url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/answerCallbackQuery"
-            body = json.dumps({"callback_query_id": callback_query_id}).encode()
-            req = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json"})
-            with contextlib.suppress(Exception):
-                urllib.request.urlopen(req, timeout=2)
+            async def _dismiss_spinner() -> None:
+                url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/answerCallbackQuery"
+                try:
+                    async with httpx.AsyncClient() as client:
+                        await client.post(url, json={"callback_query_id": callback_query_id}, timeout=2.0)
+                except Exception:
+                    pass  # Non-fatal
+
+            # Fire-and-forget (do not await)
+            _dismiss_task = asyncio.create_task(_dismiss_spinner())
+            _BACKGROUND_TASKS.add(_dismiss_task)
+            _dismiss_task.add_done_callback(_BACKGROUND_TASKS.discard)
 
         # Call send_telegram_response
         send_args: dict[str, object] = {

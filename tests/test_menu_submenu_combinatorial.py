@@ -199,9 +199,9 @@ class TestLevel1MenuPrincipal:
     # --- 3. Recordatorios ---
 
     @pytest.mark.asyncio
-    async def test_idle_recordatorios_keyword_3_not_handled_by_fsm(self) -> None:
-        """Tecla '3' desde idle → not handled by FSM (delegated to conversational router)."""
-        args = _args(user_input="3", ai_intent="activar_recordatorios", ai_confidence=0.95)
+    async def test_idle_recordatorios_keyword_4_not_handled_by_fsm(self) -> None:
+        """Tecla '4' desde idle → not handled by FSM (delegated to conversational router)."""
+        args = _args(user_input="4", ai_intent="activar_recordatorios", ai_confidence=0.95)
         with patch("f.internal._nlu_cache.ensure_nlu_cache", AsyncMock()):
             res = await _main_async(args)
         data = cast("dict[str, Any]", res["data"])

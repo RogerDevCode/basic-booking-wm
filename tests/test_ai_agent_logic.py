@@ -95,9 +95,18 @@ class TestAIAgentLogic:
         assert res is not None
         assert res[0] == INTENT["VER_MIS_CITAS"]
 
-    def test_detect_menu_command_recordatorios_digit_returns_activar(self) -> None:
+    def test_detect_menu_command_reporte_digit_returns_generar_reporte(self) -> None:
         # Arrange
         text = "3"
+        # Act
+        res = detect_menu_command(text)
+        # Assert
+        assert res is not None
+        assert res[0] == INTENT["GENERAR_REPORTE"]
+
+    def test_detect_menu_command_recordatorios_digit_returns_activar(self) -> None:
+        # Arrange
+        text = "4"
         # Act
         res = detect_menu_command(text)
         # Assert
@@ -106,7 +115,7 @@ class TestAIAgentLogic:
 
     def test_detect_menu_command_info_digit_returns_pregunta_general(self) -> None:
         # Arrange
-        text = "4"
+        text = "5"
         # Act
         res = detect_menu_command(text)
         # Assert
@@ -115,7 +124,7 @@ class TestAIAgentLogic:
 
     def test_detect_menu_command_mis_datos_digit_returns_ver_mis_datos(self) -> None:
         # Arrange
-        text = "5"
+        text = "6"
         # Act
         res = detect_menu_command(text)
         # Assert

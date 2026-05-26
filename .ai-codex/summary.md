@@ -417,8 +417,8 @@
 - ⚡ `async_fn` `query_my_bookings` (L65)
 - ⚡ `async_fn` `resolve_provider_by_name` (L96)
 - ⚡ `async_fn` `get_mis_citas_text` (L128)
-- ⚡ `async_fn` `get_mis_citas_buttons` (L163)
-- ⚡ `async_fn` `get_mis_citas_data` (L200)
+- ⚡ `async_fn` `get_mis_citas_buttons` (L169)
+- ⚡ `async_fn` `get_mis_citas_data` (L211)
 
 ### `f/internal/_booking_utils.py`
 - 📦 `class` `ActiveBookingInfo` (L9)
@@ -482,11 +482,11 @@
 
 ### `f/internal/_nlu_cache.py`
 - ⚡ `async_fn` `load_nlu_rules_to_redis` (L13)
-- ⚡ `async_fn` `ensure_nlu_cache` (L72)
-- 🔧 `fn` `get_nlu_rule` (L115)
+- ⚡ `async_fn` `ensure_nlu_cache` (L76)
+- 🔧 `fn` `get_nlu_rule` (L116)
 
 ### `f/internal/_redis_client.py`
-- ⚡ `async_fn` `create_redis_client` (L42)
+- ⚡ `async_fn` `create_redis_client` (L44)
 
 ### `f/internal/_report_logic.py`
 - 📦 `class` `ReportData` (L19)
@@ -510,13 +510,13 @@
 - ⚡ `async_fn` `get_fast_track_option` (L24)
 
 ### `f/internal/_wmill_adapter.py`
-- 🔧 `fn` `is_dict_str_obj` (L23)
-- 🔧 `fn` `get_variable_strict` (L30)
-- 🔧 `fn` `get_resource_strict` (L38)
-- 🔧 `fn` `get_variable` (L46)
-- 🔧 `fn` `get_resource` (L62)
-- 🔧 `fn` `run_script` (L74)
-- 🔧 `fn` `log` (L104)
+- 🔧 `fn` `is_dict_str_obj` (L24)
+- 🔧 `fn` `get_variable_strict` (L31)
+- 🔧 `fn` `get_resource_strict` (L39)
+- 🔧 `fn` `get_variable` (L47)
+- 🔧 `fn` `get_resource` (L63)
+- 🔧 `fn` `run_script` (L75)
+- 🔧 `fn` `log` (L105)
 
 ### `f/internal/ai_agent/_ai_agent_logic.py`
 - 🔧 `fn` `compute_requires_fsm_routing` (L60)
@@ -528,7 +528,7 @@
 - 🔧 `fn` `determine_escalation_level` (L312)
 - 🔧 `fn` `generate_ai_response` (L337)
 - 🔧 `fn` `detect_social` (L354)
-- 🔧 `fn` `detect_menu_command` (L408)
+- 🔧 `fn` `detect_menu_command` (L409)
 
 ### `f/internal/ai_agent/_ai_agent_models.py`
 - 📦 `class` `ConversationState` (L11)
@@ -571,7 +571,7 @@
 - ⚡ `async_fn` `get_rag_context` (L68)
 
 ### `f/internal/ai_agent/main.py`
-- 🔧 `fn` `main` (L234)
+- 🔧 `fn` `main` (L242)
 
 ### `f/internal/apply_fix_migration.py`
 - 🔧 `fn` `main` (L37)
@@ -629,7 +629,7 @@
 - 🔧 `fn` `build_confirmation_keyboard` (L142)
 
 ### `f/internal/booking_prefetch/main.py`
-- 🔧 `fn` `main` (L301)
+- 🔧 `fn` `main` (L290)
 
 ### `f/internal/client_register/main.py`
 - 🔧 `fn` `main` (L73)
@@ -659,7 +659,7 @@
 ### `f/internal/conversational_router/main.py`
 - 📦 `class` `ConversationalInput` (L44)
 - 📦 `class` `ConversationalResult` (L59)
-- 🔧 `fn` `main` (L276)
+- 🔧 `fn` `main` (L274)
 
 ### `f/internal/debug_db.py`
 - 🔧 `fn` `main` (L22)
@@ -687,7 +687,7 @@
 - ⚡ `async_fn` `handle_mis_citas` (L10)
 
 ### `f/internal/fsm_router/main.py`
-- 🔧 `fn` `main` (L653)
+- 🔧 `fn` `main` (L655)
 
 ### `f/internal/gcal_utils/_gcal_logic.py`
 - 🔧 `fn` `build_gcal_event` (L8)
@@ -1109,10 +1109,10 @@
 - ⚡ `async_fn` `get_list_avg` (L78)
 
 ### `f/telegram_gateway/worker.py`
-- ⚡ `async_fn` `startup` (L38)
-- ⚡ `async_fn` `shutdown` (L53)
-- ⚡ `async_fn` `process_telegram_update` (L61)
-- 📦 `class` `WorkerSettings` (L381)
+- ⚡ `async_fn` `startup` (L39)
+- ⚡ `async_fn` `shutdown` (L54)
+- ⚡ `async_fn` `process_telegram_update` (L62)
+- 📦 `class` `WorkerSettings` (L389)
 
 ### `f/telegram_menu/_menu_logic.py`
 - 🔧 `fn` `parse_user_option` (L13)

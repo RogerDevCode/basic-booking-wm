@@ -103,9 +103,9 @@ class TestTelegramRouterMainMenu:
             "pg_url": "postgresql://test:test@localhost:5432/test",
         }
         with patch(
-            "f.internal.fsm_router.handlers._wallet_handler.get_mis_citas_text", new_callable=AsyncMock
+            "f.internal.fsm_router.handlers._wallet_handler.get_mis_citas_data", new_callable=AsyncMock
         ) as mock_query:
-            mock_query.return_value = "Tus citas..."
+            mock_query.return_value = ("Tus citas...", None)
             res = await main(args)
             data = cast("dict[str, Any]", res["data"])
             assert data["handled"] is True

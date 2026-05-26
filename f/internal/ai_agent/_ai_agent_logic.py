@@ -400,9 +400,10 @@ _MENU_MIS_CITAS: frozenset[str] = frozenset(
         "ver mis horas",
     }
 )
-_MENU_RECORDATORIOS: frozenset[str] = frozenset({"3", "recordatorios", "recordatorio"})
-_MENU_INFO: frozenset[str] = frozenset({"4", "informacion", "información", "info"})
-_MENU_MIS_DATOS: frozenset[str] = frozenset({"5", "mis datos", "datos", "mi perfil", "perfil", "ver mis datos"})
+_MENU_RECORDATORIOS: frozenset[str] = frozenset({"4", "recordatorios", "recordatorio"})
+_MENU_INFO: frozenset[str] = frozenset({"5", "informacion", "información", "info"})
+_MENU_MIS_DATOS: frozenset[str] = frozenset({"6", "mis datos", "datos", "mi perfil", "perfil", "ver mis datos"})
+_MENU_REPORTE: frozenset[str] = frozenset({"3", "reporte", "informe", "descargar citas", "obtener reporte"})
 
 
 def detect_menu_command(text: str) -> tuple[str, float] | None:
@@ -415,6 +416,8 @@ def detect_menu_command(text: str) -> tuple[str, float] | None:
         return cast("tuple[str, float]", (INTENT["CREAR_CITA"], 0.97))
     if lower in _MENU_MIS_CITAS:
         return cast("tuple[str, float]", (INTENT["VER_MIS_CITAS"], 0.97))
+    if lower in _MENU_REPORTE:
+        return cast("tuple[str, float]", (INTENT["GENERAR_REPORTE"], 0.97))
     if lower in _MENU_RECORDATORIOS:
         return cast("tuple[str, float]", (INTENT["ACTIVAR_RECORDATORIOS"], 0.97))
     if lower in _MENU_INFO:

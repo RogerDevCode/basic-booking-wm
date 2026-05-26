@@ -544,16 +544,20 @@ EXECUTE. NO DEVIATION.
 
 ---
 
-## DEV CONTEXT & SYNTHESIS (APRIL 2026)
+## DEV CONTEXT & SYNTHESIS (MAY 2026)
 
-**Última Actualización:** Refactorización Arquitectónica de Windmill (Flujos asíncronos y Orquestación).
+**Última Actualización:** Optimización Sistémica de Latencia y UX (Mayo 2026).
 
 **Estado Actual del Sistema:**
-1. **Resolución `async/await` (WM-01):** Todos los 54 entrypoints usan el patrón *Sync Wrapper* (`asyncio.run(_main_async)`). Ya no se devuelven objetos `coroutine` a Windmill.
-2. **Sandboxing (WM-09):** Inyectados los metadatos de dependencias (PEP 723) en la cabecera de todos los scripts para evitar caídas por `ModuleNotFoundError` (ej. `beartype`).
-3. **Redis Hardening:** `_redis_client.py` inyecta automáticamente el esquema `redis://` si el entorno provee únicamente el hostname.
-4. **Orquestador Resiliente (Graceful Exit):** `OrchestratorInput` ahora acepta cualquier `intent`. Si la IA devuelve algo no relacionado con agendar (ej. `duda_general`), el orquestador ignora la ejecución y delega la respuesta a la IA para no interrumpir el flujo conversacional con errores de validación de Pydantic.
-5. **Estabilidad Estricta:** 100% de cumplimiento en tipado estático (`mypy --strict` 0 errores) y 284 pruebas unitarias pasando (`pytest -q`).
+1. **Optimización de Latencia (Fast-Path):** Implementada lógica condicional en `flow.yaml` para saltar preprocesamiento e IA en entradas puramente numéricas, reduciendo la latencia en ~1s.
+2. **Localización de Jerga ("Cita" → "Hora"):** Erradicado el término "cita" de todos los mensajes al usuario, botones y correos. Implementada regla **BANNED-13** para blindar este estándar.
+3. **UX Proactiva (Redirect):** En conflictos de agendamiento (`already_booked`), el sistema ahora redirige automáticamente a la vista de "Mis Horas" con botones de resolución inmediatos.
+4. **Eficiencia en Red (Async Fire-and-Forget):** Sustituido `urllib` bloqueante por `httpx` asíncrono en el worker para despachar acciones de chat en segundo plano sin penalizar la respuesta principal.
+5. **Arquitectura de Memoria (Redis Hash & Pool):** 
+   - Migradas reglas NLU de llaves sueltas (`KEYS`) a un único Hash (`HGETALL`) para búsquedas en O(1).
+   - Implementado Pool Global de conexiones en `_redis_client.py` con aislamiento de Event Loop para estabilidad en tests unitarios.
+6. **Optimización de Concurrencia:** Reducido el tiempo de reintento (`Retry defer`) en el worker de 1.0s a 0.3s para fluidez en interacciones rápidas.
+7. **Estabilidad Estricta:** 100% de cumplimiento en tipado (`mypy --strict`) y paso exitoso de 1234 pruebas unitarias/combinatorias.
 
 **Próximos Pasos (Tras lanzar `/start` mañana):**
 Validar end-to-end el flujo en Telegram. El flujo debería poder saludar, mantener contexto en Redis, evaluar intenciones sin crashear el orquestador y finalmente agendar/cancelar si la intención es estricta. Todo está preparado en el código.

@@ -277,14 +277,15 @@ class TestFSMRouter_CancelarHora:
         with (
             patch("f.internal._nlu_cache.ensure_nlu_cache", AsyncMock()),
             patch(
-                "f.internal.fsm_router.handlers._wallet_handler.get_mis_citas_text",
+                "f.internal.fsm_router.handlers._wallet_handler.get_mis_citas_data",
                 AsyncMock(
                     return_value=(
                         "📋 *Mis Horas* (1 próxima)\n\n"
                         "✅ Confirmada\n"
                         "👨‍⚕️ Dr. Gallegos — Cardiología\n"
                         "📅 20 de mayo a las 10:00\n"
-                        "🆔 Ref: `GA-123-456`"
+                        "🆔 Ref: `GA-123-456`",
+                        None,
                     )
                 ),
             ),
@@ -320,14 +321,15 @@ class TestFSMRouter_ReagendarHora:
         with (
             patch("f.internal._nlu_cache.ensure_nlu_cache", AsyncMock()),
             patch(
-                "f.internal.fsm_router.handlers._wallet_handler.get_mis_citas_text",
+                "f.internal.fsm_router.handlers._wallet_handler.get_mis_citas_data",
                 AsyncMock(
                     return_value=(
                         "📋 *Mis Horas* (1 próxima)\n\n"
                         "✅ Confirmada\n"
                         "👨‍⚕️ Dr. Gallegos — Cardiología\n"
                         "📅 20 de mayo a las 10:00\n"
-                        "🆔 Ref: `GA-123-456`"
+                        "🆔 Ref: `GA-123-456`",
+                        None,
                     )
                 ),
             ),
@@ -363,14 +365,15 @@ class TestFSMRouter_VerMisHoras:
         with (
             patch("f.internal._nlu_cache.ensure_nlu_cache", AsyncMock()),
             patch(
-                "f.internal.fsm_router.handlers._wallet_handler.get_mis_citas_text",
+                "f.internal.fsm_router.handlers._wallet_handler.get_mis_citas_data",
                 AsyncMock(
                     return_value=(
                         "📋 *Mis Horas* (1 próxima)\n\n"
                         "✅ Confirmada\n"
                         "👨‍⚕️ Dr. Gallegos — Cardiología\n"
                         "📅 20 de mayo a las 10:00\n"
-                        "🆔 Ref: `GA-123-456`"
+                        "🆔 Ref: `GA-123-456`",
+                        None,
                     )
                 ),
             ),

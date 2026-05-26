@@ -181,3 +181,33 @@ async def test_resolve_provider_db_error_raises() -> None:
             await resolve_provider_by_name("Gallegos", "postgresql://test")
 
     mock_db.close.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_get_mis_citas_data_queries_once() -> None:
+    """get_mis_citas_data fetches bookings once and returns both text and buttons."""
+    from f.internal._booking_shared import get_mis_citas_data
+
+    client_id = "c1"
+    pg_url = "pg://test"
+    chat_id = "123"
+
+    mock_rows = [
+        {
+            "booking_id": "1234567890",
+            "start_time": datetime(2026, 5, 20, 10, 0, tzinfo=UTC),
+            "status": "confirmed",
+            "provider_name": "Dr. Smith",
+            "service_name": "Consultation",
+            "tz_name": "UTC",
+        }
+    ]
+
+    with patch("f.internal._booking_shared.query_my_bookings", AsyncMock(return_value=mock_rows)) as mock_query:
+        text, btns = await get_mis_citas_data(client_id, pg_url, chat_id, session_id="sess-99")
+
+    mock_query.assert_called_once_with(client_id, pg_url)
+    assert text is not None
+    assert "Dr. Smith" in text
+    assert btns is not None
+    assert any(b["callback_data"].startswith("cxl:1234567890|sess-99") for row in btns for b in row)

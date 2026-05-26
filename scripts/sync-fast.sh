@@ -66,6 +66,29 @@ _add() {
   TARGETS+=("$p")
 }
 
+# Archivos núcleo que casi todo el sistema usa.
+# Se sincronizarán siempre que haya ALGÚN otro cambio para evitar ImportErrors.
+CORE_FILES=(
+  "f/internal/_config.py"
+  "f/internal/_db_client.py"
+  "f/internal/_redis_client.py"
+  "f/internal/_wmill_adapter.py"
+  "f/internal/_nlu_cache.py"
+  "f/internal/booking_fsm/_fsm_machine.py"
+  "f/internal/booking_fsm/_fsm_models.py"
+)
+
+_include_core() {
+  echo -e "${B}🛡 Incluyendo archivos núcleo para evitar errores de dependencia...${NC}"
+  for core in "${CORE_FILES[@]}"; do
+    if [[ -f "$core" ]]; then
+      _add "$core"
+      [[ -f "${core%.py}.script.yaml" ]] && _add "${core%.py}.script.yaml"
+      [[ -f "${core%.py}.script.lock" ]] && _add "${core%.py}.script.lock"
+    fi
+  done
+}
+
 if [[ $# -gt 0 ]]; then
   # Archivos explícitos pasados como argumentos
   for arg in "$@"; do
@@ -98,6 +121,11 @@ else
       git ls-files --others --exclude-standard
     } | sort -u
   )
+fi
+
+# ── Protección: Incluir siempre el núcleo si hay cambios ───────────────────
+if [[ ${#TARGETS[@]} -gt 0 ]]; then
+  _include_core
 fi
 
 # ── Nada que hacer ────────────────────────────────────────────────────────────

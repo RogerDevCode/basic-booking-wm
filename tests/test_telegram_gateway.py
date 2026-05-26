@@ -120,8 +120,8 @@ async def test_worker_process_update_acquires_and_releases_lock(
         patch("f.telegram_gateway.worker.run_telegram_auto_register", new_callable=AsyncMock) as mock_reg,
         patch("f.telegram_gateway.worker.run_ai_agent", new_callable=AsyncMock) as mock_ai,
         patch("f.telegram_gateway.worker.run_fsm_router", new_callable=AsyncMock) as mock_fsm,
-        patch("f.telegram_gateway.worker.run_conversational_router", new_callable=AsyncMock),
-        patch("f.telegram_gateway.worker.run_conversation_update", new_callable=AsyncMock),
+        patch("f.telegram_gateway.worker.run_conversational_router", new_callable=AsyncMock) as mock_conv,
+        patch("f.telegram_gateway.worker.run_conversation_update", new_callable=AsyncMock) as mock_upd,
         patch("f.telegram_gateway.worker.run_telegram_send", new_callable=AsyncMock) as mock_send,
     ):
         mock_reg.return_value = {"client_id": "client-uuid", "phone": "569123456", "name": "Test"}
@@ -130,10 +130,14 @@ async def test_worker_process_update_acquires_and_releases_lock(
         )
         mock_ai.return_value = {"success": True, "data": {"intent": "crear_cita", "requires_fsm_routing": True}}
         mock_fsm.return_value = {
-            "handled": True,
-            "response_text": "FSM response",
-            "nextState": {"name": "selecting_time"},
+            "data": {
+                "handled": True,
+                "response_text": "FSM response",
+                "nextState": {"name": "selecting_time"},
+            }
         }
+        mock_conv.return_value = {"data": {"handled": False}}
+        mock_upd.return_value = {"success": True}
 
         # Action
         await process_telegram_update(ctx, update_json)

@@ -22,7 +22,7 @@ from pydantic import BaseModel, ConfigDict
 from ...rag_query.main import run_rag_query
 from ...reminder_config._config_models import InputSchema as ReminderConfigInput
 from ...reminder_config.main import run_reminder_config
-from .._booking_shared import get_mis_citas_buttons, get_mis_citas_text
+from .._booking_shared import get_mis_citas_data
 from .._nlu_cache import ensure_nlu_cache
 from .._report_logic import generate_booking_report
 from .._wmill_adapter import log
@@ -166,15 +166,13 @@ async def _handle(inp: ConversationalInput) -> ConversationalResult:
                 response_text="📋 *Mis Horas*\n\nNo pude cargar tus citas en este momento.",
             )
 
-        text = await get_mis_citas_text(inp.client_id, inp.pg_url, inp.chat_id)
+        text, buttons = await get_mis_citas_data(inp.client_id, inp.pg_url, inp.chat_id, session_id=inp.session_id)
         if not text:
             return ConversationalResult(
                 handled=True,
                 nextState={"name": "idle"},
                 response_text="📋 *Mis Horas*\n\nNo tienes horas agendadas próximamente.",
             )
-
-        buttons = await get_mis_citas_buttons(inp.client_id, inp.pg_url, session_id=inp.session_id)
 
         return ConversationalResult(
             handled=True,

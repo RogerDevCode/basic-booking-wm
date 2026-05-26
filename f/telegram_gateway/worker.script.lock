@@ -165,7 +165,7 @@ uvicorn==0.48.0
 watchdog==6.0.0
 websocket-client==1.9.0
 websockets==15.0.1
-wmill==1.708.0
+wmill==1.709.0
 wrapt==2.2.1
 xxhash==3.7.0
 yarl==1.24.2

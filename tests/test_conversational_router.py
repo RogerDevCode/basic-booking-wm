@@ -111,8 +111,8 @@ class TestConversationalRouter:
         }
         from unittest.mock import AsyncMock, patch
 
-        with patch("f.internal.conversational_router.main.get_mis_citas_text", new_callable=AsyncMock) as mock_query:
-            mock_query.return_value = "📋 *Mis Horas*\n\nDr. Smith..."
+        with patch("f.internal.conversational_router.main.get_mis_citas_data", new_callable=AsyncMock) as mock_query:
+            mock_query.return_value = ("📋 *Mis Horas*\n\nDr. Smith...", None)
             res = await main(args)
             data = res["data"]
             assert data["handled"] is True
