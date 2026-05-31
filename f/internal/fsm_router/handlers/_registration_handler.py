@@ -4,7 +4,7 @@ import re
 from typing import Final
 
 from ..._wmill_adapter import log
-from ...booking_fsm._fsm_machine import get_main_menu_text
+from ...booking_fsm._fsm_machine import get_main_menu_inline_buttons, get_main_menu_text
 from .._router_models import RouterInput, RouterResult
 
 MODULE = "registration_handler"
@@ -62,6 +62,7 @@ def handle_registration_state(
                 response_text=(
                     "Entendido. 👍\n\nPuedes registrarte cuando quieras para agendar horas.\n\n" + get_main_menu_text()
                 ),
+                inline_buttons=get_main_menu_inline_buttons(),
             )
         attempts = int(str(current_state_raw.get("invalid_attempts", 0))) + 1
         if attempts >= 3:
@@ -71,6 +72,7 @@ def handle_registration_state(
                 nextDraft={},
                 response_text="❌ Demasiados intentos inválidos. Volviendo al menú principal.\n\n"
                 + get_main_menu_text(),
+                inline_buttons=get_main_menu_inline_buttons(),
             )
         return RouterResult(
             handled=True,
@@ -103,6 +105,7 @@ def handle_registration_state(
                 nextDraft={},
                 response_text="❌ Demasiados intentos inválidos. Volviendo al menú principal.\n\n"
                 + get_main_menu_text(),
+                inline_buttons=get_main_menu_inline_buttons(),
             )
         return RouterResult(
             handled=True,
@@ -146,6 +149,7 @@ def handle_registration_state(
                     nextDraft={},
                     response_text="❌ Demasiados intentos inválidos de teléfono. Volviendo al menú principal.\n\n"
                     + get_main_menu_text(),
+                    inline_buttons=get_main_menu_inline_buttons(),
                 )
             return RouterResult(
                 handled=True,
@@ -181,6 +185,7 @@ def handle_registration_state(
                         response_text="❌ Demasiados intentos de correo inválidos. Registro completado sin correo.\n\n"
                         + get_main_menu_text(),
                         registration_data={"name": reg_name, "phone": reg_phone, "email": None},
+                        inline_buttons=get_main_menu_inline_buttons(),
                     )
                 return RouterResult(
                     handled=True,
@@ -200,6 +205,7 @@ def handle_registration_state(
             nextDraft={},
             registration_data={"name": reg_name, "phone": reg_phone, "email": reg_email},
             response_text=("✅ ¡Registro completado!\n\nYa puedes agendar tu hora. 🗓️\n\n" + get_main_menu_text()),
+            inline_buttons=get_main_menu_inline_buttons(),
         )
 
     return RouterResult(handled=False)

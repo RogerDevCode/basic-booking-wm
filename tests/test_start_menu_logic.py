@@ -64,7 +64,7 @@ async def test_start_command_returns_inline_buttons() -> None:
 
         # Verify text contains menu heading (NLU rule content in body is expected)
         print("SENT TEXT:", sent_args["text"])
-        assert "📱 *Menú Principal*" in sent_args["text"]
+        assert "🏥 *AutoAgenda - Menú Principal*" in sent_args["text"]
 
         # Verify inline buttons are present and numbered
         buttons = sent_args["inline_buttons"]

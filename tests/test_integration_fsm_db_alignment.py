@@ -174,7 +174,7 @@ async def test_integration_empty_list_lua_normalization() -> None:
 
     try:
         # ACTION: Retrieve state using conversation_get
-        result = await _get_conversation(chat_id, redis_url=os.environ["REDIS_URL"])  # type: ignore[call-arg]
+        result = await _get_conversation(chat_id, redis_url=os.environ["REDIS_URL"])
 
         # GUARANTEE: conversation_get normalizes empty dict items back to empty list []
         assert result.data is not None

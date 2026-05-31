@@ -9,7 +9,7 @@ from f.nlu._datetime_resolver import resolve_datetime as _resolve_datetime_hybri
 from ..._booking_shared import resolve_provider_by_name
 from ..._db_client import create_db_client as _create_db_client
 from ..._wmill_adapter import log
-from ...booking_fsm._fsm_machine import get_main_menu_text
+from ...booking_fsm._fsm_machine import get_main_menu_inline_buttons, get_main_menu_text
 from ...booking_fsm._fsm_models import DraftBooking, NamedItem, TimeSlotItem
 from ...booking_fsm._fsm_responses import (
     build_doctor_keyboard,
@@ -77,6 +77,7 @@ async def handle_smart_prefill(
                 f"No encontré a *{display}* en nuestro sistema. 🔍\n\n"
                 "¿Deseas buscar por especialidad médica?\n\n" + get_main_menu_text()
             ),
+            inline_buttons=get_main_menu_inline_buttons(),
         )
 
     if len(matches) > 1:

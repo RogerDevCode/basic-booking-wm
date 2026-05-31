@@ -23,16 +23,14 @@ def build_specialty_prompt(items: list[NamedItem], error: str | None = None) -> 
     header = build_header(error)
     if not items:
         return f"{header}Lo sentimos, el sistema está temporalmente en mantenimiento. Intenta más tarde. 🛠️"
-    lines = "\n".join(f"{i + 1}. {it['name']}" for i, it in enumerate(items))
-    return f"{header}Selecciona la especialidad que necesitas:\n\n{lines}"
+    return f"{header}Selecciona la especialidad que necesitas:"
 
 
 def build_doctors_prompt(specialty_name: str, items: list[NamedItem], error: str | None = None) -> str:
     header = build_header(error)
     if not items:
         return f"{header}No hay doctores disponibles en este momento para esa especialidad. 🛠️"
-    lines = "\n".join(f"{i + 1}. {it['name']}" for i, it in enumerate(items))
-    return f"{header}¿Con qué doctor deseas tu hora?\n\n{lines}"
+    return f"{header}¿Con qué doctor deseas tu hora?"
 
 
 def build_doctors_with_specialty_prompt(
@@ -43,16 +41,14 @@ def build_doctors_with_specialty_prompt(
     header = build_header(error)
     if not matches:
         return f"{header}No hay doctores disponibles en este momento. 🛠️"
-    lines = "\n".join(f"{i + 1}. {m['name']} ({m['specialty_name']})" for i, m in enumerate(matches))
-    return f"{header}Encontré varios doctores con ese nombre. ¿Con cuál deseas agendar?\n\n{lines}"
+    return f"{header}Encontré varios doctores con ese nombre. ¿Con cuál deseas agendar?"
 
 
 def build_slots_prompt(doctor_name: str, items: list[TimeSlotItem], error: str | None = None) -> str:
     header = build_header(error)
     if not items:
         return f"{header}No hay horarios disponibles en este momento. 🛠️"
-    lines = "\n".join(f"{i + 1}. {it['label']}" for i, it in enumerate(items))
-    return f"{header}¿Qué horario prefieres?\n\n{lines}"
+    return f"{header}¿Qué horario prefieres?"
 
 
 def build_confirmation_prompt(time_label: str, doctor_name: str, extra: str | None = None) -> str:
@@ -131,7 +127,7 @@ def build_time_slot_keyboard(items: list[TimeSlotItem], session_id: str | None =
     suffix = f"|{session_id}" if session_id else ""
     # 1 button per row — labels already contain full info (day + date + time)
     chunked: list[list[InlineButton]] = [
-        [{"text": it["label"], "callback_data": f"time:{it['id']}{suffix}"}] for it in items
+        [{"text": f"{i + 1}. {it['label']}", "callback_data": f"time:{it['id']}{suffix}"}] for i, it in enumerate(items)
     ]
     chunked.append(
         [

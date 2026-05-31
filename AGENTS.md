@@ -1,29 +1,29 @@
-# AGENTS.md — PYTHON BOOKING OPS v3.0
+# AGENTS.md — PYTHON BOOKING OPS v4.0
 
 ## MISSION
 
 ROLE: SR-PY/BACKEND ENG  
 OBJ : BUILD/MAINTAIN BOOKING SYS  
-MODE: STRICT / DETERMINISTIC / ZERO-AMBIGUITY  
+MODE: STATIC-STRICT (Go-Style) / ZERO-AMBIGUITY  
 
 ---
 
 ## ABSOLUTE LAWS (ALL MUST PASS)
 
 LAW-01  FULL TYPE COVERAGE → VAR/PARAM/RETURN  
-LAW-02  mypy --strict = 0 ERR  
+LAW-02  mypy --strict = 0 ERR (Go-Style Rigidity)
 LAW-03  pyright --strict = 0 ERR  
 LAW-04  ruff clean + formatted  
 LAW-05  pytest pass + ≥80% LOGIC  
 LAW-06  1 FILE = 1 RESPONSIBILITY  
-LAW-07  Pydantic v2 strict @ ALL BOUNDARIES  
+LAW-07  Pydantic v2 @ BOUNDARIES ONLY (Validation ≠ Type Enforcement)
 LAW-08  NO dict CROSSING FN BOUNDARIES  
 LAW-09  FAIL = EXCEPTION (NO STATUS OBJECTS)  
 LAW-10  NO SIDE-EFFECTS @ TOP LEVEL  
 LAW-11  EXCEPT = LOG + RAISE → NO silent swallow, NO error dict return  
-LAW-12  FSM-SAFE BY DEFAULT → Fallback de orquestación a FSM si IA falla o no corre.
-LAW-13  HYBRID EXTRACTION OVER LLM → Extraer datos (fechas, IDs) vía Python primero. LLM solo como fallback.
-LAW-14  BANNED-13: "CITA" IN USER MESSAGES → Nunca usar "cita" en respuestas al usuario. Siempre usar "hora" o "reserva".
+LAW-12  FSM-SAFE BY DEFAULT → Fallback de orquestación a FSM si IA falla.
+LAW-13  HYBRID EXTRACTION OVER LLM → Extraer datos vía Python primero.
+LAW-14  BANNED-13: "CITA" IN USER MESSAGES → Siempre usar "hora" o "reserva".
 
 ---
 
@@ -32,52 +32,42 @@ LAW-14  BANNED-13: "CITA" IN USER MESSAGES → Nunca usar "cita" en respuestas a
 PYTHON: 3.13 (MANDATORY EXCLUSIVITY)  
 PKG   : uv  
 LINT  : ruff  
-TYPE  : mypy + pyright  
+TYPE  : mypy + pyright (Static Safety over Runtime Enforcement)
 TEST  : pytest  
-DATA  : pydantic v2  
-GUARD : beartype  
+DATA  : pydantic v2 (Strict mode at I/O boundaries)
 FLOW  : returns  
 QUEUE : arq (Redis)  
 DB    : postgresql (asyncpg)
 
 ---
 
-## PROJECT STRUCTURE
+## STATIC CONFIGURATION (GO-STYLE)
 
-f/
-  booking_create/main.py
-  booking_cancel/main.py
-  services/booking/core.py
-  services/booking/repo.py
-  internal/booking_fsm/_fsm_machine.py
+Para lograr la rigidez de Go, delegamos la seguridad al análisis estático en tiempo de desarrollo y CI-CD, eliminando penalizaciones en ejecución:
 
-tests/
-  test_booking_create.py
-  test_booking_cancel.py
-  conftest.py
-
-RULES:
-- NAME = verb_noun  
-- NO utils/helpers/common  
-- __init__ = EXPORT ONLY  
+```toml
+[tool.mypy]
+strict = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+no_implicit_optional = true
+warn_return_any = true
+```
 
 ---
 
-## TYPE SYSTEM (STRICT MODE)
+## TYPE SYSTEM
 
 HEADER:
 from __future__ import annotations  
 
 RULES:
 - USE list[T] dict[K,V] T|None  
-- NO List/Dict/Optional  
 - NO Any IN PUBLIC API  
 
 CONST:
 from typing import Final  
-
-FN:
-def fn(x: int) -> str: ...
 
 ---
 
@@ -90,19 +80,17 @@ class BookingIn(BaseModel):
   slot: str
 
 RULE:
-- ALL INPUT/OUTPUT VALIDATED  
-- NO RAW JSON  
+- Validar entrada/salida en los bordes del sistema.
+- Confiar en el tipado estático dentro de la lógica interna.
 
 ---
 
 ## PURE LOGIC LAYER
 
-@beartype  
-def _validate(data: str) -> Result[str, str]
-
 RULE:
 - INTERNAL → Result[T,E]  
 - EXTERNAL → raise Exception  
+- NO runtime type guards (@beartype is BANNED).
 
 ---
 
@@ -116,37 +104,11 @@ match result:
   Success → return  
   Failure → raise RuntimeError  
 
-FORBIDDEN:
-- silent except  
-- return error dict  
-
----
-
-## TEST CONTRACT
-
-AAA PATTERN ONLY  
-
-RULES:
-- 1 TEST = 1 BEHAVIOR  
-- FILE MIRROR STRUCTURE  
-- NO NETWORK/DB  
-
-NAME:
-test_<unit>_<case>_<expected>  
-
----
-
-## MOCK STRATEGY
-
-- MOCK AT BOUNDARY  
-- ASSERT CALLS  
-- NO INTERNAL PATCH  
-
 ---
 
 ## EXCEPTION BUBBLING (FAIL-FAST MANDATORY)
 
-PRINCIPLE: Every `except` block MUST log AND re-raise. Errors propagate to the entrypoint. No silent swallowing. No error dict returns.
+PRINCIPLE: Every `except` block MUST log AND re-raise. No silent swallowing.
 
 PATTERN — CORRECT:
 ```python
@@ -163,32 +125,26 @@ except Exception as e:
 
 - BATCH OPS  
 - MIN I/O  
-- CACHE WHEN SAFE  
+- ZERO RUNTIME TYPE OVERHEAD
 - CONNECTION POOLING (Redis/Postgres)
 
 ---
 
 ## PROMPT ENGINE
 
-> **HEART OF THE LAWS:** every law exists to collapse ambiguity *before* runtime. Fewer reachable states → fewer error states. Strict types + validated boundaries + fail-fast make the syntax/logic error *unrepresentable*, not caught late. Determinism is error-prevention.
-
-### MODE: DEV (default)
-
-Solve the GOAL, not the symptom. Logic first: model the situation → resolve the conflict → pick the deterministic path.  
-Flow: SPEC→MODEL→LOGIC→ENTRY→TEST→GATES→COMMIT. Stop on first gate fail.  
+> **HEART OF THE LAWS:** every law exists to collapse ambiguity *before* runtime. Static types + validated boundaries + fail-fast make the error *unrepresentable*. Determinism is error-prevention.
 
 ---
 
 ## DEV CONTEXT & SYNTHESIS (MAY 2026)
 
-**Última Actualización:** Eliminación de Windmill e Infraestructura Pure-Python (Mayo 2026).
+**Última Actualización:** Transición a Seguridad Estática Estilo Go (Mayo 2026).
 
 **Estado Actual del Sistema:**
-1. **Arquitectura Independiente:** Windmill ha sido eliminado. El sistema ahora opera como una aplicación Python pura usando FastAPI (Gateway) y Arq (Workers).
-2. **Optimización de Latencia (Fast-Path):** Lógica de atajos numéricos integrada en el flujo para evitar IA en comandos simples.
-3. **Localización de Jerga ("Cita" → "Hora"):** Erradicado el término "cita". Implementada regla **BANNED-13**.
+1. **Seguridad Estática:** Eliminado el uso de `beartype` y casteos forzados en runtime. La seguridad ahora reside 100% en `mypy --strict` y `pyright --strict`.
+2. **Arquitectura Independiente:** Sistema operando con FastAPI y Arq.
+3. **Localización de Jerga ("Cita" → "Hora"):** Erradicado el término "cita".
 4. **Eficiencia en Red:** Uso de `httpx` asíncrono y Pool Global de Redis.
-5. **Estabilidad Estricta:** 100% de cumplimiento en tipado (`mypy --strict`) y paso exitoso de tests unitarios.
 
 **Próximos Pasos:**
-Completar la migración de los últimos scripts en `f/` para que funcionen como módulos estándar importables sin el overhead de Windmill.
+Remover `beartype` de las dependencias y limpiar decoradores residuales en la capa de lógica.

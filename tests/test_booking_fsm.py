@@ -88,7 +88,7 @@ class TestBookingFSM:
         assert buttons is not None
         assert len(buttons) == 3
         # First row is Dr. Jekyll (index 4)
-        assert buttons[0][0]["text"] == "Dr. Jekyll"
+        assert buttons[0][0]["text"] == "5. Dr. Jekyll"
         assert buttons[0][0]["callback_data"].startswith("doc:d5")
         # Second row is pagination
         assert buttons[1][0]["text"] == "◀ Anterior"

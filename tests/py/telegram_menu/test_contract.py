@@ -44,7 +44,7 @@ class TestMenuController:
         resp = await ctrl.handle(MenuInput(action="start", chat_id="123"))
         assert resp.handled is True
         assert "AutoAgenda" in resp.response_text
-        assert len(resp.inline_buttons) == 2
+        assert len(resp.inline_buttons) == 8
 
     @pytest.mark.asyncio
     async def test_select_option_cmd_book_not_handled_by_menu(self) -> None:

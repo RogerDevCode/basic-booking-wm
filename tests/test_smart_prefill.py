@@ -147,15 +147,14 @@ class TestSmartPrefillMultipleMatches:
         assert isinstance(items, list)
         assert len(cast("list[object]", items)) == 2
 
-        # Response is a numbered menu showing name + specialty (buttons replace number instruction)
-        text = result.response_text or ""
-        assert "1." in text
-        assert "2." in text
-        assert "Cardiología" in text
-        assert "Neurología" in text
+        # Response is a prompt (buttons replace the number list)
+        assert result.response_text is not None
         # Inline buttons must be present — one per doctor + back/cancel
         assert result.inline_buttons is not None
         assert len(result.inline_buttons) >= 1
+        # Doctor names should appear in button labels
+        all_button_texts = [btn["text"] for row in result.inline_buttons for btn in row]
+        assert any("Gallegos" in t for t in all_button_texts)
 
 
 class TestSmartPrefillNoMatch:

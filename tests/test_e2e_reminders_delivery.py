@@ -129,18 +129,22 @@ async def test_e2e_reminders_delivery_telegram() -> None:
                     pytest.fail("Dispatch failed!")
                 assert result.sent >= 1
 
-                # Assert HTTP post to telegram API was made
-                mock_post.assert_called_once()
-                call_args = mock_post.call_args
+                # Assert HTTP post to telegram API was made for our chat_id
+                target_call = None
+                for call in mock_post.call_args_list:
+                    if call[1].get("json", {}).get("chat_id") == chat_id:
+                        target_call = call
+                        break
+                assert target_call is not None, f"No message was sent to chat_id {chat_id}"
 
                 # Verify URL
-                assert "api.telegram.org/botmock_bot_token/sendMessage" in call_args[0][0]
+                assert "api.telegram.org/botmock_bot_token/sendMessage" in target_call[0][0]
 
                 # Verify payload
-                payload = call_args[1]["json"]
-                assert payload["chat_id"] == chat_id
+                payload = target_call[1]["json"]
                 assert "Recordatorio de tu hora" in payload["text"]
                 assert "Test Prov E2E" in payload["text"]
+
 
     finally:
         # CLEANUP

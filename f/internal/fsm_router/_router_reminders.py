@@ -136,10 +136,13 @@ async def handle_reminders_config(
     res_config = await run_reminder_config(config_input, input_data.pg_url)
 
     if action == "back":
+        from ..booking_fsm._fsm_machine import get_main_menu_inline_buttons
+
         return RouterResult(
             handled=True,
             nextState={"name": "idle"},
-            response_text="📋 Menú principal. ¿En qué puedo ayudarte?\n\n" + get_main_menu_text(),
+            response_text="📱 *Menú Principal*\\n\\n¿En qué puedo ayudarte?\n\n" + get_main_menu_text(),
+            inline_buttons=get_main_menu_inline_buttons(),
         )
 
     return RouterResult(

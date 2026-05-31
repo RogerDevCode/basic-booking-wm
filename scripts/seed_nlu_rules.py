@@ -72,7 +72,8 @@ async def seed_nlu_rules() -> None:
             ),
             "msg_generic": "No pudimos confirmar tu cita. Por favor intenta de nuevo en unos minutos.",
             "msg_main_menu": (
-                "📱 *Menú Principal*\n\n1️⃣ Agendar cita\n2️⃣ Mis citas\n3️⃣ Recordatorios\n4️⃣ Información\n5️⃣ Mis datos"
+                "🏥 *AutoAgenda - Menú Principal*\n\n"
+                "¿Cómo podemos ayudarte hoy?"
             ),
         }
 

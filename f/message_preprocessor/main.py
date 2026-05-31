@@ -13,7 +13,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from beartype import beartype
 
 from ..nlu._datetime_resolver import resolve_datetime
 from ._entity_extractor import extract_entities
@@ -24,7 +23,6 @@ from ._text_cleaner import clean_text
 from ._threat_scanner import scan_threats
 
 
-@beartype
 def _preprocess(raw_text: str) -> PreprocessorOutput:
     # Stage 0: Extract structured entities (URLs, phones, RUTs) and replace emojis
     working, extracted_entities = extract_entities(raw_text)

@@ -169,7 +169,7 @@ async def _confirm_booking_core(
     async def operation() -> BookingResult:
         # ── Advisory lock: serialize all ops for this chat_id ────────────
         await conn.execute(
-            "SELECT pg_advisory_xact_lock(chat_id_lock_key($1))",
+            "SELECT pg_advisory_xact_lock(hashtext($1::text))",
             chat_id,
         )
 

@@ -17,7 +17,6 @@ from __future__ import annotations
 import contextlib
 from typing import Final
 
-from beartype import beartype
 
 from .._conversation_tx import ConversationConflictError, invalidate_cache, read_state, write_state
 from .._db_client import create_db_client
@@ -28,7 +27,6 @@ from ._update_models import ConversationUpdateInput, ConversationUpdateResult
 MODULE: Final[str] = "conversation_update"
 
 
-@beartype
 async def _update_conversation(
     input_data: ConversationUpdateInput,
     redis_url: str | None = None,
@@ -41,7 +39,7 @@ async def _update_conversation(
         # ── BEGIN + advisory lock (serializes all ops for this chat_id) ───────
         await conn.execute("BEGIN")
         await conn.execute(
-            "SELECT pg_advisory_xact_lock(chat_id_lock_key($1))",
+            "SELECT pg_advisory_xact_lock(hashtext($1::text))",
             input_data.chat_id,
         )
 
@@ -111,7 +109,7 @@ async def _main_async(
     except Exception as e:
         raise RuntimeError(f"conversation_update validation error: {e}") from e
 
-    result = await _update_conversation(input_data, redis_url, pg_url)  # type: ignore[call-arg]
+    result = await _update_conversation(input_data, redis_url, pg_url)
     return {"data": dict(result.model_dump())}
 
 

@@ -380,4 +380,4 @@ class TestTelegramRouterDateHandling:
         # Assert
         assert data["handled"] is True
         assert data["nextState"]["name"] == "selecting_specialty"
-        assert "Cardiología" in data["response_text"]
+        assert any("Cardiología" in btn["text"] for row in data["inline_buttons"] for btn in row)

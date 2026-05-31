@@ -112,6 +112,7 @@ async def _handle(inp: ConversationalInput) -> ConversationalResult:
             handled=True,
             nextState=state_raw,
             response_text="¡Hola! 👋\n\n" + _format_menu_with_user_info(inp.client_name, inp.phone),
+            inline_buttons=get_main_menu_inline_buttons(),
         )
 
     if handler == "farewell":
@@ -126,6 +127,7 @@ async def _handle(inp: ConversationalInput) -> ConversationalResult:
             handled=True,
             nextState=state_raw,
             response_text="¡Con gusto! 😊\n\n" + _format_menu_with_user_info(inp.client_name, inp.phone),
+            inline_buttons=get_main_menu_inline_buttons(),
         )
 
     if handler == "reporte":
@@ -156,6 +158,7 @@ async def _handle(inp: ConversationalInput) -> ConversationalResult:
             handled=True,
             nextState={"name": "idle"},
             response_text=_format_menu_with_user_info(inp.client_name, inp.phone),
+            inline_buttons=get_main_menu_inline_buttons(),
         )
 
     if handler == "mis_citas":
@@ -172,6 +175,7 @@ async def _handle(inp: ConversationalInput) -> ConversationalResult:
                 handled=True,
                 nextState={"name": "idle"},
                 response_text="📋 *Mis Horas*\n\nNo tienes horas agendadas próximamente.",
+                inline_buttons=get_main_menu_inline_buttons(),
             )
 
         return ConversationalResult(
@@ -193,6 +197,7 @@ async def _handle(inp: ConversationalInput) -> ConversationalResult:
                     "👤 *Mis Datos*\n\nAún no estás registrado. "
                     "Para agendar horas necesito tu número de teléfono.\n\n" + get_main_menu_text()
                 ),
+                inline_buttons=get_main_menu_inline_buttons(),
             )
         return ConversationalResult(
             handled=True,
@@ -203,6 +208,7 @@ async def _handle(inp: ConversationalInput) -> ConversationalResult:
                 "📱 Teléfono: ✅ Registrado\n\n"
                 "Para actualizar tu información, contáctanos.\n\n" + get_main_menu_text()
             ),
+            inline_buttons=get_main_menu_inline_buttons(),
         )
 
     if handler == "recordatorios":
@@ -213,6 +219,7 @@ async def _handle(inp: ConversationalInput) -> ConversationalResult:
                 response_text=(
                     "⚠️ Necesitas estar registrado para configurar recordatorios.\n\n" + get_main_menu_text()
                 ),
+                inline_buttons=get_main_menu_inline_buttons(),
             )
         config_input = ReminderConfigInput(
             action="show",
@@ -258,6 +265,7 @@ async def _handle(inp: ConversationalInput) -> ConversationalResult:
             "Soy tu asistente de reservas médicas. Puedes agendar una hora, "
             "ver tus horas, configurar recordatorios o preguntar por horarios y servicios.\n\n" + get_main_menu_text()
         ),
+        inline_buttons=get_main_menu_inline_buttons(),
     )
 
 
@@ -265,8 +273,28 @@ async def _main_async(args: dict[str, Any]) -> dict[str, Any]:
     inp = ConversationalInput.model_validate(args)
     result = await _handle(inp)
 
-    if not result.inline_buttons and result.response_text and "📱 *Menú Principal*" in result.response_text:
-        result.inline_buttons = get_main_menu_inline_buttons()
+    if result.response_text and (
+        "1️⃣" in result.response_text
+        or "Menú Principal" in result.response_text
+        or "menú principal" in result.response_text.lower()
+    ):
+        has_main_menu = False
+        if result.inline_buttons:
+            for row in result.inline_buttons:
+                for btn in row:
+                    cb = btn.get("callback_data") or ""
+                    if cb.startswith("cmd:agendar") or cb.startswith("cmd:book"):
+                        has_main_menu = True
+                        break
+                if has_main_menu:
+                    break
+        if not has_main_menu:
+            main_menu_btns = get_main_menu_inline_buttons()
+            if not result.inline_buttons:
+                result.inline_buttons = main_menu_btns
+            else:
+                current_btns = list(result.inline_buttons)
+                result.inline_buttons = current_btns + main_menu_btns
 
     return {"data": result.model_dump()}
 

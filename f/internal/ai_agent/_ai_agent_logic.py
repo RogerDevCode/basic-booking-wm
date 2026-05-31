@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from typing import Literal, cast
+from typing import Final, Literal, cast
 
 from .._nlu_cache import get_nlu_rule
 from ._ai_agent_models import AvailabilityContext, ConversationState, EntityMap, EscalationLevel
@@ -383,10 +383,10 @@ def detect_social(text: str) -> tuple[str, float] | None:
 # Caller MUST gate this on booking_state_name == "idle": mid-FSM a digit means
 # slot/specialty selection and must reach the FSM untouched.
 
-_MENU_AGENDAR: frozenset[str] = frozenset(
+_MENU_AGENDAR: Final[frozenset[str]] = frozenset(
     {"1", "agendar", "agendar cita", "agendar hora", "nueva cita", "nueva hora", "pedir hora", "tomar hora"}
 )
-_MENU_MIS_CITAS: frozenset[str] = frozenset(
+_MENU_MIS_CITAS: Final[frozenset[str]] = frozenset(
     {
         "2",
         "mis citas",
@@ -400,16 +400,16 @@ _MENU_MIS_CITAS: frozenset[str] = frozenset(
         "ver mis horas",
     }
 )
-_MENU_CANCELAR_HORA: frozenset[str] = frozenset(
-    {"3", "cancelar", "cancelar hora", "cancelar cita", "quiero cancelar", "borrar hora", "anular hora"}
+_MENU_CANCELAR: Final[frozenset[str]] = frozenset(
+    {"3", "cancelar", "cancelar cita", "cancelar hora", "anular", "anular cita", "anular hora"}
 )
-_MENU_REAGENDAR_HORA: frozenset[str] = frozenset(
-    {"4", "reagendar", "reagendar hora", "reagendar cita", "cambiar hora", "cambiar cita", "mover hora", "reprogramar"}
+_MENU_REAGENDAR: Final[frozenset[str]] = frozenset(
+    {"4", "reagendar", "reagendar cita", "reagendar hora", "cambiar cita", "cambiar hora", "mover cita", "mover hora"}
 )
-_MENU_REPORTE: frozenset[str] = frozenset({"5", "reporte", "informe", "descargar citas", "obtener reporte"})
-_MENU_RECORDATORIOS: frozenset[str] = frozenset({"6", "recordatorios", "recordatorio"})
-_MENU_INFO: frozenset[str] = frozenset({"7", "informacion", "información", "info"})
-_MENU_MIS_DATOS: frozenset[str] = frozenset({"8", "mis datos", "datos", "mi perfil", "perfil", "ver mis datos"})
+_MENU_REPORTE: Final[frozenset[str]] = frozenset({"5", "reporte", "informe", "descargar citas", "obtener reporte"})
+_MENU_RECORDATORIOS: Final[frozenset[str]] = frozenset({"6", "recordatorios", "recordatorio"})
+_MENU_INFO: Final[frozenset[str]] = frozenset({"7", "informacion", "información", "info"})
+_MENU_MIS_DATOS: Final[frozenset[str]] = frozenset({"8", "mis datos", "datos", "mi perfil", "perfil", "ver mis datos"})
 
 
 def detect_menu_command(text: str) -> tuple[str, float] | None:
@@ -422,9 +422,9 @@ def detect_menu_command(text: str) -> tuple[str, float] | None:
         return cast("tuple[str, float]", (INTENT["CREAR_CITA"], 0.97))
     if lower in _MENU_MIS_CITAS:
         return cast("tuple[str, float]", (INTENT["VER_MIS_CITAS"], 0.97))
-    if lower in _MENU_CANCELAR_HORA:
+    if lower in _MENU_CANCELAR:
         return cast("tuple[str, float]", (INTENT["CANCELAR_CITA"], 0.97))
-    if lower in _MENU_REAGENDAR_HORA:
+    if lower in _MENU_REAGENDAR:
         return cast("tuple[str, float]", (INTENT["REAGENDAR_CITA"], 0.97))
     if lower in _MENU_REPORTE:
         return cast("tuple[str, float]", (INTENT["GENERAR_REPORTE"], 0.97))

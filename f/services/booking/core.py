@@ -49,7 +49,13 @@ async def cancel_booking(
         raise BookingPermissionError(f"Client {req.actor_id} cannot cancel another client's booking")
 
     updated = await repo.update_status(req.booking_id, "cancelled", req.actor_id, req.reason, str(req.actor))
-    # calendar.sync / notifier.send enqueued via outbox.
+    # GCal sync: repo.update_status sets gcal_sync_status='pending' on the booking row.
+    # A polling worker (gcal_reconcile) reads pending rows → atomic outbox pattern. ✅
+    #
+    # Waitlist notification: NOT YET IMPLEMENTED via outbox.
+    # TODO(H2-audit): When a slot is freed, insert a row into outbox_events
+    # (or use a dedicated notify_waitlist ARQ job) inside the same DB transaction
+    # to guarantee at-least-once delivery. Current code does NOT notify waitlist on cancel.
     return BookingResult(booking_id=updated["booking_id"], status=updated["status"])
 
 

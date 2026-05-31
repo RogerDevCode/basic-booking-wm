@@ -3,7 +3,6 @@ from __future__ import annotations
 import re
 from typing import Final
 
-from beartype import beartype
 
 from ._preprocessor_models import ExtractedEntities
 
@@ -48,7 +47,6 @@ def _validate_rut(rut: str) -> bool:
         return False
 
 
-@beartype
 def extract_entities(text: str) -> tuple[str, ExtractedEntities]:
     entities = ExtractedEntities()
 

@@ -140,8 +140,33 @@ async def process_telegram_update(ctx: dict[str, Any], update_json: str, ingest_
                 log_structured(logging.WARNING, "security_threat_detected", chat_id=chat_id, text=text)
 
         # 4. Get conversation state
-        conv_res = await _get_conversation(chat_id, redis_url=REDIS_URL, pg_url=DATABASE_URL)  # type: ignore[call-arg]
+        conv_res = await _get_conversation(chat_id, redis_url=REDIS_URL, pg_url=DATABASE_URL)
         conv_state = conv_res.data
+
+        # Enforce linear flow / button locking:
+        # Clear inline keyboard markup of the last sent bot message (message_id) so the user cannot click old buttons.
+        if conv_state and conv_state.message_id:
+            import httpx as _httpx
+
+            async def _clear_previous_markup(msg_id: int) -> None:
+                url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/editMessageReplyMarkup"
+                try:
+                    async with _httpx.AsyncClient(timeout=3.0) as _client:
+                        await _client.post(
+                            url,
+                            json={
+                                "chat_id": chat_id,
+                                "message_id": msg_id,
+                                "reply_markup": {"inline_keyboard": []},
+                            },
+                        )
+                except Exception as e:
+                    log_structured(logging.WARNING, "clear_previous_markup_failed", chat_id=chat_id, error=str(e))
+                    raise RuntimeError(f"Clear previous markup failed: {e}") from e
+
+            _clear_prev_task = asyncio.create_task(_clear_previous_markup(conv_state.message_id))
+            _BACKGROUND_TASKS.add(_clear_prev_task)
+            _clear_prev_task.add_done_callback(_BACKGROUND_TASKS.discard)
 
         # 5. Register client (if not already exists)
         reg_args: dict[str, object] = {
@@ -408,7 +433,25 @@ async def process_telegram_update(ctx: dict[str, Any], update_json: str, ingest_
             _BACKGROUND_TASKS.add(_clear_task)
             _clear_task.add_done_callback(_BACKGROUND_TASKS.discard)
 
-        await run_telegram_send(send_args)
+        send_res = await run_telegram_send(send_args)
+        if send_res and send_res.sent and send_res.message_id:
+
+            async def _save_message_id(msg_id: int) -> None:
+                try:
+                    db_conn = await create_db_client(DATABASE_URL)
+                    await db_conn.execute(
+                        "UPDATE conversation_states SET message_id = $1 WHERE chat_id = $2",
+                        msg_id,
+                        chat_id,
+                    )
+                    await db_conn.close()
+                except Exception as e:
+                    log_structured(logging.WARNING, "message_id_db_save_failed", chat_id=chat_id, error=str(e))
+                    raise RuntimeError(f"Message ID save failed: {e}") from e
+
+            _save_task = asyncio.create_task(_save_message_id(send_res.message_id))
+            _BACKGROUND_TASKS.add(_save_task)
+            _save_task.add_done_callback(_BACKGROUND_TASKS.discard)
         tg_send_ms = (time.perf_counter() - tg_outbound_start) * 1000
         await metrics.record_telegram_send_time(tg_send_ms)
 

@@ -49,15 +49,7 @@ from ._fsm_responses import (
 
 
 def get_main_menu_text() -> str:
-    default_text = (
-        "📱 *Menú Principal*\n\n"
-        "1️⃣ Agendar hora\n"
-        "2️⃣ Mis horas\n"
-        "3️⃣ Generar reporte\n"
-        "4️⃣ Recordatorios\n"
-        "5️⃣ Información\n"
-        "6️⃣ Mis datos"
-    )
+    default_text = "🏥 *AutoAgenda - Menú Principal*\n\n¿Cómo podemos ayudarte hoy?"
     return str(get_nlu_rule("msg_main_menu", default_text))
 
 
@@ -189,6 +181,7 @@ def apply_transition(
             nextState=IdleState(session_id=current_state.session_id),
             responseText=get_main_menu_text(),
             advance=False,
+            inlineButtons=get_main_menu_inline_buttons(),
         )
 
     # 2. Step Handlers
@@ -211,6 +204,7 @@ def apply_transition(
                 nextState=IdleState(session_id=current_state.session_id),
                 responseText=get_main_menu_text(),
                 advance=False,
+                inlineButtons=get_main_menu_inline_buttons(),
             )
 
         if isinstance(action, SelectAction):
@@ -227,9 +221,9 @@ def apply_transition(
                 if attempts >= 3:
                     return TransitionOutcome(
                         nextState=IdleState(session_id=current_state.session_id),
-                        responseText="❌ Demasiados intentos inválidos. Volviendo al menú principal.\n\n"
-                        + get_main_menu_text(),
+                        responseText="❌ Demasiados intentos inválidos. Volviendo al menú principal.",
                         advance=False,
+                        inlineButtons=get_main_menu_inline_buttons(),
                     )
                 return TransitionOutcome(
                     nextState=SelectingSpecialtyState(
@@ -318,9 +312,9 @@ def apply_transition(
                 if attempts >= 3:
                     return TransitionOutcome(
                         nextState=IdleState(session_id=current_state.session_id),
-                        responseText="❌ Demasiados intentos inválidos. Volviendo al menú principal.\n\n"
-                        + get_main_menu_text(),
+                        responseText="❌ Demasiados intentos inválidos. Volviendo al menú principal.",
                         advance=False,
+                        inlineButtons=get_main_menu_inline_buttons(),
                     )
                 return TransitionOutcome(
                     nextState=SelectingDoctorState(
@@ -419,9 +413,9 @@ def apply_transition(
                 if attempts >= 3:
                     return TransitionOutcome(
                         nextState=IdleState(session_id=current_state.session_id),
-                        responseText="❌ Demasiados intentos inválidos. Volviendo al menú principal.\n\n"
-                        + get_main_menu_text(),
+                        responseText="❌ Demasiados intentos inválidos. Volviendo al menú principal.",
                         advance=False,
+                        inlineButtons=get_main_menu_inline_buttons(),
                     )
                 return TransitionOutcome(
                     nextState=SelectingTimeState(
@@ -526,9 +520,9 @@ def apply_transition(
         if attempts >= 3:
             return TransitionOutcome(
                 nextState=IdleState(session_id=current_state.session_id),
-                responseText="❌ Demasiados intentos inválidos. Volviendo al menú principal.\n\n"
-                + get_main_menu_text(),
+                responseText="❌ Demasiados intentos inválidos. Volviendo al menú principal.",
                 advance=False,
+                inlineButtons=get_main_menu_inline_buttons(),
             )
 
         return TransitionOutcome(

@@ -1,0 +1,7 @@
+includes:
+  - "f/**"
+  - "scripts/**"
+excludes:
+  - "*.pyc"
+  - "__pycache__/**"
+defaultTs: python3

@@ -8,13 +8,11 @@ dependencies = [
     "pydantic>=2.10.0",
     "email-validator>=2.2.0",
     "asyncpg>=0.30.0",
-    "cryptography>=48.0.0",
+    "cryptography>=44.0.0",
     "python-dotenv>=1.0.1",
-    "beartype>=0.19.0",
     "returns>=0.24.0",
     "redis>=7.4.0",
     "typing-extensions>=4.15.0",
-    "wmill>=1.693.3",
     "symspellpy>=6.9.0",
     "google-adk[extensions]>=2.0.0",
     "sqlalchemy>=2.0.25",
@@ -37,7 +35,6 @@ dev = [
     "rapidfuzz>=3.14.5",
     "jellyfish>=1.2.1",
     "dateparser>=1.4.0",
-    "symspellpy>=6.9.0",
     "aiosqlite>=0.19.0",
 ]
 
@@ -47,11 +44,13 @@ managed = true
 [tool.mypy]
 python_version = "3.13"
 strict = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+no_implicit_optional = true
+warn_return_any = true
 mypy_path = "stubs"
 # golang-style: all generics parametrized, no untyped returns, no redundant casts
-# disallow_any_explicit intentionally omitted — Windmill entrypoints need dict[str,Any];
-# ANN401 in ruff enforces no-Any in public annotations instead.
-warn_return_any = true
 warn_redundant_casts = true
 warn_unused_ignores = true
 disallow_any_generics = true
@@ -60,9 +59,6 @@ strict_equality = true
 extra_checks = true
 exclude = ["^reset_nlu\\.py$", "^fix_nlu\\.py$", "^scripts/", "^patch_auth\\.py$", "^conftest\\.py$", "^tests/conftest\\.py$"]
 
-[[tool.mypy.overrides]]
-module = "wmill.*"
-ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = "spellchecker.*"
@@ -72,6 +68,7 @@ ignore_missing_imports = true
 [tool.ruff]
 line-length = 120
 target-version = "py313"
+exclude = ["migrations/", ".venv/", "stubs/"]
 
 [tool.ruff.lint]
 # golang-style: explicit, strict, zero dead code, no Any in annotations

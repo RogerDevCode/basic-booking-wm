@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from ..._booking_shared import get_mis_citas_data
-from ...booking_fsm._fsm_machine import get_main_menu_text
+from ...booking_fsm._fsm_machine import get_main_menu_inline_buttons, get_main_menu_text
 from .._router_models import RouterInput, RouterResult
 
 MODULE = "wallet_handler"
@@ -18,6 +18,7 @@ async def handle_mis_citas(
             nextState={"name": "idle"},
             nextDraft={},
             response_text=("📋 *Mis Horas*\n\nNo pudimos cargar tus horas en este momento.\n\n" + get_main_menu_text()),
+            inline_buttons=get_main_menu_inline_buttons(),
         )
 
     text, buttons = await get_mis_citas_data(
@@ -32,6 +33,7 @@ async def handle_mis_citas(
             nextState={"name": "idle"},
             nextDraft={},
             response_text=msg + "\n\n" + get_main_menu_text(),
+            inline_buttons=get_main_menu_inline_buttons(),
         )
 
     return RouterResult(

@@ -18,9 +18,7 @@
 # ///
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Final, cast
-
-from beartype import beartype
+from typing import TYPE_CHECKING, Any, Final, cast
 
 from f.internal._config import DEFAULT_TIMEZONE
 
@@ -173,7 +171,6 @@ def _start_phone_only(
     )
 
 
-@beartype
 async def _route_impl(input_data: RouterInput) -> RouterResult:
     state_dict = input_data.state or {}
     active_flow = cast("str | None", state_dict.get("active_flow"))
@@ -344,6 +341,7 @@ async def _route_impl(input_data: RouterInput) -> RouterResult:
                 nextState={"name": "idle"},
                 nextDraft={},
                 response_text="He cancelado la reserva en curso.\n\n" + get_main_menu_text(),
+                inline_buttons=get_main_menu_inline_buttons(),
             )
         else:
             return RouterResult(
@@ -351,6 +349,7 @@ async def _route_impl(input_data: RouterInput) -> RouterResult:
                 nextState={"name": "idle"},
                 nextDraft={},
                 response_text=get_main_menu_text(),
+                inline_buttons=get_main_menu_inline_buttons(),
             )
 
     if current_state_name != "idle" and (
@@ -361,6 +360,7 @@ async def _route_impl(input_data: RouterInput) -> RouterResult:
             nextState={"name": "idle"},
             nextDraft={},
             response_text="He cancelado la reserva en curso.\n\n" + get_main_menu_text(),
+            inline_buttons=get_main_menu_inline_buttons(),
         )
 
     # Callback double-click/out-of-order protection
@@ -370,6 +370,12 @@ async def _route_impl(input_data: RouterInput) -> RouterResult:
             "selecting_doctor": ["doc:", "back", "cancel"],
             "selecting_time": ["time:", "slot:", "back", "cancel"],
             "confirming": ["cfm:yes", "cfm:no", "back", "cancel"],
+            "reminders_config": ["rem:", "back", "cancel"],
+            "needs_registration": ["back", "cancel"],
+            "reg_confirming_name": ["back", "cancel"],
+            "reg_entering_name": ["back", "cancel"],
+            "reg_collecting_phone": ["back", "cancel"],
+            "reg_collecting_email": ["back", "cancel"],
         }
         allowed = state_to_prefixes.get(current_state_name, [])
         if allowed and not any(user_input.startswith(prefix) for prefix in allowed):
@@ -447,13 +453,16 @@ async def _route_impl(input_data: RouterInput) -> RouterResult:
             return RouterResult(
                 handled=True,
                 nextState={"name": "idle"},
+                nextDraft={},
                 response_text="He cancelado la reserva en curso.\n\n" + get_main_menu_text(),
+                inline_buttons=get_main_menu_inline_buttons(),
             )
         if ai_intent == "mostrar_menu_principal":
             return RouterResult(
                 handled=True,
                 nextState={"name": "idle"},
                 response_text=get_main_menu_text(),
+                inline_buttons=get_main_menu_inline_buttons(),
             )
         if ai_intent == "ver_mis_citas":
             return await _handle_mis_citas(input_data, current_state_raw, session_id=current_session)
@@ -465,6 +474,7 @@ async def _route_impl(input_data: RouterInput) -> RouterResult:
                     "Entendido. Cuando quieras continuar con tu reserva, "
                     "responde con la opción que necesitas.\n\n" + get_main_menu_text()
                 ),
+                inline_buttons=get_main_menu_inline_buttons(),
             )
         if ai_intent in ("ver_mis_datos", "activar_recordatorios", "pregunta_general"):
             return RouterResult(
@@ -474,6 +484,7 @@ async def _route_impl(input_data: RouterInput) -> RouterResult:
                     f"He registrado tu consulta ({ai_intent}). "
                     "Para continuar con tu reserva, selecciona una opción del menú.\n\n" + get_main_menu_text()
                 ),
+                inline_buttons=get_main_menu_inline_buttons(),
             )
         if ai_intent == "urgencia":
             return RouterResult(
@@ -483,6 +494,7 @@ async def _route_impl(input_data: RouterInput) -> RouterResult:
                     "⚠️ He detectado una situación urgente. "
                     "Tu reserva en curso se ha pausado.\n\n" + get_main_menu_text()
                 ),
+                inline_buttons=get_main_menu_inline_buttons(),
             )
 
     try:
@@ -567,6 +579,7 @@ async def _route_impl(input_data: RouterInput) -> RouterResult:
                     handled=True,
                     nextState=current_state_raw,
                     response_text=get_main_menu_text(),
+                    inline_buttons=get_main_menu_inline_buttons(),
                 )
             else:
                 return RouterResult(handled=False)
@@ -696,7 +709,6 @@ async def _route_impl(input_data: RouterInput) -> RouterResult:
         raise RuntimeError(f"Router internal error: {e}") from e
 
 
-@beartype
 async def _route(input_data: RouterInput) -> RouterResult:
     result: RouterResult = await _route_impl(input_data)
 
@@ -726,7 +738,37 @@ async def _route(input_data: RouterInput) -> RouterResult:
         elif next_state_name == "idle":
             result.active_flow = None
             if not result.inline_buttons:
-                result.inline_buttons = get_main_menu_inline_buttons()
+                result.inline_buttons = cast("list[list[Any]]", get_main_menu_inline_buttons())
+
+    # Dual Action Enforcement: if text contains main menu, ensure main menu buttons are present
+    if result.response_text and (
+        "1️⃣" in result.response_text
+        or "Menú Principal" in result.response_text
+        or "menú principal" in result.response_text.lower()
+    ):
+        has_main_menu = False
+        if result.inline_buttons:
+            for row in result.inline_buttons:
+                for btn in row:
+                    if isinstance(btn, dict):
+                        btn_dict = cast("dict[str, object]", btn)
+                        cb_val = btn_dict.get("callback_data")
+                        cb = str(cb_val) if cb_val is not None else ""
+                    else:
+                        cb = ""
+                    if cb.startswith("cmd:agendar") or cb.startswith("cmd:book"):
+                        has_main_menu = True
+                        break
+                if has_main_menu:
+                    break
+        if not has_main_menu:
+            main_menu_btns = get_main_menu_inline_buttons()
+            if not result.inline_buttons:
+                result.inline_buttons = cast("list[list[Any]]", main_menu_btns)
+            else:
+                current_btns = list(result.inline_buttons)
+                result.inline_buttons = current_btns + cast("list[list[Any]]", main_menu_btns)
+
     return result
 
 

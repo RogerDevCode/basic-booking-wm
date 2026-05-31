@@ -38,7 +38,17 @@ from unittest.mock import MagicMock  # noqa: E402
 
 sys.modules["wmill"] = MagicMock()
 
-load_dotenv()
+load_dotenv(override=True)
+
+# Align database URL if running on the host pointing to docker compose container 'db'
+db_url = os.getenv("DATABASE_URL")
+if db_url:
+    os.environ["DATABASE_URL"] = db_url.replace("@db:", "@localhost:").replace("@db/", "@localhost/")
+
+# Align redis URL as well
+redis_url = os.getenv("REDIS_URL")
+if redis_url:
+    os.environ["REDIS_URL"] = redis_url.replace("redis://redis:", "redis://localhost:")
 
 from f.internal._db_client import create_db_client  # noqa: E402
 from f.internal.booking_confirm.main import _main_async as booking_confirm_main  # noqa: E402
@@ -89,6 +99,8 @@ class QATestSession:
                 await db.execute("DELETE FROM bookings WHERE client_id = $1", client_uuid)
                 await db.execute("DELETE FROM clients WHERE client_id = $1", client_uuid)
                 print(f"[QA Setup] Cleaned up test client {client_uuid} and all related data.")
+            await db.execute("DELETE FROM conversation_states WHERE chat_id = $1", TEST_CHAT_ID)
+            print(f"[QA Setup] Cleaned up conversation_states for chat_id {TEST_CHAT_ID}.")
         finally:
             await db.close()
 
@@ -102,6 +114,12 @@ class QATestSession:
         requires_fsm_routing: bool = True,
     ) -> dict[str, Any]:
         """Simulate sending a message to the fsm_router and updating local session state."""
+        # Get current state from DB to get the correct version (simulating the gateway worker)
+        from f.internal.conversation_get.main import _get_conversation
+
+        conv_res = await _get_conversation(TEST_CHAT_ID, pg_url=self.pg_url)
+        current_version = conv_res.data.version if conv_res.data else 0
+
         args: dict[str, Any] = {
             "chat_id": TEST_CHAT_ID,
             "user_input": user_input,
@@ -131,6 +149,31 @@ class QATestSession:
                 self.state["booking_draft"] = data["nextDraft"]
             print(f"Bot   <<< {data.get('response_text')}")
             print(f"State === {self.state.get('booking_state')}")
+
+            # Persist next state to DB (simulating the gateway worker)
+            # If we are transitioning from confirming -> idle via confirmation ("sí"),
+            # we do NOT write idle to the DB here, because booking_confirm_main will
+            # verify the state is "confirming" in the DB, create the booking, and write "idle".
+            is_confirming_booking = (
+                conv_res.data
+                and conv_res.data.booking_state
+                and conv_res.data.booking_state.get("name") == "confirming"
+                and self.state.get("booking_state", {}).get("name") == "idle"
+                and user_input.strip().lower() in ("sí", "si")
+            )
+
+            if not is_confirming_booking:
+                from f.internal.conversation_update.main import _main_async as conversation_update_main
+
+                update_args = {
+                    "chat_id": TEST_CHAT_ID,
+                    "booking_state": self.state.get("booking_state"),
+                    "active_flow": self.state.get("active_flow"),
+                    "booking_draft": self.state.get("booking_draft"),
+                    "version": current_version,
+                    "pg_url": self.pg_url,
+                }
+                await conversation_update_main(update_args)
         else:
             print("Bot   <<< [Not handled by FSM - delegated to conversational router/AI fallback]")
 

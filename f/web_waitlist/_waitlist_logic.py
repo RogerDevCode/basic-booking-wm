@@ -52,7 +52,9 @@ async def handle_join(db: DBClient, client_id: str, data: InputSchema) -> Waitli
     )
     position = int(count_rows[0]["cnt"]) + 1 if count_rows else 1  # type: ignore[call-overload]
 
-    # Insert
+    # Insert with ON CONFLICT DO NOTHING as DB-level safety net.
+    # The partial UNIQUE index (uq_waitlist_active_client_service) catches race
+    # conditions that slip past the SELECT check above (e.g. concurrent requests).
     ins = await db.fetch(
         """
         INSERT INTO waitlist (
@@ -60,7 +62,8 @@ async def handle_join(db: DBClient, client_id: str, data: InputSchema) -> Waitli
             preferred_start_time, preferred_end_time,
             status, position
         ) VALUES ($1::uuid, $2::uuid, $3, $4, $5, 'waiting', $6)
-        RETURNING waitlist_id
+        ON CONFLICT DO NOTHING
+        RETURNING waitlist_id, position
         """,
         client_id,
         data.service_id,
@@ -70,7 +73,20 @@ async def handle_join(db: DBClient, client_id: str, data: InputSchema) -> Waitli
         position,
     )
     if not ins:
-        raise RuntimeError("insert_failed")
+        # Conflict: concurrent insert won the race — fetch existing position
+        existing = await db.fetch(
+            """
+            SELECT position FROM waitlist
+            WHERE client_id = $1::uuid AND service_id = $2::uuid
+              AND status IN ('waiting', 'notified')
+            LIMIT 1
+            """,
+            client_id,
+            data.service_id,
+        )
+        if not existing:
+            raise RuntimeError("insert_failed")
+        position = int(existing[0]["position"])  # type: ignore[call-overload]
 
     return {"entries": [], "position": position, "message": f"Joined waitlist at position {position}"}
 

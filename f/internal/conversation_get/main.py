@@ -19,7 +19,6 @@ import json
 from datetime import UTC, datetime
 from typing import Final, cast
 
-from beartype import beartype
 
 from .._conversation_tx import read_state
 from .._db_client import create_db_client
@@ -54,7 +53,6 @@ def _snapshot_to_state(chat_id: str, data: dict[str, object]) -> ConversationSta
     )
 
 
-@beartype
 async def _get_conversation(
     chat_id: str,
     redis_url: str | None = None,
@@ -85,7 +83,7 @@ async def _get_conversation(
     try:
         await conn.execute("BEGIN")
         await conn.execute(
-            "SELECT pg_advisory_xact_lock(chat_id_lock_key($1))",
+            "SELECT pg_advisory_xact_lock(hashtext($1::text))",
             chat_id,
         )
         snapshot = await read_state(conn, chat_id)
@@ -132,7 +130,7 @@ async def _main_async(
     pg_url: str | None = None,
 ) -> dict[str, object]:
     """Windmill entrypoint."""
-    result = await _get_conversation(chat_id, redis_url, pg_url)  # type: ignore[call-arg]
+    result = await _get_conversation(chat_id, redis_url, pg_url)
     return cast("dict[str, object]", result.model_dump())
 
 

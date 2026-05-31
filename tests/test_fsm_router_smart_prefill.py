@@ -297,8 +297,8 @@ async def test_smart_prefill_ambiguous_shows_list() -> None:
     assert data["handled"] is True
     assert data["nextState"]["name"] == "selecting_doctor"
     assert len(data["nextState"]["items"]) == 2
-    assert "Juan Pérez" in data["response_text"]
-    assert "Ana Pérez" in data["response_text"]
+    assert any("Juan Pérez" in btn["text"] for row in data["inline_buttons"] for btn in row)
+    assert any("Ana Pérez" in btn["text"] for row in data["inline_buttons"] for btn in row)
 
 
 # ============================================================================
